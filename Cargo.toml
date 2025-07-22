@@ -1,0 +1,31 @@
+[package]
+name = "thwarter"
+version = "0.1.0"
+edition = "2021"
+description = "A Hugo-style engine for interactive fiction"
+authors = ["Thwarter Project"]
+license = "MIT"
+
+[[bin]]
+name = "thwart"
+path = "src/bin/thwart.rs"
+
+[lib]
+name = "thwarter"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+pulldown-cmark = "0.9"
+anyhow = "1.0"
+toml = "0.8"
+colored = "2.0"
+walkdir = "2.4"
+uuid = { version = "1.6", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = "3.8"
