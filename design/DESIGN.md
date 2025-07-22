@@ -4,6 +4,42 @@
 
 This document outlines the design for Priority 0 (P0) modules of the Thwarter interactive fiction engine. These modules form the foundation for all other components and must be implemented first.
 
+## Technology Choice: Rust
+
+### Rationale
+
+Rust was selected as the implementation language for the Thwarter interactive fiction engine based on several key requirements and architectural considerations:
+
+#### Performance Requirements
+- **Fast Startup Time**: Target of < 1 second startup for CLI tools
+- **Efficient Memory Usage**: Handle large world files and complex game state efficiently
+- **Zero-Cost Abstractions**: Maintain performance while providing high-level game engine abstractions
+
+#### Memory Safety and Reliability
+- **Safe World State Management**: Prevent memory leaks when managing complex, interconnected game world data
+- **Concurrent Processing**: Safe handling of multi-threaded operations for world updates and user interactions
+- **Robust Content Handling**: Memory-safe processing of user-generated markdown and metadata files
+
+#### Rich Ecosystem
+- **CLI Framework**: `clap` for sophisticated command-line interfaces with subcommands and argument validation
+- **Serialization**: `serde` for seamless YAML/JSON metadata processing and game state persistence
+- **Markdown Processing**: `pulldown-cmark` for reliable CommonMark-compliant parsing
+- **Error Handling**: `anyhow` for comprehensive, user-friendly error reporting and propagation
+
+#### Cross-Platform Compatibility
+- **Universal Deployment**: Single binary distribution across Linux, macOS, and Windows
+- **No Runtime Dependencies**: Simplified deployment and installation for content creators
+- **Consistent Behavior**: Uniform performance and functionality across all target platforms
+
+#### Error Handling and Developer Experience
+- **Result Types**: Comprehensive error propagation throughout the system
+- **Graceful Degradation**: Clear error messages for malformed world files and invalid content
+- **Type Safety**: Compile-time guarantees for world consistency and data integrity
+
+### Architectural Benefits
+
+The choice of Rust enables the modular architecture outlined in this document, where each engine (World, Character, Narrative, Game) can be implemented as safe, performant, and composable components. The language's ownership model naturally aligns with the game world's entity relationships, while its trait system supports the extensible design required for diverse interactive fiction mechanics.
+
 ## P0 Module 1: Command Line Document Processor
 
 ### Purpose
