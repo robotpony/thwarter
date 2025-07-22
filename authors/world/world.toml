@@ -1,0 +1,12 @@
+[metadata]
+title = "Castle Adventure"
+author = "Thwarter Example"
+version = "1.0.0"
+
+[settings]
+starting_location = "castle/courtyard"
+default_map_style = "ascii"
+
+[characters]
+default_health = 100
+default_mood = "neutral"

@@ -1,0 +1,15 @@
+[world]
+path = "authors/world/"
+default_player = "player"
+
+[output]
+format = "text"
+style = "unicode"
+
+[validation]
+strict_mode = false
+auto_fix = false
+
+[debug]
+trace_level = "info"
+profile_enabled = false
