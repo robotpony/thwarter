@@ -1,12 +1,31 @@
 [metadata]
-title = "Castle Adventure"
-author = "Thwarter Example"
-version = "1.0.0"
+title = "Castle Adventure - Extended World"
+author = "Thwarter Testing Team"
+version = "2.0.0"
+description = "Large-scale testing world with 27 locations and 15+ NPCs"
 
 [settings]
 starting_location = "castle/courtyard"
 default_map_style = "ascii"
+world_size = "large"
+locations_count = 27
+npcs_count = 15
+
+[areas]
+castle_locations = 15
+forest_locations = 12
 
 [characters]
 default_health = 100
 default_mood = "neutral"
+relationship_system = true
+
+[objects]
+dedicated_definitions = true
+object_interactions = true
+containers_enabled = true
+
+[validation]
+strict_references = true
+coordinate_checking = true
+connection_validation = true

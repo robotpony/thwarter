@@ -9,6 +9,7 @@ connections:
   north: castle/courtyard
   east: forest/clearing
   west: forest/deep-woods
+  south: forest/stream
 characters:
   - forest-ranger
 objects:

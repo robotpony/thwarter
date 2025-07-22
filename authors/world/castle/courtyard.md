@@ -8,8 +8,10 @@ coordinates: [0, 0, 0]
 connections:
   north: castle/great-hall
   east: castle/gardens
-  west: castle/stables
+  west: castle/forge
   south: forest/path
+  southeast: castle/pantry
+  southwest: castle/training-yard
 characters:
   - guard-captain
 objects:

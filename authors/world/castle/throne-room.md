@@ -7,8 +7,8 @@ location_id: castle/throne-room
 coordinates: [0, 2, 0]
 connections:
   south: castle/great-hall
-  east: castle/royal-chambers
   west: castle/treasury
+  north: castle/library
 characters:
   - king
 objects:

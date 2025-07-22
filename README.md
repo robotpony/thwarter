@@ -28,6 +28,81 @@ Thwarter is a Hugo style engine for interactive fiction (IF), driven by Markdown
 - (P1) RESTful world API as an abstration to the models (for the REPL and future clients), following RESTful API norms.
 
 
+## Basic Usage
+
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd thwarter
+
+# Build the project
+cargo build --release
+```
+
+### Quick Start
+
+```bash
+# Validate your world files
+thwart validate authors/world/
+
+# Show current world state
+thwart show authors/world/
+
+# Display a specific location
+thwart show authors/world/castle/courtyard.md
+
+# Generate an ASCII map
+thwart map authors/world/
+
+# Search for content
+thwart search "king" authors/world/
+
+# Debug world structure
+thwart debug authors/world/
+```
+
+### World Structure
+
+Create your interactive fiction world using this structure:
+
+```
+authors/world/
+├── world.toml              # World configuration
+├── thwart.toml            # CLI preferences
+├── castle/
+│   ├── courtyard.md       # Location file
+│   └── throne-room.md
+├── forest/
+│   └── path.md
+└── npcs/
+    ├── king.md            # Character file
+    └── guard-captain.md
+```
+
+### Example Location File
+
+```markdown
+---
+title: "Castle Courtyard"
+description: "A grand stone courtyard with towering walls"
+exits:
+  north: castle/throne-room.md
+  south: forest/path.md
+objects:
+  - sword
+  - shield
+npcs:
+  - guard-captain
+---
+
+# Castle Courtyard
+
+The morning sun illuminates the ancient stones of the courtyard.
+A fountain bubbles peacefully in the center.
+```
+
 #### Future components that are out of scope
 
 - web frontend

@@ -8,7 +8,6 @@ coordinates: [0, 1, 0]
 connections:
   south: castle/courtyard
   north: castle/throne-room
-  east: castle/kitchen
   west: castle/armory
 characters:
   - old-servant
