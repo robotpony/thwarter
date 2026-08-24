@@ -4,6 +4,10 @@
 
 This document defines the command-style interface for the Thwarter command line document processor, supporting interactions in the format `thwart action location --param1=1 --param2=2`.
 
+## Status
+
+For what's actually implemented versus still a mock or unbuilt, see the implementation status table in `design/ARCHITECTURE.md`. Short version: `validate` and `show` do real work against loaded world content; `search`, `map`, `debug`, `go`, `do`, `test`, and `create` are either honestly-labeled "not implemented" or not wired into the CLI at all. Everything below this line is the target interface, not a description of current behavior.
+
 ## Command Structure
 
 ```
@@ -210,7 +214,7 @@ These options work with all commands:
 ### Global Configuration File: `thwart.toml`
 ```toml
 [world]
-path = "authors/world/"
+path = "authors/mx/test-world/"
 default_player = "player"
 
 [output]

@@ -1,53 +1,20 @@
-use crate::cli::{OutputFormatter, OutputFormat};
+use crate::cli::{OutputFormat, OutputFormatter};
 use anyhow::Result;
 
+/// Not implemented yet. `WorldEngine` can now load and validate a world
+/// (see `validate_command`, `show_command`), but ASCII map rendering
+/// (`design/CLI_DESIGN.md`) has not been built on top of it. This command
+/// intentionally reports that rather than printing placeholder output, so
+/// `thwart map` failing to do anything real is visible instead of hidden.
 pub fn map_command(
-    location: Option<String>,
-    player: Option<String>,
-    depth: Option<usize>,
-    style: String,
-    output: Option<String>,
-    connections: bool,
+    _location: Option<String>,
+    _player: Option<String>,
+    _depth: Option<usize>,
+    _style: String,
+    _output: Option<String>,
+    _connections: bool,
 ) -> Result<()> {
-    let formatter = OutputFormatter::new(OutputFormat::Text); // Maps are always text-based
-    
-    formatter.print_info("Generating map...");
-    
-    // TODO: Implement actual map generation logic
-    if let Some(loc) = location {
-        formatter.print_info(&format!("Generating map from location: {}", loc));
-    } else {
-        formatter.print_info("Generating full world map");
-    }
-    
-    if let Some(player_name) = player {
-        formatter.print_info(&format!("Player perspective (FOW): {}", player_name));
-    }
-    
-    if let Some(max_depth) = depth {
-        formatter.print_info(&format!("Map depth limited to: {}", max_depth));
-    }
-    
-    formatter.print_info(&format!("Using map style: {}", style));
-    
-    if connections {
-        formatter.print_info("Showing connection types");
-    }
-    
-    // Mock ASCII map
-    println!("+---+---+---+");
-    println!("| A | B | C |");
-    println!("+---+---+---+");
-    println!("| D |[P]| E |");
-    println!("+---+---+---+");
-    println!("| F | G | H |");
-    println!("+---+---+---+");
-    
-    formatter.print_success("Map generated successfully");
-    
-    if let Some(output_file) = output {
-        formatter.print_info(&format!("Map saved to: {}", output_file));
-    }
-    
-    Ok(())
+    let formatter = OutputFormatter::new(OutputFormat::Text);
+    formatter.print_warning("thwart map is not implemented yet (tracked in design/CLI_DESIGN.md)");
+    Err(anyhow::anyhow!("map command not implemented"))
 }

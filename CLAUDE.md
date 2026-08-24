@@ -4,26 +4,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Thwarter is a Hugo-style engine for interactive fiction (IF), driven by Markdown files and YAML/JSON metadata. The system breaks down storytelling into reusable components like variables, including maps, alternative text, and other common IF mechanisms.
+Thwarter is a Hugo-style engine for interactive fiction (IF), driven by Markdown files and YAML frontmatter. The system breaks down storytelling into reusable components: locations, characters, objects, plot points, and narrative arcs.
+
+For anything beyond this orientation, prefer these over re-deriving from source:
+- `design/ARCHITECTURE.md` — module layout and, critically, its implementation status table. Check this before assuming a feature works.
+- `design/CONTENT_FORMAT.md` — the content file format, single source of truth
+- `design/DECISIONS.md` — why Rust, why frontmatter-first
 
 ## Project Structure
 
 - `src/` - Rust source code for the IF engine
-  - `src/bin/` - CLI binary executable (`thwart`)  
+  - `src/bin/` - CLI binary executable (`thwart`)
   - `src/models/` - Core data models (World, Character, Narrative, Game)
   - `src/engines/` - Processing engines for game logic
   - `src/parsers/` - Markdown and metadata file parsers
   - `src/cli/` - Command-line interface implementation
 - `design/` - Design documents and technical specifications
 - `tasks/` - Implementation planning and task tracking
-- `authors/world/` - Sample world content with locations and characters
+- `authors/<author>/<world-name>/` - World content, one directory per author. The shipped example is `authors/mx/test-world/`.
   - Example locations: `castle/courtyard.md`, `forest/path.md`
   - Character files: `npcs/king.md`, `npcs/guard-captain.md`
   - World configuration: `world.toml`
 
 ## Architecture Principles
 
-- All world entities are defined in Markdown files
+- All world entities are defined in Markdown files with YAML frontmatter (see `design/CONTENT_FORMAT.md`)
 - URIs are world locations that read well to humans
 - Components include rooms, objects, NPCs, locations, plot points, and narrative arcs
 - Location descriptions and metadata map to file/folder structure
@@ -32,7 +37,7 @@ Thwarter is a Hugo-style engine for interactive fiction (IF), driven by Markdown
 ## Priority 0 (P0) Modules
 
 1. **Command Line Document Processor** - Shares models with other components, provides world state visualization, debugging tools, and ASCII map generation
-2. **Shared Models and Components** - World engine, character engine, narrative engine, and game engine
+2. **Shared Models and Components** - World engine, character engine, narrative engine, and game engine, including action processing and narrative state (this is broader than "document processor" alone; see `design/ARCHITECTURE.md`'s Next Steps for the recommended build order within it)
 
 ## Priority 1 (P1) Modules
 
@@ -49,36 +54,18 @@ This project has Claude Code permissions configured in `.claude/settings.local.j
 - `clap` - Command-line argument parsing and subcommands
 - `serde` - Serialization for YAML/JSON metadata handling
 - `pulldown-cmark` - CommonMark-compliant Markdown parsing
+- `walkdir` - Recursive world directory traversal
 - `anyhow` - Comprehensive error handling
 - `colored` - Terminal output formatting
 
-**CLI Interface**: The `thwart` command provides these core operations:
-- `thwart validate` - Validate world files and check references
-- `thwart show` - Display world state and location information
-- `thwart map` - Generate ASCII maps with optional fog-of-war
-- `thwart search` - Find content across locations and characters
-- `thwart debug` - Debugging tools and diagnostics
+**CLI Interface**: The `thwart` command has five subcommands. What each one actually does today (versus what's specified in `design/CLI_DESIGN.md` but not yet built) is tracked in `design/ARCHITECTURE.md`'s implementation status table, not here, to avoid a second copy going stale.
 
-**World Structure**: Content is organized in `authors/world/` with:
-- Location files: `location-name.md` with YAML frontmatter metadata
-- Character files: `npcs/character-name.md` with attributes and dialogue
-- World configuration: `world.toml` for global settings
-- CLI configuration: `thwart.toml` for tool preferences
+**World Structure**: Content is organized in `authors/<author>/<world-name>/`, see `design/CONTENT_FORMAT.md` for file format and `design/ARCHITECTURE.md` for the layout rationale.
 
 ## Project Status
 
-**P0 Implementation: COMPLETE** ✅
-- ✅ Rust project structure with all modules
-- ✅ Core data models for World, Character, Narrative, and Game entities
-- ✅ Four processing engines (World, Character, Narrative, Game)
-- ✅ Markdown/YAML parsing infrastructure
-- ✅ Complete CLI with all five core commands
-- ✅ Output formatting system (text, JSON, YAML)
-- ✅ Configuration management system
-- ✅ Sample world content with castle and forest locations
+Do not mark a checklist item done here without also updating `design/ARCHITECTURE.md`'s implementation status table to match; the two describing different realities is exactly the problem an August 2026 audit found and fixed (broken build, five CLI commands that printed fabricated success output regardless of input, sample content in a format the parser couldn't read). Treat `design/ARCHITECTURE.md` as authoritative on what works; this section is a summary of it, not an independent claim.
 
-**Ready for P1 Development**: The foundation is complete and ready for:
-- REPL client implementation
-- RESTful API development  
-- Advanced world loading and validation
-- Enhanced map generation and visualization
+**Current state**: builds cleanly, zero unit tests, `validate` and `show` do real work against real content, `map`/`search`/`debug` honestly report themselves as not implemented rather than faking output. Full detail in `design/ARCHITECTURE.md`.
+
+**Not ready for P1** until the P0 "Next steps" in `design/ARCHITECTURE.md` are further along, specifically `find_path`/`map`/`search`, then action processing and narrative state.

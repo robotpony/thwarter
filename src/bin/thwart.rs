@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use anyhow::Result;
-use thwarter::cli::*;
+
+const DEFAULT_WORLD_PATH: &str = "authors/mx/test-world";
 
 #[derive(Parser)]
 #[command(name = "thwart")]
@@ -98,13 +99,14 @@ enum Commands {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    
+    let world_path = cli.world.clone().unwrap_or_else(|| DEFAULT_WORLD_PATH.to_string());
+
     match cli.command {
         Commands::Validate { location, strict, output, format, fix } => {
-            thwarter::cli::commands::validate_command(location, strict, output, format, fix)
+            thwarter::cli::commands::validate_command(world_path, location, strict, output, format, fix)
         },
         Commands::Show { location, player, state, format, verbose } => {
-            thwarter::cli::commands::show_command(location, player, state, format, verbose)
+            thwarter::cli::commands::show_command(world_path, location, player, state, format, verbose)
         },
         Commands::Map { location, player, depth, style, output, connections } => {
             thwarter::cli::commands::map_command(location, player, depth, style, output, connections)

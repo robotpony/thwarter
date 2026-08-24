@@ -1,3 +1,4 @@
+use crate::models::world::Coordinate;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -6,7 +7,7 @@ pub struct Location {
     pub id: String,
     pub name: String,
     pub description: String,
-    pub coordinates: Option<(i32, i32, i32)>,
+    pub coordinates: Option<Coordinate>,
     pub connections: HashMap<String, String>,
     pub characters: Vec<String>,
     pub objects: Vec<String>,

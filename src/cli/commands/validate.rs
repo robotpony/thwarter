@@ -1,7 +1,9 @@
-use crate::cli::{OutputFormatter, OutputFormat};
+use crate::cli::{OutputFormat, OutputFormatter};
+use crate::engines::WorldEngine;
 use anyhow::Result;
 
 pub fn validate_command(
+    world_path: String,
     location: Option<String>,
     strict: bool,
     output: Option<String>,
@@ -9,30 +11,66 @@ pub fn validate_command(
     fix: bool,
 ) -> Result<()> {
     let formatter = OutputFormatter::new(OutputFormat::from(format.as_str()));
-    
-    formatter.print_info("Starting world validation...");
-    
-    // TODO: Implement actual validation logic
-    if let Some(loc) = location {
-        formatter.print_info(&format!("Validating location: {}", loc));
-    } else {
-        formatter.print_info("Validating entire world");
-    }
-    
-    if strict {
-        formatter.print_info("Using strict validation mode");
-    }
-    
+
     if fix {
-        formatter.print_info("Auto-fix mode enabled");
+        formatter.print_warning("--fix is not implemented yet; no files will be modified");
     }
-    
-    // Mock validation results
-    formatter.print_success("Validation completed successfully");
-    
+    if let Some(loc) = &location {
+        formatter
+            .print_warning(&format!("scoping validation to `{}` is not implemented yet; validating the whole world", loc));
+    }
+
+    formatter.print_info(&format!("Validating world at {}", world_path));
+
+    let mut engine = WorldEngine::new();
+    let report = engine.load_world(&world_path)?;
+
+    formatter.print_info(&format!(
+        "Loaded {} location(s), {} character(s), {} object(s)",
+        report.locations_loaded,
+        report.characters.len(),
+        report.objects_loaded
+    ));
+
+    let mut problems = report.errors.clone();
+    for (from, direction, target) in engine.broken_connections() {
+        problems.push(format!(
+            "{}: connection `{}` points at unknown location `{}`",
+            from, direction, target
+        ));
+    }
+
+    if strict {
+        for character in &report.characters {
+            if let Some(default_location) = &character.default_location {
+                if engine.get_location(default_location).is_none() {
+                    problems.push(format!(
+                        "{}: default_location `{}` is not a known location",
+                        character.id, default_location
+                    ));
+                }
+            }
+        }
+    }
+
+    if problems.is_empty() {
+        formatter.print_success("Validation passed: no broken references found");
+    } else {
+        for problem in &problems {
+            formatter.print_error(problem);
+        }
+        formatter.print_error(&format!("Validation failed: {} problem(s) found", problems.len()));
+    }
+
     if let Some(output_file) = output {
+        let report_text = problems.join("\n");
+        std::fs::write(&output_file, report_text)?;
         formatter.print_info(&format!("Validation report saved to: {}", output_file));
     }
-    
-    Ok(())
+
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("{} validation problem(s) found", problems.len()))
+    }
 }

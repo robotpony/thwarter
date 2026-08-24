@@ -1,167 +1,47 @@
-# Test Results and Issues Report
+# Known Issues
 
-This document contains the results of comprehensive testing as outlined in TESTING.md.
+Replaces a prior version of this file dated 2025-07-22 that reported a "PASSING," 100%-pass-rate test run, including specific memory and timing figures, on the same day the project was first committed. Those figures came from CLI commands that printed hardcoded strings regardless of input; nothing in the codebase at that time measured anything. This file now tracks real, currently-true issues instead.
 
-## Executive Summary
+**Last updated**: 2026-08-23, alongside the format/parser rewrite described in `design/DECISIONS.md`.
 
-**Overall Status**: ✅ **PASSING** - All tests completed successfully  
-**Test Date**: 2025-07-22  
-**Total Test Categories**: 6  
-**Critical Issues**: 0  
-**Major Issues**: 1  
-**Minor Issues**: 4  
+## Open issues
 
----
+### No unit tests exist
+`cargo test` finds zero test cases. `tasks/unit-testing-plan.md` describes a target test suite; none of it is implemented yet.
+- **Severity**: High
+- **Impact**: No regression protection. The five broken location references found by `thwart validate` below existed silently in the sample content for over a year because nothing, including a human, ever ran anything against it.
 
-## Test Results by Category
+### `map`, `search`, and `debug` are not implemented
+All three now report "not implemented" and exit non-zero rather than fabricating output (previously: a hardcoded 3x3 ASCII grid, three hardcoded search results, and invented memory/performance numbers, in every case regardless of the actual input).
+- **Severity**: Medium
+- **Impact**: `design/CLI_DESIGN.md`'s interface isn't fully realized. Tracked as build order in `design/ARCHITECTURE.md`'s Next Steps.
 
-### ✅ Unit Testing - PASSED
-- **Status**: All tests passed  
-- **Tests Run**: 0 test cases found (expected for current codebase state)
-- **Build Status**: ✅ Success in both debug and release modes
-- **Compilation**: ✅ Success with warnings
+### `CharacterEngine` isn't wired into the CLI
+`WorldEngine::load_world` returns parsed `Character` values, but no CLI command hands them to `CharacterEngine`. `thwart validate --strict` checks a character's `default_location` against the loaded world graph directly rather than through the engine.
+- **Severity**: Medium
+- **Impact**: Character placement/state isn't exercised by any command yet.
 
-### ✅ World Validation Testing - PASSED  
-- **Basic validation**: ✅ All world files valid
-- **Strict mode**: ✅ Passed strict validation rules
-- **Character validation**: ✅ All NPCs properly configured
-- **World configuration**: ✅ world.toml valid
+### `ConfigManager` / `thwart.toml` is unused
+`src/cli/config.rs` can read and write `thwart.toml`, but `src/bin/thwart.rs` never constructs a `ConfigManager`. The CLI's default world path is a hardcoded constant instead.
+- **Severity**: Low
+- **Impact**: `thwart.toml`'s `[world].path` currently has no effect; `--world` is the only way to override the default.
 
-### ✅ Interactive State Testing - PASSED
-- **State display**: ✅ JSON and text output working
-- **Location queries**: ✅ Specific locations accessible
-- **Debug tools**: ✅ Reference checking operational
-- **Memory stats**: ✅ 15.2 MB total usage reported
+### Sample world has five broken location references
+Found by the now-real `thwart validate`, previously invisible because nothing ever parsed the content: `forest/hollow` → `forest/abandoned-camp`, `forest/pond` → `forest/rocky-outcrop`, `forest/ravine` → `forest/cave-entrance` and `forest/rocky-outcrop`, `forest/waterfall` → `forest/cave-behind-falls`. None of these five target locations exist.
+- **Severity**: Low (sample content, not engine code)
+- **Impact**: Left as-is rather than patched, since whether these become new rooms or get removed is an authoring decision, not an engineering one. `thwart validate` will keep flagging them until one or the other happens.
 
-### ✅ Map Generation Testing - PASSED
-- **ASCII map generation**: ✅ Successfully generates 3x3 grid
-- **Area-specific maps**: ✅ Castle area mapping works
-- **Connection display**: ✅ Shows relationships between locations
-- **Depth limiting**: ✅ Respects depth constraints
+### Compiler warnings
+`cargo build` succeeds but emits ~12 warnings, mostly unused parameters in `game_engine.rs`'s stub action handlers.
+- **Severity**: Low
+- **Impact**: Noise, not a correctness problem. Worth a `cargo fix --lib` pass when those handlers get implemented for real, since several of the unused parameters will become used at that point anyway.
 
-### ✅ Search and Content Testing - PASSED  
-- **Content discovery**: ✅ Found 3 matches for test queries
-- **Character searches**: ✅ Successfully locates NPCs
-- **Regex patterns**: ✅ Regular expressions supported
-- **Cross-references**: ✅ Character references tracked
+## Resolved (2026-08-23)
 
-### ✅ Performance Testing - PASSED
-- **Load time**: ✅ 6ms total execution time
-- **Memory profiling**: ✅ Detailed breakdown available
-- **Performance stats**: ✅ 45ms world loading, 2ms state updates
-
----
-
-## Issues Identified
-
-### Major Issues
-
-#### Issue #1: Missing Unit Tests
-- **Severity**: Major
-- **Category**: Testing Infrastructure
-- **Description**: No unit tests are currently implemented in the codebase
-- **Impact**: Regression testing not possible, code changes unvalidated
-- **Location**: src/ (all modules)
-- **Reproduction**: Run `cargo test` - returns "0 tests"
-- **Suggested Fix**: Implement unit tests for all core models and engines
-- **Priority**: High
-
-### Minor Issues
-
-#### Issue #2: Compiler Warnings - Unused Variables
-- **Severity**: Minor
-- **Category**: Code Quality
-- **Description**: 12 unused variable warnings in library code
-- **Impact**: Code maintenance and readability concerns
-- **Locations**: 
-  - src/models/world/world_graph.rs:24 (`from`, `to`)
-  - src/engines/world_engine.rs:20 (`world_path`)
-  - src/engines/narrative_engine.rs:55 (`conditions`)
-  - src/engines/game_engine.rs (multiple unused parameters)
-- **Reproduction**: Run `cargo build`
-- **Suggested Fix**: Prefix unused parameters with underscore or implement functionality
-- **Priority**: Medium
-
-#### Issue #3: Unused Import Warning
-- **Severity**: Minor  
-- **Category**: Code Quality
-- **Description**: Unused import in main binary
-- **Impact**: Code cleanliness
-- **Location**: src/bin/thwart.rs:3 (`use thwarter::cli::*`)
-- **Reproduction**: Run `cargo build`
-- **Suggested Fix**: Remove unused import or use specific imports
-- **Priority**: Low
-
-#### Issue #4: Limited CLI Argument Support
-- **Severity**: Minor
-- **Category**: Feature Gap
-- **Description**: Some command-line options listed in TESTING.md are not implemented
-- **Impact**: Testing scenarios from documentation cannot be executed
-- **Examples**: 
-  - `--verbose` flag for validate command
-  - `--check-refs` flag for validate command  
-  - `--fow` (fog-of-war) for map command
-  - `--show-npcs` for map command
-- **Reproduction**: Try commands from TESTING.md
-- **Suggested Fix**: Implement missing CLI options or update documentation
-- **Priority**: Medium
-
-#### Issue #5: Error Handling Too Permissive
-- **Severity**: Minor
-- **Category**: Error Handling
-- **Description**: Commands succeed even with invalid/missing file paths
-- **Impact**: May hide real issues in world files
-- **Examples**: 
-  - `thwart validate test-data/broken-frontmatter.md` succeeds for non-existent file
-  - `thwart show test-data/corrupted-world/` succeeds for non-existent directory
-- **Reproduction**: Run validation on non-existent files
-- **Suggested Fix**: Implement proper file existence checking and error reporting
-- **Priority**: Medium
-
----
-
-## Test Coverage Summary
-
-| Test Category | Tests Attempted | Tests Passed | Pass Rate |
-|---------------|----------------|--------------|-----------|
-| Unit Tests | 4 variants | 4 | 100% |
-| World Validation | 6 commands | 6 | 100% |
-| State Testing | 5 commands | 5 | 100% |
-| Map Generation | 4 commands | 4 | 100% |
-| Search Testing | 5 commands | 5 | 100% |
-| Performance | 3 commands | 3 | 100% |
-| **TOTAL** | **27** | **27** | **100%** |
-
----
-
-## Recommendations
-
-### Immediate Actions (High Priority)
-1. **Implement Unit Tests**: Add comprehensive test coverage for all models and engines
-2. **Fix Compiler Warnings**: Address unused variables and imports to improve code quality
-
-### Medium Priority Actions  
-1. **Enhance CLI Options**: Implement missing command-line flags documented in TESTING.md
-2. **Improve Error Handling**: Add proper file existence validation and meaningful error messages
-3. **Update Documentation**: Align TESTING.md with actual implemented CLI options
-
-### Future Considerations
-1. **Add Integration Tests**: Create automated test scenarios for end-to-end workflows
-2. **Performance Benchmarking**: Establish baseline performance metrics for regression testing
-3. **Error Scenario Testing**: Create test data with intentional errors to validate error handling
-
----
-
-## Testing Environment
-
-- **Platform**: Darwin 24.5.0
-- **Rust Version**: Latest stable (inferred from successful builds)
-- **Build Type**: Release mode testing
-- **World Content**: authors/world/ sample data
-- **Test Execution Time**: ~2 minutes total
-
-## Conclusion
-
-The Thwarter interactive fiction engine demonstrates excellent functional stability with all core features working as expected. The main concern is the lack of unit test coverage, which should be addressed to ensure long-term maintainability. All documented CLI commands execute successfully, though some advanced options from the testing documentation are not yet implemented.
-
-The codebase is in excellent shape for P1 development phases, with solid foundations for REPL and API implementation.
+- **Project did not build.** `Cargo.toml` had `[bin]` instead of `[[bin]]`, introduced by commit `d6b9e1b` ("Adds a missing file"), which silently broke `cargo build`/`cargo test` for the whole project. Fixed.
+- **Compiled binary tracked in git.** `bin/thwart`, a platform-specific Mach-O executable, was committed directly. Untracked; `bin/thwart` is now gitignored and rebuilt via `build.sh`.
+- **`Cargo.lock` was gitignored.** Backwards for a binary crate, where the lockfile should be committed for reproducible builds. Now tracked.
+- **Every CLI command was a mock.** `validate`, `show`, `map`, `search`, and `debug` all printed hardcoded success text and, in several cases, hardcoded fake data, regardless of input. `validate` and `show` now do real work; the other three now report their own absence instead of fabricating output.
+- **Markdown parser was unreachable and, if called, broken.** Nothing in the codebase called `MarkdownParser`. Had it been called, it still would have failed silently on every sample file: the parser expected frontmatter at the top of the file, but every sample location/character/object file put it at the bottom. Rewritten as part of the frontmatter-first format change; now wired into `WorldEngine::load_world` and exercised by `validate`/`show`.
+- **Three disagreeing content format specs.** `README.md`, `design/DESIGN.md`, and the actual sample content each described or used a different frontmatter shape. Collapsed to one, documented in `design/CONTENT_FORMAT.md`.
+- **`authors/world/` referenced everywhere, existed nowhere.** All docs pointed at a directory that was never created; real content lived at `authors/mx/test-world/`. Formalized `authors/<author>/<world-name>/` as the actual convention and updated defaults and docs to match.

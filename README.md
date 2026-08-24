@@ -7,14 +7,16 @@ Thwarter is a Hugo style engine for interactive fiction (IF), driven by Markdown
 
 ### Principles
 
-- All world entities are defined in Markdown files
+- All world entities are defined in Markdown files with YAML frontmatter; see `design/CONTENT_FORMAT.md` for the field-by-field spec
     - location descriptions and metadata are in files and folders that map to locations
-    - character cards can be placed in locations, or globally as core NPCs, villans, and heros
-    - object cards behave similarly (and are really the same thing, but with different defaults)
+    - character cards can be placed in locations, or globally as core NPCs, villains, and heroes
+    - object cards behave similarly, but carry different fields (weight, value, actions) since object content varies more than location or character content
     - plot points are used for authors to track scope, and to define story inflection points, decisions, and other "variables"
     - narrative arcs behave similarly, but track long running themes
 - URIs are world locations that read well to humans
 - Concepts for rooms, objects, NPCs, locations, etc.
+
+See `design/ARCHITECTURE.md` for what's actually implemented today versus still planned; several of the above (plot points, narrative arcs, dialogue) exist as data models but have no working engine behind them yet.
 
 ### Modules and services
 
@@ -43,61 +45,54 @@ cargo build --release
 
 ### Quick Start
 
+World content lives at `authors/<your-name>/<world-name>/` (see World Structure below). `--world` overrides the default configured in `thwart.toml`.
+
 ```bash
-# Validate your world files
-thwart validate authors/world/
+# Validate a world's files (broken connections, parse errors)
+thwart validate --world authors/mx/test-world
 
-# Show current world state
-thwart show authors/world/
-
-# Display a specific location
-thwart show authors/world/castle/courtyard.md
-
-# Generate an ASCII map
-thwart map authors/world/
-
-# Search for content
-thwart search "king" authors/world/
-
-# Debug world structure
-thwart debug authors/world/
+# Show the whole world state, or one location
+thwart show --world authors/mx/test-world
+thwart show --world authors/mx/test-world castle/courtyard
 ```
+
+`map`, `search`, and `debug` are specified in `design/CLI_DESIGN.md` but not implemented yet; running them reports that honestly rather than printing placeholder output. See `design/ARCHITECTURE.md` for current status.
 
 ### World Structure
 
-Create your interactive fiction world using this structure:
+Each author's content lives under their own name, so a single repo can hold more than one author's world:
 
 ```
-authors/world/
-├── world.toml              # World configuration
-├── thwart.toml            # CLI preferences
-├── castle/
-│   ├── courtyard.md       # Location file
-│   └── throne-room.md
-├── forest/
-│   └── path.md
-└── npcs/
-    ├── king.md            # Character file
-    └── guard-captain.md
+authors/
+└── mx/
+    └── test-world/
+        ├── world.toml          # World configuration
+        ├── castle/
+        │   ├── courtyard.md    # Location file
+        │   └── throne-room.md
+        ├── forest/
+        │   └── path.md
+        └── npcs/
+            ├── king.md         # Character file
+            └── guard-captain.md
+thwart.toml                     # CLI preferences, including the default world path
 ```
 
 ### Example Location File
 
+See `design/CONTENT_FORMAT.md` for the full field-by-field spec across locations, characters, and objects. A minimal location:
+
 ```markdown
 ---
-title: "Castle Courtyard"
-description: "A grand stone courtyard with towering walls"
-exits:
-  north: castle/throne-room.md
-  south: forest/path.md
-objects:
-  - sword
-  - shield
-npcs:
-  - guard-captain
+id: castle/courtyard
+title: Castle Courtyard
+type: location
+connections:
+  north: castle/throne-room
+  south: forest/path
+objects: [sword, shield]
+characters: [guard-captain]
 ---
-
-# Castle Courtyard
 
 The morning sun illuminates the ancient stones of the courtyard.
 A fountain bubbles peacefully in the center.

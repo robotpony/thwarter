@@ -10,6 +10,10 @@ pub struct Character {
     pub default_location: Option<String>,
     pub attributes: HashMap<String, i32>,
     pub dialogue_tree: Option<String>,
+    /// Object IDs the character starts carrying.
+    pub inventory: Vec<String>,
+    /// Other character ID -> relationship label (e.g. "mentor", "rival").
+    pub relationships: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +34,8 @@ impl Character {
             default_location: None,
             attributes: HashMap::new(),
             dialogue_tree: None,
+            inventory: Vec::new(),
+            relationships: HashMap::new(),
         }
     }
 }

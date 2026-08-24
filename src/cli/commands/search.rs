@@ -1,47 +1,17 @@
-use crate::cli::{OutputFormatter, OutputFormat};
+use crate::cli::{OutputFormat, OutputFormatter};
 use anyhow::Result;
 
+/// Not implemented yet. See the note in `map.rs`: this reports its own
+/// absence instead of returning fabricated results.
 pub fn search_command(
-    query: String,
-    location: Option<String>,
-    search_type: Option<String>,
-    case_sensitive: bool,
-    regex: bool,
-    missing_connections: bool,
+    _query: String,
+    _location: Option<String>,
+    _search_type: Option<String>,
+    _case_sensitive: bool,
+    _regex: bool,
+    _missing_connections: bool,
 ) -> Result<()> {
     let formatter = OutputFormatter::new(OutputFormat::Text);
-    
-    formatter.print_info("Starting search...");
-    
-    // TODO: Implement actual search logic
-    if missing_connections {
-        formatter.print_info("Searching for broken location references");
-    } else {
-        formatter.print_info(&format!("Searching for: {}", query));
-        
-        if let Some(loc) = location {
-            formatter.print_info(&format!("Search scope: {}", loc));
-        }
-        
-        if let Some(stype) = search_type {
-            formatter.print_info(&format!("Search type: {}", stype));
-        }
-        
-        if case_sensitive {
-            formatter.print_info("Case-sensitive search enabled");
-        }
-        
-        if regex {
-            formatter.print_info("Regular expression search enabled");
-        }
-    }
-    
-    // Mock search results
-    formatter.print_success("Search completed successfully");
-    println!("Found 3 matches:");
-    println!("  - castle/throne-room: golden throne");
-    println!("  - castle/treasury: golden key");
-    println!("  - npcs/king: golden crown");
-    
-    Ok(())
+    formatter.print_warning("thwart search is not implemented yet (tracked in design/CLI_DESIGN.md)");
+    Err(anyhow::anyhow!("search command not implemented"))
 }

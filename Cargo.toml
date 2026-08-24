@@ -6,7 +6,7 @@ description = "A Hugo-style engine for interactive fiction"
 authors = ["Thwarter Project"]
 license = "MIT"
 
-[bin]
+[[bin]]
 name = "thwart"
 path = "src/bin/thwart.rs"
 

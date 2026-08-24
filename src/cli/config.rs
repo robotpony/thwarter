@@ -65,7 +65,7 @@ impl Default for ThwartConfig {
     fn default() -> Self {
         Self {
             world: WorldConfig {
-                path: "authors/world/".to_string(),
+                path: "authors/mx/test-world/".to_string(),
                 default_player: "player".to_string(),
             },
             output: OutputConfig {
@@ -118,7 +118,7 @@ impl ConfigManager {
             global_config: ThwartConfig::default(),
             world_config: None,
             config_path: PathBuf::from("thwart.toml"),
-            world_path: PathBuf::from("authors/world"),
+            world_path: PathBuf::from("authors/mx/test-world"),
         }
     }
     

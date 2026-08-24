@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document outlines the implementation plan for the first pass of the Thwarter command line tool based on the P0 requirements from `design/DESIGN.md` and the interface specification from `design/CLI_DESIGN.md`.
+This document outlines the implementation plan for the first pass of the Thwarter command line tool based on the P0 requirements from `design/ARCHITECTURE.md` (formerly `design/DESIGN.md`, split 2026-08-23) and the interface specification from `design/CLI_DESIGN.md`.
+
+**Status**: this is the original plan, kept for its phase breakdown, which is still a reasonable shape. The Success Criteria checkboxes below were honestly left unchecked in the original version of this file, even though `CLAUDE.md` elsewhere claimed P0 was complete; that inconsistency between two docs in the same repo was part of what an August 2026 audit flagged. The checkboxes are now updated to match `design/ARCHITECTURE.md`'s implementation status table, which is the authoritative source going forward.
 
 ## Project Structure
 
@@ -245,26 +247,26 @@ For the initial implementation, focus on these core features:
 ## Success Criteria
 
 ### Functional Requirements
-- [ ] Load and validate world files from `authors/world/` directory
-- [ ] Parse location markdown with YAML frontmatter
-- [ ] Parse character cards and place in locations
+- [x] Load and validate world files from `authors/<author>/<world-name>/` directory (path convention formalized 2026-08-23; was specified as `authors/world/` but no content ever used that path)
+- [x] Parse location markdown with YAML frontmatter
+- [x] Parse character cards and place in locations (parsing yes; placement via `CharacterEngine` not yet wired into any CLI command)
 - [ ] Generate ASCII maps showing location connections
-- [ ] Display world state from any location perspective
-- [ ] Detect and report broken location references
-- [ ] Support basic configuration via toml files
+- [x] Display world state from any location perspective (`--player`/perspective-based FOW view still open)
+- [x] Detect and report broken location references
+- [x] Support basic configuration via toml files (`ConfigManager` works standalone but isn't called from `main.rs` yet; see `tasks/ISSUES.md`)
 
 ### Technical Requirements
-- [ ] Proper error handling with structured output
-- [ ] Modular architecture supporting P1 extensions  
-- [ ] Memory-efficient file loading and caching
-- [ ] Cross-platform compatibility (Linux, macOS, Windows)
+- [x] Proper error handling with structured output (for `validate`/`show`; `map`/`search`/`debug` report their own absence rather than erroring on bad input, since there's no real logic yet to error out of)
+- [x] Modular architecture supporting P1 extensions
+- [ ] Memory-efficient file loading and caching (works, unoptimized; no caching layer, no benchmark against a large world)
+- [ ] Cross-platform compatibility (Linux, macOS, Windows) (only built/run on macOS so far)
 - [ ] Documentation for all public APIs
 
 ### Quality Requirements
-- [ ] Comprehensive error messages with suggestions
-- [ ] Fast startup time (< 1 second for basic commands)
-- [ ] Handles malformed input gracefully
-- [ ] Consistent CLI interface following design specification
+- [ ] Comprehensive error messages with suggestions (errors are reported; few include a fix suggestion yet)
+- [x] Fast startup time (< 1 second for basic commands)
+- [ ] Handles malformed input gracefully (per-file parse errors are collected rather than aborting the whole load, but not yet fuzzed or edge-case tested)
+- [ ] Consistent CLI interface following design specification (`map`/`search`/`debug` don't yet implement the interface `design/CLI_DESIGN.md` specifies)
 
 ## Development Notes
 
@@ -289,9 +291,9 @@ For the initial implementation, focus on these core features:
 ## File Dependencies
 
 This implementation plan requires these existing files to be present:
-- `design/DESIGN.md` - Technical specification
+- `design/ARCHITECTURE.md` - Technical specification (formerly `design/DESIGN.md`)
 - `design/CLI_DESIGN.md` - CLI interface specification  
 - `CLAUDE.md` - Project guidelines and architecture principles
-- `authors/world/` - World content directory (to be created)
+- `authors/<author>/<world-name>/` - World content directory (e.g. `authors/mx/test-world/`, already present)
 
 This plan provides a structured approach to building the first pass of the Thwarter CLI tool while adhering to the P0 requirements and maintaining flexibility for future P1 enhancements.

@@ -1,5 +1,5 @@
 [world]
-path = "authors/world/"
+path = "authors/mx/test-world/"
 default_player = "player"
 
 [output]

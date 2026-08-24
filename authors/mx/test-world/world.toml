@@ -2,17 +2,17 @@
 title = "Castle Adventure - Extended World"
 author = "Thwarter Testing Team"
 version = "2.0.0"
-description = "Large-scale testing world with 27 locations and 15+ NPCs"
+description = "Large-scale testing world with 28 locations and 18 NPCs"
 
 [settings]
 starting_location = "castle/courtyard"
 default_map_style = "ascii"
 world_size = "large"
-locations_count = 27
-npcs_count = 15
+locations_count = 28
+npcs_count = 18
 
 [areas]
-castle_locations = 15
+castle_locations = 16
 forest_locations = 12
 
 [characters]
