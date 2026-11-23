@@ -20,7 +20,7 @@ Agreed by Bruce, 2026-11-23. Every decision in this document should follow from 
 6. **Play never changes content.** Everything that happens in a game lives in the game state.
 7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
 
-Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept, 2026-11-23.
+Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Both 2026-11-23.
 
 ## Terms
 
@@ -154,8 +154,8 @@ Inheritance is never implicit (Bruce, 2026-11-23). A file inherits only if its f
 - Inside a bundle, a state file says `inherits: index`. The console writes this when it creates a state.
 - Across things, `inherits: objects/box` makes a thing start from another thing, as a template. A bare name (`index`) means a file in the same bundle; anything else is a path from the world root without `.md`. A template passes down its attributes and its prose, never its `id`; a bundle used as a template passes down only its `index.md`, never a state.
 - A file has one parent. Cycles are an error. Template chains are at most 4 levels deep (*proposed*); a bundle's own index, state and overlay layers don't count toward that.
-- A scalar or a list in the child replaces the parent's, so a state that lists `objects:` replaces the whole list. Maps (`connections`, `vars`) merge key by key, all the way down. `null` removes an inherited key; `validate` warns about each removal, since a bare `north:` with no value also means `null`.
-- Overlays inherit from whatever version is current, by definition, and don't need `inherits:`.
+- A scalar or a list in the child replaces the parent's, so a state that lists `objects:` replaces the whole list; `validate` warns (never errors) each time a layer replaces an inherited list (Bruce, 2026-11-23). Maps (`connections`, `vars`) merge key by key, all the way down. `null` removes an inherited key; `validate` warns about each removal, since a bare `north:` with no value also means `null`.
+- Overlays inherit from whatever version is current, by definition, and don't need `inherits:`. Because that bends principle 2, `validate` warns about each overlay that applies by placement, for now; if that proves confusing or noisy, it gets adjusted (Bruce, 2026-11-23).
 - The console always shows the result and where each part came from (`north: castle/hall (from index)`). Nothing inherited is hidden.
 
 ## Engine rules
