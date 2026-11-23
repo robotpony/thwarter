@@ -30,6 +30,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.20.1 (2026-11-23)
+
+### Fixed
+
+- Edit mode listed a bundle's state files, chapter overlays, chapters, templates, area `_index.md` files and `game/` files as files that don't parse. It now asks the engine what each file is (`file_role`), lists each as what it is ("State `stale` of bread"), and `look` shows it as written. `/edit` on one says editing those comes with bundle editing. A file with a real problem shows the engine's reason.
+- The file list and the file watcher now apply the world's own `ignore` list from `world.toml`, through the engine's `is_ignored`.
+
 ## 0.20.0 (2026-11-23)
 
 ### Added

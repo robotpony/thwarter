@@ -35,6 +35,12 @@ pub fn watch(root: &Path, console: Arc<Mutex<Console>>, notices: SyncSender<Stri
         };
         let (changed, report) = {
             let Ok(mut console) = console.lock() else { return };
+            // What the loader ignores (dot-names, Hugo's folders, the
+            // world's `ignore` list) doesn't reload the world.
+            let changed: Vec<String> = changed
+                .into_iter()
+                .filter(|p| p.starts_with('(') || !console.world.engine.is_ignored(std::path::Path::new(p)))
+                .collect();
             let changed = console.not_own_writes(changed);
             if changed.is_empty() {
                 return;
@@ -61,10 +67,6 @@ fn content_files(paths: &[PathBuf], root: &Path) -> Vec<String> {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         let is_content = path.extension().and_then(|e| e.to_str()) == Some("md") || name == "world.toml";
         if !is_content || name.starts_with('.') {
-            continue;
-        }
-        let parts = super::world::relative_parts(&canonical_root, path);
-        if !parts.is_empty() && crate::engines::bundles::ignored(&parts, &[]) {
             continue;
         }
         let relative = path

@@ -2,9 +2,10 @@
 //! index of the files on disk, so edit mode can navigate the world as
 //! folders (REQ-CON-4).
 
+use crate::engines::bundles::FileRole;
 use crate::engines::{EntityKind, WorldEngine, WorldLoadReport};
 use anyhow::{bail, Result};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -19,6 +20,18 @@ pub enum Kind {
     /// A file in `world/`: the world's own settings (title, start, intro,
     /// story and player), not a thing.
     World,
+    /// One of a bundle's state files (`design/STATES.md` › Bundles).
+    State,
+    /// A chapter overlay, on one thing or on everything in an area.
+    Overlay,
+    /// A chapter's definition.
+    Chapter,
+    /// An area's `_index.md`.
+    Area,
+    /// A template, kept out of the world itself.
+    Template,
+    /// A file in `game/`, which sets the starting state.
+    Game,
 }
 
 impl Kind {
@@ -29,7 +42,19 @@ impl Kind {
             Kind::Object => "object",
             Kind::Broken => "doesn't parse",
             Kind::World => "world settings",
+            Kind::State => "state",
+            Kind::Overlay => "chapter overlay",
+            Kind::Chapter => "chapter",
+            Kind::Area => "area",
+            Kind::Template => "template",
+            Kind::Game => "game start",
         }
+    }
+
+    /// A room, character or object: something the world holds, as opposed
+    /// to a part of one (a state, an overlay) or a file with a problem.
+    pub fn is_thing(self) -> bool {
+        matches!(self, Kind::Room | Kind::Character | Kind::Object)
     }
 }
 
@@ -129,22 +154,15 @@ impl World {
 /// (`WorldEngine::sources`). A `.md` file the engine has no record of
 /// failed to parse.
 fn index_files(root: &Path, engine: &WorldEngine) -> (BTreeMap<String, FileEntry>, BTreeSet<String>) {
-    let mut loaded: HashMap<&Path, (EntityKind, &str)> = HashMap::new();
-    for ((kind, id), paths) in &engine.sources {
-        for path in paths {
-            loaded.insert(path.as_path(), (*kind, id.as_str()));
-        }
-    }
-
     let mut files = BTreeMap::new();
     let mut dirs = BTreeSet::new();
     dirs.insert(String::new());
 
-    // The loader's rule for files that belong to other tools: dot-names and
-    // Hugo's folders. The world's own `ignore` list isn't visible here yet.
+    // What the loader skips (dot-names, Hugo's folders, world.toml's
+    // `ignore`) isn't the world's, so edit mode doesn't show it either.
     let walk = WalkDir::new(root).into_iter().filter_entry(|e| {
-        let parts = relative_parts(root, e.path());
-        parts.is_empty() || !crate::engines::bundles::ignored(&parts, &[])
+        let rel = e.path().strip_prefix(root).unwrap_or(e.path());
+        rel.as_os_str().is_empty() || !engine.is_ignored(rel)
     });
     for entry in walk.filter_map(|e| e.ok()) {
         let path = entry.path();
@@ -159,36 +177,52 @@ fn index_files(root: &Path, engine: &WorldEngine) -> (BTreeMap<String, FileEntry
             dirs.insert(dir.to_string_lossy().replace('\\', "/"));
             parent = dir.parent();
         }
-
-        let file = match loaded.get(path) {
-            Some((EntityKind::Location, id)) => entry_for(Kind::Room, id, engine.get_location(id).map(|l| &l.name)),
-            Some((EntityKind::Character, id)) => {
-                entry_for(Kind::Character, id, engine.characters.get(*id).map(|c| &c.name))
-            }
-            Some((EntityKind::Object, id)) => entry_for(Kind::Object, id, engine.objects.get(*id).map(|o| &o.title)),
-            None if key.starts_with("world/") => {
-                // `world/index.md` is the world itself; other files are named
-                // for what they hold (`world/player.md`).
-                let stem = key.rsplit('/').next().unwrap_or(&key);
-                let title = if stem == "index" { "World".to_string() } else { title_case(stem) };
-                FileEntry { kind: Kind::World, id: key.clone(), title }
-            }
-            None => FileEntry { kind: Kind::Broken, id: key.clone(), title: String::new() },
-        };
-        files.insert(key, file);
+        files.insert(key.clone(), entry_for_role(engine, engine.file_role(rel), &key));
     }
     (files, dirs)
 }
 
-fn entry_for(kind: Kind, id: &str, title: Option<&String>) -> FileEntry {
-    FileEntry { kind, id: id.to_string(), title: title.cloned().unwrap_or_default() }
+/// What edit mode shows for a file, from the role the engine gave it.
+fn entry_for_role(engine: &WorldEngine, role: Option<&FileRole>, key: &str) -> FileEntry {
+    let part = |kind: Kind, id: &str, title: String| FileEntry { kind, id: id.to_string(), title };
+    match role {
+        Some(FileRole::Thing { kind: EntityKind::Location, id }) => {
+            entry_for(Kind::Room, id, engine.get_location(id).map(|l| &l.name))
+        }
+        Some(FileRole::Thing { kind: EntityKind::Character, id }) => {
+            entry_for(Kind::Character, id, engine.characters.get(id).map(|c| &c.name))
+        }
+        Some(FileRole::Thing { kind: EntityKind::Object, id }) => {
+            entry_for(Kind::Object, id, engine.objects.get(id).map(|o| &o.title))
+        }
+        Some(FileRole::State { id, name, .. }) => part(Kind::State, id, format!("State `{}` of {}", name, id)),
+        Some(FileRole::Overlay { id, chapter, .. }) => {
+            part(Kind::Overlay, id, format!("{} in chapter {}", id, chapter.name()))
+        }
+        Some(FileRole::AreaOverlay { area, chapter }) => part(
+            Kind::Overlay,
+            key,
+            format!("Everything in {}/ in chapter {}", area.to_string_lossy().replace('\\', "/"), chapter.name()),
+        ),
+        Some(FileRole::Chapter(chapter)) => part(Kind::Chapter, key, format!("Chapter {}", chapter.name())),
+        Some(FileRole::Area) => part(Kind::Area, key, "Notes for this area".to_string()),
+        Some(FileRole::World) => {
+            // `world/index.md` is the world itself; other files are named
+            // for what they hold (`world/player.md`).
+            let stem = key.rsplit('/').next().unwrap_or(key);
+            let title = if stem == "index" { "World".to_string() } else { title_case(stem) };
+            part(Kind::World, key, title)
+        }
+        Some(FileRole::Template) => part(Kind::Template, key, title_case(key.rsplit('/').next().unwrap_or(key))),
+        Some(FileRole::Game) => part(Kind::Game, key, "How a new game starts".to_string()),
+        // The title holds the reason, for `look`.
+        Some(FileRole::Problem(why)) => part(Kind::Broken, key, why.clone()),
+        None => part(Kind::Broken, key, String::new()),
+    }
 }
 
-/// `path`'s components below `root`, as the loader's ignore rule takes them.
-pub(super) fn relative_parts(root: &Path, path: &Path) -> Vec<String> {
-    path.strip_prefix(root)
-        .map(|rel| rel.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect())
-        .unwrap_or_default()
+fn entry_for(kind: Kind, id: &str, title: Option<&String>) -> FileEntry {
+    FileEntry { kind, id: id.to_string(), title: title.cloned().unwrap_or_default() }
 }
 
 /// `player` becomes `Player`.
@@ -197,5 +231,34 @@ fn title_case(word: &str) -> String {
     match chars.next() {
         Some(first) => first.to_uppercase().chain(chars).collect(),
         None => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn a_bundles_files_show_as_its_parts_not_as_problems() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::create_dir_all(root.join("objects/bread")).unwrap();
+        fs::create_dir_all(root.join(".obsidian")).unwrap();
+        fs::write(root.join("hall.md"), "---\nid: hall\ntitle: Hall\ntype: location\nobjects: [bread]\n---\n").unwrap();
+        fs::write(
+            root.join("objects/bread/index.md"),
+            "---\nid: bread\ntitle: Loaf of bread\ntype: object\nobject_type: food\nstate: fresh\n---\nA loaf.\n",
+        )
+        .unwrap();
+        fs::write(root.join("objects/bread/fresh.md"), "---\ninherits: index\n---\nStill warm.\n").unwrap();
+        fs::write(root.join("objects/bread/stale.md"), "---\ninherits: index\n---\nGone hard.\n").unwrap();
+        fs::write(root.join(".obsidian/notes.md"), "not the world's").unwrap();
+
+        let world = World::load(root).unwrap();
+        assert_eq!(world.files["objects/bread/index"].kind, Kind::Object);
+        assert_eq!(world.files["objects/bread/stale"].kind, Kind::State, "{:?}", world.files["objects/bread/stale"]);
+        assert_eq!(world.files["objects/bread/stale"].title, "State `stale` of bread");
+        assert!(!world.files.keys().any(|k| k.starts_with(".obsidian")), "ignored folders stay out");
     }
 }

@@ -457,15 +457,14 @@ impl Console {
             },
             Kind::World => view::world(self.world.engine.world(), &path),
             Kind::Broken => {
-                let reason = self
-                    .world
-                    .report
-                    .errors
-                    .iter()
-                    .find(|e| e.contains(&format!("{}.md", path)))
-                    .cloned()
-                    .unwrap_or_else(|| "it doesn't parse".to_string());
-                format!("{}.md doesn't parse: {}", path, reason)
+                let reason = if entry.title.is_empty() { "it doesn't parse" } else { entry.title.as_str() };
+                format!("{}.md isn't part of the world: {}", path, reason)
+            }
+            // A part of a thing or of the world: shown as written, until
+            // bundle editing shows it in place (`design/STATES.md` › Console).
+            _ => {
+                let text = std::fs::read_to_string(self.world.root.join(format!("{}.md", path))).unwrap_or_default();
+                format!("{} ({}), {}.md\n\n{}", entry.title, entry.kind.label(), path, text.trim_end())
             }
         }
     }

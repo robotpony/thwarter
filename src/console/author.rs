@@ -271,7 +271,7 @@ impl Console {
     fn current_file(&self) -> Option<Current> {
         let Place::File(path) = &self.place else { return None };
         let entry = self.world.files.get(path)?;
-        (entry.kind != Kind::Broken).then(|| Current { kind: entry.kind, id: entry.id.clone() })
+        entry.kind.is_thing().then(|| Current { kind: entry.kind, id: entry.id.clone() })
     }
 
     /// The room edit mode is in, if it's in one.
@@ -379,7 +379,7 @@ pub(super) fn entity_kind(kind: Kind) -> Option<EntityKind> {
         Kind::Room => Some(EntityKind::Location),
         Kind::Character => Some(EntityKind::Character),
         Kind::Object => Some(EntityKind::Object),
-        Kind::Broken | Kind::World => None,
+        _ => None,
     }
 }
 

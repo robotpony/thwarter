@@ -205,6 +205,11 @@ impl Console {
             // World settings aren't a room, character or object; any kind
             // word opens them.
             Kind::World => self.open_target(Kind::World, entry.id.clone(), path.clone()),
+            found if !found.is_thing() => Err(format!(
+                "{}.md is a {}. Editing those comes with bundle editing; look shows it for now.",
+                path,
+                found.label()
+            )),
             found if found == kind => self.open_target(kind, entry.id.clone(), path.clone()),
             found => Err(format!("{} is a {}, not a {}: /edit {} opens it.", path, found.label(), label, found.label())),
         }
