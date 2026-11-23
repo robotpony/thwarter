@@ -11,7 +11,7 @@ Now at village/tower.
 > look
 The Old Tower (village/tower)
 
-
+(no description yet)
 
 Exits:
   south  village/well
