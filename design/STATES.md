@@ -173,6 +173,12 @@ Settled by the commander from the coder's review (2026-11-23).
 - `_index.md` marks an area. Its frontmatter MAY have a `title` and author notes, and nothing else yet.
 - Layers merge as raw YAML before the result is typed as a location, object or character. Every key remembers the file it came from, for error messages and for the console's "(from index)" labels.
 
+**Chapters in any scope** (built in 0.12.0, confirmed by the commander):
+- In any `chapters/` folder, a numbered file (`25-the-vault-opens.md`) defines a chapter in that scope, and an unnumbered one (`the-vault-opens.md`) is an overlay for the nearest chapter of that name, looked up from its folder outward to the root. Mixing numbered and unnumbered files for one chapter path is an error, and so is an unnumbered file in the root `chapters/`.
+- A chapter is identified by its scope and name, so names only need to be unique within a scope. A scoped definition that hides an outer chapter of the same name gets a warning, since it's most likely an overlay written with its number.
+- `chapter:` actions and `version()` resolve a chapter name from the thing outward, the same way.
+- A layer that breaks a rule (a state file that sets `id`, `type` or `state:`, an overlay with `inherits:`) is kept, with the offending keys removed and reported, so one bad key doesn't cause more errors further down.
+
 **Current version.**
 - A thing's current version depends on play state, so it is built on request, not stored at load.
 - Edit mode shows a thing's starting version (starting state, no chapter) unless a playtest is running, and then the version the game is in; a header always says which (`castle/vault · open · after-the-king`). `show` and `validate` default to the starting version. `thwart show --state <name> --chapter <name>` shows any other. `validate` checks every state against every chapter stack.
