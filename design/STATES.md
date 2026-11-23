@@ -20,7 +20,7 @@ Agreed by Bruce, 2026-11-23. Every decision in this document should follow from 
 6. **Play never changes content.** Everything that happens in a game lives in the game state.
 7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
 
-Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Both 2026-11-23.
+Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). All 2026-11-23.
 
 ## Terms
 
@@ -93,7 +93,7 @@ sets: { story.king: dead }          # story values on entering the chapter
 <!-- Arc notes: the court splits; the guard captain takes charge. -->
 ```
 
-The number prefix only orders the chapters; the chapter's name is the rest (`after-the-king`), and that's what overlays and actions use. Leave gaps (10, 20, 30) so a chapter can be inserted by naming one file. A root chapter can exist before any overlay does, as a placeholder for the arc. Root chapters don't change individual things; that's what a thing's own overlays are for.
+The number prefix only orders the chapters; the chapter's name is the rest (`after-the-king`), and that's what overlays and actions use. Leave gaps (10, 20, 30) so a chapter can be inserted by naming one file. A root chapter can exist before any overlay does, as a placeholder for the arc. Root chapters don't change individual things; that's what a thing's own overlays are for. What a root chapter can change is world-level settings, the kind `world.toml` holds (starting room, title, intro text), plus story values (Bruce, 2026-11-23). Whether world-level content also gets a `world/` or `game/` folder is open.
 
 Inside a thing, a chapter is an overlay for that thing:
 
@@ -110,7 +110,7 @@ npcs/guard/
     after-the-king.md        # the guard in chapter 2
 ```
 
-An overlay's file name MUST match a root chapter's name, without its number. A thing that's one file becomes a bundle when it gets its first state or overlay; the console does that move (see Console).
+`chapters` is a reserved folder name everywhere in a world (Bruce, 2026-11-23): at the root it holds the chapters, and anywhere else it holds that folder's or thing's chapter versions. An overlay's file name matches a root chapter's name, without its number, for now; local or "secret" chapters, defined inside an area or around an object rather than at the root, are wanted but not yet designed (open question below). A thing that's one file becomes a bundle when it gets its first state or overlay; the console does that move (see Console).
 
 Chapters are siblings: one chapter's changes never carry into the next (Bruce, 2026-11-23). A chapter applies to another only when it is its parent. A root chapter with sub-chapters is a folder, and its sub-chapters inherit from it:
 
@@ -292,5 +292,7 @@ Commands the console will need, *proposed*: `/state new <name>`, `/state set <na
 ## Open questions
 
 1. **Doors**: a special construct, to be designed in its own discussion.
-2. **Clocks and game values**: when do time, weather and randomness come in, and is time turns or game time?
-3. **Showing play state in the editor**: what the author sees, and how they change it while playtesting.
+2. **How chapters overlay, and local chapters.** Authors may use chapters globally, but also add "secret" chapters or sub-chapters inside an area or tied to an object. Where are those defined, what starts them, and how do they stack with root chapters (Bruce, 2026-11-23)?
+3. **World-level content**: `world.toml` alone, or also a `world/` or `game/` folder for world-level text and settings?
+4. **Clocks and game values**: when do time, weather and randomness come in, and is time turns or game time?
+5. **Showing play state in the editor**: what the author sees, and how they change it while playtesting.
