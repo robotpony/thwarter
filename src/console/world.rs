@@ -74,14 +74,22 @@ impl World {
 
     /// Problems that are normal while a world is being written, such as
     /// exits to rooms not written yet. Shown, never blocking (REQ-CON-7).
-    /// Includes keys that differ only in case from a known key.
+    /// Includes the engine's warnings, such as keys that differ only in
+    /// case from a known key. Reflects changes made in memory since the load.
     pub fn warnings(&self) -> Vec<String> {
         self.engine
-            .problems(&self.report, false)
+            .current_problems(false)
             .into_iter()
             .filter(|p| !self.report.errors.contains(p))
-            .chain(self.report.warnings.iter().cloned())
+            .chain(self.engine.current_warnings())
             .collect()
+    }
+
+    /// Rebuilds the folder index after files were written.
+    pub fn refresh_index(&mut self) {
+        let (files, dirs) = index_files(&self.root, &self.engine);
+        self.files = files;
+        self.dirs = dirs;
     }
 
     pub fn path_of(&self, kind: Kind, id: &str) -> Option<String> {

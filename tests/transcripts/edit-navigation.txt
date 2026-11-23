@@ -60,7 +60,7 @@ Actions: light
 > cd /village/square
 Village Square (room)
 > cd bench
-`bench` is scenery, with no card yet. /edit object will create one (PLAN.md › Phase 3).
+`bench` is scenery, with no card yet. /new object bench gives it one.
 > cd nowhere
 No folder, room, exit, character or object called `nowhere` here.
 > dance

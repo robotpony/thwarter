@@ -4,7 +4,7 @@
 //! change caused.
 
 use super::session::{Console, Place, COMPASS_ALIASES};
-use super::world::{Kind, World};
+use super::world::Kind;
 use crate::engines::EntityKind;
 use crate::writer::{Edit, NewEntity, WorldWriter};
 use serde_yaml::Value;
@@ -128,6 +128,16 @@ impl Console {
     }
 
     fn new_object(&mut self, args: &[&str]) -> String {
+        // Scenery this room names, given only its id, gets the default card
+        // (`object_type: scenery`, REQ-CF-8).
+        let scenery_args;
+        let args = match args {
+            [id] if self.is_scenery_here(id) => {
+                scenery_args = [*id, "scenery"];
+                &scenery_args[..]
+            }
+            _ => args,
+        };
         let [id, object_type, title @ ..] = args else {
             return "Usage: /new object <id> <type> [title], where type is free-form: tool, weapon, furniture, ...".to_string();
         };
@@ -252,6 +262,13 @@ impl Console {
 
     // Shared steps.
 
+    /// Whether the current room names `id` as an object with no card.
+    fn is_scenery_here(&self, id: &str) -> bool {
+        let Some(here) = self.current_room() else { return false };
+        let named = self.world.engine.get_location(&here).is_some_and(|l| l.objects.iter().any(|o| o == id));
+        named && !self.world.engine.objects.contains_key(id)
+    }
+
     fn current_file(&self) -> Option<Current> {
         let Place::File(path) = &self.place else { return None };
         let entry = self.world.files.get(path)?;
@@ -279,42 +296,46 @@ impl Console {
         WorldWriter::new(&self.world.root).map_err(|e| format!("Can't write to the world: {}", e))
     }
 
-    fn create(&self, new: &NewEntity, edits: &[Edit]) -> Result<PathBuf, String> {
+    /// Writes a new entity and adds it to the loaded world (REQ-ENG-7, 8).
+    fn create(&mut self, new: &NewEntity, edits: &[Edit]) -> Result<PathBuf, String> {
         let writer = self.writer()?;
-        writer.create(new, edits).map_err(|e| format!("Not created: {}", within(&writer, &e)))
+        self.note_warnings_before();
+        let report = writer
+            .create_loaded(&mut self.world.engine, new, edits, false)
+            .map_err(|e| format!("Not created: {}", within(&writer, &e)))?;
+        Ok(report.path)
     }
 
-    fn save(&self, kind: Kind, id: &str, edits: &[Edit]) -> Result<PathBuf, String> {
+    /// Writes edits to an entity's file and applies them to the loaded world.
+    fn save(&mut self, kind: Kind, id: &str, edits: &[Edit]) -> Result<PathBuf, String> {
         let kind = entity_kind(kind).ok_or_else(|| format!("{} can't be changed.", id))?;
         let writer = self.writer()?;
-        writer.edit(&self.world.engine, kind, id, edits).map_err(|e| format!("Not saved: {}", within(&writer, &e)))
+        self.note_warnings_before();
+        let report = writer
+            .edit_loaded(&mut self.world.engine, kind, id, edits, false)
+            .map_err(|e| format!("Not saved: {}", within(&writer, &e)))?;
+        Ok(report.path)
     }
 
-    /// After saving `written`: reloads the world, and reports `summary`
-    /// with any problems that weren't there before the change. Until the
-    /// engine can apply a change in memory (REQ-ENG-8), this reload is how
-    /// the problems are found.
+    /// Keeps the world's warnings from before a command's first change, so
+    /// `after_writes` can say which ones the command added.
+    fn note_warnings_before(&mut self) {
+        if self.warnings_before.is_none() {
+            self.warnings_before = Some(self.world.warnings());
+        }
+    }
+
+    /// After a command saved `written`, which the engine has already
+    /// applied in memory: refreshes the folder index and reports `summary`
+    /// with any problems or warnings the command added.
     fn after_writes(&mut self, written: &[PathBuf], summary: String) -> String {
-        let root = self.world.root.canonicalize().unwrap_or_else(|_| self.world.root.clone());
         let now = Instant::now();
         for path in written {
-            let relative = path.strip_prefix(&root).unwrap_or(path).to_string_lossy().replace('\\', "/");
+            let relative = path.strip_prefix(&self.world.root).unwrap_or(path).to_string_lossy().replace('\\', "/");
             self.own_writes.push((relative, now));
         }
-
-        let before = self.world.warnings();
-        let fresh = match World::load(&self.world.root) {
-            Ok(world) => world,
-            Err(e) => return format!("{}\nSaved, but the reload failed: {}. Try /reload.", summary, e),
-        };
-        if !fresh.blocking_problems().is_empty() {
-            return format!(
-                "{}\nSaved, but the world no longer loads cleanly, so the console kept the previous one:\n  {}",
-                summary,
-                fresh.blocking_problems().join("\n  ")
-            );
-        }
-        self.world = fresh;
+        self.world.refresh_index();
+        let before = self.warnings_before.take().unwrap_or_default();
         let new_problems: Vec<String> = self.world.warnings().into_iter().filter(|w| !before.contains(w)).collect();
         if new_problems.is_empty() {
             summary

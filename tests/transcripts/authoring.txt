@@ -40,8 +40,25 @@ Removed the up exit from village/cellar.
 Not saved: `connections` has no entry `up`
 > cd /village/square
 Village Square (room)
+> cd bench
+`bench` is scenery, with no card yet. /new object bench gives it one.
+> /new object bench
+Created object bench, Bench; village/square already lists it, and now it has a card.
+> cd bench
+Bench (object)
+> look
+Bench (bench)
+objects/bench.md, scenery
+
+(no description yet)
+
+Actions: none
+> cd ..
+objects/
+> cd /village/square
+Village Square (room)
 > /new object bench furniture Stone Bench
-Created object bench, Stone Bench; village/square already lists it, and now it has a card.
+Not created: objects/bench.md already exists
 > /new object rope tool
 Created object rope, Rope, placed in village/square.
 > /new character smith The Smith
@@ -61,7 +78,7 @@ Characters:
 
 Objects:
   Brass Lantern (lantern)
-  Stone Bench (bench)
+  Bench (bench)
   Rope (rope)
 > cd smith
 The Smith (character)

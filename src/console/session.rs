@@ -36,6 +36,8 @@ pub struct Console {
     /// Files the console saved itself, relative to the world root, with
     /// when, so the file watcher doesn't announce them a second time.
     pub(super) own_writes: Vec<(String, Instant)>,
+    /// The world's warnings before the current command changed anything.
+    pub(super) warnings_before: Option<Vec<String>>,
 }
 
 pub(super) const COMPASS_ALIASES: &[(&str, &str)] = &[
@@ -55,7 +57,7 @@ impl Console {
     pub fn open(world_path: &Path, mode: Mode) -> Result<Console> {
         let world = World::load(world_path)?;
         let room = world.default_room();
-        let mut console = Console { world, mode, place: Place::Dir(String::new()), room, own_writes: Vec::new() };
+        let mut console = Console { world, mode, place: Place::Dir(String::new()), room, own_writes: Vec::new(), warnings_before: None };
         if mode == Mode::Play {
             console.place_at_room();
         }
@@ -431,7 +433,7 @@ impl Console {
                     }
                     if location.objects.iter().any(|o| o == target) {
                         return self.world.path_of(Kind::Object, target).map(Place::File).ok_or_else(|| {
-                            format!("`{}` is scenery, with no card yet. /edit object will create one (PLAN.md › Phase 3).", target)
+                            format!("`{}` is scenery, with no card yet. /new object {} gives it one.", target, target)
                         });
                     }
                 }
