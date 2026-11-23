@@ -64,6 +64,13 @@ This project has Claude Code permissions configured in `.claude/settings.local.j
 
 ## Conventions
 
+**Session lanes.** Three Claude sessions share this checkout, each with its own lane (Bruce, 2026-11-23). Work that crosses a lane is sent to its owner as a message, not edited across lanes.
+- *thwarter commander*: docs and design (`README.md`, `REQUIREMENTS.md`, `design/`), `PLAN.md` and `BUGS.md` entries, conventions, and handing work to the coders.
+- *thwarter coder*: the engine, models, parsers and data layers, plus the `thwart` command-line tooling (`src/bin/`, `src/cli/`), with its tests, version bumps and `CHANGELOG.md` entries.
+- *thwarter console coder*: the console, the interactive REPL client for reading (playing) and writing (authoring) worlds, including its UX and reload, with its own tests and `CHANGELOG.md` entries.
+
+A coder who fixes a bug or finishes a task ticks it in `PLAN.md` or moves it to `BUGS.md` › Fixed in the same commit, and updates `design/ARCHITECTURE.md`'s status table if the change makes an entry true.
+
 **Git.** Commit straight to `main`. Stage only the files a task touched, by name, never `git add -A`. The subject line is one descriptive phrase with no conventional-commit prefix; a docs-only commit starts with the file (`PLAN.md: ...`). The why and how go in the body. Never add Claude as a co-author or a "Generated with Claude Code" line; `.claude/hooks/check-commit-message.sh` refuses those commits. Never force-push or rewrite pushed history.
 
 **Tasks.** `PLAN.md` holds phased work (`## Phase N · Name` headings, `- [ ]` items) and `BUGS.md` holds defects (`## Open` and `## Fixed`; keep those headings). Space Command reads both, so a tag written in prose goes in backticks. Each task is one short line pointing to its spec, never the spec itself. Done items are ticked in place, then squashed into one "Done (squashed)" line naming the commit that has the full list. No inline TODO comments as a tracking system.
