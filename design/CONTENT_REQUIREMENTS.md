@@ -46,8 +46,11 @@ Principle 9 (Bruce, 2026-11-23). Much of the format already follows Hugo's conve
 
 - REQ-CF-23: World files MUST be plain Markdown with YAML frontmatter that VS Code, Obsidian and Hugo can open without errors. The format MUST NOT add syntax that breaks their preview. Response markers and section headers are HTML comments, which all three hide.
 - REQ-CF-24: The loader MUST ignore folders and files that belong to other tools: any name starting with `.` (`.obsidian/`, `.vscode/`, `.git/`), and Hugo's own (`layouts/`, `static/`, `assets/`, `public/`, `hugo.toml`). A world MAY list more in `world.toml`. *Proposed.*
-- REQ-CF-25: Wherever the format takes an `id` (exits, `objects:`, `inherits:`, `becomes:` and the rest), it SHOULD also accept an Obsidian link to the same file (`"[[castle/courtyard]]"`), so Obsidian's graph shows the world's map and links. *Proposed.*
+- REQ-CF-25: Wherever the format takes an `id` (exits, `objects:`, `inherits:`, `becomes:` and the rest), it SHOULD also accept an Obsidian link to the same file (`"[[castle/courtyard]]"`), so Obsidian's graph shows the world's map and links (Bruce confirmed links matter to Thwarter, 2026-11-23).
 - REQ-CF-26: Thing ids SHOULD match their file names, as REQ-CF-22 and the default layout already make them, because Obsidian identifies a note by its file name. *Proposed.*
+- REQ-CF-28: Thwarter files are Markdown, and the mechanics of Markdown documents apply to them (Bruce, 2026-11-23). Headings, emphasis, lists and links in prose MUST render in play as a terminal can show them, and MUST NOT be shown as raw syntax.
+- REQ-CF-29: A link in prose to a thing (`[[lever]]`, `[[castle/vault]]` or `[the lever](objects/lever.md)`) MUST mean that thing to Thwarter, whatever its kind: object, character, door, location. In play it shows as its text. In edit mode the console MUST be able to follow it, and `validate` MUST warn about a link to a thing that doesn't exist, as it does for exits. *Proposed*: a room's prose that links an object it doesn't place makes that object examinable from the room, as scenery, without placing it.
+- REQ-CF-30: Tags (`#tag` in prose, or `tags:` in frontmatter, as Obsidian uses them) MUST be searchable and filterable in the console. *Proposed*: play shows a tag in prose as its plain word, without the `#`.
 - REQ-CF-27: `{{ variables }}` are written so Hugo leaves them alone: Hugo only runs templates in layouts, and runs shortcodes only in the `{{< >}}` and `{{% %}}` forms. A Hugo site MAY render them through a small plugin of its own. *Proposed.*
 
 ## Open questions
@@ -56,4 +59,4 @@ The world model's open questions are in `design/STATES.md` › Open questions. F
 
 1. Dialogue tree format is unspecified. REQ-CF-5 loads `dialogue_tree` as an opaque reference.
 2. Should `validate` check a location's `id` against its path as a MUST once the check exists?
-3. Tags and links in prose: should `#tag` and `[[link]]` inside a description mean anything to Thwarter (a tag the console can search, a link the console can follow), or only to the other tools?
+3. ~~Tags and links in prose~~: they matter to Thwarter (Bruce, 2026-11-23); REQ-CF-28 to 30.
