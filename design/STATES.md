@@ -278,7 +278,7 @@ Built in 0.23.0 (a2e45a9), and confirmed by the commander:
 - A faint thing is found by `search`, or by examining the room itself. Once found it stays found for the game, even if it later changes state, and it can't be named before it's found, so a player can't guess "take key".
 - An absent thing can't be named by anything.
 - Visibility covers objects, characters and exits (an exit by the visibility of the room it leads to). Things the player carries are always shown. Doors join in Phase 6.
-- *Pending Bruce*: a hidden thing is never listed or found by search, but an action that names it exactly still works (a secret lever, a magic word); `take` and `examine` say it isn't there. That keeps hidden distinct from absent.
+- A hidden thing is never listed or found by search. An action that names it exactly still works (a secret lever, a magic word) if that action has no prerequisite (`requires:`) and the thing is of a type that can be found; otherwise it behaves as absent until something reveals it (Bruce, 2026-11-23). Which types can be found is to settle with the built-ins: *proposed*, objects, doors and exits can, characters can't unless they say so.
 - *Pending Bruce*: search replies are built in today ("You search carefully and find the brass key and a way north."). A room could override them with a `<!-- thwarter:reply search -->` block.
 
 Revealing is ordinary state switching: an action `becomes:` a state with a different `visibility:`. Special activation, such as magic, is a `requires:` on that action (`requires: { has: wand }`).
