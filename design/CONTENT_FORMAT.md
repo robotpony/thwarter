@@ -79,7 +79,7 @@ Object content is far more varied than location or character content (compare a 
 | `category` | no | Free text, finer-grained than `object_type`. |
 | `weight` | no | Free text by convention (`light`, `heavy`, `immovable`), not a unit. |
 | `value` | no | Free text; sample content mixes numbers (`1000`) and descriptions (`priceless`, `unknown`). |
-| `actions` | no | List of single-key maps, action name to response text: `- wield: "The sword feels like an extension of your arm"`. |
+| `actions` | no | Map of action name to its mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`). The text a player reads is in the body, after a `<!-- thwarter:action wield -->` marker, never here. See `design/STATES.md` › Responses. |
 | anything else | no | Preserved verbatim (e.g. `properties`, `stats`, `effects`, `contents`, `security` in the sample world). Not validated. |
 
 ## What the loader does today

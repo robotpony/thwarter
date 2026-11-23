@@ -19,7 +19,7 @@ Agreed by Bruce, 2026-11-23 (principle 8 added the same day). Every decision in 
 5. **Files are the truth; the console is how you edit them.** Structure changes go through commands, and the files stay plain Markdown.
 6. **Play never changes content.** Everything that happens in a game lives in the game state.
 7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
-8. **Content lives in prose, not frontmatter.** Frontmatter holds state, ids and mechanics; everything a player reads is in the Markdown body (Bruce, 2026-11-23).
+8. **Content lives in prose, not frontmatter.** Frontmatter holds state, ids and mechanics; everything a player reads is in the Markdown body. `title` is the one exception (Bruce, 2026-11-23).
 
 Review status: reviewed with Bruce group by group, all six groups done. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). Changing state: reviewed, with doors and templates designed in outline. Variables: reviewed; undeclared variables and shared ids warn rather than fail. Console: reviewed; full editing may take the whole terminal, headers defined, conflicts handled by git and safe reloads. All 2026-11-23.
 
@@ -150,7 +150,10 @@ Within each level, a parent chapter comes before its sub-chapter. An area can th
 
 An overlay applies on top of whichever state is current; it can't vary by state. Bruce sees no case for that yet (2026-11-23), so it's out of scope.
 
-Frontmatter merges by the inheritance rules below. Prose replaces the layer below only if the layer has prose; a body that is empty once author comments are removed counts as no prose, so an overlay holding only a note never blanks a room.
+Frontmatter merges by the inheritance rules below. Prose merges block by block (agreed by Bruce, 2026-11-23):
+- A body is a description followed by response blocks (see Responses). Each part merges separately: the description replaces the description below it, and each block replaces only the block of the same name below it. So a state can change one response without restating the description, and the other way round.
+- A thing's own layers (its `index.md`, state and chapter versions) replace prose. An area's layers add it: an area chapter's description is added after the description of every room beneath it, so "the castle in mourning" reads as each room's own text plus `Black banners hang from every wall.`
+- A description that is empty once author comments are removed counts as no prose, so a layer holding only a note never blanks a room.
 
 ## Inheritance
 
@@ -194,7 +197,7 @@ Settled by the commander from the coder's review (2026-11-23).
 - Values are strings. Where values are compared, `yes`, `true`, `no` and `false` count as the same pair on purpose.
 - `requires:` stays closed to `has:` until a real case needs more. Each new key would bring the condition language back.
 - Variables work in prose only for now, not in frontmatter.
-- Actions are a map, not a list of one-key maps: `actions: { pull: { text: ..., becomes: ... } }`. The existing object cards move to this shape (the coder migrates them).
+- Actions are a map of mechanics, not a list of one-key maps: `actions: { pull: { becomes: { castle/vault: open } } }`. What the player reads is in the body (see Responses). The existing object cards move to this shape (the coder migrates them, moving their response strings into blocks).
 
 **Play state and saves.**
 - `PlayState` stores each thing's state only when it has left its starting state (like `taken`), the current chapter, values by level, visits per room and the turn count. A turn is one player action that the game understood; console commands and unknown verbs don't count. `flags` goes away.
@@ -290,12 +293,30 @@ How states switch is mostly invisible to the author, who works in the console (B
 - Time-based change (bread going stale after 20 turns) needs a clock, which doesn't exist yet. *Proposed* for later: `after: { turns: 20, becomes: stale }` on a state.
 
 ```yaml
-# objects/lever.md
+---
+id: lever
+title: Iron lever
+type: object
 actions:
-  pull:
-    text: "Gears grind somewhere below."
-    becomes: { castle/vault: open }
+  pull: { becomes: { castle/vault: open } }
+---
+A rusted iron lever juts from the wall.
+
+<!-- thwarter:action pull -->
+Gears grind somewhere below.
 ```
+
+## Responses
+
+What a player reads when they act is prose in the body, never frontmatter (principle 8; agreed by Bruce, 2026-11-23).
+
+- The body starts with the thing's description. Each response follows a marker line, the same comment form as section headers: `<!-- thwarter:action pull -->`.
+- `<!-- thwarter:action pull refused -->` is the reply when the action's `requires:` isn't met.
+- A response block can stand alone, with no mechanics in frontmatter: a block for `kick` holding "Ow." is a whole action.
+- An action with mechanics but no block gets a built-in reply made from the verb and the title ("You pull the iron lever."), varied like the ambiguity replies. So does a refused action with no `refused` block.
+- Edit mode warns about each of these: an action with no response, a refusal with no reply, a block with no matching mechanics. The editor shows the author which responses an object needs and which it could have.
+- Ambiguity replies an author overrides are blocks too: `<!-- thwarter:reply ambiguous -->`.
+- In the editor, response markers are drawn like section headers, not typed.
 
 ## Variables
 
