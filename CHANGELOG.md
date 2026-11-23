@@ -30,6 +30,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.20.0 (2026-11-23)
+
+### Added
+
+- `WorldEngine::file_role(relative)` and `file_roles()` say what each file the engine read is: a thing, a state, a thing's or an area's chapter overlay, a chapter, an area, a `world/` file, a template, a `game/` file, or a problem with its reason. The console's file list no longer has to guess from `sources`.
+- `WorldEngine::is_ignored(relative)` applies the loader's ignore rules, the world's own `ignore` list included.
+- A link by bare file name that more than one file has is reported as ambiguous, naming the files, for exits and `becomes:` (REQ-CF-25). `WorldEngine::link_ambiguity` gives the reason.
+
 ## 0.19.0 (2026-11-23)
 
 ### Added

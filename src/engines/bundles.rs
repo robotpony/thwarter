@@ -189,6 +189,33 @@ pub fn visible_chapters<'a>(chapters: &'a [Chapter], scope: &Path) -> Vec<&'a Ch
     out
 }
 
+/// What one `.md` file in a world is, by where it sits (for the console's
+/// file list, edit mode and bundle editing).
+#[derive(Debug, Clone, PartialEq)]
+pub enum FileRole {
+    /// A thing's one file, or its bundle's `index.md`.
+    Thing { kind: EntityKind, id: String },
+    /// One of a bundle's state files.
+    State { kind: EntityKind, id: String, name: String },
+    /// A thing's own chapter overlay.
+    Overlay { kind: EntityKind, id: String, chapter: ChapterKey },
+    /// An overlay in an area's `chapters/`, for everything in the area.
+    AreaOverlay { area: PathBuf, chapter: ChapterKey },
+    /// A chapter's definition.
+    Chapter(ChapterKey),
+    /// An area's `_index.md`.
+    Area,
+    /// A file in `world/`.
+    World,
+    /// A template (in `templates/`, or `template: true`), kept out of the world.
+    Template,
+    /// A file in `game/`, whose format isn't built yet.
+    Game,
+    /// A file that isn't part of the world as loaded, with why: it doesn't
+    /// parse, it's misplaced, or its thing doesn't type.
+    Problem(String),
+}
+
 /// What a world's files add up to.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Built {
@@ -200,6 +227,10 @@ pub(crate) struct Built {
     pub world: WorldDef,
     /// Whether `world/index.md` exists, so `world.toml` isn't read for it.
     pub has_world_index: bool,
+    /// Roles known while sorting: world files, templates, areas, `game/`,
+    /// chapters and area overlays. Things, states and overlays come from
+    /// `things`.
+    pub roles: Vec<(PathBuf, FileRole)>,
     pub problems: Vec<String>,
     pub warnings: Vec<String>,
 }
@@ -352,6 +383,7 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
             continue;
         }
         if let Some(which) = world_file(&parts) {
+            built.roles.push((file.path.clone(), FileRole::World));
             let layer = match (&which, &file.layer) {
                 (WorldFile::Styles, _) => continue,
                 (WorldFile::Other, _) => {
@@ -381,6 +413,8 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
         }
         // game/ has its own format, not built yet.
         if excluded(&parts) {
+            let role = if parts.first().map(String::as_str) == Some("game") { FileRole::Game } else { FileRole::Template };
+            built.roles.push((file.path.clone(), role));
             continue;
         }
         let mut layer = match &file.layer {
@@ -391,6 +425,7 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
             }
         };
         if is_template(file) {
+            built.roles.push((file.path.clone(), FileRole::Template));
             continue;
         }
         match classify(&rel(&file.path), &bundle_dirs) {
@@ -426,6 +461,7 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
                 in_chapters(scope, is_bundle, parts, layer, &mut definitions, &mut pending, &mut built);
             }
             Role::Area => {
+                built.roles.push((file.path.clone(), FileRole::Area));
                 for key in layer.metadata.keys().filter_map(Value::as_str) {
                     if key != "title" {
                         built.warnings.push(format!(
@@ -439,6 +475,9 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
     }
 
     built.chapters = build_chapters(definitions, &mut built.problems, &mut built.warnings);
+    for c in &built.chapters {
+        built.roles.push((c.layer.path.clone(), FileRole::Chapter(c.key.clone())));
+    }
 
     // Resolve each overlay's chapter from its folder outward.
     let mut overlays: BTreeMap<PathBuf, BTreeMap<ChapterKey, Layer>> = BTreeMap::new();
@@ -473,6 +512,7 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
         if o.is_bundle {
             overlays.entry(o.scope).or_default().insert(chapter.key.clone(), o.layer);
         } else {
+            built.roles.push((o.layer.path.clone(), FileRole::AreaOverlay { area: o.scope.clone(), chapter: chapter.key.clone() }));
             area_overlays.push(AreaOverlay { area: o.scope, chapter: chapter.key.clone(), layer: o.layer });
         }
     }

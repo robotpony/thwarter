@@ -1,7 +1,7 @@
 use crate::engines::location_view::{direction_rank, EntityRef, ExitView, LocationView};
 use crate::models::character::Character;
 use crate::models::world::*;
-use crate::engines::bundles::{self, Chapter, ChapterKey, FileRecord, Thing};
+use crate::engines::bundles::{self, Chapter, ChapterKey, FileRecord, FileRole, Thing};
 use crate::engines::layers::{Layer, Merged};
 use crate::engines::world_def::WorldDef;
 use crate::models::game::{PlayState, SavedChapter};
@@ -80,6 +80,8 @@ pub struct WorldEngine {
     /// folder), and its file name, to the things it may name, so an
     /// Obsidian link to a file finds the thing (REQ-CF-25).
     links: HashMap<String, Vec<(EntityKind, String)>>,
+    /// Every file read, by its path in the engine's form, and what it is.
+    roles: std::collections::BTreeMap<PathBuf, FileRole>,
 }
 
 /// Which version of each thing to see: the starting versions (the
@@ -144,7 +146,30 @@ impl WorldEngine {
             ignore: Vec::new(),
             world_toml_warning: None,
             links: HashMap::new(),
+            roles: std::collections::BTreeMap::new(),
         }
+    }
+
+    /// What one file is, by its path relative to the world root: a thing,
+    /// a state, an overlay, a chapter, an area, a `world/` file, a template,
+    /// or a problem with why. `None` for a file the engine didn't read
+    /// (another tool's, or not `.md`).
+    pub fn file_role(&self, relative: &Path) -> Option<&FileRole> {
+        let root = self.world_root.clone().unwrap_or_default();
+        self.roles.get(&root.join(relative))
+    }
+
+    /// Every file read, in path order, each with its role. Paths are in
+    /// the engine's form, as in `sources`.
+    pub fn file_roles(&self) -> impl Iterator<Item = (&Path, &FileRole)> {
+        self.roles.iter().map(|(p, r)| (p.as_path(), r))
+    }
+
+    /// Whether the loader skips this path, relative to the world root:
+    /// other tools' files and the world's own `ignore` list (REQ-CF-24).
+    pub fn is_ignored(&self, relative: &Path) -> bool {
+        let parts: Vec<String> = relative.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+        bundles::ignored(&parts, &self.ignore)
     }
 
     /// The world's own definition: title, author, starting room, intro,
@@ -254,6 +279,41 @@ impl WorldEngine {
         if let Some(start) = self.world.start.take() {
             self.world.start = Some(self.resolve_name(&start, Some(EntityKind::Location)));
         }
+        self.roles.clear();
+        for (path, role) in &built.roles {
+            self.roles.insert(path.clone(), role.clone());
+        }
+        for (thing, _) in &built.things {
+            let (kind, id) = (thing.kind, thing.id.clone());
+            self.roles.insert(thing.index.path.clone(), FileRole::Thing { kind, id: id.clone() });
+            for (name, layer) in &thing.states {
+                self.roles.insert(layer.path.clone(), FileRole::State { kind, id: id.clone(), name: name.clone() });
+            }
+            for (chapter, layer) in &thing.overlays {
+                self.roles.insert(layer.path.clone(), FileRole::Overlay { kind, id: id.clone(), chapter: chapter.clone() });
+            }
+        }
+        for file in &self.files {
+            if self.roles.contains_key(&file.path) {
+                continue;
+            }
+            let rel = file.path.strip_prefix(&root).unwrap_or(&file.path);
+            if file.path.starts_with(&root) && self.is_ignored(rel) {
+                continue;
+            }
+            let shown = format!("{}: ", file.path.display());
+            let why = built
+                .problems
+                .iter()
+                .find_map(|p| p.strip_prefix(&shown))
+                .map(str::to_string)
+                .or_else(|| match &file.layer {
+                    Err(e) => Some(e.clone()),
+                    Ok(_) => None,
+                })
+                .unwrap_or_else(|| "isn't part of the world as loaded".to_string());
+            self.roles.insert(file.path.clone(), FileRole::Problem(why));
+        }
         self.file_problems = built.problems;
         self.file_warnings = built.warnings;
         if let Some(w) = &self.world_toml_warning {
@@ -283,6 +343,27 @@ impl WorldEngine {
             [(_, id)] => id.clone(),
             _ => name.to_string(),
         }
+    }
+
+    /// Why `name` names no one thing, if it's a file name more than one
+    /// file has: "it matches more than one file: a.md, b.md".
+    pub fn link_ambiguity(&self, name: &str, kind: Option<EntityKind>) -> Option<String> {
+        let matches: Vec<&(EntityKind, String)> = self
+            .links
+            .get(name)?
+            .iter()
+            .filter(|(k, _)| kind.map_or(true, |want| *k == want))
+            .collect();
+        if matches.len() < 2 {
+            return None;
+        }
+        let mut files: Vec<String> = matches
+            .iter()
+            .filter_map(|key| self.things.get(key))
+            .map(|t| t.index.path.display().to_string())
+            .collect();
+        files.sort();
+        Some(format!("`{}` matches more than one file: {}", name, files.join(", ")))
     }
 
     /// Turn every reference in `entity` that names a file into the id of
@@ -428,7 +509,10 @@ impl WorldEngine {
                 let at = format!("object `{}`, action `{}`", id, name);
                 for (target, state) in &action.becomes {
                     match self.thing_by_id(target) {
-                        Err(e) => problems.push(format!("{}: `becomes:` {}", at, e)),
+                        Err(e) => match self.link_ambiguity(target, None) {
+                            Some(why) => problems.push(format!("{}: `becomes:` is ambiguous: {}", at, why)),
+                            None => problems.push(format!("{}: `becomes:` {}", at, e)),
+                        },
                         Ok(thing) if !thing.states.contains_key(state) => problems.push(format!(
                             "{}: `becomes:` names state `{}`, but {} `{}` has no such state file",
                             at,
@@ -644,10 +728,13 @@ impl WorldEngine {
             }
         }
         for (from, direction, target) in self.broken_connections() {
-            problems.push(format!(
-                "{}: connection `{}` points at unknown location `{}`",
-                from, direction, target
-            ));
+            match self.link_ambiguity(&target, Some(EntityKind::Location)) {
+                Some(why) => problems.push(format!("{}: connection `{}` is ambiguous: {}", from, direction, why)),
+                None => problems.push(format!(
+                    "{}: connection `{}` points at unknown location `{}`",
+                    from, direction, target
+                )),
+            }
         }
         if strict {
             let mut characters: Vec<&Character> = self.characters.values().collect();
@@ -1067,5 +1154,53 @@ mod tests {
         // A link to nothing is reported like any unknown id.
         engine.set_file(&d.join("castle/yard.md"), "---\nid: castle/yard\ntitle: Yard\ntype: location\nconnections:\n  east: \"[[castle/nowhere]]\"\n---\n");
         assert!(engine.current_problems(false).iter().any(|p| p.contains("`east` points at unknown location `castle/nowhere`")));
+    }
+
+    #[test]
+    fn a_file_name_two_files_share_is_reported_as_ambiguous() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        write(d, "castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\n---\n");
+        write(d, "forest/hall.md", "---\nid: forest/hall\ntitle: Hall\ntype: location\n---\n");
+        write(d, "yard.md", "---\nid: yard\ntitle: Yard\ntype: location\nconnections: { north: \"[[hall]]\" }\n---\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
+        let problems = engine.current_problems(false);
+        assert!(problems.iter().any(|p| p.starts_with("yard: connection `north` is ambiguous: `hall` matches more than one file:")
+            && p.contains("castle/hall.md") && p.contains("forest/hall.md")), "{:?}", problems);
+    }
+
+    #[test]
+    fn every_file_read_has_a_role() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        write(d, "castle/_index.md", "---\ntitle: Castle\n---\n");
+        write(d, "castle/vault/index.md", "---\nid: castle/vault\ntitle: Vault\ntype: location\nstate: shut\n---\n");
+        write(d, "castle/vault/shut.md", "---\ninherits: index\n---\n");
+        write(d, "castle/vault/chapters/after.md", "---\n---\n");
+        write(d, "castle/chapters/after.md", "---\n---\n");
+        write(d, "chapters/10-after.md", "---\n---\n");
+        write(d, "objects/templates/book.md", "---\ntitle: Book\n---\n");
+        write(d, "world/index.md", "---\ntitle: T\ntype: world\n---\n");
+        write(d, "broken.md", "nope\n");
+        write(d, ".obsidian/x.md", "nope\n");
+        write(d, "world.toml", "ignore = [\"drafts\"]\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
+        let role = |p: &str| engine.file_role(Path::new(p)).cloned();
+        let after = |scope: &str| ChapterKey { scope: PathBuf::from(scope), path: vec!["after".into()] };
+        assert_eq!(role("castle/vault/index.md"), Some(FileRole::Thing { kind: EntityKind::Location, id: "castle/vault".into() }));
+        assert_eq!(role("castle/vault/shut.md"), Some(FileRole::State { kind: EntityKind::Location, id: "castle/vault".into(), name: "shut".into() }));
+        assert_eq!(role("castle/vault/chapters/after.md"), Some(FileRole::Overlay { kind: EntityKind::Location, id: "castle/vault".into(), chapter: after("") }));
+        assert_eq!(role("castle/chapters/after.md"), Some(FileRole::AreaOverlay { area: "castle".into(), chapter: after("") }));
+        assert_eq!(role("chapters/10-after.md"), Some(FileRole::Chapter(after(""))));
+        assert_eq!(role("castle/_index.md"), Some(FileRole::Area));
+        assert_eq!(role("objects/templates/book.md"), Some(FileRole::Template));
+        assert_eq!(role("world/index.md"), Some(FileRole::World));
+        assert!(matches!(role("broken.md"), Some(FileRole::Problem(why)) if why.contains("frontmatter")));
+        assert_eq!(role(".obsidian/x.md"), None);
+        assert_eq!(engine.file_roles().count(), 9);
+        assert!(engine.is_ignored(Path::new("drafts/a.md")) && engine.is_ignored(Path::new(".git/x")));
+        assert!(!engine.is_ignored(Path::new("castle/hall.md")));
     }
 }
