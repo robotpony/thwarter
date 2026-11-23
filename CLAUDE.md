@@ -65,9 +65,11 @@ This project has Claude Code permissions configured in `.claude/settings.local.j
 ## Conventions
 
 **Session lanes.** Three Claude sessions share this checkout, each with its own lane (Bruce, 2026-11-23). Work that crosses a lane is sent to its owner as a message, not edited across lanes.
-- *thwarter commander*: docs and design (`README.md`, `REQUIREMENTS.md`, `design/`), `PLAN.md` and `BUGS.md` entries, conventions, and handing work to the coders.
-- *thwarter coder*: the engine, models, parsers and data layers, plus the `thwart` command-line tooling (`src/bin/`, `src/cli/`), with its tests, version bumps and `CHANGELOG.md` entries.
-- *thwarter console coder*: the console, the interactive REPL client for reading (playing) and writing (authoring) worlds, including its UX and reload, with its own tests and `CHANGELOG.md` entries.
+- *thwarter commander*: docs and design (`README.md`, `REQUIREMENTS.md` with the principles, `design/` apart from the requirements below), the content requirements (`design/CONTENT_REQUIREMENTS.md`), `PLAN.md` and `BUGS.md` entries, conventions, and handing work to the coders.
+- *thwarter coder*: the engine, models, parsers and data layers, plus the `thwart` command-line tooling (`src/bin/`, `src/cli/`), with its tests, version bumps and `CHANGELOG.md` entries. Owns `design/ENGINE_REQUIREMENTS.md` and `design/CLI_REQUIREMENTS.md`.
+- *thwarter console coder*: the console, the interactive REPL client for reading (playing) and writing (authoring) worlds, including its UX and reload, with its own tests and `CHANGELOG.md` entries. Owns `design/CONSOLE_REQUIREMENTS.md`, which Bruce works on with it directly.
+
+Each component's requirements have one owner (`REQUIREMENTS.md` › 5. Components). A change that crosses components goes through the commander as a message, never as an edit to another owner's document (Bruce, 2026-11-23).
 
 A coder who fixes a bug or finishes a task ticks it in `PLAN.md` or moves it to `BUGS.md` › Fixed in the same commit, and updates `design/ARCHITECTURE.md`'s status table if the change makes an entry true.
 

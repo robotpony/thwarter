@@ -5,6 +5,7 @@ This document used to hold the full P0 design: language rationale, module archit
 - **`design/DECISIONS.md`** — standing decisions (language choice, format choice) with context, alternatives, and trade-offs
 - **`design/ARCHITECTURE.md`** — module layout, engine responsibilities, and current implementation status
 - **`design/CONTENT_FORMAT.md`** — the content file format authors write against
+- **Requirements, one per component:** `design/CONTENT_REQUIREMENTS.md`, `design/ENGINE_REQUIREMENTS.md`, `design/CLI_REQUIREMENTS.md`, `design/CONSOLE_REQUIREMENTS.md`; the overview and principles are in `REQUIREMENTS.md`
 - **`design/STATES.md`** — states, bundles and chapters: how things change over a story (draft)
 - **`design/UNIT_TESTS.md`** — the unit test plan, in priority order
 - **`design/CLI_DESIGN.md`** — the command-line interface spec, with a status column showing what's actually built

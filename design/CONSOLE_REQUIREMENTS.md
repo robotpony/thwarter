@@ -21,8 +21,24 @@ The console is the interactive terminal client for writing and playing a world. 
 - REQ-CON-11: Play mode MUST be able to save a game and load it again, with `/save [name]` and `/load [name]` (`quicksave` when no name is given). Saves MUST NOT be written inside the world folder, since worlds are content repositories and saves would end up committed. They go in `$XDG_STATE_HOME/thwarter/saves/<world>/<name>.yaml` (`~/.local/state` when `$XDG_STATE_HOME` isn't set), where `<world>` is the world folder's name plus a short hash of its full path, so two worlds that are both called `test-world` don't share saves.
 - REQ-CON-12: Play state and edit-mode navigation are separate. `/play` resumes the game in progress where it was; `/play here` starts the game in, or moves the player to, the room edit mode is in, for playtesting from where the author is writing. Moving around in edit mode never moves the player. `/reload` during a game keeps the play state and drops anything that no longer exists, with a warning (REQ-CON-7).
 
+## Writing helpers
+
+Edit-mode tools that use a large language model (an AI) on the author's prose. Bruce asked for them on 2026-11-23: review prose, rewrite prose, flesh out points, and apply writing styles. The requirements below are the commander's first draft of that request, for the console coder to review with Bruce; items marked *proposed* go beyond what he asked.
+
+- REQ-CON-13: Edit mode MUST offer four writing helpers on prose: **review** (comments on the text, never changes it), **rewrite** (proposes new wording for the same content), **flesh out** (turns notes or points into prose), and **apply a style** (rewrites the text in a named writing style).
+- REQ-CON-14: A helper MUST NOT change a file by itself. It shows its proposal against the current text, and the author accepts it, edits it or discards it. An accepted proposal is saved through the writer like any other edit (REQ-ENG-7).
+- REQ-CON-15: A helper works on prose only (principle 8): a selection, a thing's description, one response block, or every section of a bundle. It MAY propose a `title`, and MUST NOT change any other frontmatter.
+- REQ-CON-16: A helper's proposal MUST keep every `{{ variable }}`, response marker and author comment in the text it changes. The console MUST check this and refuse a proposal that drops or alters one.
+- REQ-CON-17: A helper SHOULD send the model the context the prose sits in: the thing's frontmatter and title, its area, the current chapter's notes, and the style being applied. Author comments are context, not text to rewrite.
+- REQ-CON-18: A style is a Markdown file of guidance an author writes, such as voice, tense, tone and words to avoid. *Proposed*: styles live in `world/styles/<name>.md`, and a world, chapter or thing MAY name its default style.
+- REQ-CON-19: Sending prose to a model service publishes it to that service. The console MUST say which service and model a helper uses, MUST NOT send anything until the author has turned helpers on for that world, and MUST work fully with helpers off. API keys MUST come from the author's environment or tool configuration, never from the world folder.
+- REQ-CON-20: *Proposed*: helpers are authoring tools only. Play mode MUST NOT call a model, so generated text reaches a player only after an author has accepted it into a file (principle 6).
+- REQ-CON-21: *Proposed*: the model is configurable, defaulting to a current Claude model.
+
 ## Open questions
 
 1. ~~What does full editing look like on screen?~~ Decided 2026-11-23 (Bruce): in the terminal, inside the console, and it may take the whole terminal; REQ-CON-6.
 2. What can play mode do and not do? Assumed until Bruce says otherwise: in-game verbs only, no changes to content, game saves only (REQ-CON-3).
 3. Should `/new room north` also add the return exit (`south`) to the new room? Proposed: yes for compass directions and `up`/`down`, no for free-text directions. Implemented as proposed in 0.6.1, pending Bruce.
+4. Writing helpers: which model services to support (one, several, or a local model), and can "flesh out" also propose new things, such as rooms from an outline, or only prose?
+5. Writing helpers: where styles live, until `world/`'s layout is settled (`design/STATES.md` › Open questions).
