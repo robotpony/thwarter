@@ -60,6 +60,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
 - [ ] Renaming an id with every reference updated, and proposed renames for shared ids [coder, console] (`design/STATES.md` › Engine rules › Ids and names)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
+- [ ] Showing a template or built-in: `/template` in the console, and a `thwart show` option [console, coder] (REQ-CF-21)
 
 ## Phase 6 · Doors and play
 

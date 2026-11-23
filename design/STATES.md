@@ -257,6 +257,13 @@ objects/
 
 A template is never placed in the world itself. It's marked either way (Bruce, 2026-11-23): by living in a `templates/` folder, which can exist globally or in any scope and is a reserved name like `chapters`, or by `template: true` in its own frontmatter. Most doors and many objects are expected to be global templates (`locked-door`, `magic-door`, `fortified-door`) that hold their whole definition, so a specific door or object is mostly just a name and a template.
 
+Built in 0.22.0 (9ee03ed), and confirmed by the commander:
+- A template counts as part of the thing that names it. Its layers sit between the area's layers and the thing's own `index.md`, most distant template first, so the thing's own prose replaces a template's.
+- A bare template name is looked up in `templates/` folders from the thing's own folder out to the root, then in the built-ins. A name with a slash is a path from the root. A template's own `inherits:` is resolved from the template's folder. A state file's `inherits: index` still means its bundle's `index.md`.
+- A template never passes down `id`, `template:` or `state:`. A bundle used as a template passes down only its `index.md`.
+- A chain of more than 4 templates is a problem.
+- Built-ins are Markdown files in `src/builtins/`, compiled in. `scenery` has `title: Scenery` and `object_type: scenery`.
+
 Identical copies (three healing potions) are one thing with a count: `objects: { potion: 3 }`, with play state tracking how many are left. A copy that needs to differ becomes its own thing with its own file. Counts come after templates, when a world needs them.
 
 ## Built-in mechanics
