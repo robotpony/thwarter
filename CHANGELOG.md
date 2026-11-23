@@ -26,6 +26,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.3.0 (2026-11-23)
+
+### Added
+
+- The console watches the world's files and reloads when they change (REQ-CON-7). It prints what changed and what the reload said above the prompt, with the same rules as `/reload`. Only `.md` files and `world.toml` count; dotfiles and editor backups don't. Changes are settled for 300 ms, so one editor save is one reload. It watches only on a terminal, so piped runs and transcripts aren't affected. If watching can't start, the console says so, and `/reload` still works. New dependency: `notify-debouncer-mini`.
+
 ## 0.2.3 (2026-11-23)
 
 ### Added

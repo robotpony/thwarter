@@ -203,7 +203,7 @@ impl Console {
 
     /// Reloads from disk, keeping the room and place (REQ-CON-7). Keeps the
     /// old world if a file fails to parse or the current room is gone.
-    fn reload(&mut self) -> String {
+    pub(crate) fn reload(&mut self) -> String {
         let fresh = match World::load(&self.world.root) {
             Ok(world) => world,
             Err(e) => return format!("Reload failed, keeping the previous world: {}", e),

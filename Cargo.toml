@@ -1,6 +1,6 @@
 [package]
 name = "thwarter"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 description = "A Hugo-style engine for interactive fiction"
 authors = ["Thwarter Project"]
@@ -27,6 +27,7 @@ walkdir = "2.4"
 uuid = { version = "1.6", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 reedline = "0.53.0"
+notify-debouncer-mini = "0.8.0"
 
 [dev-dependencies]
 tempfile = "3.8"
