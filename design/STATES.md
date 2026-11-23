@@ -442,6 +442,51 @@ Full editing is a full-screen editor in the terminal (Bruce, 2026-11-23; `design
 
 Commands the console will need, *proposed*: `/state new <name>`, `/state set <name>` (the starting state), `/chapter new <number> <name>` at the root, and `/chapter overlay` inside a thing. Turning a one-file thing into a bundle (`lantern.md` → `lantern/index.md`) is a file move, which the writer refuses today; these commands are where it gets built.
 
+## Keys and clocks (proposed, Phase 6)
+
+The commander's proposals for Phase 6, not yet reviewed with Bruce.
+
+### Keys
+
+A built-in `locked-door` has to say which key opens each door, without each door restating the unlock action. The template names the key as a value, and each door sets it:
+
+```yaml
+# built-in: locked-door
+vars: { key: "" }
+actions:
+  unlock: { requires: { has: this.key }, becomes: { this: closed } }
+```
+
+```yaml
+# castle/doors/vault-door.md
+inherits: locked-door
+vars: { key: brass-key }
+```
+
+- `has:` takes an `id`, or a variable whose value is an `id` (`this.key`, `vault-door.key`). That's the only change to `requires:`. It still has one key, so principle 7 holds.
+- `becomes: { this: closed }` lets a template switch the thing that uses it.
+- `validate` warns about a locked door whose `key` is empty or names nothing.
+
+### Clocks
+
+Time is counted in turns, which the engine already keeps (`game.turn`). Everything else is built on states and values, with no new condition language.
+
+- **Changes over time.** A state MAY say `after: { turns: 20, becomes: stale }`: 20 turns after a thing enters that state, it switches. The count is per thing, from when it entered the state, so bread bought late goes stale late.
+- **A range** (`turns: 15-25`) picks a point in it, the first source of randomness.
+- **Game time.** `world/index.md` MAY set `start_time: "08:00"` and `minutes_per_turn: 5`. The engine then supplies `game.time` and `game.day` from the turn count. A world that sets nothing has turns only.
+- **Weather** is an ordinary bundle in `world/` with states and `after:`, so it changes the way bread spoils:
+
+```yaml
+# world/weather/clear.md
+inherits: index
+after: { turns: 10-30, becomes: rain }
+---
+The sky is clear.
+```
+
+  Rooms show it with `{{ weather.title }}` or a link, and actions can check it once `requires:` needs a state check.
+- **Randomness in prose.** A response MAY have several blocks with the same name, and play picks one each time, so "Ow." doesn't repeat word for word. The built-in replies already vary this way.
+
 ## Validation
 
 `thwart validate` (and `/reload`) will check:
@@ -460,6 +505,6 @@ Commands the console will need, *proposed*: `/state new <name>`, `/state set <na
 
 ## Open questions
 
-1. **Clocks and game values**: Bruce wants them (2026-11-23). Still to settle: is time counted in turns or in game time, and how weather and randomness are declared. Phase 6.
+1. **Clocks and game values**: proposed above (Keys and clocks), to review with Bruce. Phase 6.
 2. **Showing play state**: it MUST be visible in a sidebar in the console and be queryable (Bruce, 2026-11-23). The layout and the query commands are console work for `design/CONSOLE_REQUIREMENTS.md`. Phase 5.
-3. **Keys for built-in locked doors**: a `locked-door` template needs to say which key opens each door, which means `requires: { has: this.key }`, a variable inside a condition. Phase 6.
+3. **Keys for built-in locked doors**: proposed above (Keys and clocks), to review with Bruce. Phase 6.
