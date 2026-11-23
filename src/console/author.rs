@@ -200,7 +200,7 @@ impl Console {
 
     pub(super) fn set(&mut self, args: &[&str]) -> String {
         let Some(current) = self.current_file() else {
-            return "/set changes the room, character or object you're in; cd to one first.".to_string();
+            return "/set changes the room, character or object you're in; go to one first.".to_string();
         };
         let [key, value @ ..] = args else {
             return "Usage: /set <key> <value>, for example /set title The Old Well".to_string();
@@ -226,7 +226,7 @@ impl Console {
 
     pub(super) fn link(&mut self, args: &[&str]) -> String {
         let Some(here) = self.current_room() else {
-            return "/link changes an exit of the room you're in; cd to a room first.".to_string();
+            return "/link changes an exit of the room you're in; go to a room first.".to_string();
         };
         let [direction, target] = args else {
             return "Usage: /link <direction> <room>, for example /link north castle/great-hall".to_string();
@@ -246,7 +246,7 @@ impl Console {
 
     pub(super) fn unlink(&mut self, args: &[&str]) -> String {
         let Some(here) = self.current_room() else {
-            return "/unlink removes an exit of the room you're in; cd to a room first.".to_string();
+            return "/unlink removes an exit of the room you're in; go to a room first.".to_string();
         };
         let [direction] = args else {
             return "Usage: /unlink <direction>".to_string();

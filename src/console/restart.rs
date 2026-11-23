@@ -219,7 +219,7 @@ mod tests {
         before.handle("take lantern");
         before.handle("n");
         before.handle("/edit");
-        before.handle("cd /npcs/elder");
+        before.handle("go /npcs/elder");
         let history = vec!["take lantern".to_string(), "n".to_string()];
         let snapshot = before.write_snapshot(&history, &dir.path().join("restart")).unwrap();
 
@@ -239,7 +239,7 @@ mod tests {
     fn what_no_longer_exists_starts_fresh_with_a_notice() {
         let (dir, root) = tiny_copy();
         let mut before = Console::open(&root, Mode::Edit).unwrap();
-        before.handle("cd /village/well");
+        before.handle("go /village/well");
         let snapshot = before.write_snapshot(&[], &dir.path().join("restart")).unwrap();
         fs::remove_file(root.join("village/well.md")).unwrap();
 

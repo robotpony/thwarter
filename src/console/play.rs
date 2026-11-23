@@ -74,7 +74,7 @@ impl Console {
     /// edit mode is in, keeping what they carry (REQ-CON-12).
     pub(super) fn play_here(&mut self) -> String {
         let Some(room) = self.edit_room() else {
-            return "/play here needs edit mode to be in a room. /edit, cd to one, then /play here.".to_string();
+            return "/play here needs edit mode to be in a room. /edit, go to one, then /play here.".to_string();
         };
         match self.game.as_mut() {
             Some(state) => state.location = room,

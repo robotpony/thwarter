@@ -30,6 +30,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.17.0 (2026-11-23)
+
+### Changed
+
+- Edit mode moves with play mode's words (REQ-CON-4, Bruce, 2026-11-23), so the author walks the world like a game master: directions and `go <direction>` follow exits, `go <name>` goes to any room, area, folder, character or object by its path, id, last path segment or title (a name that fits several asks which), `go back` returns to the place before, `go /` goes to the root, `look` shows where you are and `examine <thing>` (`x`) shows a person or thing in the room without going to it. Arriving at a folder lists what it holds; at a character or object, it names the file.
+
+### Removed
+
+- `cd`, `ls` and `pwd` in edit mode. Typing one says what replaced it. Recover with `git show 3818dfe:src/console/session.rs`.
+
 ## 0.16.0 (2026-11-23)
 
 ### Added

@@ -3,7 +3,7 @@
 # copy: yes
 Editing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
 1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
-> cd village/well
+> go village/well
 The Well (room)
 > /new room north tower The Old Tower
 Created village/tower, The Old Tower, through the north exit of village/well, with a south exit back.
@@ -19,17 +19,25 @@ Exits:
 Characters: none
 
 Objects: none
-> cd s
+> go s
 The Well (room)
 > /new room n gatehouse
 village/well already has a north exit, to village/tower. Use /link north <room> to change it.
 > /new room behind cellar
 Created village/cellar, Cellar, through the behind exit of village/well.
 Now at village/cellar.
-> cd behind
-No folder, room, exit, character or object called `behind` here.
-> pwd
-village/cellar
+> go behind
+Nothing called `behind` here or anywhere in the world.
+> look
+Cellar (village/cellar)
+
+(no description yet)
+
+Exits: none
+
+Characters: none
+
+Objects: none
 > /link up village/attic
 Linked village/cellar up to village/attic.
 This adds 1 problem(s):
@@ -38,14 +46,14 @@ This adds 1 problem(s):
 Removed the up exit from village/cellar.
 > /unlink up
 Not saved: `connections` has no entry `up`
-> cd /village/square
+> go /village/square
 Village Square (room)
-> cd bench
+> go bench
 `bench` is scenery, with no card yet. /new object bench gives it one.
 > /new object bench
 Created object bench, Bench; village/square already lists it, and now it has a card.
-> cd bench
-Bench (object)
+> go bench
+Bench (object), objects/bench.md
 > look
 Bench (bench)
 objects/bench.md, scenery
@@ -53,9 +61,9 @@ objects/bench.md, scenery
 (no description yet)
 
 Actions: none
-> cd ..
-objects/
-> cd /village/square
+> go back
+Village Square (room)
+> go /village/square
 Village Square (room)
 > /new object bench furniture Stone Bench
 Not created: objects/bench.md already exists
@@ -80,8 +88,8 @@ Objects:
   Brass Lantern (lantern)
   Bench (bench)
   Rope (rope)
-> cd smith
-The Smith (character)
+> go smith
+The Smith (character), npcs/smith.md
 > /set attributes.strength 12
 Set attributes.strength on smith.
 > /set inventory rope, lantern
@@ -98,15 +106,15 @@ Starts in: village/square
 Carries: rope, lantern
 > /new character npcs/bad
 Character and object ids are bare names, without folders: `bad`.
-> cd /
-/
+> go /
+/  3 items: npcs/, objects/, village/
 > /set title Nope
-/set changes the room, character or object you're in; cd to one first.
+/set changes the room, character or object you're in; go to one first.
 > /new room village/garden
 Created village/garden, Garden.
 Now at village/garden.
-> cd /
-/
+> go /
+/  3 items: npcs/, objects/, village/
 > /new room village/garden
 Not created: village/garden.md already exists
 > /reload

@@ -21,9 +21,22 @@ You see: Brass Lantern, Bench.
 Here: The Elder.
 > /edit
 Edit mode, at village/square.
-> pwd
-village/square
-> cd n
+> look
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  village/well
+  east   village/inn  (missing)
+
+Characters:
+  The Elder (elder)
+
+Objects:
+  Brass Lantern (lantern)
+  bench  (no card)
+> go n
 The Well (room)
 > /play
 Play mode.
@@ -68,13 +81,12 @@ Console commands, in either mode:
   /help           this list
   /quit           leave the console
 
-Edit mode moves through the world's folders:
-  ls              list this folder, or show this file
-  cd <name>       go into a folder, room, character or object
-  cd <direction>  follow an exit from this room (north, n, up, ...)
-  cd ..           go up one folder;  cd /  goes to the world root
-  pwd             where you are
-  look            show the room, character or object you're in
+Edit mode moves through the world as play does:
+  north, n, go up, ...  follow an exit from this room
+  go <name>             go to a room, area, folder, character or object
+  go back               back to where you were;  go /  goes to the world root
+  look                  show where you are: a room, a thing, or a folder
+  examine <thing>, x    show a person or thing here without going to it
 
 Changing content (each saves the file):
   /new room <direction> <id> [title]   a room through a new exit from this one
@@ -97,5 +109,18 @@ Type /help for commands.
 Reloaded: 2 room(s), 1 character(s), 1 object(s).
 1 warning(s):
   village/square: connection `east` points at unknown location `village/inn`
-> pwd
-village/square
+> look
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  village/well
+  east   village/inn  (missing)
+
+Characters:
+  The Elder (elder)
+
+Objects:
+  Brass Lantern (lantern)
+  bench  (no card)

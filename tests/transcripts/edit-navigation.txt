@@ -2,18 +2,16 @@
 # mode: edit
 Editing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
 1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
-> pwd
-/
-> ls
+> look
 npcs/     1 file(s)
 objects/  1 file(s)
 village/  2 file(s)
-> cd village
-village/
-> ls
+> go village
+village/  2 rooms: square, well
+> look
 square  Village Square  (room)
 well    The Well  (room)
-> cd square
+> go square
 Village Square (room)
 > look
 Village Square (village/square)
@@ -30,42 +28,50 @@ Characters:
 Objects:
   Brass Lantern (lantern)
   bench  (no card)
-> cd n
+> n
 The Well (room)
-> cd s
+> s
 Village Square (room)
-> cd east
+> go east
 The east exit leads to `village/inn`, which isn't written yet.
-> cd elder
-The Elder (character)
-> pwd
-npcs/elder
-> cd ..
-npcs/
-> ls
-elder  The Elder  (character)
-> cd /
-/
-> cd village/square
+> go elder
+The Elder (character), npcs/elder.md
+> go back
 Village Square (room)
-> cd lantern
-Brass Lantern (object)
-> look
+> examine lantern
 Brass Lantern (lantern)
 objects/lantern.md, tool
 
 A dented brass lantern with a little oil left.
 
 Actions: light
-> cd /village/square
-Village Square (room)
-> cd bench
+> x bench
 `bench` is scenery, with no card yet. /new object bench gives it one.
-> cd nowhere
-No folder, room, exit, character or object called `nowhere` here.
+> examine nothing
+There's no `nothing` here. go nothing looks for it anywhere in the world.
+> go objects
+objects/  1 thing: lantern
+> look
+lantern  Brass Lantern  (object)
+> n
+There are no exits here: objects/ isn't a room. go <name> goes anywhere.
+> go lantern
+Brass Lantern (object), objects/lantern.md
+> go /
+/  3 items: npcs/, objects/, village/
+> go well
+The Well (room)
+> go back
+/  3 items: npcs/, objects/, village/
+> go nowhere
+Nothing called `nowhere` here or anywhere in the world.
+> go
+Go where?
 > dance
 Edit mode doesn't know `dance`. Type /help for commands.
-> ls extra
-`ls` takes no name here; cd to it first.
+> cd village
+Edit mode moves as play does now: go <name>, a direction, go back, look. (`cd` is gone.)
+> take lantern
+That's a play-mode verb. Here, /new and /set change what's in a room; /play here tries it.
 > /quit
 Bye.

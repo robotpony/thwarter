@@ -3,6 +3,7 @@
 //! `/reload` (REQ-CON-7). Play mode is in `play.rs`, authoring in
 //! `author.rs`.
 
+use super::verbs::{parse, Verb, DIRECTIONS};
 use super::view;
 use super::world::{Kind, World};
 use super::Mode;
@@ -50,7 +51,12 @@ pub struct Console {
     pub(super) interactive: bool,
     /// The file a `/edit <kind>` asked to open, for the terminal loop.
     pub(super) pending_edit: Option<super::full_edit::EditTarget>,
+    /// Where edit mode has been, most recent last, for `go back`.
+    pub(super) trail: Vec<Place>,
 }
+
+/// How many places `go back` remembers.
+const TRAIL_LENGTH: usize = 100;
 
 pub(super) const COMPASS_ALIASES: &[(&str, &str)] = &[
     ("n", "north"),
@@ -78,6 +84,7 @@ impl Console {
             warnings_before: None,
             interactive: false,
             pending_edit: None,
+            trail: Vec::new(),
         };
         if mode == Mode::Play {
             if let Some(room) = console.world.default_room() {
@@ -179,13 +186,12 @@ impl Console {
         match self.mode {
             Mode::Edit => lines.extend([
                 String::new(),
-                "Edit mode moves through the world's folders:".to_string(),
-                "  ls              list this folder, or show this file".to_string(),
-                "  cd <name>       go into a folder, room, character or object".to_string(),
-                "  cd <direction>  follow an exit from this room (north, n, up, ...)".to_string(),
-                "  cd ..           go up one folder;  cd /  goes to the world root".to_string(),
-                "  pwd             where you are".to_string(),
-                "  look            show the room, character or object you're in".to_string(),
+                "Edit mode moves through the world as play does:".to_string(),
+                "  north, n, go up, ...  follow an exit from this room".to_string(),
+                "  go <name>             go to a room, area, folder, character or object".to_string(),
+                "  go back               back to where you were;  go /  goes to the world root".to_string(),
+                "  look                  show where you are: a room, a thing, or a folder".to_string(),
+                "  examine <thing>, x    show a person or thing here without going to it".to_string(),
                 String::new(),
                 "Changing content (each saves the file):".to_string(),
                 "  /new room <direction> <id> [title]   a room through a new exit from this one".to_string(),
@@ -285,22 +291,99 @@ impl Console {
 
     // Edit-mode navigation (REQ-CON-4).
 
+    /// Edit mode moves with play mode's words (REQ-CON-4): the author
+    /// walks the world like a game master, not a file system.
     fn edit_input(&mut self, line: &str) -> String {
-        let mut words = line.split_whitespace();
-        let verb = words.next().unwrap_or("");
-        let arg: Vec<&str> = words.collect();
-        let arg = arg.join(" ");
-        match (verb, arg.as_str()) {
-            ("pwd", _) => self.pwd(),
-            ("ls", "") => self.ls(),
-            ("look" | "l", "") => self.look(),
-            ("cd", "") => {
-                self.place = Place::Dir(String::new());
-                self.pwd()
+        let first = line.split_whitespace().next().unwrap_or("");
+        if matches!(first, "cd" | "ls" | "pwd") {
+            return format!(
+                "Edit mode moves as play does now: go <name>, a direction, go back, look. (`{}` is gone.)",
+                first
+            );
+        }
+        match parse(line) {
+            Verb::Look => self.look(),
+            Verb::Examine(noun) => self.examine(&noun),
+            Verb::Go(target) => self.go(&target),
+            Verb::Incomplete(question) => question,
+            Verb::Take(_) | Verb::Inventory => {
+                "That's a play-mode verb. Here, /new and /set change what's in a room; /play here tries it.".to_string()
             }
-            ("cd", target) => self.cd(target),
-            ("ls" | "look" | "l", _) => format!("`{}` takes no name here; cd to it first.", verb),
-            _ => format!("Edit mode doesn't know `{}`. Type /help for commands.", verb),
+            Verb::Unknown(_) => format!("Edit mode doesn't know `{}`. Type /help for commands.", first),
+        }
+    }
+
+    /// `go <direction or name>`, `go back` and `go /`.
+    fn go(&mut self, target: &str) -> String {
+        let target = target.trim();
+        if target == "back" {
+            return match self.trail.pop() {
+                Some(place) => {
+                    self.place = place;
+                    self.arrival()
+                }
+                None => "There's nowhere to go back to yet.".to_string(),
+            };
+        }
+        match self.resolve(target) {
+            Ok(place) => {
+                if place != self.place {
+                    self.trail.push(std::mem::replace(&mut self.place, place));
+                    if self.trail.len() > TRAIL_LENGTH {
+                        self.trail.remove(0);
+                    }
+                }
+                self.arrival()
+            }
+            Err(message) => message,
+        }
+    }
+
+    /// What edit mode says on arriving somewhere: a room's or thing's
+    /// title, or what a folder holds.
+    fn arrival(&self) -> String {
+        match &self.place {
+            Place::File(path) => match self.world.files.get(path) {
+                Some(entry) if entry.kind == Kind::Room => format!("{} (room)", entry.title),
+                Some(entry) if entry.kind == Kind::Broken => format!("{}.md (doesn't parse)", path),
+                Some(entry) => format!("{} ({}), {}.md", entry.title, entry.kind.label(), path),
+                None => self.pwd(),
+            },
+            Place::Dir(dir) => {
+                let prefix = if dir.is_empty() { String::new() } else { format!("{}/", dir) };
+                let child = |path: &str| -> Option<String> {
+                    let rest = path.strip_prefix(&prefix)?;
+                    (!rest.is_empty() && !rest.contains('/')).then(|| rest.to_string())
+                };
+                let folders: Vec<String> = self.world.dirs.iter().filter_map(|d| child(d)).collect();
+                let files: Vec<(String, Kind)> =
+                    self.world.files.iter().filter_map(|(p, e)| child(p).map(|n| (n, e.kind))).collect();
+                let mut names: Vec<String> = folders.iter().map(|f| format!("{}/", f)).collect();
+                names.extend(files.iter().map(|(n, _)| n.clone()));
+                if names.is_empty() {
+                    return format!("{}  nothing here yet", self.pwd());
+                }
+                let noun = if folders.is_empty() && files.iter().all(|(_, k)| *k == Kind::Room) {
+                    "room"
+                } else if folders.is_empty() && files.iter().all(|(_, k)| matches!(k, Kind::Object | Kind::Character)) {
+                    "thing"
+                } else {
+                    "item"
+                };
+                let plural = if names.len() == 1 { "" } else { "s" };
+                format!("{}  {} {}{}: {}", self.pwd(), names.len(), noun, plural, names.join(", "))
+            }
+        }
+    }
+
+    /// `examine <thing>`: a person or thing here, shown without going to it.
+    fn examine(&self, noun: &str) -> String {
+        match self.resolve_here(noun) {
+            Some(Ok(Place::File(path))) => self.view_of(&path),
+            Some(Ok(Place::Dir(_))) | None => {
+                format!("There's no `{}` here. go {} looks for it anywhere in the world.", noun, noun)
+            }
+            Some(Err(message)) => message,
         }
     }
 
@@ -309,13 +392,6 @@ impl Console {
             Place::Dir(dir) if dir.is_empty() => "/".to_string(),
             Place::Dir(dir) => format!("{}/", dir),
             Place::File(path) => path.clone(),
-        }
-    }
-
-    fn ls(&self) -> String {
-        match &self.place {
-            Place::Dir(dir) => self.list_dir(dir),
-            Place::File(_) => self.look(),
         }
     }
 
@@ -353,11 +429,16 @@ impl Console {
     }
 
     fn look(&self) -> String {
-        let path = match (&self.mode, &self.place) {
-            (Mode::Play, _) => return self.play_look(),
-            (Mode::Edit, Place::Dir(dir)) => return self.list_dir(dir),
-            (Mode::Edit, Place::File(path)) => path.clone(),
-        };
+        match (&self.mode, &self.place) {
+            (Mode::Play, _) => self.play_look(),
+            (Mode::Edit, Place::Dir(dir)) => self.list_dir(dir),
+            (Mode::Edit, Place::File(path)) => self.view_of(path),
+        }
+    }
+
+    /// The edit-mode view of the content file at `path`.
+    fn view_of(&self, path: &str) -> String {
+        let path = path.to_string();
         let Some(entry) = self.world.files.get(&path) else {
             return format!("{} is not in the world.", path);
         };
@@ -388,63 +469,20 @@ impl Console {
         }
     }
 
-    fn cd(&mut self, target: &str) -> String {
-        match self.resolve(target) {
-            Ok(place) => {
-                self.place = place;
-                if let Place::File(path) = &self.place {
-                    if let Some(entry) = self.world.files.get(path) {
-                        if entry.kind != Kind::Broken {
-                            return format!("{} ({})", entry.title, entry.kind.label());
-                        }
-                    }
-                }
-                self.pwd()
-            }
-            Err(message) => message,
-        }
-    }
-
-    /// Finds the place `target` names, trying in turn: `/` and `..`; an
-    /// exit from this room; a character or object this room holds; a path
-    /// relative to this folder; a path from the world root.
+    /// Finds the place `target` names, trying in turn: `/`; an exit, person
+    /// or thing here (`resolve_here`); a path from this folder or the world
+    /// root; then a character, object, room, area or folder anywhere, by id
+    /// or name. A name that fits several places is a question.
     fn resolve(&self, target: &str) -> Result<Place, String> {
         let target = target.trim();
         if target == "/" {
             return Ok(Place::Dir(String::new()));
         }
-        if target == ".." {
-            return Ok(Place::Dir(self.parent_dir()));
+        if let Some(found) = self.resolve_here(target) {
+            return found;
         }
-
-        if let Place::File(path) = &self.place {
-            if let Some(entry) = self.world.files.get(path).filter(|e| e.kind == Kind::Room) {
-                if let Some(location) = self.world.engine.get_location(&entry.id) {
-                    let direction = COMPASS_ALIASES
-                        .iter()
-                        .find(|(short, _)| *short == target)
-                        .map(|(_, long)| *long)
-                        .unwrap_or(target);
-                    if let Some(to) = location.connections.get(direction) {
-                        return match self.world.path_of(Kind::Room, to) {
-                            Some(path) => Ok(Place::File(path)),
-                            None => Err(format!("The {} exit leads to `{}`, which isn't written yet.", direction, to)),
-                        };
-                    }
-                    if location.characters.iter().any(|c| c == target) {
-                        return self
-                            .world
-                            .path_of(Kind::Character, target)
-                            .map(Place::File)
-                            .ok_or_else(|| format!("`{}` is here but has no character card.", target));
-                    }
-                    if location.objects.iter().any(|o| o == target) {
-                        return self.world.path_of(Kind::Object, target).map(Place::File).ok_or_else(|| {
-                            format!("`{}` is scenery, with no card yet. /new object {} gives it one.", target, target)
-                        });
-                    }
-                }
-            }
+        if DIRECTIONS.contains(&target) && !matches!(self.current_kind(), Some(Kind::Room)) {
+            return Err(format!("There are no exits here: {} isn't a room. go <name> goes anywhere.", self.pwd()));
         }
 
         let trimmed = target.trim_end_matches('/');
@@ -459,7 +497,71 @@ impl Console {
                 return Ok(Place::Dir(candidate));
             }
         }
-        Err(format!("No folder, room, exit, character or object called `{}` here.", target))
+
+        for kind in [Kind::Character, Kind::Object] {
+            if let Some(path) = self.world.path_of(kind, trimmed) {
+                return Ok(Place::File(path));
+            }
+        }
+        let wanted = trimmed.to_lowercase();
+        let last = |path: &str| path.rsplit('/').next().unwrap_or(path).to_lowercase();
+        let mut found: Vec<Place> = self
+            .world
+            .files
+            .iter()
+            .filter(|(path, e)| e.kind != Kind::Broken && (last(path) == wanted || e.title.to_lowercase() == wanted))
+            .map(|(path, _)| Place::File(path.clone()))
+            .collect();
+        found.extend(self.world.dirs.iter().filter(|d| !d.is_empty() && last(d) == wanted).map(|d| Place::Dir(d.clone())));
+        match found.len() {
+            0 => Err(format!("Nothing called `{}` here or anywhere in the world.", target)),
+            1 => Ok(found.remove(0)),
+            _ => {
+                let names: Vec<String> = found
+                    .iter()
+                    .map(|p| match p {
+                        Place::File(path) => path.clone(),
+                        Place::Dir(dir) => format!("{}/", dir),
+                    })
+                    .collect();
+                Err(format!("Which do you mean: {}?", names.join(", ")))
+            }
+        }
+    }
+
+    /// An exit from this room, or a person or thing in it, if `target`
+    /// names one. `None` when it names nothing here.
+    fn resolve_here(&self, target: &str) -> Option<Result<Place, String>> {
+        let Place::File(path) = &self.place else { return None };
+        let entry = self.world.files.get(path).filter(|e| e.kind == Kind::Room)?;
+        let location = self.world.engine.get_location(&entry.id)?;
+        let direction = COMPASS_ALIASES.iter().find(|(short, _)| *short == target).map(|(_, long)| *long).unwrap_or(target);
+        if let Some(to) = location.connections.get(direction) {
+            return Some(match self.world.path_of(Kind::Room, to) {
+                Some(path) => Ok(Place::File(path)),
+                None => Err(format!("The {} exit leads to `{}`, which isn't written yet.", direction, to)),
+            });
+        }
+        if location.characters.iter().any(|c| c == target) {
+            return Some(
+                self.world
+                    .path_of(Kind::Character, target)
+                    .map(Place::File)
+                    .ok_or_else(|| format!("`{}` is here but has no character card.", target)),
+            );
+        }
+        if location.objects.iter().any(|o| o == target) {
+            return Some(self.world.path_of(Kind::Object, target).map(Place::File).ok_or_else(|| {
+                format!("`{}` is scenery, with no card yet. /new object {} gives it one.", target, target)
+            }));
+        }
+        None
+    }
+
+    /// The kind of file edit mode is in, if it's in one.
+    fn current_kind(&self) -> Option<Kind> {
+        let Place::File(path) = &self.place else { return None };
+        self.world.files.get(path).map(|e| e.kind)
     }
 
     /// The folder this place is in: itself for a folder, its parent for a file.
@@ -533,7 +635,7 @@ mod tests {
 
     fn console_at_well(dir: &tempfile::TempDir) -> Console {
         let mut console = Console::open(dir.path(), Mode::Edit).unwrap();
-        console.handle("cd village/well");
+        console.handle("go village/well");
         assert_eq!(console.pwd(), "village/well");
         console
     }
@@ -560,7 +662,7 @@ mod tests {
         let (out, _) = console.handle("/reload");
         assert!(out.starts_with("Reload failed, keeping the previous world:"), "{}", out);
         assert!(out.contains("square.md"), "{}", out);
-        assert!(console.handle("cd s").0.starts_with("Village Square"), "old world still loaded");
+        assert!(console.handle("go s").0.starts_with("Village Square"), "old world still loaded");
     }
 
     #[test]
@@ -601,7 +703,7 @@ mod tests {
     fn reload_moves_up_a_folder_when_the_current_card_is_gone() {
         let dir = copy_fixture();
         let mut console = console_at_well(&dir);
-        console.handle("cd /npcs/elder");
+        console.handle("go /npcs/elder");
         fs::remove_file(dir.path().join("npcs/elder.md")).unwrap();
 
         let (out, _) = console.handle("/reload");

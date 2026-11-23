@@ -20,7 +20,7 @@ pub enum Verb {
 }
 
 /// Directions a player can type with no `go`.
-const DIRECTIONS: &[&str] = &[
+pub(super) const DIRECTIONS: &[&str] = &[
     "north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest", "up", "down", "in", "out",
 ];
 

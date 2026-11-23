@@ -85,9 +85,22 @@ There's no save called `nothing`. Saves: quicksave.
 Not saved: save names use letters, digits, `-` and `_`: `../escape` doesn't.
 > /edit
 Edit mode, at village/square.
-> pwd
-village/square
-> cd /village/well
+> look
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  village/well
+  east   village/inn  (missing)
+
+Characters:
+  The Elder (elder)
+
+Objects:
+  Brass Lantern (lantern)
+  bench  (no card)
+> go /village/well
 The Well (room)
 > /new object rope tool
 Created object rope, Rope, placed in village/well.

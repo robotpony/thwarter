@@ -193,7 +193,7 @@ impl Console {
     fn edit_target_here(&self, kind: Kind) -> Result<EditTarget, String> {
         let label = kind.label();
         let Place::File(path) = &self.place else {
-            return Err(format!("/edit {} edits the {} you're in. cd to one, or /edit {} <id>.", label, label, label));
+            return Err(format!("/edit {} edits the {} you're in. Go to one, or /edit {} <id>.", label, label, label));
         };
         let entry = self.world.files.get(path).ok_or_else(|| format!("{} is not in the world.", path))?;
         match entry.kind {
@@ -286,7 +286,7 @@ mod tests {
     fn console_at(root: &Path, place: &str) -> Console {
         let mut console = Console::open(root, Mode::Edit).unwrap();
         console.interactive = true;
-        console.handle(&format!("cd {}", place));
+        console.handle(&format!("go {}", place));
         console
     }
 
@@ -363,8 +363,8 @@ mod tests {
         let (_dir, root) = tiny_copy();
         let mut console = console_at(&root, "village/square");
         assert_eq!(console.handle("/edit character").0, "village/square is a room, not a character: /edit room opens it.");
-        console.handle("cd /");
-        assert_eq!(console.handle("/edit room").0, "/edit room edits the room you're in. cd to one, or /edit room <id>.");
+        console.handle("go /");
+        assert_eq!(console.handle("/edit room").0, "/edit room edits the room you're in. Go to one, or /edit room <id>.");
         assert_eq!(console.handle("/edit object rope").0, "No object `rope` here or in the world. /new object rope <type> makes one.");
         assert!(console.take_pending_edit().is_none());
     }
