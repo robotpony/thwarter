@@ -102,7 +102,14 @@ pub struct Thing {
     pub overlays: BTreeMap<ChapterKey, Layer>,
     /// Overlays from the folders above it, outermost folder first.
     pub area_overlays: Vec<AreaOverlay>,
+    /// The templates it inherits from, the most distant first
+    /// (`inherits:`, then that template's `inherits:`, and so on).
+    pub templates: Vec<Layer>,
 }
+
+/// The most templates one thing may chain through (`design/STATES.md` ›
+/// Inheritance, *proposed*).
+pub const MAX_TEMPLATE_DEPTH: usize = 4;
 
 impl Thing {
     /// The layers for one version, bottom first: the folders' overlays
@@ -129,6 +136,9 @@ impl Thing {
                     layers.push((&o.layer, true));
                 }
             }
+        }
+        for template in &self.templates {
+            layers.push((template, false));
         }
         layers.push((&self.index, false));
         if let Some(layer) = state.and_then(|s| self.states.get(s)) {
@@ -431,15 +441,7 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
         match classify(&rel(&file.path), &bundle_dirs) {
             Role::Excluded => {}
             Role::Invalid(reason) => built.problems.push(format!("{}: {}", shown, reason)),
-            Role::Entity { bundle } => {
-                if layer.has_key("inherits") {
-                    built.problems.push(format!(
-                        "{}: `inherits:` names a template, and templates aren't supported yet",
-                        shown
-                    ));
-                }
-                entities.push((layer, bundle));
-            }
+            Role::Entity { bundle } => entities.push((layer, bundle)),
             Role::State { bundle, name } => {
                 strip_identity(&mut layer, "a state file", &mut built.problems);
                 match layer.metadata.get("inherits") {
@@ -517,9 +519,33 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
         }
     }
 
+    // Every file a template name can find: by its path from the root
+    // without `.md`, and a bundle by its folder.
+    let mut library: BTreeMap<String, Layer> = BTreeMap::new();
+    for file in files {
+        let (Ok(layer), true) = (&file.layer, file.path.starts_with(root) || root.as_os_str().is_empty()) else { continue };
+        let parts = names(&rel(&file.path));
+        if ignored(&parts, ignore) || world_file(&parts).is_some() {
+            continue;
+        }
+        let key = rel(&file.path).with_extension("");
+        let key = key.to_string_lossy().replace('\\', "/");
+        if let Some(folder) = key.strip_suffix("/index") {
+            library.insert(folder.to_string(), layer.clone());
+        }
+        library.insert(key, layer.clone());
+    }
+
     for (index, bundle) in entities {
         let relative = rel(&index.path);
-        if let Some(thing) = build_thing(index, relative, bundle, &states, &overlays, &area_overlays, &built.chapters.clone(), &mut built) {
+        let templates = match template_chain(&index, &relative, bundle.as_deref(), &library, root) {
+            Ok(chain) => chain,
+            Err(why) => {
+                built.problems.push(format!("{}: {}", index.path.display(), why));
+                Vec::new()
+            }
+        };
+        if let Some(thing) = build_thing(index, relative, bundle, templates, &states, &overlays, &area_overlays, &built.chapters.clone(), &mut built) {
             built.things.push(thing);
         }
     }
@@ -647,11 +673,74 @@ fn build_chapters(
     chapters
 }
 
+/// The template `name` means, seen from the folder `scope`: a path from
+/// the world root, or a bare name looked up in `templates/` folders from
+/// `scope` outward to the root, then among the built-ins.
+fn find_template(name: &str, scope: &Path, library: &BTreeMap<String, Layer>) -> Option<Layer> {
+    if name.contains('/') {
+        return library.get(name).cloned();
+    }
+    let mut dir = Some(scope);
+    while let Some(d) = dir {
+        let key = d.join("templates").join(name).to_string_lossy().replace('\\', "/");
+        if let Some(layer) = library.get(&key) {
+            return Some(layer.clone());
+        }
+        dir = if d.as_os_str().is_empty() { None } else { Some(d.parent().unwrap_or(Path::new(""))) };
+    }
+    super::builtins::builtin(name)
+}
+
+/// The templates a thing inherits from, the most distant first, each
+/// without its `id`, `template:` or `state:`, which never pass down.
+fn template_chain(
+    index: &Layer,
+    relative: &Path,
+    bundle: Option<&Path>,
+    library: &BTreeMap<String, Layer>,
+    root: &Path,
+) -> Result<Vec<Layer>, String> {
+    let mut chain: Vec<Layer> = Vec::new();
+    let mut seen: Vec<PathBuf> = vec![index.path.clone()];
+    let mut current = index.clone();
+    let mut scope = bundle.map(Path::to_path_buf).unwrap_or_else(|| relative.parent().map(Path::to_path_buf).unwrap_or_default());
+    while let Some(value) = current.metadata.get("inherits") {
+        let name = crate::parsers::id_value(value).ok_or("`inherits:` names one template")?;
+        if chain.len() == MAX_TEMPLATE_DEPTH {
+            return Err(format!("its templates chain more than {} deep; `{}` is one too many", MAX_TEMPLATE_DEPTH, name));
+        }
+        let template = find_template(&name, &scope, library).ok_or_else(|| {
+            let where_ = if name.contains('/') { format!("no file {}.md", name) } else { "no templates/ folder from here to the root has it, and no built-in does".to_string() };
+            format!("`inherits: {}` names no template: {}", name, where_)
+        })?;
+        if seen.contains(&template.path) {
+            return Err(format!("`inherits: {}` loops back to {}", name, template.path.display()));
+        }
+        seen.push(template.path.clone());
+        let mut passed = template.clone();
+        for key in ["id", "template", "state"] {
+            passed.metadata.remove(key);
+        }
+        chain.push(passed);
+        scope = template
+            .path
+            .strip_prefix(root)
+            .unwrap_or(&template.path)
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default();
+        current = template;
+    }
+    chain.reverse();
+    Ok(chain)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_thing(
     index: Layer,
     relative: PathBuf,
     bundle: Option<PathBuf>,
+    templates: Vec<Layer>,
     states: &BTreeMap<PathBuf, BTreeMap<String, Layer>>,
     overlays: &BTreeMap<PathBuf, BTreeMap<ChapterKey, Layer>>,
     area_overlays: &[AreaOverlay],
@@ -706,6 +795,7 @@ fn build_thing(
         states: own_states,
         overlays: own_overlays,
         area_overlays: above,
+        templates,
     };
 
     // The starting version is what the world tables hold.
@@ -1011,5 +1101,57 @@ mod tests {
         assert_eq!(o.responses["pull"], "It grinds and sticks.");
         assert_eq!(o.responses["kick"], "Ow.");
         assert!(rusted.merged.blocks.iter().any(|(k, _, p)| k == "action pull" && p.ends_with("rusted.md")));
+    }
+
+    #[test]
+    fn templates_are_found_along_the_lineage_then_among_built_ins() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        write(d, "objects/templates/book.md", "---\ntitle: A book\ntype: object\nobject_type: book\nweight: light\nvars: { read: no }\n---\nPages and a spine.\n");
+        write(d, "objects/templates/tome.md", "---\ninherits: book\nweight: heavy\n---\n");
+        write(d, "objects/red-cookbook.md", "---\nid: red-cookbook\ntitle: Red cookbook\ntype: object\ninherits: book\n---\n");
+        write(d, "objects/old-tome.md", "---\nid: old-tome\ntitle: Old tome\ntype: object\ninherits: tome\n---\nDusty.\n");
+        write(d, "objects/diary.md", "---\nid: diary\ntitle: Diary\ntype: object\ninherits: \"[[objects/templates/book]]\"\n---\n");
+        write(d, "objects/bench.md", "---\nid: bench\ntitle: Bench\ntype: object\ninherits: scenery\n---\n");
+        write(d, "castle/templates/scenery.md", "---\ntype: object\nobject_type: castle-scenery\n---\n");
+        write(d, "castle/throne.md", "---\nid: throne\ntitle: Throne\ntype: object\ninherits: scenery\n---\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
+        assert!(engine.current_problems(false).is_empty(), "{:?}", engine.current_problems(false));
+
+        let cookbook = &engine.objects["red-cookbook"];
+        assert_eq!((cookbook.object_type.as_str(), cookbook.weight.as_deref()), ("book", Some("light")));
+        assert_eq!(cookbook.title, "Red cookbook");
+        assert_eq!(cookbook.description, "Pages and a spine."); // prose passes down
+        let tome = &engine.objects["old-tome"];
+        assert_eq!((tome.object_type.as_str(), tome.weight.as_deref(), tome.description.as_str()), ("book", Some("heavy"), "Dusty."));
+        assert_eq!(engine.objects["diary"].object_type, "book");
+        assert_eq!(engine.objects["bench"].object_type, "scenery"); // the built-in
+        assert_eq!(engine.objects["throne"].object_type, "castle-scenery"); // the nearer world template wins
+        assert!(engine.objects.get("book").is_none()); // templates aren't in the world
+        assert!(engine.variable("red-cookbook.read", &crate::engines::variables::Scope::default()).is_some());
+        let version = engine.version(EntityKind::Object, "old-tome", None, None).unwrap();
+        assert!(version.merged.source_of("object_type").unwrap().ends_with("objects/templates/book.md"));
+    }
+
+    #[test]
+    fn missing_looping_and_deep_templates_are_problems() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        write(d, "objects/lost.md", "---\nid: lost\ntitle: Lost\ntype: object\ninherits: nowhere\n---\n");
+        write(d, "objects/templates/a.md", "---\ninherits: b\n---\n");
+        write(d, "objects/templates/b.md", "---\ninherits: a\n---\n");
+        write(d, "objects/loop.md", "---\nid: loop\ntitle: Loop\ntype: object\ninherits: a\n---\n");
+        for (name, parent) in [("t1", "t2"), ("t2", "t3"), ("t3", "t4"), ("t4", "t5")] {
+            write(d, &format!("objects/templates/{}.md", name), &format!("---\ninherits: {}\n---\n", parent));
+        }
+        write(d, "objects/templates/t5.md", "---\ntype: object\nobject_type: x\n---\n");
+        write(d, "objects/deep.md", "---\nid: deep\ntitle: Deep\ntype: object\ninherits: t1\n---\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
+        let problems = engine.current_problems(false);
+        for expected in ["lost.md: `inherits: nowhere` names no template", "loop.md: `inherits: a` loops back to", "deep.md: its templates chain more than 4 deep"] {
+            assert!(problems.iter().any(|p| p.contains(expected)), "{}: {:?}", expected, problems);
+        }
     }
 }

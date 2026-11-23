@@ -67,10 +67,8 @@ impl ContentFile {
     /// Split `text` as if it were the file at `path`.
     pub fn from_text(path: impl AsRef<Path>, text: &str) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        let entity = MarkdownParser::new()
-            .parse_content(text, &path)
-            .with_context(|| format!("{} doesn't parse, so it can't be edited", path.display()))?;
-        let (type_name, id) = entity_key(&entity);
+        let (type_name, id) =
+            identity(text, &path).with_context(|| format!("{} doesn't parse, so it can't be edited", path.display()))?;
 
         let mut parts = text.split_inclusive('\n');
         let opening = parts.next().unwrap_or_default().to_string();
@@ -265,10 +263,8 @@ impl ContentFile {
     }
 
     fn verify_entity(&self) -> Result<()> {
-        let entity = MarkdownParser::new()
-            .parse_content(&self.text(), &self.path)
-            .context("the edited file wouldn't parse, so the edit was not made")?;
-        let (type_name, id) = entity_key(&entity);
+        let (type_name, id) =
+            identity(&self.text(), &self.path).context("the edited file wouldn't parse, so the edit was not made")?;
         if type_name != self.type_name || id != self.id {
             bail!("the edit would change the entity's `type` or `id`, which isn't supported");
         }
@@ -632,6 +628,26 @@ enum Shape {
     BlockSeq { indent: usize },
     BlockMap { indent: usize },
     Other,
+}
+
+/// A file's `type` and `id`, checked as far as the file alone allows. A
+/// file that names a template (`inherits:`) may take required keys such
+/// as `object_type` from it, so only its frontmatter, `id` and `type` are
+/// checked here; the engine types it with its template and reports any
+/// problem. Any other file must parse as a whole entity.
+fn identity(text: &str, path: &Path) -> Result<(String, String)> {
+    let parser = MarkdownParser::new();
+    let doc = parser.split_document(text)?;
+    if doc.metadata.get("inherits").is_some() {
+        let get = |key: &str| doc.metadata.get(key).and_then(Value::as_str).map(str::to_string);
+        let type_name = get("type").ok_or_else(|| anyhow!("missing required frontmatter field `type`"))?;
+        if !["location", "character", "object"].contains(&type_name.as_str()) {
+            bail!("unknown type `{}` (expected location, character, or object)", type_name);
+        }
+        let id = get("id").ok_or_else(|| anyhow!("missing required frontmatter field `id`"))?;
+        return Ok((type_name, id));
+    }
+    Ok(entity_key(&parser.parse_content(text, path)?))
 }
 
 fn entity_key(entity: &ParsedEntity) -> (String, String) {

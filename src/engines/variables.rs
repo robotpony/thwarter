@@ -94,7 +94,7 @@ fn title_of(entity: &ParsedEntity) -> String {
 /// Every name a thing declares in any of its files, plus `title`.
 pub fn declared_by(thing: &Thing) -> Vec<String> {
     let mut names: Vec<String> = THING_VALUES.iter().map(|s| s.to_string()).collect();
-    let layers = std::iter::once(&thing.index)
+    let layers = thing.templates.iter().chain(std::iter::once(&thing.index))
         .chain(thing.states.values())
         .chain(thing.overlays.values())
         .chain(thing.area_overlays.iter().map(|o| &o.layer));

@@ -30,6 +30,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.22.0 (2026-11-23)
+
+### Added
+
+- Templates (REQ-CF-15, `design/STATES.md` › Templates and copies, Inheritance). `inherits:` on a thing names a template: a path from the world root (`objects/templates/book`, or `"[[objects/templates/book]]"`), or a bare name looked up in `templates/` folders from the thing's scope outward to the root. A template's frontmatter and prose stack under the thing's own files; its `id`, `template:` and `state:` never pass down. Templates may name templates, up to 4 deep. A name that finds nothing, a loop, or a chain more than 4 deep is a problem. Templates never appear in the world.
+- Built-in templates (REQ-CF-21): ordinary Markdown files compiled into the engine (`src/builtins/`), found after the world's own, so a world template of the same name overrides one. The first is `scenery` (`object_type: scenery`), for a cardless object's new card.
+- A thing's declared variables include its templates' `vars:`.
+
+### Changed
+
+- The writer checks a file that names a template (`inherits:`) only for its frontmatter, `id` and `type`, since keys such as `object_type` may come from the template. The engine types it with its template and reports any problem. Other files must still parse whole.
+
 ## 0.21.0 (2026-11-23)
 
 ### Added

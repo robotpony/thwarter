@@ -729,4 +729,19 @@ mod tests {
         assert!(writer.replace_file_loaded(&mut engine, Path::new("castle/link.md"), text, None, false).is_err());
         assert!(fs::read_to_string(&target).unwrap().contains("title: X"));
     }
+
+    #[test]
+    fn a_card_that_names_a_template_saves_without_the_keys_it_inherits() {
+        let dir = world();
+        let writer = WorldWriter::new(dir.path()).unwrap();
+        let mut engine = loaded(dir.path());
+        let new = NewEntity { kind: EntityKind::Object, id: "bench".into(), title: "Bench".into(), object_type: Some("scenery".into()) };
+        let text = "---\nid: bench\ntitle: Stone bench\ntype: object\ninherits: scenery\n---\n";
+        let report = writer.create_loaded(&mut engine, &new, &[Edit::ReplaceAll(text.into())], false).unwrap();
+        assert!(report.added.is_empty(), "{:?}", report.added);
+        assert_eq!(engine.objects["bench"].object_type, "scenery");
+        // Without a template, a card still needs its own object_type.
+        let bad = "---\nid: bench\ntitle: Bench\ntype: object\n---\n";
+        assert!(writer.replace_file_loaded(&mut engine, Path::new("objects/bench.md"), bad, None, false).is_err());
+    }
 }
