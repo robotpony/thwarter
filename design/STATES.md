@@ -8,6 +8,20 @@ A room, object or character is either one Markdown file or a folder of them (a b
 
 This replaces the earlier idea of conditional text blocks (`{{< when >}}` shortcodes) and conditions on exits. The one condition that survives is `requires:` on an action.
 
+## Principles
+
+Agreed by Bruce, 2026-11-23. Every decision in this document should follow from at least one.
+
+1. **Lineage only.** A thing takes values from global definitions, the folders above it, and templates it names; never from a sibling beside it.
+2. **Explicit, never hidden.** Inheritance is written down, and the console shows where every value came from.
+3. **Predictable from the tree.** An author can tell what applies by looking at the folders.
+4. **Major changes are files, minor ones are values.** States and chapters are files; small changes are variables.
+5. **Files are the truth; the console is how you edit them.** Structure changes go through commands, and the files stay plain Markdown.
+6. **Play never changes content.** Everything that happens in a game lives in the game state.
+7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
+
+Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept, 2026-11-23.
+
 ## Terms
 
 - **Thing**: a room, object or character.
