@@ -20,7 +20,7 @@ Agreed by Bruce, 2026-11-23. Every decision in this document should follow from 
 6. **Play never changes content.** Everything that happens in a game lives in the game state.
 7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
 
-Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). Changing state: reviewed, with doors and templates designed in outline. All 2026-11-23.
+Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). Changing state: reviewed, with doors and templates designed in outline. Variables: reviewed; undeclared variables and shared ids warn rather than fail. All 2026-11-23.
 
 ## Terms
 
@@ -176,7 +176,7 @@ Settled by the commander from the coder's review (2026-11-23).
 - What a room holds is its current `objects:` list, minus anything the player holds or has taken, so a chapter overlay can never duplicate an item the player already has. With counts (see Templates and copies), it's the count minus the number taken.
 
 **Ids and names.**
-- Once states exist, an `id` shared by two kinds is an error, not a warning, because `becomes:`, `requires:` and `{{ }}` name things by bare id.
+- Once states exist, an `id` shared by two kinds (a door and a room both called `vault`) is ambiguous, because `becomes:`, `requires:` and `{{ }}` name things by bare id. It's a warning in authoring, and the console proposes a rename to fix it (for example `vault` → `vault-door`) (Bruce, 2026-11-23). That needs renaming, which updates every reference to the old id (see Console).
 - `game`, `story`, `player`, `location` and `this` are reserved and can't be ids. Ids can't contain a dot, so `{{ castle/vault.lid }}` splits cleanly at the last dot.
 
 **Values.**
@@ -283,7 +283,7 @@ vars: { sharp: yes }    # values; can change in play
 can: [cut]              # abilities; checked by actions
 ```
 
-A variable that isn't declared at its level is a `validate` error. In play, a value that can't be resolved shows as blank, never as raw `{{ }}`. Author comments (`<!-- -->`) show in edit mode and are removed in play.
+A variable that isn't declared at its level is a warning, not an error: edit mode shows it in place, marked, with the warning beside it, and `validate` lists it. In play it shows as blank, never as raw `{{ }}` (Bruce, 2026-11-23). Author comments (`<!-- -->`) show in edit mode and are removed in play.
 
 ## Console
 
