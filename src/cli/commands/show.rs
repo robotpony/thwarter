@@ -98,17 +98,20 @@ fn print_location(location: &Location, engine: &WorldEngine, report: &WorldLoadR
     print_named_list(
         "Characters",
         &location.characters,
+        "not found",
         |id| report.characters.iter().find(|c| &c.id == id).map(|c| c.name.clone()),
     );
+    // An object with no card is scenery (REQ-CF-8), not an error.
     print_named_list(
         "Objects",
         &location.objects,
+        "no card",
         |id| engine.objects.get(id).map(|o| o.title.clone()),
     );
 }
 
-/// Prints `id (Name)` per entry, or `id  (not found)` when no card matches.
-fn print_named_list(heading: &str, ids: &[String], lookup: impl Fn(&String) -> Option<String>) {
+/// Prints `Name (id)` per entry, or `id  (<missing_label>)` when no card matches.
+fn print_named_list(heading: &str, ids: &[String], missing_label: &str, lookup: impl Fn(&String) -> Option<String>) {
     println!();
     if ids.is_empty() {
         println!("{}: none", heading);
@@ -118,7 +121,7 @@ fn print_named_list(heading: &str, ids: &[String], lookup: impl Fn(&String) -> O
     for id in ids {
         match lookup(id) {
             Some(name) => println!("  {} ({})", name, id),
-            None => println!("  {}  (not found)", id),
+            None => println!("  {}  ({})", id, missing_label),
         }
     }
 }
