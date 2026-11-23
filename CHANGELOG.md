@@ -22,6 +22,8 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Removed
 
+- `REQUIREMENTS.md` › 4.1 to 4.4, split into one requirements document per component: `design/CONTENT_REQUIREMENTS.md` (REQ-CF, REQ-WS), `design/ENGINE_REQUIREMENTS.md` (REQ-ENG) and `design/CLI_REQUIREMENTS.md` (REQ-CLI), with ids unchanged; the principles moved from `design/STATES.md` to `REQUIREMENTS.md` › 4 (Bruce, 2026-11-23). Recover the old sections with `git show 1620350:REQUIREMENTS.md`.
+- `PLAN.md`'s old Phase 4 (Play) and Phase 5 (Tooling), regrouped into Phases 4 to 9 with a "done when" each (Bruce, 2026-11-23). Recover with `git show e4e87e6:PLAN.md`.
 - `REQUIREMENTS.md` › 4.6 Console, moved to `design/CONSOLE_REQUIREMENTS.md` with the console's open questions from `PLAN.md` (Bruce, 2026-11-23). The REQ-CON ids are unchanged. Recover the old section with `git show 7a10a8d:REQUIREMENTS.md`.
 - `tasks/cli-first-pass-TODO.md`, the original 20-day, six-phase plan. It described a `src/lib/` layout that never existed. Replaced by `PLAN.md`; recover with `git show 884ae96:tasks/cli-first-pass-TODO.md`.
 - The tooling-first phase order (Tests, Static-world tooling, Game loop), replaced the same day by authoring first. Recover with `git show e43fbbf:PLAN.md`.

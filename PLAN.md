@@ -2,7 +2,7 @@
 
 The phased work queue. Each task is one line that points to its spec, with its lane in brackets. Phases are `##` headings with checkboxes, so Space Command can read this file. Defects go in `BUGS.md`, what each component does today in `design/ARCHITECTURE.md` › Implementation status, and retired plans in `CHANGELOG.md`.
 
-Authoring comes first, play second (Bruce, 2026-11-23). The console is where both happen. Engine work is done only when authoring, then play, needs it, never on its own until it needs refactoring. Each phase brings its own tests; the console's acceptance tests are transcripts (`design/CONSOLE_REQUIREMENTS.md` › REQ-CON-9).
+Authoring comes first, play second (Bruce, 2026-11-23). Each phase from 4 on says when it's done. Phase 7, the sample world, runs alongside Phases 4 to 6, and what Bruce needs while writing it can reorder their work. The console is where both happen. Engine work is done only when authoring, then play, needs it, never on its own until it needs refactoring. Each phase brings its own tests; the console's acceptance tests are transcripts (`design/CONSOLE_REQUIREMENTS.md` › REQ-CON-9).
 
 ## Phase 1 · Foundation
 
@@ -31,23 +31,65 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 - [x] File watching for `/reload` [console] (REQ-CON-7)
 - [x] Line editing and history at the console prompt (arrow keys) [console] (REQ-CON-2)
 
-## Phase 4 · Play
+## Phase 4 · World model
 
-- [x] Play-mode verbs and aliases, v1 [console] (REQ-CON-10)
-- [x] Action effects for move, look, take, examine and inventory [coder] (REQ-ENG-5)
-- [x] Design states, bundles and chapters, replacing flags, conditions and alternative text; agreed with Bruce 2026-11-23, with open questions [commander] (`design/STATES.md`)
-- [x] Bundle loading, layers and merging, with key sources and the comment-only prose rule [coder] (`design/STATES.md` › Engine rules › Loading)
-- [x] Current versions on request, play state v2 and saves v2 [coder] (`design/STATES.md` › Engine rules)
-- [x] Actions as a map, with `becomes:`, `sets:`, `chapter:` and `requires: { has: }`, and the 9 object cards migrated [coder] (`design/STATES.md` › Changing state)
-- [ ] Variables by level, with warnings for undeclared ones [coder] (`design/STATES.md` › Variables)
-- [ ] Templates, kept out of the world [coder] (`design/STATES.md` › Templates and copies)
-- [ ] Renaming an id with every reference updated, and proposed renames for shared ids [coder, console] (`design/STATES.md` › Engine rules › Ids and names)
+The engine side of `design/STATES.md` (run by the commander with the coder). Done when `validate` and `show` handle every construct in `design/STATES.md` except doors.
+
+- [x] Done (squashed; 0.7.0 to 0.14.0, f987904 to e4e87e6): play verbs, action effects, and save and load from the console; the states, bundles and chapters design, agreed with Bruce; bundle loading, layers and merging with key sources; current versions on request, play state v2 and saves v2; actions as a map of mechanics with responses as body blocks, and the 9 object cards migrated. The old Phase 4 list is in `git show e4e87e6:PLAN.md`.
+- [ ] The `world/` folder: `index.md`, `story.md`, `player.md`, and the test world moved off `world.toml` [coder] (REQ-CF-20)
+- [ ] The loader ignores other tools' files: dot-folders and Hugo's own [coder] (REQ-CF-24)
+- [ ] Obsidian links wherever frontmatter takes an id, as a file path or an id [coder] (REQ-CF-25)
+- [ ] Variables by level, with warnings for undeclared ones [coder] (REQ-CF-16)
+- [ ] Templates and built-ins, with `scenery` the first built-in [coder] (REQ-CF-15, REQ-CF-21)
+- [ ] `visibility:` in play: faint, hidden and absent [coder] (REQ-CF-18)
+- [ ] `reply ambiguous` from the candidates' shared template, else an in-world default [coder] (`design/STATES.md` › Ambiguity)
+- [ ] Links in prose, Markdown rendered in play, and tags [coder] (REQ-CF-28 to 30)
+- [ ] `design/STATES.md` › Engine rules written as REQ-ENG items [coder] (`design/ENGINE_REQUIREMENTS.md`)
+
+## Phase 5 · Authoring the model
+
+The console side (Bruce with the console coder). Done when an author can build a bundle with states and a chapter, and run the world, without touching a file by hand.
+
+- [ ] `/restart` onto a new build, keeping the session [console] (REQ-CON-30, REQ-CON-31)
+- [ ] Edit mode moves with play words (go, go back, look, examine), replacing cd, ls and pwd [console] (REQ-CON-4)
+- [ ] Full-screen console: status bar, output, a sidebar with GAME and HERE, the editor inside it [console] (REQ-CON-22, REQ-CON-23)
+- [ ] The `/` command menu with argument completion [console] (REQ-CON-33)
+- [ ] The `game/` folder, and `/set` in it changing only the running game [console] (REQ-CON-24, REQ-CON-25)
+- [ ] Scope: a sticky default, per-command overrides, `/move` [console] (REQ-CON-26 to 29)
 - [ ] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
-- [ ] Choosing and changing scope while writing [console] (`design/STATES.md` › Scope)
-- [ ] Doors, once their details are designed [coder, console] (`design/STATES.md` › Doors)
-- [x] Save and load from the console [console, coder] (REQ-CON-11)
+- [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
+- [ ] Renaming an id with every reference updated, and proposed renames for shared ids [coder, console] (`design/STATES.md` › Engine rules › Ids and names)
+- [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 
-## Phase 5 · Tooling, as needed
+## Phase 6 · Doors and play
+
+Done when a locked-door puzzle plays from both sides.
+
+- [ ] Doors as their own type, with sides, `passable:` and `transparent:` [coder] (REQ-CF-19, `design/STATES.md` › Doors)
+- [ ] Door built-ins: `door`, `locked-door`, `portal` [coder] (REQ-CF-21)
+- [ ] Linking two rooms through a door template from the console [console] (`design/STATES.md` › Doors)
+- [ ] Keys for locked doors: a variable inside `requires:` [commander, coder] (`design/STATES.md` › Open questions)
+- [ ] Clocks and game values: time, weather, randomness [commander, coder] (`design/STATES.md` › Open questions)
+
+## Phase 7 · A real sample world
+
+Bruce authors it with the console coder, starting now, using what exists and growing as features land. Done when it plays start to finish and has a transcript test.
+
+- [ ] Write the world: a short story that uses states, chapters, templates and a door [Bruce, console]
+- [ ] Fix or remove the test world's five broken exits along the way [Bruce] (`BUGS.md`)
+- [ ] A transcript that plays it through [console] (REQ-CON-9)
+
+## Phase 8 · Writing helpers
+
+AI tools for prose in edit mode. Done when an author can review and rewrite a room's prose from the console.
+
+- [ ] Review the writing helper requirements with Bruce [console] (REQ-CON-13 to 21)
+- [ ] Review, rewrite, flesh out and apply a style [console] (REQ-CON-13 to 17)
+- [ ] Styles as files in `world/styles/` [console, coder] (REQ-CON-18)
+- [ ] Turning helpers on per world, with the service and model shown [console] (REQ-CON-19, REQ-CON-21)
+
+## Phase 9 · Tooling, as needed
+
 
 Built when authoring or play asks for them, most likely as console commands. Until then they stay as they are.
 
@@ -60,4 +102,4 @@ Built when authoring or play asks for them, most likely as console commands. Unt
 
 ## Open questions
 
-The console's open questions (how full editing looks, play mode's limits, return exits for `/new room`) are in `design/CONSOLE_REQUIREMENTS.md` › Open questions.
+Open questions live with their component: `design/STATES.md` (the world model), `design/CONTENT_REQUIREMENTS.md` (the format) and `design/CONSOLE_REQUIREMENTS.md` (the console).
