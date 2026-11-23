@@ -82,3 +82,14 @@ fn templates_and_built_ins_show_as_written() {
     let (ok, _, err) = show(dir.path(), &["--template", "nope"]);
     assert!(!ok && err.contains("No template `nope`. Templates here: objects/templates/book, scenery"), "{}", err);
 }
+
+#[test]
+fn warnings_go_to_stderr_as_a_count_and_json_is_one_document() {
+    let dir = world();
+    let (ok, out, err) = show(dir.path(), &["diary", "--format", "json"]);
+    assert!(ok);
+    let doc: serde_json::Value = serde_json::from_str(&out).unwrap_or_else(|e| panic!("not one JSON document ({}):\n{}", e, out));
+    assert_eq!(doc["id"], "diary");
+    assert!(!out.contains("WARNING"));
+    assert!(err.trim() == "2 warnings; run `thwart validate` to list them", "{}", err);
+}

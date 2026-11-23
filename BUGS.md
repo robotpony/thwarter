@@ -6,12 +6,12 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 
 ## Open
 
-- [ ] **`thwart show` prints every world warning on standard output before its result**, about 30 lines on the test world, so the result is buried and `--format json` output isn't a single JSON document. Warnings belong on standard error, and `show` should summarize them ("27 warnings; run `thwart validate`") (2026-11-23)
 - [ ] **Five connections in the test world point at rooms that don't exist**: `forest/abandoned-camp`, `forest/rocky-outcrop` (twice), `forest/cave-entrance`, `forest/cave-behind-falls`. An authoring decision for Bruce: write the rooms or cut the exits. Blocks using `validate` as a CI gate (2026-08-23)
 - [ ] **Three compiler warnings left**, two in `world_graph::find_path` and one in `narrative_engine`, both stubs; they go when Phase 5's map and Phase 4's narrative state use that code. Down from 11 in 0.7.0 (2026-08-23)
 
 ## Fixed
 
+- 2026-11-23 (0.27.1): `thwart show` no longer prints the world's warnings on standard output; it writes one count to standard error ("2 problems and 27 warnings; run `thwart validate` to list them"), so its result stands alone and `--format json` is one document.
 - 2026-11-23 (0.1.1): `--world`, `--config`, `-q` and `-v` are global, so they work after the subcommand as the docs write them.
 - 2026-11-23 (0.1.1): `validate` prints its failure once and still exits non-zero.
 - 2026-11-23 (0.1.1): `show <location>` text output reads as a room (name, description, exits, characters, objects) rather than a debug dump.

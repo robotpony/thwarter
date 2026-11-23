@@ -32,6 +32,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.27.1 (2026-11-23)
+
+### Fixed
+
+- `thwart show` printed every load problem and warning on standard output before its result, about 30 lines on the test world, so `--format json` wasn't one JSON document. It now writes one line to standard error, "2 problems and 27 warnings; run `thwart validate` to list them", and nothing for a clean world. `validate` still lists them all.
+
 ## 0.27.0 (2026-11-23)
 
 ### Added

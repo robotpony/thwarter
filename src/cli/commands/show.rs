@@ -34,8 +34,10 @@ pub fn show_command(req: ShowRequest) -> Result<()> {
 
     let mut engine = WorldEngine::new();
     let report = engine.load_world(&req.world_path)?;
-    for message in report.errors.iter().chain(&report.warnings) {
-        formatter.print_warning(message);
+    // A count on stderr, never the list: stdout holds only the result, so
+    // `--format json` is one document. `validate` lists them.
+    if let Some(note) = load_note(report.errors.len(), report.warnings.len()) {
+        eprintln!("{}", note);
     }
 
     if let Some(name) = &req.template {
@@ -53,6 +55,21 @@ pub fn show_command(req: ShowRequest) -> Result<()> {
             show_world(&engine, &req.world_path, &formatter)
         }
     }
+}
+
+/// "2 problems and 27 warnings; run `thwart validate` to list them", or
+/// `None` for a clean world.
+fn load_note(problems: usize, warnings: usize) -> Option<String> {
+    let count = |n: usize, what: &str| format!("{} {}{}", n, what, if n == 1 { "" } else { "s" });
+    let parts: Vec<String> = [(problems, "problem"), (warnings, "warning")]
+        .into_iter()
+        .filter(|(n, _)| *n > 0)
+        .map(|(n, w)| count(n, w))
+        .collect();
+    if parts.is_empty() {
+        return None;
+    }
+    Some(format!("{}; run `thwart validate` to list them", parts.join(" and ")))
 }
 
 /// The kinds a name could mean, in the order a bare name is tried.
