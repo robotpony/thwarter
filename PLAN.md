@@ -10,7 +10,7 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 
 ## Phase 2 · Console shell
 
-- [ ] `thwart edit <world>` and `thwart play <world>`, handing off to `src/console/` [coder] (REQ-CON-1)
+- [x] `thwart edit <world>` and `thwart play <world>`, handing off to `src/console/` [coder] (REQ-CON-1)
 - [ ] The console loop: `/edit`, `/play`, `/reload`, `/help`, `/quit` [console] (REQ-CON-2, REQ-CON-3, REQ-CON-7)
 - [ ] Edit-mode navigation by area and room, like folders [console] (REQ-CON-4)
 - [ ] Room view in the console, from the same renderer as `thwart show` [console, coder] (REQ-CON-8)

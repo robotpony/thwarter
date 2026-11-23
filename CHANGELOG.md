@@ -26,6 +26,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.1.5 (2026-11-23)
+
+### Added
+
+- `thwart edit [world]` and `thwart play [world]`, which open the console in edit or play mode through `thwarter::console::run` (REQ-CON-1). The world is the positional argument, then `--world`, then the default. Until the console loop lands they report that it isn't implemented and exit non-zero.
+
 ## 0.1.4 (2026-11-23)
 
 ### Added

@@ -26,6 +26,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Open the console in edit mode, to write a world
+    Edit {
+        /// World directory (defaults to --world, then the built-in default)
+        #[arg(value_name = "WORLD")]
+        world_dir: Option<String>,
+    },
+    /// Open the console in play mode, to read (play) a world
+    Play {
+        /// World directory (defaults to --world, then the built-in default)
+        #[arg(value_name = "WORLD")]
+        world_dir: Option<String>,
+    },
     /// Validate world files
     Validate {
         /// Location to validate (optional)
@@ -100,6 +112,14 @@ fn main() -> ExitCode {
     let world_path = cli.world.clone().unwrap_or_else(|| DEFAULT_WORLD_PATH.to_string());
 
     let result = match cli.command {
+        Commands::Edit { world_dir } => {
+            let path = world_dir.unwrap_or(world_path);
+            thwarter::console::run(std::path::Path::new(&path), thwarter::console::Mode::Edit)
+        },
+        Commands::Play { world_dir } => {
+            let path = world_dir.unwrap_or(world_path);
+            thwarter::console::run(std::path::Path::new(&path), thwarter::console::Mode::Play)
+        },
         Commands::Validate { location, strict, output, format, fix } => {
             thwarter::cli::commands::validate_command(world_path, location, strict, output, format, fix)
         },
