@@ -4,8 +4,37 @@ use crate::models::world::*;
 use crate::parsers::{MarkdownParser, ParsedEntity};
 use anyhow::Result;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+
+/// The three kinds of content file. An `id` is unique within a kind; a
+/// location and an object may share one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum EntityKind {
+    Location,
+    Character,
+    Object,
+}
+
+impl EntityKind {
+    /// The frontmatter `type` value for this kind.
+    pub fn type_name(self) -> &'static str {
+        match self {
+            EntityKind::Location => "location",
+            EntityKind::Character => "character",
+            EntityKind::Object => "object",
+        }
+    }
+
+    pub fn from_type_name(name: &str) -> Option<Self> {
+        match name {
+            "location" => Some(EntityKind::Location),
+            "character" => Some(EntityKind::Character),
+            "object" => Some(EntityKind::Object),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct WorldEngine {
@@ -15,6 +44,11 @@ pub struct WorldEngine {
     /// Character cards by id, as loaded. A read-only catalog for lookups
     /// and validation; placement and state belong to `CharacterEngine`.
     pub characters: HashMap<String, Character>,
+    /// Every file each `(kind, id)` was loaded from, in load order. More
+    /// than one file means a duplicate id: the last one loaded wins in
+    /// the tables above, `problems` reports it, and the writer refuses to
+    /// edit it (REQ-ENG-7).
+    pub sources: HashMap<(EntityKind, String), Vec<PathBuf>>,
 }
 
 /// Summary of a `load_world` pass: what was loaded, and every file that
@@ -39,6 +73,7 @@ impl WorldEngine {
             loaded_locations: HashMap::new(),
             objects: HashMap::new(),
             characters: HashMap::new(),
+            sources: HashMap::new(),
         }
     }
 
@@ -58,17 +93,14 @@ impl WorldEngine {
             }
 
             match parser.parse_file(path) {
-                Ok(ParsedEntity::Location(location)) => {
-                    self.world_graph.add_location(location);
-                    report.locations_loaded += 1;
-                }
-                Ok(ParsedEntity::Object(object)) => {
-                    self.objects.insert(object.id.clone(), object);
-                    report.objects_loaded += 1;
-                }
-                Ok(ParsedEntity::Character(character)) => {
-                    self.characters.insert(character.id.clone(), character.clone());
-                    report.characters.push(character);
+                Ok(entity) => {
+                    let key = match &entity {
+                        ParsedEntity::Location(l) => (EntityKind::Location, l.id.clone()),
+                        ParsedEntity::Character(c) => (EntityKind::Character, c.id.clone()),
+                        ParsedEntity::Object(o) => (EntityKind::Object, o.id.clone()),
+                    };
+                    self.sources.entry(key).or_default().push(path.to_path_buf());
+                    self.add_parsed(entity, &mut report);
                 }
                 Err(e) => {
                     report.errors.push(format!("{}: {}", path.display(), e));
@@ -78,6 +110,55 @@ impl WorldEngine {
 
         self.loaded_locations = self.world_graph.locations.clone();
         Ok(report)
+    }
+
+    fn add_parsed(&mut self, entity: ParsedEntity, report: &mut WorldLoadReport) {
+        match entity {
+            ParsedEntity::Location(location) => {
+                self.world_graph.add_location(location);
+                report.locations_loaded += 1;
+            }
+            ParsedEntity::Object(object) => {
+                self.objects.insert(object.id.clone(), object);
+                report.objects_loaded += 1;
+            }
+            ParsedEntity::Character(character) => {
+                self.characters.insert(character.id.clone(), character.clone());
+                report.characters.push(character);
+            }
+        }
+    }
+
+    /// The one file `(kind, id)` was loaded from. An error if it wasn't
+    /// loaded, or if two files define it.
+    pub fn source_path(&self, kind: EntityKind, id: &str) -> Result<&Path> {
+        match self.sources.get(&(kind, id.to_string())).map(|v| v.as_slice()) {
+            None | Some([]) => Err(anyhow::anyhow!("no {} `{}` is loaded", kind.type_name(), id)),
+            Some([one]) => Ok(one.as_path()),
+            Some(many) => Err(anyhow::anyhow!(
+                "{} `{}` is defined in {} files ({}); fix the duplicate first",
+                kind.type_name(),
+                id,
+                many.len(),
+                join_paths(many)
+            )),
+        }
+    }
+
+    /// Every `(kind, id)` defined in more than one file, sorted.
+    pub fn duplicate_ids(&self) -> Vec<(EntityKind, String, Vec<PathBuf>)> {
+        let mut dups: Vec<_> = self
+            .sources
+            .iter()
+            .filter(|(_, paths)| paths.len() > 1)
+            .map(|((kind, id), paths)| {
+                let mut paths = paths.clone();
+                paths.sort();
+                (*kind, id.clone(), paths)
+            })
+            .collect();
+        dups.sort();
+        dups
     }
 
     pub fn get_location(&self, location_id: &str) -> Option<&Location> {
@@ -126,8 +207,20 @@ impl WorldEngine {
     /// validation" means the same thing in both.
     pub fn problems(&self, report: &WorldLoadReport, strict: bool) -> Vec<String> {
         let mut problems = report.errors.clone();
+        for (kind, id, paths) in self.duplicate_ids() {
+            problems.push(format!(
+                "{} `{}` is defined in {} files: {}",
+                kind.type_name(),
+                id,
+                paths.len(),
+                join_paths(&paths)
+            ));
+        }
         for (from, direction, target) in self.broken_connections() {
-            problems.push(format!("{}: connection `{}` points at unknown location `{}`", from, direction, target));
+            problems.push(format!(
+                "{}: connection `{}` points at unknown location `{}`",
+                from, direction, target
+            ));
         }
         if strict {
             let mut characters: Vec<&Character> = self.characters.values().collect();
@@ -165,12 +258,18 @@ impl WorldEngine {
         let characters = location
             .characters
             .iter()
-            .map(|cid| EntityRef { id: cid.clone(), name: self.characters.get(cid).map(|c| c.name.clone()) })
+            .map(|cid| EntityRef {
+                id: cid.clone(),
+                name: self.characters.get(cid).map(|c| c.name.clone()),
+            })
             .collect();
         let objects = location
             .objects
             .iter()
-            .map(|oid| EntityRef { id: oid.clone(), name: self.objects.get(oid).map(|o| o.title.clone()) })
+            .map(|oid| EntityRef {
+                id: oid.clone(),
+                name: self.objects.get(oid).map(|o| o.title.clone()),
+            })
             .collect();
 
         Some(LocationView {
@@ -183,6 +282,14 @@ impl WorldEngine {
             objects,
         })
     }
+}
+
+fn join_paths(paths: &[PathBuf]) -> String {
+    paths
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 impl Default for WorldEngine {
@@ -219,12 +326,76 @@ mod tests {
     fn describe_location_resolves_references() {
         let view = engine().describe_location("castle/yard").unwrap();
         assert_eq!(view.title, "Yard");
-        let exits: Vec<(&str, bool)> = view.exits.iter().map(|e| (e.direction.as_str(), e.target_exists)).collect();
+        let exits: Vec<(&str, bool)> = view
+            .exits
+            .iter()
+            .map(|e| (e.direction.as_str(), e.target_exists))
+            .collect();
         assert_eq!(exits, vec![("north", false), ("west", true), ("behind", true)]);
         assert_eq!(view.characters[0].name.as_deref(), Some("The King"));
         assert_eq!(view.characters[1].name, None);
         assert_eq!(view.objects[0].name.as_deref(), Some("Old Well"));
         assert_eq!(view.objects[1].name, None);
+    }
+
+    fn write(dir: &Path, rel: &str, text: &str) {
+        let path = dir.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, text).unwrap();
+    }
+
+    #[test]
+    fn load_records_sources_and_reports_duplicate_ids() {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "castle/yard.md",
+            "---\nid: castle/yard\ntitle: Yard\ntype: location\n---\n",
+        );
+        write(
+            dir.path(),
+            "npcs/king.md",
+            "---\nid: king\ntitle: King\ntype: character\n---\n",
+        );
+        write(
+            dir.path(),
+            "npcs/king-copy.md",
+            "---\nid: king\ntitle: King 2\ntype: character\n---\n",
+        );
+        // Same id, different kind: not a duplicate.
+        write(
+            dir.path(),
+            "objects/yard.md",
+            "---\nid: castle/yard\ntitle: Yard\ntype: object\nobject_type: x\n---\n",
+        );
+
+        let mut engine = WorldEngine::new();
+        let report = engine.load_world(dir.path()).unwrap();
+
+        let yard = engine.source_path(EntityKind::Location, "castle/yard").unwrap();
+        assert!(yard.ends_with("castle/yard.md"));
+        assert!(engine
+            .source_path(EntityKind::Object, "castle/yard")
+            .unwrap()
+            .ends_with("objects/yard.md"));
+        assert!(engine
+            .source_path(EntityKind::Location, "nowhere")
+            .unwrap_err()
+            .to_string()
+            .contains("no location `nowhere`"));
+        let dup_err = engine
+            .source_path(EntityKind::Character, "king")
+            .unwrap_err()
+            .to_string();
+        assert!(dup_err.contains("defined in 2 files"), "{}", dup_err);
+
+        let dups = engine.duplicate_ids();
+        assert_eq!(dups.len(), 1);
+        assert_eq!((dups[0].0, dups[0].1.as_str()), (EntityKind::Character, "king"));
+
+        let problems = engine.problems(&report, false);
+        assert_eq!(problems.len(), 1, "{:?}", problems);
+        assert!(problems[0].starts_with("character `king` is defined in 2 files: "));
     }
 
     #[test]
@@ -235,7 +406,10 @@ mod tests {
     #[test]
     fn problems_include_load_errors_broken_exits_and_strict_checks() {
         let engine = engine();
-        let report = WorldLoadReport { errors: vec!["bad.md: no type".into()], ..Default::default() };
+        let report = WorldLoadReport {
+            errors: vec!["bad.md: no type".into()],
+            ..Default::default()
+        };
         let loose = engine.problems(&report, false);
         assert_eq!(loose.len(), 2);
         assert_eq!(loose[0], "bad.md: no type");

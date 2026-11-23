@@ -26,6 +26,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.2.1 (2026-11-23)
+
+### Added
+
+- `WorldEngine::sources`, every file each `(EntityKind, id)` was loaded from, and `source_path(kind, id)`, which fails when an id is unloaded or defined twice. The round-trip writer and the console's folder navigation use it.
+- `EntityKind` (`Location`, `Character`, `Object`). An id is unique within a kind.
+- `validate`, and the console's `/reload` through `WorldEngine::problems`, report an id defined in more than one file. Before this, the last file loaded won silently.
+
 ## 0.2.0 (2026-11-23)
 
 ### Added
