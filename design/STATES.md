@@ -325,6 +325,8 @@ Revealing is ordinary state switching: an action `becomes:` a state with a diffe
 
 When a command could mean more than one thing ("open door" with two doors), the reply is part of the story, not a fixed system message (Bruce, 2026-11-23): "Which door do you want to open?", "You stare at both doors, not sure which to open." The engine has a set of such replies and varies them. *Proposed*: an author can override them per world, and per thing for a thing with something to say.
 
+Built in 0.24.0 (79af69c): the reply is the `<!-- thwarter:reply ambiguous -->` block of the nearest template every candidate shares, with its variables filled in, as Bruce decided. Otherwise one of the built-in replies, which always name the candidates so the player can still choose ("Which sword do you want to take: the rusty sword or the old sword?"). Overrides per world or per thing aren't built; each is one more lookup if a world needs it.
+
 ## Scope
 
 Where a thing's file lives is its scope (Bruce, 2026-11-23):
