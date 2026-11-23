@@ -3,7 +3,7 @@
 
 use crate::engines::location_view::{expand_direction, EntityRef, LocationView};
 use crate::engines::variables::Scope;
-use crate::engines::{At, EntityKind, WorldEngine};
+use crate::engines::{At, EntityKind, Visibility, WorldEngine};
 use crate::models::game::{ActionResult, Change, PlayAction, PlayState};
 use crate::render::{render_location_as, RenderStyle};
 use anyhow::{bail, Context, Result};
@@ -58,6 +58,7 @@ impl GameEngine {
             PlayAction::Take(noun) => self.take(world, state, noun),
             PlayAction::Examine(noun) => self.examine(world, state, noun),
             PlayAction::Inventory => self.inventory(world, state),
+            PlayAction::Search => self.search(world, state, "You search carefully"),
             PlayAction::Use { verb, noun } => self.use_object(world, state, verb, noun),
         }
     }
@@ -66,11 +67,53 @@ impl GameEngine {
     /// version, without what's been taken or is carried, so a chapter that
     /// adds an object the player holds never shows a second one.
     pub fn view(&self, world: &WorldEngine, state: &PlayState) -> Option<LocationView> {
+        let mut view = self.whole_view(world, state)?;
+        view.objects.retain(|o| shown(world, state, EntityKind::Object, &o.id));
+        view.characters.retain(|c| shown(world, state, EntityKind::Character, &c.id));
+        view.exits.retain(|e| !e.target_exists || shown(world, state, EntityKind::Location, &e.target));
+        Some(view)
+    }
+
+    /// The room with everything in it, however hidden, minus what's been
+    /// taken or is carried.
+    fn whole_view(&self, world: &WorldEngine, state: &PlayState) -> Option<LocationView> {
         let mut view = world.describe_location_at(&state.location, At::play(state))?;
         view.body = world.fill(&view.body, &Scope { at: At::play(state), this: Some((EntityKind::Location, &state.location)), here: None });
         view.objects
             .retain(|o| !state.was_taken(&state.location, &o.id) && !state.inventory.contains(&o.id));
         Some(view)
+    }
+
+    /// Find the faint things here not yet found, and say what was found.
+    fn search(&self, world: &WorldEngine, state: &mut PlayState, opening: &str) -> ActionResult {
+        let Some(view) = self.whole_view(world, state) else { return ActionResult::say("You're nowhere.") };
+        let mut found: Vec<(EntityKind, String, String)> = Vec::new();
+        let faint = |kind, id: &str| world.visibility(kind, id, At::play(state)) == Visibility::Faint && !state.has_noticed(kind.type_name(), id);
+        for o in &view.objects {
+            if faint(EntityKind::Object, &o.id) {
+                found.push((EntityKind::Object, o.id.clone(), the_object(o)));
+            }
+        }
+        for c in &view.characters {
+            if faint(EntityKind::Character, &c.id) {
+                found.push((EntityKind::Character, c.id.clone(), person(c)));
+            }
+        }
+        for e in view.exits.iter().filter(|e| e.target_exists) {
+            if faint(EntityKind::Location, &e.target) {
+                found.push((EntityKind::Location, e.target.clone(), format!("a way {}", e.direction)));
+            }
+        }
+        if found.is_empty() {
+            return ActionResult::say(format!("{}, but find nothing new.", opening));
+        }
+        let mut changes = Vec::new();
+        for (kind, id, _) in &found {
+            state.notice(kind.type_name(), id);
+            changes.push(Change::Noticed { type_name: kind.type_name().to_string(), id: id.clone() });
+        }
+        let names: Vec<String> = found.into_iter().map(|(_, _, name)| name).collect();
+        ActionResult { text: format!("{} and find {}.", opening, join_and(&names)), changes, note: None }
     }
 
     fn look(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
@@ -88,7 +131,11 @@ impl GameEngine {
         let Some(here) = world.location_at(&state.location, At::play(state)) else {
             return ActionResult::say("You're nowhere.");
         };
-        let Some(target) = here.connections.get(&direction) else {
+        let Some(target) = here
+            .connections
+            .get(&direction)
+            .filter(|t| world.get_location(t).is_none() || shown(world, state, EntityKind::Location, t))
+        else {
             return ActionResult::say(format!("You can't go {} from here.", direction));
         };
         if world.get_location(target).is_none() {
@@ -140,7 +187,7 @@ impl GameEngine {
         }
     }
 
-    fn examine(&self, world: &WorldEngine, state: &PlayState, noun: &str) -> ActionResult {
+    fn examine(&self, world: &WorldEngine, state: &mut PlayState, noun: &str) -> ActionResult {
         if noun.trim().is_empty() {
             return ActionResult::say("Examine what?");
         }
@@ -148,6 +195,15 @@ impl GameEngine {
             Some(v) => v,
             None => return ActionResult::say("You're nowhere."),
         };
+        // Examining the room itself looks closely, finding faint things.
+        let wanted = noun.trim().to_lowercase();
+        let wanted = wanted.strip_prefix("the ").unwrap_or(&wanted);
+        if ["room", "here", "around"].contains(&wanted) || wanted == view.title.to_lowercase() || wanted == view.id.to_lowercase() {
+            let look = render_location_as(&view, RenderStyle::Player);
+            let mut found = self.search(world, state, "You look closely");
+            found.text = format!("{}\n\n{}", look, found.text);
+            return found;
+        }
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
         match resolve(noun, &things, the_object) {
@@ -196,9 +252,19 @@ impl GameEngine {
         };
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
+        // A hidden object can't be seen, but an action may name it exactly.
+        let hidden = || -> Option<EntityRef> {
+            let whole = self.whole_view(world, state)?;
+            let wanted = noun.trim().to_lowercase();
+            whole.objects.into_iter().find(|o| {
+                world.visibility(EntityKind::Object, &o.id, At::play(state)) == Visibility::Hidden
+                    && (o.id.to_lowercase() == wanted || o.display_name().to_lowercase() == wanted)
+            })
+        };
         let object = match resolve(noun, &things, the_object) {
             Ok(Some(o)) => o,
             Err(which) => return ActionResult::say((self.ask_which)(&verb, &which)),
+            Ok(None) if hidden().is_some() => hidden().unwrap(),
             Ok(None) => {
                 return match resolve(noun, &view.characters, person) {
                     Ok(Some(p)) => ActionResult::say(format!("You can't {} {}.", verb, person(&p))),
@@ -469,6 +535,23 @@ fn builtin_reply(verb: &str, name: &str, turn: u64) -> String {
 fn builtin_refusal(verb: &str, name: &str, turn: u64) -> String {
     let forms = ["You can't {verb} the {name} yet.", "Not yet: you can't {verb} the {name}."];
     forms[(turn as usize) % forms.len()].replace("{verb}", verb).replace("{name}", name)
+}
+
+/// Whether play shows a thing: visible, or faint and already found.
+fn shown(world: &WorldEngine, state: &PlayState, kind: EntityKind, id: &str) -> bool {
+    match world.visibility(kind, id, At::play(state)) {
+        Visibility::Visible => true,
+        Visibility::Faint => state.has_noticed(kind.type_name(), id),
+        Visibility::Hidden | Visibility::Absent => false,
+    }
+}
+
+fn join_and(items: &[String]) -> String {
+    match items {
+        [] => String::new(),
+        [one] => one.clone(),
+        [init @ .., last] => format!("{} and {}", init.join(", "), last),
+    }
 }
 
 fn join_or(items: &[String]) -> String {
@@ -886,5 +969,69 @@ mod tests {
         let mut state = game.start(&world, "castle/yard").unwrap();
         let r = game.act(&world, &mut state, &PlayAction::Take("sword".into()));
         assert_eq!(r.text, "Which one do you want to take? the rusty sword or the old sword");
+    }
+
+    #[test]
+    fn faint_things_are_found_hidden_ones_revealed_and_absent_ones_unnameable() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        let w = |rel: &str, text: &str| {
+            let p = d.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, text).unwrap();
+        };
+        w("cellar.md", "---\nid: cellar\ntitle: Cellar\ntype: location\nconnections: { north: passage }\nobjects: [key, lever, ghost, crate]\n---\nDamp.\n");
+        w("passage.md", "---\nid: passage\ntitle: Passage\ntype: location\nvisibility: faint\n---\n");
+        w("objects/key.md", "---\nid: key\ntitle: Brass key\ntype: object\nobject_type: key\nvisibility: faint\n---\n");
+        w("objects/crate.md", "---\nid: crate\ntitle: Crate\ntype: object\nobject_type: box\n---\n");
+        w("objects/lever/index.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nstate: secret\nactions:\n  pull: { becomes: { ghost: here } }\n---\n<!-- thwarter:action pull -->\nA chill passes.\n");
+        w("objects/lever/secret.md", "---\ninherits: index\nvisibility: hidden\n---\n");
+        w("objects/ghost/index.md", "---\nid: ghost\ntitle: Ghost\ntype: object\nobject_type: spirit\nstate: gone\n---\nPale.\n");
+        w("objects/ghost/gone.md", "---\ninherits: index\nvisibility: absent\n---\n");
+        w("objects/ghost/here.md", "---\ninherits: index\n---\n");
+        let mut world = WorldEngine::new();
+        world.load_world(d).unwrap();
+        assert!(world.current_problems(false).is_empty(), "{:?}", world.current_problems(false));
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "cellar").unwrap();
+        let act = |state: &mut PlayState, a: PlayAction| game.act(&world, state, &a).text;
+
+        let look = act(&mut state, PlayAction::Look);
+        assert!(look.contains("You see: Crate.") && look.contains("There's no way out."), "{}", look);
+        assert_eq!(act(&mut state, PlayAction::Take("key".into())), "There's no key here.");
+        assert_eq!(act(&mut state, PlayAction::Go("north".into())), "You can't go north from here.");
+
+        assert_eq!(act(&mut state, PlayAction::Search), "You search carefully and find the brass key and a way north.");
+        assert_eq!(act(&mut state, PlayAction::Search), "You search carefully, but find nothing new.");
+        let look = act(&mut state, PlayAction::Look);
+        assert!(look.contains("You see: Brass key, Crate.") && look.contains("Exits: north."), "{}", look);
+        assert_eq!(act(&mut state, PlayAction::Take("key".into())), "You take the brass key.");
+
+        // Hidden: never listed or found, but an action can name it exactly.
+        assert_eq!(act(&mut state, PlayAction::Examine("lever".into())), "There's no lever here.");
+        assert_eq!(act(&mut state, PlayAction::Examine("ghost".into())), "There's no ghost here.");
+        let pull = |noun: &str| PlayAction::Use { verb: "pull".into(), noun: noun.into() };
+        assert_eq!(act(&mut state, pull("lev")), "There's no lev here.");
+        assert_eq!(act(&mut state, pull("lever")), "A chill passes.");
+        assert_eq!(act(&mut state, PlayAction::Examine("ghost".into())), "Pale.");
+    }
+
+    #[test]
+    fn examining_the_room_looks_closely() {
+        let (dir, mut world) = world();
+        world.set_file(&dir.path().join("objects/old-sword.md"), "---\nid: old-sword\ntitle: Old sword\ntype: object\nobject_type: weapon\nvisibility: faint\n---\n");
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        let r = game.act(&world, &mut state, &PlayAction::Examine("room".into()));
+        assert!(r.text.starts_with("Yard\n\nGrass."), "{}", r.text);
+        assert!(r.text.ends_with("You look closely and find the old sword."), "{}", r.text);
+        assert!(state.has_noticed("object", "old-sword"));
+    }
+
+    #[test]
+    fn a_bad_visibility_is_a_problem() {
+        let (dir, mut world) = world();
+        world.set_file(&dir.path().join("objects/well.md"), "---\nid: well\ntitle: Well\ntype: object\nobject_type: x\nvisibility: invisible\n---\n");
+        assert!(world.current_problems(false).iter().any(|p| p.contains("`visibility: invisible` must be one of visible, faint, hidden, absent")));
     }
 }

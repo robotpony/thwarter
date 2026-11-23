@@ -41,7 +41,7 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 - [x] Obsidian links wherever frontmatter takes an id, as a file path or an id [coder] (REQ-CF-25)
 - [x] Variables by level, with warnings for undeclared ones [coder] (REQ-CF-16)
 - [x] Templates and built-ins, with `scenery` the first built-in [coder] (REQ-CF-15, REQ-CF-21)
-- [ ] `visibility:` in play: faint, hidden and absent [coder] (REQ-CF-18)
+- [x] `visibility:` in play: faint, hidden and absent [coder] (REQ-CF-18)
 - [ ] `reply ambiguous` from the candidates' shared template, else an in-world default [coder] (`design/STATES.md` › Ambiguity)
 - [ ] Links in prose, Markdown rendered in play, and tags [coder] (REQ-CF-28 to 30)
 - [ ] `design/STATES.md` › Engine rules written as REQ-ENG items [coder] (`design/ENGINE_REQUIREMENTS.md`)

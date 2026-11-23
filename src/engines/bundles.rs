@@ -823,6 +823,16 @@ fn build_thing(
         for w in key_case_warnings(&Value::Mapping(layer.metadata.clone()), type_name) {
             built.warnings.push(format!("{}: {}", layer.path.display(), w));
         }
+        match layer.metadata.get("visibility") {
+            None => {}
+            Some(Value::String(v)) if super::world_engine::Visibility::from_name(v).is_some() => {}
+            Some(other) => built.problems.push(format!(
+                "{}: `visibility: {}` must be one of {}",
+                layer.path.display(),
+                serde_yaml::to_string(other).unwrap_or_default().trim(),
+                super::world_engine::Visibility::NAMES.join(", ")
+            )),
+        }
     }
 
     if let Some(folder) = &thing.bundle {

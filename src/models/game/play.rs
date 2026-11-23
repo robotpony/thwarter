@@ -35,6 +35,10 @@ pub struct PlayState {
     /// Player actions the game understood; console commands don't count.
     #[serde(default)]
     pub turn: u64,
+    /// Faint things the player has found by searching or examining a
+    /// room, by kind and id. Once found, a faint thing stays found.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub noticed: BTreeMap<String, std::collections::BTreeSet<String>>,
 }
 
 /// A chapter as a save names it: the folder that defines it (empty for
@@ -89,6 +93,15 @@ impl PlayState {
         }
     }
 
+    pub fn has_noticed(&self, type_name: &str, id: &str) -> bool {
+        self.noticed.get(type_name).map_or(false, |ids| ids.contains(id))
+    }
+
+    /// Record a faint thing as found; `false` if it already was.
+    pub fn notice(&mut self, type_name: &str, id: &str) -> bool {
+        self.noticed.entry(type_name.to_string()).or_default().insert(id.to_string())
+    }
+
     /// How many times the player has entered `room`.
     pub fn visits_to(&self, room: &str) -> u32 {
         self.visits.get(room).copied().unwrap_or(0)
@@ -106,6 +119,8 @@ pub enum PlayAction {
     Take(String),
     Examine(String),
     Inventory,
+    /// Look closely around the room, finding faint things.
+    Search,
     /// An object's own named action (`design/STATES.md` › Changing
     /// state): `pull lever` is `verb` "pull", `noun` "lever".
     Use { verb: String, noun: String },
@@ -141,5 +156,7 @@ pub enum Change {
     /// A thing switched state; `type_name` is `location`, `object` or `character`.
     Became { type_name: String, id: String, state: String },
     EnteredChapter { name: String },
+    /// A faint thing was found.
+    Noticed { type_name: String, id: String },
     Set { name: String, value: String },
 }

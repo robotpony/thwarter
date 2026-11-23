@@ -85,6 +85,36 @@ pub struct WorldEngine {
     roles: std::collections::BTreeMap<PathBuf, FileRole>,
 }
 
+/// How plainly a thing is there, from its current version's
+/// `visibility:` (REQ-CF-18, `design/STATES.md` › Hidden things).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Visibility {
+    /// Listed in the room.
+    #[default]
+    Visible,
+    /// Not listed; found by searching or examining the room.
+    Faint,
+    /// Not listed or found by looking; only an action reveals it, though
+    /// an action may name it.
+    Hidden,
+    /// Not there at all until something brings it in; can't be named.
+    Absent,
+}
+
+impl Visibility {
+    pub const NAMES: &'static [&'static str] = &["visible", "faint", "hidden", "absent"];
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "visible" => Visibility::Visible,
+            "faint" => Visibility::Faint,
+            "hidden" => Visibility::Hidden,
+            "absent" => Visibility::Absent,
+            _ => return None,
+        })
+    }
+}
+
 /// Which version of each thing to see: the starting versions (the
 /// default), or those of a game in progress.
 #[derive(Debug, Clone, Copy, Default)]
@@ -850,6 +880,24 @@ impl WorldEngine {
             }
             Err(_) => starting(),
         }
+    }
+
+    /// How plainly a thing is there in the version `at` sees. A thing
+    /// that isn't loaded, or says nothing, is visible.
+    pub fn visibility(&self, kind: EntityKind, id: &str, at: At) -> Visibility {
+        let Some(thing) = self.thing(kind, id) else { return Visibility::Visible };
+        let state = at
+            .play
+            .and_then(|p| p.state_of(kind.type_name(), id))
+            .filter(|s| thing.states.contains_key(*s))
+            .map(String::from)
+            .or_else(|| thing.starting_state.clone());
+        let chapter = at.play.and_then(|p| p.chapter.as_ref()).and_then(|c| self.chapter_key(c));
+        thing
+            .build(state.as_deref(), chapter.as_ref())
+            .ok()
+            .and_then(|(_, merged)| merged.metadata.get("visibility").and_then(|v| v.as_str()).and_then(Visibility::from_name))
+            .unwrap_or_default()
     }
 
     pub fn location_at(&self, id: &str, at: At) -> Option<Location> {

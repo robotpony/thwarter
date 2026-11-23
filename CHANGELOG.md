@@ -30,6 +30,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.23.0 (2026-11-23)
+
+### Added
+
+- `visibility:` in play (REQ-CF-18, `design/STATES.md` › Hidden things), read from a thing's current version, for objects, characters and exits (by the room they lead to). `faint` things aren't listed until the player searches or examines the room; once found, they stay found. `hidden` things are never listed or found by looking, but an action may name one exactly ("pull lever"). `absent` things can't be named at all. Revealing one is ordinary state switching (`becomes:`).
+- `PlayAction::Search` ("You search carefully and find the brass key and a way north."), and `examine` on the room itself (`room`, `here`, `around`, or its title or id), which shows the room and finds faint things the same way. `PlayState` keeps what's been found (`noticed`), and `Change` gains `Noticed`. `WorldEngine::visibility(kind, id, at)` gives a thing's visibility.
+- A `visibility:` other than `visible`, `faint`, `hidden` or `absent` is a problem. `visibility` joins the known keys.
+
 ## 0.22.1 (2026-11-23)
 
 ### Changed
