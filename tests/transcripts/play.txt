@@ -20,9 +20,9 @@ Exits: north, east.
 You see: Brass Lantern, Bench.
 Here: The Elder.
 > take the lantern
-You take the Brass Lantern.
+You take the brass lantern.
 > take lantern
-You already have the Brass Lantern.
+You already have the brass lantern.
 > get bench
 You can't take the bench.
 Author note: `bench` is scenery with no card, so it can't be taken
