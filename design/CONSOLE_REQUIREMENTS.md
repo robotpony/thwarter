@@ -118,4 +118,4 @@ Where a thing's file lives is its scope: global, area or local (`design/STATES.m
 4. Writing helpers: which model services to support (one, several, or a local model), and can "flesh out" also propose new things, such as rooms from an outline, or only prose?
 5. Writing helpers: where styles live, until `world/`'s layout is settled (`design/STATES.md` › Open questions).
 6. Scope: what does `local` mean in a room? Making an object local to a room turns the room into a bundle (`castle/hall.md` becomes `castle/hall/index.md`, with `torch.md` beside it). Proposed: `/new ... in here` asks first, or works only in a room that is already a bundle.
-7. Scope: must object, character and door ids be unique across the whole world, so a room's `torch` always means one file? Proposed: yes; `/move` keeps it so. This touches the content format, so it goes to the commander.
+7. ~~Scope: must object, character and door ids be unique across the whole world?~~ Decided 2026-11-23: yes, whatever their scope, and `/move` keeps the id (`design/CONTENT_REQUIREMENTS.md` › REQ-CF-22). Templates and chapters are the exception: named per scope and looked up along the lineage.
