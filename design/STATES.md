@@ -93,7 +93,9 @@ sets: { story.king: dead }          # story values on entering the chapter
 <!-- Arc notes: the court splits; the guard captain takes charge. -->
 ```
 
-The number prefix only orders the chapters; the chapter's name is the rest (`after-the-king`), and that's what overlays and actions use. Leave gaps (10, 20, 30) so a chapter can be inserted by naming one file. A root chapter can exist before any overlay does, as a placeholder for the arc. Root chapters don't change individual things; that's what a thing's own overlays are for. What a root chapter can change is world-level settings, the kind `world.toml` holds (starting room, title, intro text), plus story values (Bruce, 2026-11-23). Whether world-level content also gets a `world/` or `game/` folder is open.
+The number prefix only orders the chapters; the chapter's name is the rest (`after-the-king`), and that's what overlays and actions use. Leave gaps (10, 20, 30) so a chapter can be inserted by naming one file. A root chapter can exist before any overlay does, as a placeholder for the arc. Root chapters don't change individual things; that's what a thing's own overlays are for. What a root chapter can change is world-level settings (starting room, title, intro text) and story values (Bruce, 2026-11-23).
+
+The world's definition gets its own `world/` folder (Bruce, 2026-11-23): its title, intro, starting room, and the `story.` and `player.` declarations, which move out of `world.toml`. The running game is a virtual `game/` folder the console shows but that isn't on disk. A real `game/` folder, if one exists, can only set the game's starting state. *Proposed*: `world.toml` stays for tool settings, such as the default map style.
 
 Inside a thing, a chapter is an overlay for that thing:
 
@@ -123,6 +125,8 @@ chapters/
 ```
 
 A thing's overlays follow the same shape: `castle/courtyard/chapters/after-the-king.md` applies in `after-the-king` and in its sub-chapters, and `castle/courtyard/chapters/after-the-king/the-funeral.md` only in `the-funeral`. So an author can tell what applies from the folder tree.
+
+Chapters can be defined in any scope, not only at the root (Bruce, 2026-11-23). A chapter defined inside an area or a thing (a "secret" chapter) is an ordinary chapter with a narrow scope: it exists only there, and an action inside that scope moves to it. The same goes for objects, characters and everything else: anything defined in a limited scope, and any global too, can be hidden. Hidden only means it is found, and means something, in a specific state or chapter. The timeline is the playthrough that results from the states a player passes through; nothing else decides what's hidden.
 
 ### What applies, in order
 
@@ -207,7 +211,7 @@ objects/
   blue-diary.md            # inherits: objects/templates/book
 ```
 
-A template is never placed in the world itself. *Proposed*: it's marked by living in a `templates/` folder, a reserved name like `chapters`. Most doors and many objects are expected to be global templates (`locked-door`, `magic-door`, `fortified-door`) that hold their whole definition, so a specific door or object is mostly just a name and a template.
+A template is never placed in the world itself. It's marked either way (Bruce, 2026-11-23): by living in a `templates/` folder, which can exist globally or in any scope and is a reserved name like `chapters`, or by `template: true` in its own frontmatter. Most doors and many objects are expected to be global templates (`locked-door`, `magic-door`, `fortified-door`) that hold their whole definition, so a specific door or object is mostly just a name and a template.
 
 Identical copies (three healing potions) are one thing with a count: `objects: { potion: 3 }`, with play state tracking how many are left. A copy that needs to differ becomes its own thing with its own file. Counts come after templates, when a world needs them.
 
@@ -269,8 +273,8 @@ Prose can include variables, written `{{ name }}`. Every name starts with the le
 | Level | Prefix | Examples | Declared in |
 |---|---|---|---|
 | Game | `game.` | `game.turn`, `game.score` | the engine; fixed |
-| Story | `story.` | `story.chapter`, `story.king` | `world.toml` `[story]`, with starting values |
-| Player | `player.` | `player.name`, `player.health` | `world.toml` `[player]` |
+| Story | `story.` | `story.chapter`, `story.king` | `world/`, with starting values |
+| Player | `player.` | `player.name`, `player.health` | `world/` |
 | Current room | `location.` | `location.title`, `location.visits` | the engine and the room |
 | A thing | `<id>.` | `box.lid`, `knife.sharp` | the thing's `vars:` |
 | This thing | `this.` | `this.lid` | the thing's `vars:` |
@@ -351,9 +355,7 @@ Commands the console will need, *proposed*: `/state new <name>`, `/state set <na
 
 ## Open questions
 
-1. **Doors, the details**: where a door's file lives when it isn't global, one-way and hidden doors, see-through windows, and whether a specific door can be just a template plus two rooms with no file of its own.
-2. **How chapters overlay, and local chapters.** Authors may use chapters globally, but also add "secret" chapters or sub-chapters inside an area or tied to an object. Where are those defined, what starts them, and how do they stack with root chapters (Bruce, 2026-11-23)?
-3. **World-level content**: `world.toml` alone, or also a `world/` or `game/` folder for world-level text and settings?
-4. **Clocks and game values**: when do time, weather and randomness come in, and is time turns or game time?
-5. **Showing play state in the editor**: what the author sees, and how they change it while playtesting.
-6. **Templates**: a reserved `templates/` folder, or a `template: true` marker?
+1. **Doors, the details**: one-way, hidden and see-through doors, where a door's file lives when it isn't global, and whether a door can exist without a file of its own. Being worked through with Bruce.
+2. **Clocks and game values**: Bruce wants them (2026-11-23). Still to settle: is time counted in turns or in game time, and how weather and randomness are declared.
+3. **Showing play state**: it MUST be visible in a sidebar in the console and be queryable (Bruce, 2026-11-23). The layout and the query commands are console work for `design/CONSOLE_REQUIREMENTS.md`.
+4. **What's in `world/`**: its file layout, and what stays in `world.toml`.
