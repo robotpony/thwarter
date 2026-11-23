@@ -28,6 +28,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.9.0 (2026-11-23)
+
+### Added
+
+- Full editing (REQ-CON-6): `/edit room`, `/edit object` and `/edit character` open the file edit mode is in, or the one named (`/edit character elder`), in a full-screen editor inside the terminal, built on ratatui and ratatui-textarea. Ctrl-S saves and stays open; Esc closes, asking once if there are unsaved changes. A save replaces the whole file through the writer, so text that doesn't parse, or that changes the `id` or `type`, is refused with the reason on the status line and the editor stays open. A file changed on disk since it opened is a conflict: a second Ctrl-S overwrites it. Each save's report, with any problems it adds, prints when the editor closes.
+- Scenery gets its card on first edit (REQ-CF-8): `/edit object bench` for an object the room names without a card opens a new card with `object_type: scenery`, written on the first save.
+- In scripts and transcripts, which have no screen, `/edit <kind>` says which file it would open.
+
+### Changed
+
+- The file watcher sends its notices after unlocking the console, so a burst of changes while the editor is open can't block its saves.
+
 ## 0.8.1 (2026-11-23)
 
 ### Changed

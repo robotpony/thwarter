@@ -26,8 +26,8 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 - [x] `validate` warns when two kinds share an `id`, such as a location and an object [coder] (`design/CONTENT_FORMAT.md` › Keys, order and file locations)
 - [x] `/new room <direction>`, `/new object`, `/new character` [console] (REQ-CON-5)
 - [x] `/set` and `/link` for single fields and exits [console] (REQ-CON-5)
-- [ ] `/edit room`, `/edit object`, `/edit character`: full editing in the terminal [console] (REQ-CON-6)
-- [ ] An object without a card gets one on its first edit [console, coder] (REQ-CF-8)
+- [x] `/edit room`, `/edit object`, `/edit character`: full editing in the terminal [console] (REQ-CON-6)
+- [x] An object without a card gets one on its first edit [console, coder] (REQ-CF-8)
 - [x] File watching for `/reload` [console] (REQ-CON-7)
 - [x] Line editing and history at the console prompt (arrow keys) [console] (REQ-CON-2)
 

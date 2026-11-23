@@ -7,6 +7,8 @@
 //! transcript (REQ-CON-9).
 
 mod author;
+mod editor;
+mod full_edit;
 mod play;
 mod saves;
 mod session;
@@ -60,7 +62,8 @@ pub fn run(world_path: &Path, mode: Mode) -> Result<()> {
 /// Ctrl-R search) on a real terminal. Ctrl-C clears the line; Ctrl-D
 /// leaves, like `/quit`. World files are watched, and a change reloads
 /// the world and prints what happened above the prompt (REQ-CON-7).
-fn drive_terminal(console: Console, world_path: &Path) -> Result<()> {
+fn drive_terminal(mut console: Console, world_path: &Path) -> Result<()> {
+    console.interactive = true;
     let console = Arc::new(Mutex::new(console));
     let notices = ExternalPrinter::<String>::default();
     let _watching = match watch::watch(world_path, console.clone(), notices.sender()) {
@@ -89,6 +92,22 @@ fn drive_terminal(console: Console, world_path: &Path) -> Result<()> {
         if flow == Flow::Quit {
             return Ok(());
         }
+        let pending = lock(&console).take_pending_edit();
+        if let Some(target) = pending {
+            println!("{}", edit_full_screen(&console, target));
+        }
+    }
+}
+
+/// Runs the full-screen editor for a `/edit <kind>` (REQ-CON-6). The
+/// console is locked only while a save is written, so the file watcher
+/// keeps working; its notices wait until the prompt is back.
+fn edit_full_screen(console: &Mutex<Console>, mut target: full_edit::EditTarget) -> String {
+    let document = lock(console).edit_document(&target);
+    let closed = editor::run_in_terminal(document, |sections, force| lock(console).save_full_edit(&mut target, &sections[0], force));
+    match closed {
+        Ok(closed) => lock(console).edit_closed(&target, closed),
+        Err(e) => format!("The editor failed: {}. Nothing more was saved.", e),
     }
 }
 

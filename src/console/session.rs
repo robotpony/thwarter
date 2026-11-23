@@ -43,6 +43,11 @@ pub struct Console {
     pub(super) own_writes: Vec<(String, Instant)>,
     /// The world's warnings before the current command changed anything.
     pub(super) warnings_before: Option<Vec<String>>,
+    /// Whether a terminal is attached, so `/edit <kind>` can open the
+    /// full-screen editor. Scripts and transcripts have none.
+    pub(super) interactive: bool,
+    /// The file a `/edit <kind>` asked to open, for the terminal loop.
+    pub(super) pending_edit: Option<super::full_edit::EditTarget>,
 }
 
 pub(super) const COMPASS_ALIASES: &[(&str, &str)] = &[
@@ -69,6 +74,8 @@ impl Console {
             game_engine: GameEngine::new(),
             own_writes: Vec::new(),
             warnings_before: None,
+            interactive: false,
+            pending_edit: None,
         };
         if mode == Mode::Play {
             if let Some(room) = console.world.default_room() {
@@ -131,7 +138,7 @@ impl Console {
             ("quit" | "q", _) => return ("Bye.".to_string(), Flow::Quit),
             ("help" | "?", _) => self.help(),
             ("edit", []) => self.switch_to_edit(),
-            ("edit", [kind, ..]) => self.full_edit(kind),
+            ("edit", args) => self.full_edit(args),
             ("play", []) => self.play(),
             ("play", ["here"]) => self.play_here(),
             ("play", _) => "Usage: /play, or /play here".to_string(),
@@ -182,7 +189,11 @@ impl Console {
                 "  /set <key> <value>                   one field; attributes.health 80 sets one entry".to_string(),
                 "  /link <direction> <room>             add or change one exit from this room".to_string(),
                 "  /unlink <direction>                  remove one exit from this room".to_string(),
-                "Not built yet: /edit room, /edit object, /edit character (PLAN.md › Phase 3).".to_string(),
+                String::new(),
+                "Full editing, in a full-screen editor (ctrl-s saves, esc closes):".to_string(),
+                "  /edit room [id]                      the room you're in, or the one named".to_string(),
+                "  /edit character [id]                 the character you're in, or the one named".to_string(),
+                "  /edit object [id]                    an object; scenery here gets its card".to_string(),
             ]),
             Mode::Play => lines.extend([
                 String::new(),
@@ -204,23 +215,6 @@ impl Console {
         }
         self.mode = Mode::Edit;
         format!("Edit mode, at {}.", self.pwd())
-    }
-
-    /// `/edit room`, `/edit object`, `/edit character` (REQ-CON-6). From
-    /// play mode, switches to edit mode at the current room first
-    /// (REQ-CON-2). The editing itself is Phase 3.
-    fn full_edit(&mut self, kind: &str) -> String {
-        let mut out = Vec::new();
-        if !matches!(kind, "room" | "object" | "character") {
-            return format!("`/edit {}`: the kinds are room, object and character.", kind);
-        }
-        if self.mode == Mode::Play {
-            self.mode = Mode::Edit;
-            self.place_at_room();
-            out.push(format!("Edit mode, at {}.", self.pwd()));
-        }
-        out.push(format!("/edit {} isn't built yet (PLAN.md › Phase 3).", kind));
-        out.join("\n")
     }
 
     /// Reloads from disk, keeping the game and edit mode's place

@@ -1,6 +1,6 @@
 [package]
 name = "thwarter"
-version = "0.8.1"
+version = "0.9.0"
 edition = "2021"
 description = "A Hugo-style engine for interactive fiction"
 authors = ["Thwarter Project"]
@@ -28,6 +28,8 @@ uuid = { version = "1.6", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 reedline = "0.53.0"
 notify-debouncer-mini = "0.8.0"
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm_0_29"] }
+ratatui-textarea = { version = "0.9.4", default-features = false, features = ["crossterm"] }
 
 [dev-dependencies]
 tempfile = "3.8"

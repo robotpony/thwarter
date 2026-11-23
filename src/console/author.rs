@@ -262,7 +262,7 @@ impl Console {
     // Shared steps.
 
     /// Whether the current room names `id` as an object with no card.
-    fn is_scenery_here(&self, id: &str) -> bool {
+    pub(super) fn is_scenery_here(&self, id: &str) -> bool {
         let Some(here) = self.current_room() else { return false };
         let named = self.world.engine.get_location(&here).is_some_and(|l| l.objects.iter().any(|o| o == id));
         named && !self.world.engine.objects.contains_key(id)
@@ -275,13 +275,13 @@ impl Console {
     }
 
     /// The room edit mode is in, if it's in one.
-    fn current_room(&self) -> Option<String> {
+    pub(super) fn current_room(&self) -> Option<String> {
         self.current_file().filter(|c| c.kind == Kind::Room).map(|c| c.id)
     }
 
     /// A room id as typed: from the world root if it has a `/`, else in
     /// the current folder (`gatehouse` in `castle/` is `castle/gatehouse`).
-    fn room_id(&self, typed: &str) -> String {
+    pub(super) fn room_id(&self, typed: &str) -> String {
         let typed = typed.trim_start_matches('/');
         let dir = self.current_dir();
         if typed.contains('/') || dir.is_empty() {
@@ -296,7 +296,7 @@ impl Console {
     }
 
     /// Writes a new entity and adds it to the loaded world (REQ-ENG-7, 8).
-    fn create(&mut self, new: &NewEntity, edits: &[Edit]) -> Result<PathBuf, String> {
+    pub(super) fn create(&mut self, new: &NewEntity, edits: &[Edit]) -> Result<PathBuf, String> {
         let writer = self.writer()?;
         self.note_warnings_before();
         let report = writer
@@ -306,7 +306,7 @@ impl Console {
     }
 
     /// Writes edits to an entity's file and applies them to the loaded world.
-    fn save(&mut self, kind: Kind, id: &str, edits: &[Edit]) -> Result<PathBuf, String> {
+    pub(super) fn save(&mut self, kind: Kind, id: &str, edits: &[Edit]) -> Result<PathBuf, String> {
         let kind = entity_kind(kind).ok_or_else(|| format!("{} can't be changed.", id))?;
         let writer = self.writer()?;
         self.note_warnings_before();
@@ -327,7 +327,7 @@ impl Console {
     /// After a command saved `written`, which the engine has already
     /// applied in memory: refreshes the folder index and reports `summary`
     /// with any problems or warnings the command added.
-    fn after_writes(&mut self, written: &[PathBuf], summary: String) -> String {
+    pub(super) fn after_writes(&mut self, written: &[PathBuf], summary: String) -> String {
         let now = Instant::now();
         for path in written {
             let relative = path.strip_prefix(&self.world.root).unwrap_or(path).to_string_lossy().replace('\\', "/");
@@ -392,7 +392,7 @@ fn opposite(direction: &str) -> Option<&'static str> {
 
 /// The typed title, or one made from the id's last part:
 /// `castle/great-hall` becomes `Great hall`.
-fn title_or_default(typed: &[&str], id: &str) -> String {
+pub(super) fn title_or_default(typed: &[&str], id: &str) -> String {
     if !typed.is_empty() {
         return typed.join(" ");
     }
@@ -405,7 +405,7 @@ fn title_or_default(typed: &[&str], id: &str) -> String {
 }
 
 /// Character and object ids are bare names (`king`, not `npcs/king`).
-fn bare_id_problem(id: &str) -> Option<String> {
+pub(super) fn bare_id_problem(id: &str) -> Option<String> {
     id.contains('/').then(|| {
         format!("Character and object ids are bare names, without folders: `{}`.", id.rsplit('/').next().unwrap_or(id))
     })

@@ -53,7 +53,7 @@ You see: Brass Lantern, Bench.
 Here: The Elder.
 > /edit room
 Edit mode, at village/square.
-/edit room isn't built yet (PLAN.md › Phase 3).
+/edit room opens village/square.md in a full-screen editor, which needs a terminal.
 > /edit spaceship
 `/edit spaceship`: the kinds are room, object and character.
 > /help
@@ -83,7 +83,11 @@ Changing content (each saves the file):
   /set <key> <value>                   one field; attributes.health 80 sets one entry
   /link <direction> <room>             add or change one exit from this room
   /unlink <direction>                  remove one exit from this room
-Not built yet: /edit room, /edit object, /edit character (PLAN.md › Phase 3).
+
+Full editing, in a full-screen editor (ctrl-s saves, esc closes):
+  /edit room [id]                      the room you're in, or the one named
+  /edit character [id]                 the character you're in, or the one named
+  /edit object [id]                    an object; scenery here gets its card
 > /bogus
 Unknown command `/bogus`. Type /help for commands.
 > /
