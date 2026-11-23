@@ -300,10 +300,14 @@ impl GameEngine {
                     && (o.id.to_lowercase() == wanted || o.display_name().to_lowercase() == wanted)
             })
         };
+        let mut named_hidden = false;
         let object = match resolve(noun, &things, the_object) {
             Ok(Some(o)) => o,
             Err(which) => return ActionResult::say(self.which(world, state, &verb, noun, EntityKind::Object, &which)),
-            Ok(None) if hidden().is_some() => hidden().unwrap(),
+            Ok(None) if hidden().is_some() => {
+                named_hidden = true;
+                hidden().unwrap()
+            }
             Ok(None) => {
                 return match resolve(noun, &view.characters, person) {
                     Ok(Some(p)) => ActionResult::say(format!("You can't {} {}.", verb, person(&p))),
@@ -319,6 +323,12 @@ impl GameEngine {
             return cant();
         };
         let (key, action) = (found.clone(), action.clone());
+        // A hidden thing answers to its exact name only for an action with
+        // no `requires:`; otherwise it is as good as absent (Bruce,
+        // 2026-11-23).
+        if named_hidden && !action.requires_has.is_empty() {
+            return ActionResult::say(format!("There's no {} here.", noun.trim()));
+        }
 
         let name = object_name(&object);
         if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
@@ -1028,7 +1038,7 @@ mod tests {
         w("passage.md", "---\nid: passage\ntitle: Passage\ntype: location\nvisibility: faint\n---\n");
         w("objects/key.md", "---\nid: key\ntitle: Brass key\ntype: object\nobject_type: key\nvisibility: faint\n---\n");
         w("objects/crate.md", "---\nid: crate\ntitle: Crate\ntype: object\nobject_type: box\n---\n");
-        w("objects/lever/index.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nstate: secret\nactions:\n  pull: { becomes: { ghost: here } }\n---\n<!-- thwarter:action pull -->\nA chill passes.\n");
+        w("objects/lever/index.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nstate: secret\nactions:\n  pull: { becomes: { ghost: here } }\n  turn: { requires: { has: key } }\n---\n<!-- thwarter:action pull -->\nA chill passes.\n<!-- thwarter:action turn -->\nIt turns.\n<!-- thwarter:action turn refused -->\nStuck.\n");
         w("objects/lever/secret.md", "---\ninherits: index\nvisibility: hidden\n---\n");
         w("objects/ghost/index.md", "---\nid: ghost\ntitle: Ghost\ntype: object\nobject_type: spirit\nstate: gone\n---\nPale.\n");
         w("objects/ghost/gone.md", "---\ninherits: index\nvisibility: absent\n---\n");
@@ -1056,6 +1066,8 @@ mod tests {
         assert_eq!(act(&mut state, PlayAction::Examine("ghost".into())), "There's no ghost here.");
         let pull = |noun: &str| PlayAction::Use { verb: "pull".into(), noun: noun.into() };
         assert_eq!(act(&mut state, pull("lev")), "There's no lev here.");
+        // An action with `requires:` can't reach a hidden thing, even with the key in hand.
+        assert_eq!(act(&mut state, PlayAction::Use { verb: "turn".into(), noun: "lever".into() }), "There's no lever here.");
         assert_eq!(act(&mut state, pull("lever")), "A chill passes.");
         assert_eq!(act(&mut state, PlayAction::Examine("ghost".into())), "Pale.");
     }
