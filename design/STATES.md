@@ -202,45 +202,7 @@ Inheritance is never implicit (Bruce, 2026-11-23). A file inherits only if its f
 
 ## Engine rules
 
-Settled by the commander from the coder's review (2026-11-23).
-
-**Loading.**
-- An entity's `id` comes from its `index.md` frontmatter, as today. The folder is only how the loader finds the files. `validate` warns when the `id` and the folder disagree.
-- A bundle is a leaf. It may contain state files and one `chapters/` folder, nothing else; a nested `index.md` is an error. `index`, `_index` and `chapters` are reserved and can't be state names.
-- The loader knows what a file is from where it sits: next to an `index.md` it's a state, under a thing's `chapters/` it's an overlay, and at the root `chapters/` it's a chapter. State and overlay files have no `id` or `type`.
-- `_index.md` marks an area. Its frontmatter MAY have a `title` and author notes, and nothing else yet.
-- Layers merge as raw YAML before the result is typed as a location, object or character. Every key remembers the file it came from, for error messages and for the console's "(from index)" labels.
-
-**Chapters in any scope** (built in 0.12.0, confirmed by the commander):
-- In any `chapters/` folder, a numbered file (`25-the-vault-opens.md`) defines a chapter in that scope, and an unnumbered one (`the-vault-opens.md`) is an overlay for the nearest chapter of that name, looked up from its folder outward to the root. Mixing numbered and unnumbered files for one chapter path is an error, and so is an unnumbered file in the root `chapters/`.
-- A chapter is identified by its scope and name, so names only need to be unique within a scope. A scoped definition that hides an outer chapter of the same name gets a warning, since it's most likely an overlay written with its number.
-- `chapter:` actions and `version()` resolve a chapter name from the thing outward, the same way.
-- A layer that breaks a rule (a state file that sets `id`, `type` or `state:`, an overlay with `inherits:`) is kept, with the offending keys removed and reported, so one bad key doesn't cause more errors further down.
-
-**Current version.**
-- A thing's current version depends on play state, so it is built on request, not stored at load.
-- Edit mode shows a thing's starting version (starting state, no chapter) unless a playtest is running, and then the version the game is in; a header always says which (`castle/vault · open · after-the-king`). `show` and `validate` default to the starting version. `thwart show --state <name> --chapter <name>` shows any other. `validate` checks every state against every chapter stack.
-- Only `index.md` may set `state:`, and it means the starting state. No layer may change `id` or `type`. A bundle may leave out `state:`, in which case `index.md` alone is the version until something switches it.
-- What a room holds is its current `objects:` list, minus anything the player holds or has taken, so a chapter overlay can never duplicate an item the player already has. With counts (see Templates and copies), it's the count minus the number taken.
-
-**Ids and names.**
-- Once states exist, an `id` shared by two kinds (a door and a room both called `vault`) is ambiguous, because `becomes:`, `requires:` and `{{ }}` name things by bare id. It's a warning in authoring, and the console proposes a rename to fix it (for example `vault` → `vault-door`) (Bruce, 2026-11-23). That needs renaming, which updates every reference to the old id (see Console).
-- `game`, `story`, `player`, `location` and `this` are reserved and can't be ids. Ids can't contain a dot, so `{{ castle/vault.lid }}` splits cleanly at the last dot.
-
-**Values.**
-- Values are strings. Where values are compared, `yes`, `true`, `no` and `false` count as the same pair on purpose.
-- `requires:` stays closed to `has:` until a real case needs more. Each new key would bring the condition language back.
-- Variables work in prose only for now, not in frontmatter.
-- Actions are a map of mechanics, not a list of one-key maps: `actions: { pull: { becomes: { castle/vault: open } } }`. What the player reads is in the body (see Responses). The existing object cards move to this shape (the coder migrates them, moving their response strings into blocks).
-
-**Play state and saves.**
-- `PlayState` stores each thing's state only when it has left its starting state (like `taken`), the current chapter, values by level, visits per room and the turn count. A turn is one player action that the game understood; console commands and unknown verbs don't count. `flags` goes away.
-- Saves become `thwarter_save: 2`. A version 1 save loads as is. On load, a state that no longer exists falls back to the starting state, a thing that's gone is dropped, and a chapter that's gone falls back to the nearest earlier one, each with a warning.
-
-**Writing.**
-- Turning a one-file thing into a bundle writes the new files first, then renames the old file to `index.md` last. If that fails partway, both files exist and `validate` reports a duplicate `id`, so a half-done move is visible, never silent. The file watcher sees it as a delete and a create.
-- A bundle saves through one call that checks the merged thing before writing anything. Authors manage changes on disk with git, so conflicts should be rare (Bruce, 2026-11-23). The console reloads a changed file on its own whenever that's safe, meaning the author has no unsaved edits to it. If they do, saving warns once before overwriting, as for one file today; special handling waits until conflicts turn out to be common. Only sections that changed are written, so a one-word edit to `open.md` leaves `index.md` untouched on disk and in git. Every changed file is written to a temporary file and checked, then renamed in turn; if a rename fails, the console reports exactly which files were written.
-- Renaming or deleting a state is a command (`/state rename`, `/state delete`). A rename also updates every `becomes:` and `state:` that names it.
+The engine rules settled during this design, from the coder's review on 2026-11-23 onwards, are now requirements: `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-10 to 29, grouped as loading, chapters, building a version, ids and values, play and saves, and writing bundles. That document is the one copy; this one no longer repeats them. The rules as they stood here are in `git show 1e2af89:design/STATES.md`.
 
 ## Templates and copies
 

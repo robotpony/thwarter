@@ -23,6 +23,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Removed
 
+- `design/STATES.md` › Engine rules' text, now `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-10 to 29 so there's one copy. Recover with `git show 1e2af89:design/STATES.md`.
 - `REQUIREMENTS.md` › 4.1 to 4.4, split into one requirements document per component: `design/CONTENT_REQUIREMENTS.md` (REQ-CF, REQ-WS), `design/ENGINE_REQUIREMENTS.md` (REQ-ENG) and `design/CLI_REQUIREMENTS.md` (REQ-CLI), with ids unchanged; the principles moved from `design/STATES.md` to `REQUIREMENTS.md` › 4 (Bruce, 2026-11-23). Recover the old sections with `git show 1620350:REQUIREMENTS.md`.
 - `PLAN.md`'s old Phase 4 (Play) and Phase 5 (Tooling), regrouped into Phases 4 to 9 with a "done when" each (Bruce, 2026-11-23). Recover with `git show e4e87e6:PLAN.md`.
 - `REQUIREMENTS.md` › 4.6 Console, moved to `design/CONSOLE_REQUIREMENTS.md` with the console's open questions from `PLAN.md` (Bruce, 2026-11-23). The REQ-CON ids are unchanged. Recover the old section with `git show 7a10a8d:REQUIREMENTS.md`.

@@ -58,7 +58,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Scope: a sticky default, per-command overrides, `/move` [console] (REQ-CON-26 to 29)
 - [ ] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
-- [ ] Renaming an id with every reference updated, and proposed renames for shared ids [coder, console] (`design/STATES.md` › Engine rules › Ids and names)
+- [ ] Renaming an id with every reference updated, and proposed renames for shared ids [coder, console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 - [ ] Showing a template or built-in: `/template` in the console, and a `thwart show` option [console, coder] (REQ-CF-21)
 
