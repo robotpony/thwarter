@@ -47,7 +47,7 @@ A new entity's file goes where its `id` says:
 - a character at `npcs/<id>.md`, whatever its `character_type`
 - an object at `objects/<id>.md`
 
-Existing files can live anywhere in the world; the loader finds them by walking the directory and keeps track of which file each `id` came from. An `id` must be unique within its type; a location and an object may share one, but `thwart validate` should warn when they do, since the console's `cd <id>` can't tell them apart (`PLAN.md` › Phase 3). These defaults match the test world (decided by the commander, 2026-11-23; Bruce may change them).
+Existing files can live anywhere in the world; the loader finds them by walking the directory and keeps track of which file each `id` came from. An `id` must be unique within its type; a location and an object may share one, but `thwart validate` should warn when they do, since the console's `go <name>` can't tell them apart (`PLAN.md` › Phase 3). These defaults match the test world (decided by the commander, 2026-11-23; Bruce may change them).
 
 ## `type: location`
 
