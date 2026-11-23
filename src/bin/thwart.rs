@@ -1,26 +1,26 @@
 use clap::{Parser, Subcommand};
-use anyhow::Result;
+use std::process::ExitCode;
 
 const DEFAULT_WORLD_PATH: &str = "authors/mx/test-world";
 
 #[derive(Parser)]
 #[command(name = "thwart")]
 #[command(about = "A Hugo-style engine for interactive fiction")]
-#[command(version = "0.1.0")]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
     
-    #[arg(long, help = "Specify world directory")]
+    #[arg(long, global = true, help = "Specify world directory")]
     world: Option<String>,
     
-    #[arg(long, help = "Use custom configuration file")]
+    #[arg(long, global = true, help = "Use custom configuration file")]
     config: Option<String>,
     
-    #[arg(long, short = 'q', help = "Suppress non-essential output")]
+    #[arg(long, short = 'q', global = true, help = "Suppress non-essential output")]
     quiet: bool,
     
-    #[arg(long, short = 'v', help = "Enable verbose output")]
+    #[arg(long, short = 'v', global = true, help = "Enable verbose output")]
     verbose: bool,
 }
 
@@ -49,8 +49,6 @@ enum Commands {
         state: Option<String>,
         #[arg(long, help = "Output format", default_value = "text")]
         format: String,
-        #[arg(long, help = "Include detailed information")]
-        verbose: bool,
     },
     /// Generate maps
     Map {
@@ -97,16 +95,16 @@ enum Commands {
     },
 }
 
-fn main() -> Result<()> {
+fn main() -> ExitCode {
     let cli = Cli::parse();
     let world_path = cli.world.clone().unwrap_or_else(|| DEFAULT_WORLD_PATH.to_string());
 
-    match cli.command {
+    let result = match cli.command {
         Commands::Validate { location, strict, output, format, fix } => {
             thwarter::cli::commands::validate_command(world_path, location, strict, output, format, fix)
         },
-        Commands::Show { location, player, state, format, verbose } => {
-            thwarter::cli::commands::show_command(world_path, location, player, state, format, verbose)
+        Commands::Show { location, player, state, format } => {
+            thwarter::cli::commands::show_command(world_path, location, player, state, format, cli.verbose)
         },
         Commands::Map { location, player, depth, style, output, connections } => {
             thwarter::cli::commands::map_command(location, player, depth, style, output, connections)
@@ -117,5 +115,15 @@ fn main() -> Result<()> {
         Commands::Debug { location, check_references, memory_usage, trace_action, profile } => {
             thwarter::cli::commands::debug_command(location, check_references, memory_usage, trace_action, profile)
         },
+    };
+
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        // The command already printed its own failure; just exit non-zero.
+        Err(e) if e.is::<thwarter::cli::AlreadyReported>() => ExitCode::FAILURE,
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+            ExitCode::FAILURE
+        }
     }
 }

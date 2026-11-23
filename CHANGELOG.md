@@ -23,6 +23,19 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, now `PLAN.md` Phases 3 and 4. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.1.1 (2026-11-23)
+
+### Fixed
+
+- `--world`, `--config`, `-q` and `-v` are accepted after the subcommand (`thwart validate --world <path>`), as `README.md` and `TESTING.md` write them. They were top-level only.
+- `validate` prints its failure once. The summary line stays; `main` no longer prints the returned error again, and still exits non-zero.
+- `show <location>` in text format prints the room for an author to check: name and id, coordinates, description, exits in compass order, then characters and objects by name. Exits to unknown rooms say `(missing)`; character and object ids with no card say `(not found)`. JSON and YAML output are unchanged.
+
+### Changed
+
+- `show`'s own `--verbose` is replaced by the global `-v`/`--verbose`, which `show --verbose` still reaches.
+- `thwart --version` reads the version from `Cargo.toml` instead of a hardcoded string.
+
 ## 0.1.0 (2026-08-24)
 
 The August audit (2e4d080), plus files it left uncommitted (6aa58de, 884ae96). The version number dates from July 2025 but wasn't bumped until this file began.

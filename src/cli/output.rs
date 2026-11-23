@@ -176,3 +176,16 @@ impl Default for OutputFormatter {
         Self::new(OutputFormat::Text)
     }
 }
+
+/// Returned by a command that has already printed its failure, so `main`
+/// exits non-zero without printing the error a second time.
+#[derive(Debug)]
+pub struct AlreadyReported;
+
+impl std::fmt::Display for AlreadyReported {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("failure already reported")
+    }
+}
+
+impl std::error::Error for AlreadyReported {}

@@ -1,4 +1,4 @@
-use crate::cli::{OutputFormat, OutputFormatter};
+use crate::cli::{AlreadyReported, OutputFormat, OutputFormatter};
 use crate::engines::WorldEngine;
 use anyhow::Result;
 
@@ -71,6 +71,6 @@ pub fn validate_command(
     if problems.is_empty() {
         Ok(())
     } else {
-        Err(anyhow::anyhow!("{} validation problem(s) found", problems.len()))
+        Err(AlreadyReported.into())
     }
 }
