@@ -130,6 +130,7 @@ What the player sees when they examine themselves.
 - Values use `vars:` everywhere, as things do, so `story.king` is declared in `story.md` and `player.health` in `player.md`. `{{ player.title }}` is the player's name.
 - `world.toml` keeps tool settings only, such as the default map style. The world's title, author, version and starting room move to `world/index.md`, and its description becomes the intro prose.
 - The test world's `world.toml` also holds counts and flags that nothing reads (`locations_count`, `relationship_system` and the like). They're dropped in the move, and `CHANGELOG.md` records them.
+- Built in 0.16.0 (7c7772d), and confirmed by the commander: `world.toml` MAY list more paths for the loader to ignore, as `ignore = ["drafts", "notes/old"]` from the world root. Hugo's own folder names are ignored only at the root, so `castle/static/` is still an area. A world with no `world/index.md` still reads `world.toml`'s old `[metadata]` and starting location, quietly, so older worlds keep working; a deprecation warning can come later. A player with no `title` is called "you". Unknown keys in `world/` files warn, and so do unknown files there, except under `styles/`.
 
 Inside a thing, a chapter is an overlay for that thing:
 
