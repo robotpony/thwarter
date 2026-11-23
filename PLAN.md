@@ -28,7 +28,7 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 - [ ] `/edit room`, `/edit object`, `/edit character`: full editing in the terminal [console] (REQ-CON-6)
 - [ ] An object without a card gets one on its first edit [console, coder] (REQ-CF-8)
 - [ ] File watching for `/reload` [console] (REQ-CON-7)
-- [ ] Line editing and history at the console prompt (arrow keys) [console] (REQ-CON-2)
+- [x] Line editing and history at the console prompt (arrow keys) [console] (REQ-CON-2)
 
 ## Phase 4 · Play
 

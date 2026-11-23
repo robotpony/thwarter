@@ -12,6 +12,10 @@ mod world;
 
 use anyhow::Result;
 use session::{Console, Flow};
+use reedline::{
+    FileBackedHistory, Prompt, PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus, Reedline, Signal,
+};
+use std::borrow::Cow;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::Path;
 
@@ -39,8 +43,64 @@ impl Mode {
 pub fn run(world_path: &Path, mode: Mode) -> Result<()> {
     let mut console = Console::open(world_path, mode)?;
     let stdin = io::stdin();
-    let interactive = stdin.is_terminal();
-    drive(&mut console, stdin.lock(), io::stdout().lock(), interactive)
+    if stdin.is_terminal() && io::stdout().is_terminal() {
+        drive_terminal(&mut console)
+    } else {
+        drive(&mut console, stdin.lock(), io::stdout().lock())
+    }
+}
+
+/// The interactive loop: a line editor with history (arrow keys,
+/// Ctrl-R search) on a real terminal. Ctrl-C clears the line; Ctrl-D
+/// leaves, like `/quit`.
+fn drive_terminal(console: &mut Console) -> Result<()> {
+    let mut editor = Reedline::create().with_history(Box::new(FileBackedHistory::new(HISTORY_LINES)?));
+    println!("{}", console.greeting());
+    loop {
+        let prompt = ConsolePrompt(console.prompt());
+        let line = match editor.read_line(&prompt)? {
+            Signal::Success(line) => line,
+            Signal::CtrlC(_) => continue,
+            Signal::CtrlD => return Ok(()),
+            _ => continue,
+        };
+        let (text, flow) = console.handle(&line);
+        if !text.is_empty() {
+            println!("{}", text);
+        }
+        if flow == Flow::Quit {
+            return Ok(());
+        }
+    }
+}
+
+/// Lines of history kept for the session. History isn't saved between
+/// sessions yet.
+const HISTORY_LINES: usize = 500;
+
+/// The console's prompt (`edit castle/courtyard> `) in reedline's terms.
+struct ConsolePrompt(String);
+
+impl Prompt for ConsolePrompt {
+    fn render_prompt_left(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.0)
+    }
+    fn render_prompt_right(&self) -> Cow<'_, str> {
+        Cow::Borrowed("")
+    }
+    fn render_prompt_indicator(&self, _mode: PromptEditMode) -> Cow<'_, str> {
+        Cow::Borrowed("")
+    }
+    fn render_prompt_multiline_indicator(&self) -> Cow<'_, str> {
+        Cow::Borrowed("... ")
+    }
+    fn render_prompt_history_search_indicator(&self, search: PromptHistorySearch) -> Cow<'_, str> {
+        let status = match search.status {
+            PromptHistorySearchStatus::Passing => "",
+            PromptHistorySearchStatus::Failing => "failing ",
+        };
+        Cow::Owned(format!("({}search: {}) ", status, search.term))
+    }
 }
 
 /// Runs the console over `input` as if typed, and returns everything it
@@ -48,28 +108,21 @@ pub fn run(world_path: &Path, mode: Mode) -> Result<()> {
 pub fn run_script(world_path: &Path, mode: Mode, input: &str) -> Result<String> {
     let mut console = Console::open(world_path, mode)?;
     let mut out = Vec::new();
-    drive(&mut console, input.as_bytes(), &mut out, false)?;
+    drive(&mut console, input.as_bytes(), &mut out)?;
     Ok(String::from_utf8(out)?)
 }
 
-fn drive(console: &mut Console, mut input: impl BufRead, mut out: impl Write, interactive: bool) -> Result<()> {
+/// The scripted loop: reads lines from `input` and echoes each as
+/// `> line`, so the output reads as a transcript.
+fn drive(console: &mut Console, mut input: impl BufRead, mut out: impl Write) -> Result<()> {
     writeln!(out, "{}", console.greeting())?;
     loop {
-        if interactive {
-            write!(out, "{}", console.prompt())?;
-            out.flush()?;
-        }
         let mut line = String::new();
         if input.read_line(&mut line)? == 0 {
-            if interactive {
-                writeln!(out)?;
-            }
             return Ok(());
         }
         let line = line.trim_end_matches(['\n', '\r']);
-        if !interactive {
-            writeln!(out, "> {}", line)?;
-        }
+        writeln!(out, "> {}", line)?;
         let (text, flow) = console.handle(line);
         if !text.is_empty() {
             writeln!(out, "{}", text)?;

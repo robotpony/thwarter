@@ -26,6 +26,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.2.3 (2026-11-23)
+
+### Added
+
+- Line editing and history at the console prompt on a terminal: arrow keys, Ctrl-R history search, Ctrl-C to clear the line, and Ctrl-D to leave. It uses `reedline`, which is built on crossterm, the same backend ratatui uses, so a full-screen editor could share the terminal (`PLAN.md` › Open question 1). History lasts for the session. Piped input still runs the plain transcript loop. The `reedline` dependency itself landed in f5fe6aa, swept into that commit from the working tree.
+
+### Changed
+
+- Edit mode's file index comes from `WorldEngine::sources` instead of a second parse of every file. A `.md` file the engine didn't load is listed as `(doesn't parse)`. Key-case warnings (`WorldLoadReport::warnings`) count among the console's warnings.
+
 ## 0.2.2 (2026-11-23)
 
 ### Added

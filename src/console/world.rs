@@ -2,10 +2,9 @@
 //! index of the files on disk, so edit mode can navigate the world as
 //! folders (REQ-CON-4).
 
-use crate::engines::{WorldEngine, WorldLoadReport};
-use crate::parsers::{MarkdownParser, ParsedEntity};
+use crate::engines::{EntityKind, WorldEngine, WorldLoadReport};
 use anyhow::{bail, Result};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -31,7 +30,9 @@ impl Kind {
 }
 
 /// One content file, keyed in `World::files` by its path relative to the
-/// world root without `.md` (`castle/courtyard`, `npcs/king`).
+/// world root without `.md` (`castle/courtyard`, `npcs/king`). With a
+/// duplicate id, each file has an entry, and the title is the one the
+/// engine kept.
 #[derive(Debug, Clone)]
 pub struct FileEntry {
     pub kind: Kind,
@@ -61,7 +62,7 @@ impl World {
         let mut engine = WorldEngine::new();
         let report = engine.load_world(root)?;
         let (title, starting_location) = read_world_toml(root);
-        let (files, dirs) = index_files(root);
+        let (files, dirs) = index_files(root, &engine);
         Ok(World { root: root.to_path_buf(), engine, report, title, starting_location, files, dirs })
     }
 
@@ -73,11 +74,13 @@ impl World {
 
     /// Problems that are normal while a world is being written, such as
     /// exits to rooms not written yet. Shown, never blocking (REQ-CON-7).
+    /// Includes keys that differ only in case from a known key.
     pub fn warnings(&self) -> Vec<String> {
         self.engine
             .problems(&self.report, false)
             .into_iter()
             .filter(|p| !self.report.errors.contains(p))
+            .chain(self.report.warnings.iter().cloned())
             .collect()
     }
 
@@ -114,13 +117,23 @@ fn read_world_toml(root: &Path) -> (Option<String>, Option<String>) {
     (get("metadata", "title"), get("settings", "starting_location"))
 }
 
-fn index_files(root: &Path) -> (BTreeMap<String, FileEntry>, BTreeSet<String>) {
-    let parser = MarkdownParser::new();
+/// Every content file and folder under `root`. Each file's kind and id
+/// come from the engine's record of where it loaded them
+/// (`WorldEngine::sources`). A `.md` file the engine has no record of
+/// failed to parse.
+fn index_files(root: &Path, engine: &WorldEngine) -> (BTreeMap<String, FileEntry>, BTreeSet<String>) {
+    let mut loaded: HashMap<&Path, (EntityKind, &str)> = HashMap::new();
+    for ((kind, id), paths) in &engine.sources {
+        for path in paths {
+            loaded.insert(path.as_path(), (*kind, id.as_str()));
+        }
+    }
+
     let mut files = BTreeMap::new();
     let mut dirs = BTreeSet::new();
     dirs.insert(String::new());
 
-    for entry in WalkDir::new(root).sort_by_file_name().into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
             continue;
@@ -134,13 +147,19 @@ fn index_files(root: &Path) -> (BTreeMap<String, FileEntry>, BTreeSet<String>) {
             parent = dir.parent();
         }
 
-        let file = match parser.parse_file(path) {
-            Ok(ParsedEntity::Location(l)) => FileEntry { kind: Kind::Room, id: l.id, title: l.name },
-            Ok(ParsedEntity::Character(c)) => FileEntry { kind: Kind::Character, id: c.id, title: c.name },
-            Ok(ParsedEntity::Object(o)) => FileEntry { kind: Kind::Object, id: o.id, title: o.title },
-            Err(_) => FileEntry { kind: Kind::Broken, id: key.clone(), title: String::new() },
+        let file = match loaded.get(path) {
+            Some((EntityKind::Location, id)) => entry_for(Kind::Room, id, engine.get_location(id).map(|l| &l.name)),
+            Some((EntityKind::Character, id)) => {
+                entry_for(Kind::Character, id, engine.characters.get(*id).map(|c| &c.name))
+            }
+            Some((EntityKind::Object, id)) => entry_for(Kind::Object, id, engine.objects.get(*id).map(|o| &o.title)),
+            None => FileEntry { kind: Kind::Broken, id: key.clone(), title: String::new() },
         };
         files.insert(key, file);
     }
     (files, dirs)
+}
+
+fn entry_for(kind: Kind, id: &str, title: Option<&String>) -> FileEntry {
+    FileEntry { kind, id: id.to_string(), title: title.cloned().unwrap_or_default() }
 }
