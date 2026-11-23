@@ -15,7 +15,7 @@ There are currently zero unit tests. See `design/UNIT_TESTS.md` for what's plann
 
 ## Console transcripts
 
-The console's acceptance tests (`REQUIREMENTS.md` › REQ-CON-9) are transcripts in `tests/transcripts/*.txt`: a console session written exactly as the console prints it, with input lines as `> line`. Each starts with a `# world:` and `# mode:` header and runs against a fixture world in `tests/transcripts/worlds/`. The format is described in the header comment of `tests/transcripts.rs`.
+The console's acceptance tests (`design/CONSOLE_REQUIREMENTS.md` › REQ-CON-9) are transcripts in `tests/transcripts/*.txt`: a console session written exactly as the console prints it, with input lines as `> line`. Each starts with a `# world:` and `# mode:` header and runs against a fixture world in `tests/transcripts/worlds/`. The format is described in the header comment of `tests/transcripts.rs`.
 
 ```bash
 cargo test --test transcripts                     # run every transcript

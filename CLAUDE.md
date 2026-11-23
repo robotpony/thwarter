@@ -41,7 +41,7 @@ For anything beyond this orientation, prefer these over re-deriving from source:
 
 ## Priority 1 (P1) Modules
 
-- The console (`src/console/`): one interactive client for writing and playing a world, with an edit mode and a play mode. Authoring first, play second; engine work only as they need it (`REQUIREMENTS.md` › 4.6)
+- The console (`src/console/`): one interactive client for writing and playing a world, with an edit mode and a play mode. Authoring first, play second; engine work only as they need it (`design/CONSOLE_REQUIREMENTS.md`)
 - Later: RESTful world API abstraction
 
 ## Special Configuration

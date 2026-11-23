@@ -16,7 +16,7 @@ The library crate (`thwarter`) and binary crate (`thwart`) split along these lin
 ```
 src/
 ├── bin/thwart.rs        # CLI entry point, argument parsing, dispatch
-├── console/              # The console: edit and play modes (REQUIREMENTS.md › 4.6)
+├── console/              # The console: edit and play modes (design/CONSOLE_REQUIREMENTS.md)
 ├── render.rs             # Room view text, shared by `thwart show` and the console
 ├── writer/               # Round-trip file writer: edits frontmatter in place (REQ-ENG-7)
 ├── models/               # Data structures, no behavior beyond simple constructors
