@@ -73,7 +73,34 @@ thwarter::console::run(world_path: &Path, mode: Mode) -> anyhow::Result<()>  // 
 - `problems` is `validate`'s check, also used by `/reload` (REQ-CON-7).
 - `render_location` gains a style argument (author or player view) in Phase 4.
 
-Proposed for Phase 4, not built: `PlayState { location, inventory: Vec<String>, flags: BTreeMap<String, serde_yaml::Value> }` in models, and `ActionResult { text, changes: Vec<Change> }`.
+### Play (Phase 4, 0.7.0)
+
+```rust
+// models::game
+pub struct PlayState {
+    location: String, inventory: Vec<String>,
+    taken: BTreeMap<String, Vec<String>>,          // room -> objects taken from it
+    flags: BTreeMap<String, serde_yaml::Value>,    // unused until narrative state
+}
+pub enum PlayAction { Look, Go(String), Take(String), Examine(String), Inventory }
+pub struct ActionResult { text: String, changes: Vec<Change>, note: Option<String> }  // note: author-only detail
+pub enum Change { Moved { from, to }, Took { object, from } }
+
+// engines
+GameEngine::start(&self, &WorldEngine, location) -> Result<PlayState>
+GameEngine::act(&self, &WorldEngine, &mut PlayState, &PlayAction) -> ActionResult
+GameEngine::view(&self, &WorldEngine, &PlayState) -> Option<LocationView>
+PlayState::reconcile(&mut self, &WorldEngine) -> Vec<String>
+save_game(&Path, &PlayState) -> Result<()>
+load_game(&Path, &WorldEngine) -> Result<(PlayState, Vec<String>)>
+render::RenderStyle { Author, Player }; render_location_as(&LocationView, RenderStyle) -> String
+```
+
+- The world is read-only to play (REQ-CON-3). `taken` records what the player removed from each room as a difference from the authored contents, so an author's edits during a game still show. A test checks that playing leaves every file's bytes unchanged.
+- `take` needs a card and a `weight` other than `immovable`. Scenery can be examined but not taken.
+- Nouns match by id, then title, then a unique word. A tie gets a "Which do you mean" reply.
+- `text` always reads as the game; author-only detail goes in `note` (REQ-CON-10).
+- Saves are YAML marked `thwarter_save: 1`, written atomically to a path the console chooses (REQ-CON-11). Loading reconciles the save with the current world and returns warnings for anything that's gone.
 
 ## File writer
 
@@ -110,15 +137,15 @@ This table exists because status claims in this repo have previously drifted fro
 | File writer (`writer`) | Done | See File writer above. The console's `/new`, `/set` and `/link` call it through `edit_loaded` and `create_loaded`. |
 | In-memory world changes (REQ-ENG-8) | Done | `WorldEngine::set_file` and `remove_file` apply one file's new text and recompute only the affected ids, with the same results a fresh load would give. `current_problems` and `current_warnings` check the world as it is now. |
 | Console (`thwart edit`, `thwart play`) | Partially done | The loop, `/edit`, `/play`, `/reload`, `/help` and `/quit` work, and edit mode navigates the world's folders (`ls`, `cd`, `pwd`, `look`). Play mode shows the room but has no verbs yet (Phase 4), `/new room|character|object`, `/set`, `/link` and `/unlink` save through the writer, reload, and report the problems a change adds. Full editing (`/edit room`) isn't built yet (Phase 3). On a terminal the prompt has line editing and history (reedline); history isn't saved between sessions. It also watches the world's files and reloads when they change, printing the result above the prompt. Tested by transcripts in `tests/transcripts/` and 4 `/reload` unit tests. |
-| Unit tests | Started | 69 tests: renderer, world engine, parser, `/reload`, and the writer (including a byte-identical round trip of every `.md` in the repo and a one-field edit of every test-world entity). Console behaviour is also covered by transcripts. |
+| Unit tests | Started | 85 tests: renderer, world engine, parser, `/reload`, the writer (including a byte-identical round trip of every `.md` in the repo and a one-field edit of every test-world entity), and play. Console behaviour is also covered by transcripts. |
 | `NarrativeEngine` | Model only | Plot point prerequisite checking works; consequence execution and alternative-text condition evaluation are stubs. |
-| `GameEngine` | Model only | Action dispatch exists; move/take/look/examine handlers are stubs that report success without doing anything. |
+| `GameEngine` | Partially done | Look, go, take, examine and inventory work against `PlayState` (see Play above). Narrative state (flags, conditions, alternative text) is not started. |
 | `thwart validate` | Done | Loads the world, reports parse errors and broken connections; `--strict` additionally checks character `default_location` references. It also reports an `id` defined twice within a kind, and warns (without failing) about a key that differs only in case from a known one. `--fix` and location-scoped validation are not implemented. |
 | `thwart show` | Partially done | Loads and displays the world or a single location; text output is the shared room view. Objects without cards show "(no card)", missing exits "(missing)". `--player` (perspective) and `--state` (saved state) are not implemented. |
 | `thwart map` | Not implemented | Reports that it isn't implemented and exits non-zero. |
 | `thwart search` | Not implemented | Reports that it isn't implemented and exits non-zero. |
 | `thwart debug` | Not implemented | Reports that it isn't implemented and exits non-zero. For reference checking, use `thwart validate --strict` today. |
-| Save/load game state | Not implemented | |
+| Save/load game state | Partially done | The engine side (`save_game`, `load_game`) works; the console's `/save` and `/load` are in progress. |
 | Dialogue trees | Not implemented | `dialogue_tree` is loaded as an opaque string reference; nothing parses or executes what it points to. |
 | `ConfigManager` / `thwart.toml` | Built but unused | `src/cli/config.rs` can load and save `thwart.toml` and `world.toml`, but `src/bin/thwart.rs` never constructs a `ConfigManager`; the CLI's default world path is a hardcoded constant instead. `thwart.toml`'s `[world].path` is currently inert. |
 

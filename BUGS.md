@@ -7,7 +7,7 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 ## Open
 
 - [ ] **Five connections in the test world point at rooms that don't exist**: `forest/abandoned-camp`, `forest/rocky-outcrop` (twice), `forest/cave-entrance`, `forest/cave-behind-falls`. An authoring decision for Bruce: write the rooms or cut the exits. Blocks using `validate` as a CI gate (2026-08-23)
-- [ ] **About 11 compiler warnings**, mostly unused parameters in `game_engine.rs`'s stub action handlers; many go away once Phase 4 uses them (2026-08-23)
+- [ ] **Three compiler warnings left**, two in `world_graph::find_path` and one in `narrative_engine`, both stubs; they go when Phase 5's map and Phase 4's narrative state use that code. Down from 11 in 0.7.0 (2026-08-23)
 
 ## Fixed
 
