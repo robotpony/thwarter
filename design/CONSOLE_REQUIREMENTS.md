@@ -41,24 +41,32 @@ Edit-mode tools that use a large language model (an AI) on the author's prose. B
 
 Decided by Bruce, 2026-11-23, except where marked as proposed.
 
-- REQ-CON-22: On a terminal, the console MUST be one full-screen view: scrolling output, an input line, and a play-state sidebar that is always visible. Watcher notices go into the output. The full-screen editor (REQ-CON-6) opens inside this view. Scripts and transcripts stay line-based, with the same output and no sidebar (REQ-CON-9).
+- REQ-CON-22: On a terminal, the console MUST be one full-screen view: a status bar across the top, scrolling output on the left, a sidebar on the right that is always visible, and the input line across the bottom (Bruce chose this layout, 2026-11-23). The status bar names the world and mode, counts warnings, and shows the running build. Watcher notices go into the output. The full-screen editor (REQ-CON-6) opens inside this view. Scripts and transcripts stay line-based, with the same output and no sidebar (REQ-CON-9).
 
   ```
-  play village/square                    │ GAME
-                                         │ at: village/square
-  > take lantern                         │ chapter: arrival
-  You take the brass lantern.            │
-  > n                                    │ carrying
-  The Well                               │   lantern
-  A mossy stone well. The rope is long   │
-  gone.                                  │ changed
-  Exits: south                           │   bread: stale
-                                         │   vault-door: locked
-  > _                                    │ values
-                                         │   tasty: no
+   Tiny World · edit · 2 warnings              thwart 0.12.0
+  ─────────────────────────────────────┬──────────────────
+   > look                              │ GAME
+   Village Square                      │ at  village/square
+   A small square of packed earth.     │ chapter  arrival
+   An old well stands to the north.    │ carrying  lantern
+   Exits: north (village/well),        │
+     east (village/inn, not written)   │ HERE  village/square
+   Here: The Elder.                    │ exits
+   You see: brass lantern, bench.      │   north  village/well
+                                       │   east   village/inn  (not written)
+                                       │ people
+                                       │   elder    global
+                                       │ things
+                                       │   lantern  global
+                                       │   bench    scenery, no card
+                                       │ warnings
+                                       │   east exit leads nowhere yet
+  ─────────────────────────────────────┴──────────────────
+   edit village/square [global]> _
   ```
 
-- REQ-CON-23: The sidebar MUST show the play state: where the player is, the current chapter, what they carry, every thing that has left its starting state, and the values in play. It shows the game in both modes, so an author writing in edit mode can see the playtest they are running. *Proposed*: on a terminal too narrow for both (under 100 columns), the sidebar folds into one line above the input, and `cd /game` still shows everything.
+- REQ-CON-23: The sidebar MUST show the play state under GAME: where the player is, the current chapter, what they carry, every thing that has left its starting state, and the values in play. It shows the game in both modes, so an author writing in edit mode can see the playtest they are running. In edit mode it MUST also show a HERE panel for where edit mode is, like a game master's notes for the room: its exits and which aren't written, the people and things in it with their scope, and its warnings. In play mode HERE is hidden and GAME gets the space. *Proposed*: on a terminal too narrow for both (under 100 columns), the sidebar folds into one line above the input, and `cd /game` still shows everything.
 - REQ-CON-24: The running game MUST appear as a virtual `game/` folder at the world root. It isn't on disk, and it is navigated like any other folder. A real `game/` folder on disk only sets the starting state (`design/STATES.md`).
 
   ```
@@ -109,6 +117,30 @@ Where a thing's file lives is its scope: global, area or local (`design/STATES.m
   edit castle/hall [global]> /move torch global
   Moved torch: castle/objects/torch.md → objects/torch.md.
   ```
+
+## Live reload
+
+The console restarts itself onto a new build in place, so it can be changed and tried without losing the session (Bruce, 2026-11-23). It is an early feature, so the console can be iterated on quickly. Decided by Bruce, 2026-11-23, except where marked as proposed.
+
+- REQ-CON-30: `/restart` MUST restart the console onto the `thwart` binary now on disk, in the same terminal, and put the author back where they were: the mode, edit mode's place, the running game, the scope default, the output's scrollback, the input history, and an open editor with its unsaved text and cursor. The console never restarts by itself. If the new binary doesn't start, the console stays on the one running and says why.
+
+  ```
+  (another pane: cargo build finishes)
+  edit village/square> /restart
+  Restarted on thwart 0.12.1 (built 14:02). You're where you were.
+  edit village/square> _
+  ```
+
+- REQ-CON-31: If the new build can't take part of the session as it was, such as a game saved in a shape that changed or a place that no longer exists, that part MUST start fresh with a notice saying what was reset. Everything else carries over, and the restart goes ahead.
+
+  ```
+  edit village/square> /restart
+  Restarted on thwart 0.12.1. The game was reset: its saved shape changed in this build.
+  edit village/square> _
+  ```
+
+- REQ-CON-32: *Proposed*: when a newer `thwart` has been built while the console runs, the status bar says so (`newer build: /restart`).
+- REQ-CON-33: Console commands MUST follow Claude Code's conventions for slash commands, such as `/restart` to restart (Bruce, 2026-11-23). *Proposed*, to confirm with Bruce: typing `/` opens a list of commands with one-line descriptions that narrows as you type, Tab completes, Esc closes it, and `/help` lists everything.
 
 ## Open questions
 
