@@ -26,6 +26,22 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.7.0 (2026-11-23)
+
+### Added
+
+- Play: `GameEngine::start(world, location)` and `GameEngine::act(world, &mut PlayState, &PlayAction) -> ActionResult` (REQ-ENG-5). Look, go, take, examine and inventory are implemented, in the shape agreed with the console. Playing changes only `PlayState` and never writes a world file (REQ-CON-3).
+- `PlayState` (location, inventory, objects taken from each room, and flags, which stay unused until narrative state) and `PlayAction`. `ActionResult` has player `text`, its `changes` (`Moved`, `Took`) and an author `note`, for things like an exit to a room that doesn't exist yet. Any reply that isn't a success leaves the state untouched.
+- Take works on an object with a card unless its `weight` is `immovable`. Scenery without a card can be examined but not taken. Nouns match an id, a title or a unique word, and two matches get "Which do you mean".
+- `save_game(path, &PlayState)` and `load_game(path, &world)` (REQ-CON-11). Saves are versioned YAML written atomically to a path the console chooses. Loading reconciles with the current world. `PlayState::reconcile(&world)` drops carried objects that no longer exist and reports a vanished location, for `/reload` and mid-game edits.
+- `render::RenderStyle { Author, Player }` and `render_location_as`. The player view shows names and directions only. `render_location` is unchanged.
+- `title_from_id` (`stone-bench` → "Stone bench") and `expand_direction` (`n` → `north`) in `thwarter::engines`.
+- 11 tests.
+
+### Removed
+
+- The stub `GameEngine::process_action` and its `ActionResult`, `StateChange` and `StateChangeType` models, which returned fixed text regardless of input. That removes 8 of the 11 compiler warnings. Recover with `git show 9584a28:src/engines/game_engine.rs` and `git show 9584a28:src/models/game/action.rs`.
+
 ## 0.6.2 (2026-11-23)
 
 ### Changed

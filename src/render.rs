@@ -5,6 +5,47 @@
 
 use crate::engines::LocationView;
 
+/// Who a room view is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenderStyle {
+    /// `thwart show` and edit mode: ids, coordinates, and what's missing.
+    Author,
+    /// Play mode: what the player sees, by name only.
+    Player,
+}
+
+/// `render_location` in the given style.
+pub fn render_location_as(view: &LocationView, style: RenderStyle) -> String {
+    match style {
+        RenderStyle::Author => render_location(view),
+        RenderStyle::Player => render_for_player(view),
+    }
+}
+
+/// A room as the player sees it: title, description, the ways out, then
+/// what and who is here, by name. No ids, coordinates or missing marks.
+fn render_for_player(view: &LocationView) -> String {
+    let mut out = vec![view.title.clone(), String::new()];
+    let body = view.body.trim();
+    out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
+    out.push(String::new());
+    if view.exits.is_empty() {
+        out.push("There's no way out.".to_string());
+    } else {
+        let dirs: Vec<&str> = view.exits.iter().map(|e| e.direction.as_str()).collect();
+        out.push(format!("Exits: {}.", dirs.join(", ")));
+    }
+    if !view.objects.is_empty() {
+        let names: Vec<String> = view.objects.iter().map(|o| o.display_name()).collect();
+        out.push(format!("You see: {}.", names.join(", ")));
+    }
+    if !view.characters.is_empty() {
+        let names: Vec<String> = view.characters.iter().map(|c| c.display_name()).collect();
+        out.push(format!("Here: {}.", names.join(", ")));
+    }
+    out.join("\n")
+}
+
 /// A location as an author checks it: title and id, coordinates,
 /// description (or `(no description yet)`), exits, then who and what is there. An exit to an unknown
 /// room says `(missing)`; an object with no card says `(no card)`; a
@@ -109,6 +150,25 @@ Objects:
         assert!(text.contains("Exits: none"));
         assert!(text.contains("Characters: none"));
         assert!(text.ends_with("Objects: none"));
+    }
+
+    #[test]
+    fn renders_for_the_player_by_name_only() {
+        let expected = "\
+Castle Courtyard
+
+A dry fountain.
+
+Exits: north, down.
+You see: Fountain.
+Here: Captain Marcus, Ghost.";
+        assert_eq!(render_location_as(&view(), RenderStyle::Player), expected);
+        let mut empty = view();
+        empty.exits.clear();
+        empty.objects.clear();
+        empty.characters.clear();
+        assert!(render_location_as(&empty, RenderStyle::Player).ends_with("There's no way out."));
+        assert_eq!(render_location_as(&view(), RenderStyle::Author), render_location(&view()));
     }
 
     #[test]

@@ -21,30 +21,6 @@ pub enum ActionType {
     Custom(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActionResult {
-    pub success: bool,
-    pub message: String,
-    pub state_changes: Vec<StateChange>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StateChange {
-    pub change_type: StateChangeType,
-    pub target: String,
-    pub old_value: Option<String>,
-    pub new_value: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum StateChangeType {
-    PlayerLocation,
-    Inventory,
-    CharacterState,
-    WorldState,
-    Variable,
-}
-
 impl Action {
     pub fn new(action_type: ActionType) -> Self {
         Self {
