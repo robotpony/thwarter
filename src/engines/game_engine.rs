@@ -83,20 +83,20 @@ impl GameEngine {
             Some(v) => v,
             None => return ActionResult::say("You're nowhere."),
         };
-        if let Some(carried) = resolve(noun, &self.carried(world, state)).ok().flatten() {
-            return ActionResult::say(format!("You already have the {}.", lower(&carried.display_name())));
+        if let Some(carried) = resolve(noun, &self.carried(world, state), the_object).ok().flatten() {
+            return ActionResult::say(format!("You already have {}.", the_object(&carried)));
         }
-        let object = match resolve(noun, &view.objects) {
+        let object = match resolve(noun, &view.objects, the_object) {
             Ok(Some(o)) => o,
             Ok(None) => {
-                if resolve(noun, &view.characters).ok().flatten().is_some() {
+                if resolve(noun, &view.characters, person).ok().flatten().is_some() {
                     return ActionResult::say("You can't take people.");
                 }
                 return ActionResult::say(format!("There's no {} here.", noun.trim()));
             }
             Err(which) => return ActionResult::say(which),
         };
-        let name = lower(&object.display_name());
+        let name = object_name(&object);
         let Some(card) = world.objects.get(&object.id) else {
             return ActionResult::say(format!("You can't take the {}.", name))
                 .with_note(format!("`{}` is scenery with no card, so it can't be taken", object.id));
@@ -123,17 +123,17 @@ impl GameEngine {
         };
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
-        match resolve(noun, &things) {
+        match resolve(noun, &things, the_object) {
             Ok(Some(object)) => {
                 return match world.objects.get(&object.id) {
                     Some(card) if !card.description.trim().is_empty() => ActionResult::say(card.description.trim()),
-                    _ => ActionResult::say(format!("You see nothing special about the {}.", lower(&object.display_name()))),
+                    _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
                 }
             }
             Err(which) => return ActionResult::say(which),
             Ok(None) => {}
         }
-        match resolve(noun, &view.characters) {
+        match resolve(noun, &view.characters, person) {
             Ok(Some(person)) => match world.characters.get(&person.id) {
                 Some(card) if !card.description.trim().is_empty() => ActionResult::say(card.description.trim()),
                 _ => ActionResult::say(format!("You see nothing special about {}.", person.display_name())),
@@ -229,7 +229,7 @@ pub fn load_game(path: &Path, world: &WorldEngine) -> Result<(PlayState, Vec<Str
 /// The thing `noun` names among `things`: an exact id, the id with spaces
 /// for hyphens, the name ignoring case, then a unique whole word of
 /// either. `Err` asks which, when more than one matches.
-fn resolve(noun: &str, things: &[EntityRef]) -> std::result::Result<Option<EntityRef>, String> {
+fn resolve(noun: &str, things: &[EntityRef], phrase: fn(&EntityRef) -> String) -> std::result::Result<Option<EntityRef>, String> {
     let noun = noun.trim().to_lowercase();
     let noun = noun.strip_prefix("the ").unwrap_or(&noun).trim().to_string();
     if noun.is_empty() {
@@ -261,7 +261,7 @@ fn resolve(noun: &str, things: &[EntityRef]) -> std::result::Result<Option<Entit
         0 => Ok(None),
         1 => Ok(Some(unique[0].clone())),
         _ => {
-            let names: Vec<String> = unique.iter().map(|t| format!("the {}", lower(&t.display_name()))).collect();
+            let names: Vec<String> = unique.iter().map(|t| phrase(t)).collect();
             Err(format!("Which do you mean: {}?", join_or(&names)))
         }
     }
@@ -275,19 +275,19 @@ fn join_or(items: &[String]) -> String {
     }
 }
 
-/// Lowercase a name for use mid-sentence, unless it looks like a proper
-/// name (two capitalized words, as in "Captain Marcus").
-fn lower(name: &str) -> String {
-    let capitals = name.split_whitespace().filter(|w| w.chars().next().map_or(false, char::is_uppercase)).count();
-    if capitals > 1 {
-        name.to_string()
-    } else {
-        let mut chars = name.chars();
-        match chars.next() {
-            Some(c) => c.to_lowercase().chain(chars).collect(),
-            None => String::new(),
-        }
-    }
+/// An object's name for use mid-sentence: lowercased, since object titles
+/// are often written in title case ("Brass Lantern" reads "the brass
+/// lantern"). Characters keep their names as written (`person`).
+fn object_name(object: &EntityRef) -> String {
+    object.display_name().to_lowercase()
+}
+
+fn the_object(object: &EntityRef) -> String {
+    format!("the {}", object_name(object))
+}
+
+fn person(character: &EntityRef) -> String {
+    character.display_name()
 }
 
 #[cfg(test)]
@@ -412,6 +412,27 @@ mod tests {
         game.act(&world, &mut state, &PlayAction::Take("rusty sword".into()));
         game.act(&world, &mut state, &PlayAction::Go("north".into()));
         assert_eq!(ex(&game, &mut state, "rusty sword"), "Pitted with rust.");
+    }
+
+    #[test]
+    fn object_names_are_lowercased_mid_sentence_and_people_keep_theirs() {
+        let (dir, mut world) = world();
+        world.set_file(
+            &dir.path().join("objects/brass-lantern.md"),
+            "---\nid: brass-lantern\ntitle: Brass Lantern\ntype: object\nobject_type: tool\n---\n",
+        );
+        world.set_file(&dir.path().join("npcs/queen.md"), "---\nid: queen\ntitle: Queen Aldric\ntype: character\n---\n");
+        world.set_file(
+            &dir.path().join("castle/yard.md"),
+            "---\nid: castle/yard\ntitle: Yard\ntype: location\ncharacters: [king, queen]\nobjects: [brass-lantern]\n---\n",
+        );
+        let (game, mut state) = play(&world);
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Take("lantern".into())).text, "You take the brass lantern.");
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Take("Brass Lantern".into())).text, "You already have the brass lantern.");
+        assert_eq!(
+            game.act(&world, &mut state, &PlayAction::Examine("aldric".into())).text,
+            "Which do you mean: King Aldric or Queen Aldric?"
+        );
     }
 
     #[test]

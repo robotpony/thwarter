@@ -26,6 +26,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.8.1 (2026-11-23)
+
+### Changed
+
+- Play replies lowercase object names mid-sentence ("You take the brass lantern."), even when the title is written in title case. Character names keep their case ("Which do you mean: King Aldric or Queen Aldric?"). Before this, a title with two capitalized words kept its capitals, so "Brass Lantern" sat oddly next to "the rope".
+
 ## 0.8.0 (2026-11-23)
 
 ### Added
