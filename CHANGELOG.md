@@ -26,6 +26,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.2.2 (2026-11-23)
+
+### Added
+
+- `validate` and `show` warn about a frontmatter key that differs only in case from one its type defines, such as `Inventory:` for `inventory:`. A warning doesn't fail validation. Other unknown keys aren't warned about, since objects may carry any (REQ-CF-6).
+- `WorldLoadReport::warnings`, the file-prefixed warnings from a load, kept apart from `errors` and from `WorldEngine::problems`.
+- `parsers::known_keys(type)`, each type's keys in `design/CONTENT_FORMAT.md` table order. It's the one list the parser and the writer share. `MarkdownParser::parse_file_with_warnings` and `parse_content_with_warnings` return the warnings with the entity.
+
 ## 0.2.1 (2026-11-23)
 
 ### Added

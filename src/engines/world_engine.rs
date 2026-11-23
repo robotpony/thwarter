@@ -64,6 +64,9 @@ pub struct WorldLoadReport {
     /// `design/ARCHITECTURE.md`.
     pub characters: Vec<Character>,
     pub errors: Vec<String>,
+    /// Problems that don't fail validation, such as a key that differs
+    /// only in case from a known one. Each is prefixed with its file.
+    pub warnings: Vec<String>,
 }
 
 impl WorldEngine {
@@ -92,8 +95,12 @@ impl WorldEngine {
                 continue;
             }
 
-            match parser.parse_file(path) {
-                Ok(entity) => {
+            match parser.parse_file_with_warnings(path) {
+                Ok(outcome) => {
+                    for warning in outcome.warnings {
+                        report.warnings.push(format!("{}: {}", path.display(), warning));
+                    }
+                    let entity = outcome.entity;
                     let key = match &entity {
                         ParsedEntity::Location(l) => (EntityKind::Location, l.id.clone()),
                         ParsedEntity::Character(c) => (EntityKind::Character, c.id.clone()),

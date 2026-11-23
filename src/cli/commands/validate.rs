@@ -33,6 +33,9 @@ pub fn validate_command(
     ));
 
     let problems = engine.problems(&report, strict);
+    for warning in &report.warnings {
+        formatter.print_warning(warning);
+    }
 
     if problems.is_empty() {
         formatter.print_success("Validation passed: no broken references found");

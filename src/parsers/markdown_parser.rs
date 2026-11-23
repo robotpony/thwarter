@@ -8,6 +8,58 @@ use std::path::Path;
 #[derive(Debug, Clone)]
 pub struct MarkdownParser;
 
+/// The keys `design/CONTENT_FORMAT.md` defines for a `type`, in its table
+/// order: `id`, `title`, `type`, then the type's own fields. This is the
+/// order a writer adds keys in. Empty for an unknown type.
+pub fn known_keys(type_name: &str) -> &'static [&'static str] {
+    match type_name {
+        "location" => &["id", "title", "type", "coordinates", "connections", "characters", "objects"],
+        "character" => &[
+            "id",
+            "title",
+            "type",
+            "character_type",
+            "default_location",
+            "attributes",
+            "dialogue_tree",
+            "inventory",
+            "relationships",
+        ],
+        "object" => &["id", "title", "type", "object_type", "category", "weight", "value", "actions"],
+        _ => &[],
+    }
+}
+
+/// Warnings for top-level keys that differ only in case from a key the
+/// type defines (`Inventory:` for `inventory:`). Keys are case-sensitive,
+/// so such a key isn't read as the known one. Other unknown keys aren't
+/// warned about, since objects may carry any extra keys (REQ-CF-6).
+pub fn key_case_warnings(metadata: &serde_yaml::Value, type_name: &str) -> Vec<String> {
+    let known = known_keys(type_name);
+    let mut warnings = Vec::new();
+    if let Some(map) = metadata.as_mapping() {
+        for key in map.keys().filter_map(|k| k.as_str()) {
+            if known.contains(&key) {
+                continue;
+            }
+            if let Some(k) = known.iter().find(|k| k.eq_ignore_ascii_case(key)) {
+                warnings.push(format!(
+                    "key `{}` differs only in case from `{}`; keys are case-sensitive, so it isn't read as `{}`",
+                    key, k, k
+                ));
+            }
+        }
+    }
+    warnings
+}
+
+/// A parsed file plus any warnings about it that aren't errors.
+#[derive(Debug, Clone)]
+pub struct ParseOutcome {
+    pub entity: ParsedEntity,
+    pub warnings: Vec<String>,
+}
+
 /// A markdown file split into its frontmatter and body, before any
 /// type-specific interpretation.
 #[derive(Debug, Clone)]
@@ -35,15 +87,25 @@ impl MarkdownParser {
     /// walking a world directory; it does not need to know in advance
     /// whether a given file is a location, character, or object.
     pub fn parse_file<P: AsRef<Path>>(&self, file_path: P) -> Result<ParsedEntity> {
+        Ok(self.parse_file_with_warnings(file_path)?.entity)
+    }
+
+    /// `parse_file`, plus warnings such as keys that differ only in case.
+    pub fn parse_file_with_warnings<P: AsRef<Path>>(&self, file_path: P) -> Result<ParseOutcome> {
         let content = fs::read_to_string(&file_path)
             .map_err(|e| anyhow!("Failed to read file {:?}: {}", file_path.as_ref(), e))?;
-        self.parse_content(&content, file_path)
+        self.parse_content_with_warnings(&content, file_path)
     }
 
     /// Parse a content file's text, dispatching on its frontmatter `type`.
     /// `file_path` is used only in error messages. `parse_file` is this
     /// plus the read; tests and the console can call it on text directly.
     pub fn parse_content<P: AsRef<Path>>(&self, content: &str, file_path: P) -> Result<ParsedEntity> {
+        Ok(self.parse_content_with_warnings(content, file_path)?.entity)
+    }
+
+    /// `parse_content`, plus warnings such as keys that differ only in case.
+    pub fn parse_content_with_warnings<P: AsRef<Path>>(&self, content: &str, file_path: P) -> Result<ParseOutcome> {
         let parsed = self.split_frontmatter(content)?;
 
         let entity_type = parsed
@@ -57,16 +119,18 @@ impl MarkdownParser {
                 )
             })?;
 
-        match entity_type {
-            "location" => Ok(ParsedEntity::Location(self.build_location(&parsed, &file_path)?)),
-            "character" => Ok(ParsedEntity::Character(self.build_character(&parsed, &file_path)?)),
-            "object" => Ok(ParsedEntity::Object(self.build_object(&parsed, &file_path)?)),
-            other => Err(anyhow!(
+        let entity = match entity_type {
+            "location" => ParsedEntity::Location(self.build_location(&parsed, &file_path)?),
+            "character" => ParsedEntity::Character(self.build_character(&parsed, &file_path)?),
+            "object" => ParsedEntity::Object(self.build_object(&parsed, &file_path)?),
+            other => return Err(anyhow!(
                 "{:?}: unknown type `{}` (expected location, character, or object)",
                 file_path.as_ref(),
                 other
             )),
-        }
+        };
+        let warnings = key_case_warnings(&parsed.metadata, entity_type);
+        Ok(ParseOutcome { entity, warnings })
     }
 
     pub fn parse_location_file<P: AsRef<Path>>(&self, file_path: P) -> Result<Location> {
@@ -233,16 +297,7 @@ impl MarkdownParser {
             }
         }
 
-        let known_fields = [
-            "id",
-            "title",
-            "type",
-            "object_type",
-            "category",
-            "weight",
-            "value",
-            "actions",
-        ];
+        let known_fields = known_keys("object");
         if let Some(map) = parsed.metadata.as_mapping() {
             for (key, value) in map {
                 if let Some(key_str) = key.as_str() {
@@ -549,6 +604,32 @@ A sword past its best.
             panic!("not a character")
         };
         assert!(c.inventory.is_empty());
+    }
+
+    #[test]
+    fn case_only_key_differences_are_warned_about() {
+        let parser = MarkdownParser::new();
+        let outcome = parser
+            .parse_content_with_warnings(
+                "---\nid: k\ntitle: K\ntype: character\nInventory: [sword]\nMood: grim\n---\n",
+                "k.md",
+            )
+            .unwrap();
+        assert_eq!(outcome.warnings.len(), 1, "{:?}", outcome.warnings);
+        assert!(outcome.warnings[0].starts_with("key `Inventory` differs only in case from `inventory`"));
+
+        // Objects: extra keys are fine, but a case-only difference still warns.
+        let outcome = parser
+            .parse_content_with_warnings(
+                "---\nid: s\ntitle: S\ntype: object\nobject_type: x\nCategory: y\ndamage: 4\n---\n",
+                "s.md",
+            )
+            .unwrap();
+        assert_eq!(outcome.warnings.len(), 1, "{:?}", outcome.warnings);
+        assert!(outcome.warnings[0].contains("`Category` differs only in case from `category`"));
+
+        // A clean file has none.
+        assert!(parser.parse_content_with_warnings(LOCATION, "c.md").unwrap().warnings.is_empty());
     }
 
     #[test]

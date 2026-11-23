@@ -23,10 +23,8 @@ pub fn show_command(
     let mut engine = WorldEngine::new();
     let report = engine.load_world(&world_path)?;
 
-    if !report.errors.is_empty() {
-        for error in &report.errors {
-            formatter.print_warning(error);
-        }
+    for message in report.errors.iter().chain(&report.warnings) {
+        formatter.print_warning(message);
     }
 
     match location {
