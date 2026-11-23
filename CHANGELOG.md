@@ -26,6 +26,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.4.0 (2026-11-23)
+
+### Added
+
+- `thwarter::writer`, the round-trip file writer (REQ-ENG-7). `ContentFile` edits one file's frontmatter as text, one field at a time: `SetScalar`, `SetList`, `SetMapEntry`, `RemoveMapEntry`, `RemoveKey`, `SetBody`, and `ReplaceAll` for full editing. Field order, comments, spacing, line endings, unmodelled fields and the body stay as they were.
+- The writer checks every edit by re-parsing. The frontmatter must read back as exactly the old mapping with that one change, and the file must still parse as the same entity, or the edit is refused and nothing changes. It also refuses edits to YAML shapes it doesn't handle (block scalars, non-empty flow maps, nested list items, anchors), and changes to `id` or `type`.
+- An added key goes in `design/CONTENT_FORMAT.md` table order, with extra keys at the end. Existing order never changes.
+- `WorldWriter`: `edit` writes to the file an entity was loaded from, refusing duplicate ids and files that changed since the load. `create` writes a new entity at `<id>.md`, `npcs/<id>.md` or `objects/<id>.md` (`writer::new_entity_relative_path`, the one place that rule lives). Both refuse ids and symlinks that would land outside the world.
+- Saves are atomic: a temporary file beside the target, renamed over it, keeping the original's permissions. A new file is linked into place, so it never overwrites one that appeared meanwhile.
+- 31 writer tests. They cover byte-identical round trips of every content file in the repo, a one-field edit of every entity in the test world, each operation and refusal, CRLF files, quoting, permissions, the path guard, and the safety net itself.
+
 ## 0.3.0 (2026-11-23)
 
 ### Added
