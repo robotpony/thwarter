@@ -11,7 +11,7 @@ The console is the interactive terminal client for writing and playing a world. 
 The author is a player of sorts, like a game master running a table (Bruce, 2026-11-23). Editing SHOULD feel like being in the world and running it: standing in a room, adding things to it, checking how it plays, and nudging the game's state. It should not feel like filling in forms. New commands are judged against that, and each requirement below gives an example of how it reads at the prompt.
 
 - REQ-CON-1: `thwart edit <world>` MUST open the console in edit mode and `thwart play <world>` in play mode. Both are subcommands of the one `thwart` binary.
-- REQ-CON-2: Commands to the console itself MUST start with `/`; anything else is input to the current mode. `/edit` and `/play` MUST switch modes inside a running console (`/edit` followed by a kind, such as `/edit room`, opens full editing instead, REQ-CON-6; from play mode it switches to edit mode and opens the current room), and `/help` and `/quit` MUST work in both.
+- REQ-CON-2: Commands to the console itself MUST start with `/`; anything else is input to the current mode. `/edit` MUST open where edit mode is in full editing (REQ-CON-6), whatever it is, with no kind word needed; from play mode it switches to edit mode at the player's room and opens that (Bruce, 2026-11-23). `/edit room`, `/edit object` and `/edit character`, with or without an id, name something else to open. `/play` MUST switch to play mode, and `/help` and `/quit` MUST work in both.
 - REQ-CON-3: Edit mode MUST be able to see everything in the world, including hidden state, and change content. Play mode MUST NOT change content files; it MAY write game saves. (Play mode's limits beyond that are proposed, not decided: Open question 2 below.)
 - REQ-CON-4: Edit mode MUST navigate the world with play mode's words, not shell words, since the author moves through the world like a game master (Bruce, 2026-11-23; this replaced `cd`, `ls` and `pwd`). Bare directions and `go <direction>` follow exits. `go <name>` goes to any room, area, folder, character, object or door, by its name or by a link in the prose. `go back` returns to the place before. `look` shows where edit mode is: a room, a thing, or what a folder holds. `examine <thing>` shows a thing here without going to it. A name that fits several things gets a question, never a guess. `go /` goes to the world root (built in 0.17.0). Commands that change content keep the `/` prefix.
 
@@ -184,6 +184,28 @@ Who is writing, as a persona (`REQUIREMENTS.md` › 5.2, REQ-WS-4 to 6). Decided
 - REQ-CON-35: `/author` MUST switch persona, and the status bar MUST show who you're writing as.
 - REQ-CON-36: A new world MUST go under the current persona, with `author: <id>` in its `world/index.md`.
 - REQ-CON-37: A persona's contact details ship with every packaged world (REQ-WS-6), so before packaging the console MUST say which details will go with it.
+
+## Colour
+
+Decided by Bruce, 2026-11-23.
+
+- REQ-CON-38: The console MUST take its colours from the terminal: the default foreground and background and the 16 named ANSI colours, with bold, dim, italic, underline and reverse. It never sets an RGB colour, so whatever theme the terminal has, light or dark, the console follows it. `NO_COLOR` turns colour off and keeps the rest. Colours go by role:
+
+  ```
+  status bar ............ reverse
+  your input (> look) ... bold
+  room and thing titles . bold
+  exits, links .......... cyan
+  not written, missing .. yellow
+  warnings .............. yellow
+  errors, refusals ...... red
+  author notes, Game: ... dim
+  console messages ...... green  (Saved, Reloaded, Restarted)
+  sidebar headings ...... bold blue
+  prompt ................ bold green in edit mode, bold magenta in play mode
+  ```
+
+- REQ-CON-39: The editor MUST highlight what it shows, in the same colours. Frontmatter: `---` fences dim, keys blue, ids that resolve cyan and ids that don't yellow. Prose: headings bold, emphasis italic, strong bold, links cyan and underlined, `#tags` magenta, code dim. Thwarter's markers are drawn as separators, and `{{ variables }}` are cyan when declared and yellow when not. Chrome: line numbers dim with the current one bold, the heading bar reversed, and the status line coloured by what it says (green saved, red refused, yellow a warning).
 
 ## Open questions
 
