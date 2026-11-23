@@ -1,6 +1,6 @@
 # States, bundles and chapters
 
-Status: Draft, from a design discussion between Bruce and the commander on 2026-11-23. Nothing here is built. Items marked *proposed* are the commander's suggestions that Bruce hasn't confirmed yet; everything else Bruce has agreed to.
+Status: Agreed, with open questions (below). Reviewed decision by decision with Bruce on 2026-11-23. Nothing here is built yet. Items marked *proposed* are the commander's suggestions that Bruce hasn't confirmed yet; everything else Bruce has agreed to.
 
 ## Summary
 
@@ -20,7 +20,7 @@ Agreed by Bruce, 2026-11-23. Every decision in this document should follow from 
 6. **Play never changes content.** Everything that happens in a game lives in the game state.
 7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
 
-Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). Changing state: reviewed, with doors and templates designed in outline. Variables: reviewed; undeclared variables and shared ids warn rather than fail. All 2026-11-23.
+Review status: reviewed with Bruce group by group, all six groups done. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). Changing state: reviewed, with doors and templates designed in outline. Variables: reviewed; undeclared variables and shared ids warn rather than fail. Console: reviewed; full editing may take the whole terminal, headers defined, conflicts handled by git and safe reloads. All 2026-11-23.
 
 ## Terms
 
@@ -191,7 +191,7 @@ Settled by the commander from the coder's review (2026-11-23).
 
 **Writing.**
 - Turning a one-file thing into a bundle writes the new files first, then renames the old file to `index.md` last. If that fails partway, both files exist and `validate` reports a duplicate `id`, so a half-done move is visible, never silent. The file watcher sees it as a delete and a create.
-- A bundle saves through one call that checks the merged thing before writing anything. It takes each file's text as it was when the editor opened it, and if any of the bundle's files has changed on disk since then, the whole save is a conflict. Only sections that changed are written, so a one-word edit to `open.md` leaves `index.md` untouched on disk and in git. Every changed file is written to a temporary file and checked, then renamed in turn; if a rename fails, the console reports exactly which files were written.
+- A bundle saves through one call that checks the merged thing before writing anything. Authors manage changes on disk with git, so conflicts should be rare (Bruce, 2026-11-23). The console reloads a changed file on its own whenever that's safe, meaning the author has no unsaved edits to it. If they do, saving warns once before overwriting, as for one file today; special handling waits until conflicts turn out to be common. Only sections that changed are written, so a one-word edit to `open.md` leaves `index.md` untouched on disk and in git. Every changed file is written to a temporary file and checked, then renamed in turn; if a rename fails, the console reports exactly which files were written.
 - Renaming or deleting a state is a command (`/state rename`, `/state delete`). A rename also updates every `becomes:` and `state:` that names it.
 
 ## Templates and copies
@@ -313,7 +313,19 @@ In files, a bundle is separate files. In the console, it is one document with a 
   The door hangs off one hinge now.
 ```
 
-The section headers are not text. The editor draws each one (`--- state: open (starting)`) as a fixed separator, with one text area per section, and the cursor moves across them. So no body line ever needs escaping, and a header can't be renamed or deleted by editing. New states and overlays come only from commands (`/state new`, `/chapter overlay`), never by typing a header. Sections appear in this order: `index`, the starting state, the other states A to Z, then chapter overlays in chapter order. (Settled by the commander with the console coder, 2026-11-23.)
+A section header names one file of the bundle: its kind (`index`, `state` or `chapter`), its name, tags such as `(starting)`, and its path. In the editor, headers are not text. The editor draws each one as a fixed separator, with one text area per section, and the cursor moves across them:
+
+```
+─── state: open (starting) ··· castle/vault/open.md
+```
+
+Where a bundle has to be one piece of plain text (copying it out, or a transcript test), each header is written as a Markdown comment on its own line, which renders as nothing and can't be mistaken for prose or frontmatter:
+
+```markdown
+<!-- thwarter:section state open starting -->
+```
+
+A header is never a Markdown heading (`#`), since prose uses those, and never `---`, which fences frontmatter. *Proposed*; to confirm with the console coder. So no body line ever needs escaping, and a header can't be renamed or deleted by editing. New states and overlays come only from commands (`/state new`, `/chapter overlay`), never by typing a header. Sections appear in this order: `index`, the starting state, the other states A to Z, then chapter overlays in chapter order. (Settled by the commander with the console coder, 2026-11-23.)
 
 Saving splits the document back into its files. Every section must parse before any file is written; if one fails, nothing is saved. A file that doesn't parse still opens, since editing is how an author fixes it. A one-file thing opens as a document with one section.
 
