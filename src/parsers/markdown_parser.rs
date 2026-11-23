@@ -224,8 +224,8 @@ impl MarkdownParser {
 
         if let Some(conn_map) = parsed.metadata.get("connections").and_then(|v| v.as_mapping()) {
             for (direction, target) in conn_map {
-                if let (Some(dir), Some(tgt)) = (direction.as_str(), target.as_str()) {
-                    location.connections.insert(dir.to_string(), tgt.to_string());
+                if let (Some(dir), Some(tgt)) = (direction.as_str(), id_value(target)) {
+                    location.connections.insert(dir.to_string(), tgt);
                 }
             }
         }
@@ -256,8 +256,8 @@ impl MarkdownParser {
             };
         }
 
-        if let Some(location) = parsed.metadata.get("default_location").and_then(|v| v.as_str()) {
-            character.default_location = Some(location.to_string());
+        if let Some(location) = parsed.metadata.get("default_location").and_then(id_value) {
+            character.default_location = Some(location);
         }
 
         if let Some(attr_map) = parsed.metadata.get("attributes").and_then(|v| v.as_mapping()) {
@@ -520,7 +520,7 @@ fn parse_action(name: &str, value: &serde_yaml::Value, path: &Path) -> Result<Ob
                     let k = k.as_str().ok_or_else(|| bad(&format!("`{}` keys must be text", field)))?;
                     let val = text_of(val).ok_or_else(|| bad(&format!("`{}.{}` must be a single value", field, k)))?;
                     if field == "becomes" {
-                        action.becomes.insert(k.to_string(), val);
+                        action.becomes.insert(link_target(k), val);
                     } else {
                         action.sets.insert(k.to_string(), val);
                     }
@@ -531,10 +531,10 @@ fn parse_action(name: &str, value: &serde_yaml::Value, path: &Path) -> Result<Ob
                 for (k, val) in req {
                     match k.as_str() {
                         Some("has") => match val {
-                            Value::String(s) => action.requires_has.push(s.clone()),
+                            Value::String(s) => action.requires_has.push(link_target(s)),
                             Value::Sequence(items) => {
                                 for item in items {
-                                    action.requires_has.push(item.as_str().ok_or_else(|| bad("`has` names objects"))?.to_string());
+                                    action.requires_has.push(id_value(item).ok_or_else(|| bad("`has` names objects"))?);
                                 }
                             }
                             _ => return Err(bad("`has` names an object or a list of them")),
@@ -558,8 +558,38 @@ fn string_sequence(metadata: &serde_yaml::Value, field: &str) -> Vec<String> {
     metadata
         .get(field)
         .and_then(|v| v.as_sequence())
-        .map(|seq| seq.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|seq| seq.iter().filter_map(id_value).collect())
         .unwrap_or_default()
+}
+
+/// What an Obsidian link names (REQ-CF-25): `[[castle/hall]]`,
+/// `[[castle/hall|the hall]]`, `[[hall#Exits]]` and `castle/hall.md` all
+/// name `castle/hall`. Anything else is returned trimmed, as an id. The
+/// engine resolves a name that's a file path rather than an id.
+pub fn link_target(text: &str) -> String {
+    let mut t = text.trim();
+    if let Some(inner) = t.strip_prefix("[[").and_then(|r| r.strip_suffix("]]")) {
+        t = inner;
+        t = t.split('|').next().unwrap_or(t);
+        t = t.split('#').next().unwrap_or(t);
+    }
+    let t = t.trim();
+    t.strip_suffix(".md").unwrap_or(t).trim().to_string()
+}
+
+/// An id where frontmatter takes one: a string (a link or an id), or an
+/// unquoted `[[castle/hall]]`, which YAML reads as a list in a list.
+pub fn id_value(value: &serde_yaml::Value) -> Option<String> {
+    use serde_yaml::Value;
+    match value {
+        Value::String(s) => Some(link_target(s)),
+        Value::Sequence(items) if items.len() == 1 => match &items[0] {
+            Value::String(s) => Some(link_target(s)),
+            Value::Sequence(inner) if inner.len() == 1 => inner[0].as_str().map(link_target),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 fn value_to_display_string(value: &serde_yaml::Value) -> String {
@@ -876,5 +906,23 @@ It feels heavy.
         assert_eq!(Body::parse(&body.render()), body);
         assert_eq!(response_marker("  <!--thwarter:action pull refused-->  ").as_deref(), Some("action pull refused"));
         assert_eq!(response_marker("<!-- thwarter:section state open -->"), None);
+    }
+
+    #[test]
+    fn links_name_what_they_point_at() {
+        for (text, name) in [
+            ("[[castle/hall]]", "castle/hall"),
+            ("[[castle/hall|the hall]]", "castle/hall"),
+            ("[[hall#Exits]]", "hall"),
+            ("[[objects/lever.md]]", "objects/lever"),
+            ("  castle/hall  ", "castle/hall"),
+            ("objects/lever.md", "objects/lever"),
+        ] {
+            assert_eq!(link_target(text), name, "{}", text);
+        }
+        let unquoted: serde_yaml::Value = serde_yaml::from_str("[[castle/hall]]").unwrap();
+        assert_eq!(id_value(&unquoted).as_deref(), Some("castle/hall"));
+        let pair: serde_yaml::Value = serde_yaml::from_str("[a, b]").unwrap();
+        assert_eq!(id_value(&pair), None);
     }
 }

@@ -76,6 +76,10 @@ pub struct WorldEngine {
     world_toml: WorldDef,
     ignore: Vec<PathBuf>,
     world_toml_warning: Option<String>,
+    /// A thing's file path from the world root without `.md` (a bundle's
+    /// folder), and its file name, to the things it may name, so an
+    /// Obsidian link to a file finds the thing (REQ-CF-25).
+    links: HashMap<String, Vec<(EntityKind, String)>>,
 }
 
 /// Which version of each thing to see: the starting versions (the
@@ -139,6 +143,7 @@ impl WorldEngine {
             world_toml: WorldDef::default(),
             ignore: Vec::new(),
             world_toml_warning: None,
+            links: HashMap::new(),
         }
     }
 
@@ -204,11 +209,32 @@ impl WorldEngine {
         self.characters.clear();
         self.sources.clear();
         self.things.clear();
-        for (thing, entity) in &built.things {
+        self.links.clear();
+        for (thing, _) in &built.things {
             let key = (thing.kind, thing.id.clone());
-            self.sources.entry(key.clone()).or_default().push(thing.index.path.clone());
-            self.things.insert(key, thing.clone());
-            match entity.clone() {
+            self.things.insert(key.clone(), thing.clone());
+            let rel = thing.index.path.strip_prefix(&root).unwrap_or(&thing.index.path);
+            let path = match &thing.bundle {
+                Some(folder) => folder.clone(),
+                None => rel.with_extension(""),
+            };
+            let path = path.to_string_lossy().replace('\\', "/");
+            let stem = path.rsplit('/').next().unwrap_or(&path).to_string();
+            // A bundle is also named by its index file (`castle/vault/index`).
+            let file = rel.with_extension("").to_string_lossy().replace('\\', "/");
+            for name in [path, stem, file] {
+                let entry = self.links.entry(name).or_default();
+                if !entry.contains(&key) {
+                    entry.push(key.clone());
+                }
+            }
+        }
+        for (thing, entity) in &built.things {
+            let mut entity = entity.clone();
+            self.resolve_links(&mut entity);
+            let key = (thing.kind, thing.id.clone());
+            self.sources.entry(key).or_default().push(thing.index.path.clone());
+            match entity {
                 ParsedEntity::Location(l) => self.world_graph.add_location(l),
                 ParsedEntity::Object(o) => {
                     self.objects.insert(o.id.clone(), o);
@@ -225,12 +251,65 @@ impl WorldEngine {
         } else {
             WorldDef { story: built.world.story, player: built.world.player, ..self.world_toml.clone() }
         };
+        if let Some(start) = self.world.start.take() {
+            self.world.start = Some(self.resolve_name(&start, Some(EntityKind::Location)));
+        }
         self.file_problems = built.problems;
         self.file_warnings = built.warnings;
         if let Some(w) = &self.world_toml_warning {
             self.file_warnings.insert(0, w.clone());
         }
         built.things
+    }
+
+    /// The id `name` means for a reference of `kind` (any kind if `None`):
+    /// itself if a thing has that id, else the one thing whose file path
+    /// or file name it is (an Obsidian link to the file), else unchanged,
+    /// so the usual "unknown" checks report it.
+    pub fn resolve_name(&self, name: &str, kind: Option<EntityKind>) -> String {
+        let has_id = match kind {
+            Some(k) => self.things.contains_key(&(k, name.to_string())),
+            None => self.things.keys().any(|(_, id)| id == name),
+        };
+        if has_id {
+            return name.to_string();
+        }
+        let matches: Vec<&(EntityKind, String)> = self
+            .links
+            .get(name)
+            .map(|v| v.iter().filter(|(k, _)| kind.map_or(true, |want| *k == want)).collect())
+            .unwrap_or_default();
+        match matches.as_slice() {
+            [(_, id)] => id.clone(),
+            _ => name.to_string(),
+        }
+    }
+
+    /// Turn every reference in `entity` that names a file into the id of
+    /// the thing in it.
+    fn resolve_links(&self, entity: &mut ParsedEntity) {
+        use EntityKind::*;
+        let r = |name: &mut String, kind: Option<EntityKind>| *name = self.resolve_name(name, kind);
+        match entity {
+            ParsedEntity::Location(l) => {
+                l.connections.values_mut().for_each(|t| r(t, Some(Location)));
+                l.characters.iter_mut().for_each(|c| r(c, Some(Character)));
+                l.objects.iter_mut().for_each(|o| r(o, Some(Object)));
+            }
+            ParsedEntity::Character(c) => {
+                if let Some(at) = c.default_location.as_mut() {
+                    r(at, Some(Location));
+                }
+                c.inventory.iter_mut().for_each(|o| r(o, Some(Object)));
+            }
+            ParsedEntity::Object(o) => {
+                for action in o.actions.values_mut() {
+                    action.requires_has.iter_mut().for_each(|h| r(h, Some(Object)));
+                    let becomes = std::mem::take(&mut action.becomes);
+                    action.becomes = becomes.into_iter().map(|(k, v)| (self.resolve_name(&k, None), v)).collect();
+                }
+            }
+        }
     }
 
     /// Read `world.toml`: the extra folders to ignore (`ignore = [...]`,
@@ -445,9 +524,10 @@ impl WorldEngine {
                 Some(found.key.clone())
             }
         };
-        let (entity, merged) = thing
+        let (mut entity, merged) = thing
             .build(state.as_deref(), chapter.as_ref())
             .map_err(|e| anyhow::anyhow!(e))?;
+        self.resolve_links(&mut entity);
         Ok(Version { entity, merged, state, chapter })
     }
 
@@ -660,7 +740,10 @@ impl WorldEngine {
             return starting();
         }
         match thing.build(state.as_deref(), chapter.as_ref()) {
-            Ok((entity, _)) => Some(entity),
+            Ok((mut entity, _)) => {
+                self.resolve_links(&mut entity);
+                Some(entity)
+            }
             Err(_) => starting(),
         }
     }
@@ -947,5 +1030,42 @@ mod tests {
         let strict = engine.problems(&report, true);
         assert_eq!(strict.len(), 3);
         assert!(strict[2].starts_with("king: default_location `castle/throne`"));
+    }
+
+    #[test]
+    fn obsidian_links_name_things_by_id_or_by_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        write(d, "castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\nconnections:\n  south: \"[[castle/yard]]\"\n  down: \"[[castle/vault/index|the vault]]\"\n  up: [[castle/tower.md]]\nobjects: [\"[[objects/lever]]\", \"[[lamp]]\"]\ncharacters: [\"[[npcs/king]]\"]\n---\n");
+        write(d, "castle/yard.md", "---\nid: castle/yard\ntitle: Yard\ntype: location\n---\n");
+        write(d, "castle/tower.md", "---\nid: castle/tower\ntitle: Tower\ntype: location\n---\n");
+        write(d, "castle/vault/index.md", "---\nid: castle/vault\ntitle: Vault\ntype: location\nstate: shut\n---\n");
+        write(d, "castle/vault/shut.md", "---\ninherits: index\n---\n");
+        write(d, "castle/vault/open.md", "---\ninherits: index\n---\n");
+        write(d, "objects/lever.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull:\n    becomes: { \"[[castle/vault]]\": open }\n    requires: { has: \"[[objects/lamp]]\" }\n---\n<!-- thwarter:action pull -->\nClunk.\n<!-- thwarter:action pull refused -->\nDark.\n");
+        write(d, "objects/lamp.md", "---\nid: lamp\ntitle: Lamp\ntype: object\nobject_type: x\n---\n");
+        write(d, "npcs/king.md", "---\nid: king\ntitle: King\ntype: character\ndefault_location: \"[[castle/hall]]\"\ninventory: [\"[[objects/lamp.md]]\"]\n---\n");
+        write(d, "world/index.md", "---\ntitle: T\ntype: world\nstart: \"[[castle/hall]]\"\n---\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
+        assert!(engine.current_problems(true).is_empty(), "{:?}", engine.current_problems(true));
+
+        let hall = engine.get_location("castle/hall").unwrap();
+        assert_eq!(hall.connections["south"], "castle/yard");
+        assert_eq!(hall.connections["down"], "castle/vault");
+        assert_eq!(hall.connections["up"], "castle/tower");
+        assert_eq!(hall.objects, vec!["lever", "lamp"]);
+        assert_eq!(hall.characters, vec!["king"]);
+        let king = &engine.characters["king"];
+        assert_eq!(king.default_location.as_deref(), Some("castle/hall"));
+        assert_eq!(king.inventory, vec!["lamp"]);
+        let pull = &engine.objects["lever"].actions["pull"];
+        assert_eq!(pull.becomes["castle/vault"], "open");
+        assert_eq!(pull.requires_has, vec!["lamp"]);
+        assert_eq!(engine.world().start.as_deref(), Some("castle/hall"));
+
+        // A link to nothing is reported like any unknown id.
+        engine.set_file(&d.join("castle/yard.md"), "---\nid: castle/yard\ntitle: Yard\ntype: location\nconnections:\n  east: \"[[castle/nowhere]]\"\n---\n");
+        assert!(engine.current_problems(false).iter().any(|p| p.contains("`east` points at unknown location `castle/nowhere`")));
     }
 }

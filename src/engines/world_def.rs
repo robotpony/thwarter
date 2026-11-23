@@ -126,7 +126,7 @@ impl WorldDef {
         self.title = text("title");
         self.author = text("author");
         self.version = text("version");
-        self.start = text("start");
+        self.start = layer.metadata.get("start").and_then(crate::parsers::id_value);
         self.intro = Body::parse(&layer.body).description;
         self.source = Some(layer.path.clone());
     }

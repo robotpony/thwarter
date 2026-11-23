@@ -30,6 +30,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.18.0 (2026-11-23)
+
+### Added
+
+- Obsidian links wherever frontmatter takes an id (REQ-CF-25): exits, a room's `characters` and `objects`, `default_location`, `inventory`, an action's `becomes:` and `requires: { has: }`, and `start:` in `world/index.md`. `"[[castle/hall]]"`, `[[castle/hall|the hall]]`, `[[hall#Exits]]`, `castle/hall.md` and YAML's unquoted `[[castle/hall]]` all name `castle/hall`. A name is an id first; if no thing has that id, it's the thing whose file it is, by its path from the world root (a bundle by its folder or its `index` file) or by its bare file name when only one file has it. A link to nothing is reported like any unknown id. `WorldEngine::resolve_name` does the lookup.
+
 ## 0.17.0 (2026-11-23)
 
 ### Changed
