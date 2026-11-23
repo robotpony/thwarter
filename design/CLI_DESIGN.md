@@ -31,13 +31,14 @@ thwart show [location] [options]
 ```bash
 thwart show                                    # Show current player state
 thwart show castle/throne-room                 # Show specific location state
-thwart show --player=john --state=save1.json  # Show state from save file
+thwart show castle/vault --state open --chapter after-the-king  # One version of a thing
 thwart show --format=json                      # Output as JSON
 ```
 
 **Options:**
 - `--player=<name>` - Show from specific player perspective
-- `--state=<file>` - Load from saved game state
+- `--state=<name>` - Show the thing in that state (`design/STATES.md`)
+- `--chapter=<name>` - Show the thing in that chapter, resolved from the thing outward
 - `--format=<text|json|yaml>` - Output format (default: text)
 - `--verbose` - Include detailed object/character information
 
