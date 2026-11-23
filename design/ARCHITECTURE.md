@@ -16,6 +16,8 @@ The library crate (`thwarter`) and binary crate (`thwart`) split along these lin
 ```
 src/
 ├── bin/thwart.rs        # CLI entry point, argument parsing, dispatch
+├── console/              # The console: edit and play modes (REQUIREMENTS.md › 4.6)
+├── render.rs             # Room view text, shared by `thwart show` and the console
 ├── models/               # Data structures, no behavior beyond simple constructors
 │   ├── world/            # Location, WorldGraph, Coordinate, GameObject
 │   ├── character/        # Character, Player, CharacterState
@@ -23,6 +25,7 @@ src/
 │   └── game/              # Game, GameSession, Action
 ├── engines/               # Behavior over the models
 │   ├── world_engine.rs    # Load, validate, and query the world graph
+│   ├── location_view.rs   # LocationView: what a room shows, for show and the console
 │   ├── character_engine.rs # Character placement and movement
 │   ├── narrative_engine.rs # Plot point and story variable state
 │   └── game_engine.rs      # Orchestrates the other three, processes actions
@@ -45,6 +48,32 @@ src/
 
 **Game Engine.** Orchestrates the other three and processes player `Action`s (move, take, look, examine, ...). Action dispatch exists; the actual effects of each action type do not.
 
+## Console interface
+
+The engine's interface to the console (`REQUIREMENTS.md` › REQ-ENG-9), as agreed between the coder and the console coder on 2026-11-23. The Phase 2 part is built; play state and action results come with Phase 4.
+
+```rust
+// thwarter::engines (src/engines/location_view.rs)
+pub struct LocationView {
+    id: String, title: String, coordinates: Option<Coordinate>, body: String,
+    exits: Vec<ExitView>, characters: Vec<EntityRef>, objects: Vec<EntityRef>,
+}
+pub struct ExitView { direction: String, target: String, target_exists: bool }
+pub struct EntityRef { id: String, name: Option<String> }  // None: no card
+
+WorldEngine::describe_location(&self, id: &str) -> Option<LocationView>
+WorldEngine::problems(&self, report: &WorldLoadReport, strict: bool) -> Vec<String>
+thwarter::render::render_location(&LocationView) -> String
+thwarter::console::run(world_path: &Path, mode: Mode) -> anyhow::Result<()>  // Mode { Edit, Play }
+```
+
+- Exits are listed in compass order, then other directions A to Z.
+- An `EntityRef` with no `name` has no card: scenery for an object (REQ-CF-8), a missing character for a character.
+- `problems` is `validate`'s check, also used by `/reload` (REQ-CON-7).
+- `render_location` gains a style argument (author or player view) in Phase 4.
+
+Proposed for Phase 4, not built: `PlayState { location, inventory: Vec<String>, flags: BTreeMap<String, serde_yaml::Value> }` in models, and `ActionResult { text, changes: Vec<Change> }`.
+
 ## Implementation status
 
 This table exists because status claims in this repo have previously drifted from what the code does. Update it in the same commit as any change that makes an entry true.
@@ -56,11 +85,15 @@ This table exists because status claims in this repo have previously drifted fro
 | `WorldEngine::load_world` | Done | Walks a directory, parses all content, reports per-file errors instead of aborting on the first one. |
 | `WorldGraph::find_path` | Not implemented | Returns `None` unconditionally. |
 | `WorldEngine::broken_connections` | Done | Flags connections pointing at unloaded location IDs. Backs `thwart validate`. |
-| `CharacterEngine` | Partially done | Loading, placement, and movement work; nothing calls it from the CLI yet (only `WorldEngine` is wired into `validate`/`show`). |
+| `CharacterEngine` | Partially done | Loading, placement, and movement work, but nothing calls it from the CLI. `WorldEngine` keeps character cards for lookups (names in the room view); placement is still `CharacterEngine`'s job. |
+| `WorldEngine::describe_location` / `problems` | Done | The console interface above. `problems` backs both `validate` and `/reload`. |
+| Room renderer (`render::render_location`) | Done | One renderer for `thwart show` and the console. |
+| Console (`thwart edit`, `thwart play`) | Stub | The subcommands and `console::run` exist; `run` loads the world, then reports that the console isn't built. |
+| Unit tests | Started | 5 tests, in `render.rs` and `world_engine.rs`. Parser tests are next (`design/UNIT_TESTS.md` › 1). |
 | `NarrativeEngine` | Model only | Plot point prerequisite checking works; consequence execution and alternative-text condition evaluation are stubs. |
 | `GameEngine` | Model only | Action dispatch exists; move/take/look/examine handlers are stubs that report success without doing anything. |
 | `thwart validate` | Done | Loads the world, reports parse errors and broken connections; `--strict` additionally checks character `default_location` references. `--fix` and location-scoped validation are not implemented. |
-| `thwart show` | Partially done | Loads and displays the world/a single location. `--player` (perspective) and `--state` (saved state) are not implemented. |
+| `thwart show` | Partially done | Loads and displays the world or a single location; text output is the shared room view. Objects without cards show "(no card)", missing exits "(missing)". `--player` (perspective) and `--state` (saved state) are not implemented. |
 | `thwart map` | Not implemented | Reports that it isn't implemented and exits non-zero. |
 | `thwart search` | Not implemented | Reports that it isn't implemented and exits non-zero. |
 | `thwart debug` | Not implemented | Reports that it isn't implemented and exits non-zero. For reference checking, use `thwart validate --strict` today. |

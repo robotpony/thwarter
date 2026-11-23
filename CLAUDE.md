@@ -85,6 +85,6 @@ A coder who fixes a bug or finishes a task ticks it in `PLAN.md` or moves it to 
 
 Do not mark a `PLAN.md` item done without also updating `design/ARCHITECTURE.md`'s implementation status table to match; docs drifting from the code is the problem the August 2026 audit fixed (`CHANGELOG.md` › 0.1.0). Treat `design/ARCHITECTURE.md` as authoritative on what works; this section is a summary of it, not an independent claim.
 
-**Current state**: builds cleanly, zero unit tests, `validate` and `show` do real work against real content, `map`/`search`/`debug` honestly report themselves as not implemented rather than faking output. Full detail in `design/ARCHITECTURE.md`.
+**Current state** (0.1.5): builds, 5 unit tests, `validate` and `show` do real work against real content, `thwart edit` and `thwart play` reach a console stub, `map`/`search`/`debug` report themselves as not implemented. Full detail in `design/ARCHITECTURE.md`.
 
 **Next**: `PLAN.md` › Phase 2, the console shell.
