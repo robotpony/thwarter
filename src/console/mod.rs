@@ -1,5 +1,5 @@
 //! The console: one interactive client for writing (edit mode) and
-//! reading (play mode) a world (`REQUIREMENTS.md` › §4.6).
+//! reading (play mode) a world (`design/CONSOLE_REQUIREMENTS.md`).
 //!
 //! `thwart edit` and `thwart play` hand off to `run` (REQ-CON-1). Tests
 //! drive the same loop through `run_script`, which echoes each input line
