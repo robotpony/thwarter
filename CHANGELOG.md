@@ -26,6 +26,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.5.0 (2026-11-23)
+
+### Added
+
+- In-memory changes to a loaded world (REQ-ENG-8). `WorldEngine::set_file(path, text)` replaces whatever a file defined with what new text defines, and `remove_file(path)` forgets a file. Neither touches the disk. Duplicates, last-one-wins and parse errors resolve exactly as a fresh load would, because the engine now keeps each file's parse result in load order.
+- `WorldEngine::current_problems(strict)` and `current_warnings()` check the world as it is now, with no load report needed. Right after a load they equal `problems(report, strict)` and `report.warnings`.
+- `WorldWriter::edit_loaded` and `create_loaded` write the file and then apply the same text to the loaded engine. Both return a `ChangeReport` with the path written, every problem after the change, and the problems it `added` and `resolved` (REQ-CON-5). A refused or failed write leaves the engine untouched.
+- `WorldEngine::world_root`, the directory `load_world` walked.
+- 10 tests. `validate` and `show` output is unchanged.
+
 ## 0.4.0 (2026-11-23)
 
 ### Added

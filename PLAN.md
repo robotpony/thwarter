@@ -22,7 +22,7 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 - [x] Round-trip file writer: change one field and keep everything else as it was [coder] (REQ-ENG-7)
 - [x] The loader records which file each `id` came from, and `validate` reports an `id` defined in two files [coder] (REQ-ENG-7)
 - [x] `validate` warns about a key that differs only in case from a known one, such as `Inventory:` [coder] (`design/CONTENT_FORMAT.md` › Keys, order and file locations)
-- [ ] Changes to the loaded world in memory, checked after each one [coder] (REQ-ENG-8)
+- [x] Changes to the loaded world in memory, checked after each one [coder] (REQ-ENG-8)
 - [ ] `validate` warns when two kinds share an `id`, such as a location and an object [coder] (`design/CONTENT_FORMAT.md` › Keys, order and file locations)
 - [ ] `/new room <direction>`, `/new object`, `/new character` [console] (REQ-CON-5)
 - [ ] `/set` and `/link` for single fields and exits [console] (REQ-CON-5)

@@ -35,6 +35,27 @@ pub struct NewEntity {
     pub object_type: Option<String>,
 }
 
+/// What a write did to the loaded world's problems (REQ-CON-5).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChangeReport {
+    /// The file written, in the engine's path form (as in `sources`).
+    pub path: PathBuf,
+    /// Every problem after the change, as `WorldEngine::current_problems`.
+    pub problems: Vec<String>,
+    /// Problems the change introduced.
+    pub added: Vec<String>,
+    /// Problems the change fixed.
+    pub resolved: Vec<String>,
+}
+
+impl ChangeReport {
+    fn new(path: PathBuf, before: Vec<String>, after: Vec<String>) -> Self {
+        let added = after.iter().filter(|p| !before.contains(p)).cloned().collect();
+        let resolved = before.iter().filter(|p| !after.contains(p)).cloned().collect();
+        Self { path, problems: after, added, resolved }
+    }
+}
+
 /// Writes entities inside one world directory.
 #[derive(Debug, Clone)]
 pub struct WorldWriter {
@@ -60,6 +81,11 @@ impl WorldWriter {
     /// the world, or if it no longer holds that entity (changed on disk
     /// since the load). All or nothing; returns the path written.
     pub fn edit(&self, engine: &WorldEngine, kind: EntityKind, id: &str, edits: &[Edit]) -> Result<PathBuf> {
+        Ok(self.edit_text(engine, kind, id, edits)?.0)
+    }
+
+    /// `edit`, returning the path and the exact text written.
+    fn edit_text(&self, engine: &WorldEngine, kind: EntityKind, id: &str, edits: &[Edit]) -> Result<(PathBuf, String)> {
         let path = engine.source_path(kind, id)?.to_path_buf();
         self.check_inside(&path)?;
         let mut file = ContentFile::load(&path)?;
@@ -75,13 +101,18 @@ impl WorldWriter {
         }
         file.apply_all(edits)?;
         file.save()?;
-        Ok(path)
+        Ok((path, file.text()))
     }
 
     /// Create a new entity's file at the path its kind gives, then apply
     /// `edits` to it before writing. Refuses an existing file and any
     /// path outside the world. Returns the path written.
     pub fn create(&self, new: &NewEntity, edits: &[Edit]) -> Result<PathBuf> {
+        Ok(self.create_text(new, edits)?.0)
+    }
+
+    /// `create`, returning the path and the exact text written.
+    fn create_text(&self, new: &NewEntity, edits: &[Edit]) -> Result<(PathBuf, String)> {
         let path = self.new_entity_path(new.kind, &new.id)?;
         if path.exists() {
             bail!("{} already exists", path.display());
@@ -106,7 +137,46 @@ impl WorldWriter {
         fs::create_dir_all(parent).with_context(|| format!("can't create {}", parent.display()))?;
         self.check_inside(parent)?;
         file.save_new()?;
-        Ok(path)
+        Ok((path, file.text()))
+    }
+
+    /// `edit`, then the same change in the loaded `engine` (REQ-ENG-8),
+    /// from the exact text written, without re-reading the world. Reports
+    /// the problems after the change and which ones it added or fixed. If
+    /// the write fails, `engine` is untouched.
+    pub fn edit_loaded(
+        &self,
+        engine: &mut WorldEngine,
+        kind: EntityKind,
+        id: &str,
+        edits: &[Edit],
+        strict: bool,
+    ) -> Result<ChangeReport> {
+        let before = engine.current_problems(strict);
+        let (path, text) = self.edit_text(engine, kind, id, edits)?;
+        engine.set_file(&path, &text);
+        Ok(ChangeReport::new(path, before, engine.current_problems(strict)))
+    }
+
+    /// `create`, then the same change in the loaded `engine`. The path
+    /// reported (and recorded in `engine.sources`) is in the engine's own
+    /// form: its `world_root` joined with the new file's relative path.
+    pub fn create_loaded(
+        &self,
+        engine: &mut WorldEngine,
+        new: &NewEntity,
+        edits: &[Edit],
+        strict: bool,
+    ) -> Result<ChangeReport> {
+        let engine_root = engine
+            .world_root
+            .clone()
+            .ok_or_else(|| anyhow!("the engine has no loaded world to add `{}` to", new.id))?;
+        let before = engine.current_problems(strict);
+        let (_, text) = self.create_text(new, edits)?;
+        let path = engine_root.join(new_entity_relative_path(new.kind, &new.id));
+        engine.set_file(&path, &text);
+        Ok(ChangeReport::new(path, before, engine.current_problems(strict)))
     }
 
     /// The absolute path a new `(kind, id)` would be written to, after
@@ -479,5 +549,63 @@ mod tests {
             reloaded.get_location("castle/courtyard").unwrap().name,
             "Edited castle/courtyard"
         );
+    }
+
+    #[test]
+    fn edit_loaded_updates_the_engine_and_reports_what_changed() {
+        let dir = world();
+        let writer = WorldWriter::new(dir.path()).unwrap();
+        let mut engine = loaded(dir.path());
+        let link = |target: &str| Edit::SetMapEntry {
+            key: "connections".into(),
+            subkey: "west".into(),
+            value: serde_yaml::Value::String(target.into()),
+        };
+
+        let report = writer.edit_loaded(&mut engine, EntityKind::Location, "castle/yard", &[link("castle/gone")], false).unwrap();
+        assert_eq!(report.path, engine.source_path(EntityKind::Location, "castle/yard").unwrap());
+        assert_eq!(report.added.len(), 1, "{:?}", report);
+        assert!(report.added[0].contains("`west` points at unknown location `castle/gone`"));
+        assert!(report.resolved.is_empty());
+        assert_eq!(engine.get_location("castle/yard").unwrap().connections["west"], "castle/gone");
+
+        let report = writer.edit_loaded(&mut engine, EntityKind::Location, "castle/yard", &[link("castle/hall")], false).unwrap();
+        assert!(report.added.is_empty());
+        assert_eq!(report.resolved.len(), 1);
+        assert!(report.problems.is_empty());
+
+        // The engine matches a fresh load of what's on disk.
+        let fresh = loaded(dir.path());
+        assert_eq!(fresh.get_location("castle/yard").unwrap().connections, engine.get_location("castle/yard").unwrap().connections);
+    }
+
+    #[test]
+    fn create_loaded_adds_the_entity_under_the_engines_path() {
+        let dir = world();
+        let writer = WorldWriter::new(dir.path()).unwrap();
+        let mut engine = loaded(dir.path());
+        let new = NewEntity { kind: EntityKind::Location, id: "castle/gate".into(), title: "Gate".into(), object_type: None };
+        let link = Edit::SetMapEntry {
+            key: "connections".into(),
+            subkey: "south".into(),
+            value: serde_yaml::Value::String("castle/moat".into()),
+        };
+        let report = writer.create_loaded(&mut engine, &new, &[link], false).unwrap();
+        assert_eq!(report.path, dir.path().join("castle/gate.md"));
+        assert_eq!(engine.source_path(EntityKind::Location, "castle/gate").unwrap(), dir.path().join("castle/gate.md"));
+        assert_eq!(report.added.len(), 1);
+        assert!(engine.get_location("castle/gate").is_some());
+    }
+
+    #[test]
+    fn a_refused_edit_leaves_the_engine_alone() {
+        let dir = world();
+        let writer = WorldWriter::new(dir.path()).unwrap();
+        let mut engine = loaded(dir.path());
+        let before = engine.current_problems(true);
+        let bad = Edit::SetScalar { key: "id".into(), value: serde_yaml::Value::String("x".into()) };
+        assert!(writer.edit_loaded(&mut engine, EntityKind::Location, "castle/yard", &[bad], true).is_err());
+        assert_eq!(engine.current_problems(true), before);
+        assert_eq!(engine.get_location("castle/yard").unwrap().name, "Yard");
     }
 }

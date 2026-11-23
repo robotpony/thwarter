@@ -49,6 +49,34 @@ pub struct WorldEngine {
     /// the tables above, `problems` reports it, and the writer refuses to
     /// edit it (REQ-ENG-7).
     pub sources: HashMap<(EntityKind, String), Vec<PathBuf>>,
+    /// The directory `load_world` walked, as it was given.
+    pub world_root: Option<PathBuf>,
+    /// Each file's parse result, in load order. The tables above are kept
+    /// in step with this, so an in-memory change (REQ-ENG-8) resolves
+    /// duplicates and errors exactly as a fresh load would.
+    files: Vec<FileRecord>,
+}
+
+#[derive(Debug, Clone)]
+struct FileRecord {
+    path: PathBuf,
+    /// The entity, or the parse error, without the path prefix.
+    parsed: std::result::Result<ParsedEntity, String>,
+    warnings: Vec<String>,
+}
+
+impl FileRecord {
+    fn key(&self) -> Option<(EntityKind, String)> {
+        self.parsed.as_ref().ok().map(entity_key)
+    }
+}
+
+fn entity_key(entity: &ParsedEntity) -> (EntityKind, String) {
+    match entity {
+        ParsedEntity::Location(l) => (EntityKind::Location, l.id.clone()),
+        ParsedEntity::Character(c) => (EntityKind::Character, c.id.clone()),
+        ParsedEntity::Object(o) => (EntityKind::Object, o.id.clone()),
+    }
 }
 
 /// Summary of a `load_world` pass: what was loaded, and every file that
@@ -77,6 +105,8 @@ impl WorldEngine {
             objects: HashMap::new(),
             characters: HashMap::new(),
             sources: HashMap::new(),
+            world_root: None,
+            files: Vec::new(),
         }
     }
 
@@ -88,31 +118,29 @@ impl WorldEngine {
     pub fn load_world<P: AsRef<Path>>(&mut self, world_path: P) -> Result<WorldLoadReport> {
         let parser = MarkdownParser::new();
         let mut report = WorldLoadReport::default();
+        self.world_root = Some(world_path.as_ref().to_path_buf());
 
         for entry in WalkDir::new(&world_path).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("md") {
                 continue;
             }
-
-            match parser.parse_file_with_warnings(path) {
-                Ok(outcome) => {
-                    for warning in outcome.warnings {
-                        report.warnings.push(format!("{}: {}", path.display(), warning));
-                    }
-                    let entity = outcome.entity;
-                    let key = match &entity {
-                        ParsedEntity::Location(l) => (EntityKind::Location, l.id.clone()),
-                        ParsedEntity::Character(c) => (EntityKind::Character, c.id.clone()),
-                        ParsedEntity::Object(o) => (EntityKind::Object, o.id.clone()),
-                    };
-                    self.sources.entry(key).or_default().push(path.to_path_buf());
-                    self.add_parsed(entity, &mut report);
-                }
-                Err(e) => {
-                    report.errors.push(format!("{}: {}", path.display(), e));
-                }
+            let record = match parser.parse_file_with_warnings(path) {
+                Ok(outcome) => FileRecord { path: path.to_path_buf(), parsed: Ok(outcome.entity), warnings: outcome.warnings },
+                Err(e) => FileRecord { path: path.to_path_buf(), parsed: Err(e.to_string()), warnings: Vec::new() },
+            };
+            for warning in &record.warnings {
+                report.warnings.push(format!("{}: {}", path.display(), warning));
             }
+            match &record.parsed {
+                Ok(entity) => {
+                    let key = entity_key(entity);
+                    self.sources.entry(key).or_default().push(path.to_path_buf());
+                    self.add_parsed(entity.clone(), &mut report);
+                }
+                Err(e) => report.errors.push(format!("{}: {}", path.display(), e)),
+            }
+            self.files.push(record);
         }
 
         self.loaded_locations = self.world_graph.locations.clone();
@@ -134,6 +162,95 @@ impl WorldEngine {
                 report.characters.push(character);
             }
         }
+    }
+
+    /// Change the loaded world in memory (REQ-ENG-8): replace whatever
+    /// `path` defined with what `text` defines, as if the file had been
+    /// loaded with that text. A parse error becomes that file's problem,
+    /// as it would on a load. Nothing is read from or written to disk.
+    /// `path` is in the form `load_world` uses (its root joined with the
+    /// file's relative path), the same form as `sources`.
+    pub fn set_file(&mut self, path: &Path, text: &str) {
+        let record = match MarkdownParser::new().parse_content_with_warnings(text, path) {
+            Ok(outcome) => FileRecord { path: path.to_path_buf(), parsed: Ok(outcome.entity), warnings: outcome.warnings },
+            Err(e) => FileRecord { path: path.to_path_buf(), parsed: Err(e.to_string()), warnings: Vec::new() },
+        };
+        let new_key = record.key();
+        let old_key = match self.files.iter_mut().find(|r| r.path == path) {
+            Some(existing) => std::mem::replace(existing, record).key(),
+            None => {
+                self.files.push(record);
+                None
+            }
+        };
+        for key in [old_key, new_key].into_iter().flatten() {
+            self.refresh_key(&key);
+        }
+    }
+
+    /// Forget a file and everything it defined, in memory only.
+    pub fn remove_file(&mut self, path: &Path) {
+        if let Some(i) = self.files.iter().position(|r| r.path == path) {
+            let removed = self.files.remove(i);
+            if let Some(key) = removed.key() {
+                self.refresh_key(&key);
+            }
+        }
+    }
+
+    /// Recompute one `(kind, id)` from the file records: its sources in
+    /// load order, and its table entry from the last file defining it.
+    fn refresh_key(&mut self, key: &(EntityKind, String)) {
+        let defining: Vec<&FileRecord> = self.files.iter().filter(|r| r.key().as_ref() == Some(key)).collect();
+        let paths: Vec<PathBuf> = defining.iter().map(|r| r.path.clone()).collect();
+        let winner = defining.last().and_then(|r| r.parsed.as_ref().ok()).cloned();
+        if paths.is_empty() {
+            self.sources.remove(key);
+        } else {
+            self.sources.insert(key.clone(), paths);
+        }
+        let id = &key.1;
+        match (key.0, winner) {
+            (EntityKind::Location, Some(ParsedEntity::Location(l))) => {
+                self.loaded_locations.insert(id.clone(), l.clone());
+                self.world_graph.add_location(l);
+            }
+            (EntityKind::Location, _) => {
+                self.world_graph.locations.remove(id);
+                self.loaded_locations.remove(id);
+            }
+            (EntityKind::Character, Some(ParsedEntity::Character(c))) => {
+                self.characters.insert(id.clone(), c);
+            }
+            (EntityKind::Character, _) => {
+                self.characters.remove(id);
+            }
+            (EntityKind::Object, Some(ParsedEntity::Object(o))) => {
+                self.objects.insert(id.clone(), o);
+            }
+            (EntityKind::Object, _) => {
+                self.objects.remove(id);
+            }
+        }
+    }
+
+    /// `problems` for the world as it is now, after any in-memory changes:
+    /// each file's parse error, then the same checks. No load report needed.
+    pub fn current_problems(&self, strict: bool) -> Vec<String> {
+        let errors = self
+            .files
+            .iter()
+            .filter_map(|r| r.parsed.as_ref().err().map(|e| format!("{}: {}", r.path.display(), e)))
+            .collect();
+        self.problems_from(errors, strict)
+    }
+
+    /// The file-prefixed warnings for the world as it is now.
+    pub fn current_warnings(&self) -> Vec<String> {
+        self.files
+            .iter()
+            .flat_map(|r| r.warnings.iter().map(move |w| format!("{}: {}", r.path.display(), w)))
+            .collect()
     }
 
     /// The one file `(kind, id)` was loaded from. An error if it wasn't
@@ -213,7 +330,11 @@ impl WorldEngine {
     /// `thwart validate` and the console's `/reload` (REQ-CON-7), so "fails
     /// validation" means the same thing in both.
     pub fn problems(&self, report: &WorldLoadReport, strict: bool) -> Vec<String> {
-        let mut problems = report.errors.clone();
+        self.problems_from(report.errors.clone(), strict)
+    }
+
+    fn problems_from(&self, errors: Vec<String>, strict: bool) -> Vec<String> {
+        let mut problems = errors;
         for (kind, id, paths) in self.duplicate_ids() {
             problems.push(format!(
                 "{} `{}` is defined in {} files: {}",
@@ -403,6 +524,89 @@ mod tests {
         let problems = engine.problems(&report, false);
         assert_eq!(problems.len(), 1, "{:?}", problems);
         assert!(problems[0].starts_with("character `king` is defined in 2 files: "));
+    }
+
+    fn small_world() -> (tempfile::TempDir, WorldEngine, WorldLoadReport) {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "castle/yard.md", "---\nid: castle/yard\ntitle: Yard\ntype: location\nconnections:\n  north: castle/hall\n---\nGrass.\n");
+        write(dir.path(), "castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\n---\n");
+        write(dir.path(), "npcs/king.md", "---\nid: king\ntitle: King\ntype: character\ndefault_location: castle/hall\n---\n");
+        write(dir.path(), "broken.md", "no frontmatter\n");
+        let mut engine = WorldEngine::new();
+        let report = engine.load_world(dir.path()).unwrap();
+        (dir, engine, report)
+    }
+
+    #[test]
+    fn current_problems_match_a_fresh_load() {
+        let (_dir, engine, report) = small_world();
+        assert_eq!(engine.current_problems(true), engine.problems(&report, true));
+        assert_eq!(engine.current_problems(false).len(), 1); // broken.md
+        assert_eq!(engine.current_warnings(), report.warnings);
+    }
+
+    #[test]
+    fn set_file_changes_an_entity_and_its_problems_in_memory() {
+        let (dir, mut engine, _) = small_world();
+        let yard = dir.path().join("castle/yard.md");
+        engine.set_file(
+            &yard,
+            "---\nid: castle/yard\ntitle: New Yard\ntype: location\nconnections:\n  north: castle/hall\n  west: castle/gone\n---\n",
+        );
+        assert_eq!(engine.get_location("castle/yard").unwrap().name, "New Yard");
+        assert_eq!(engine.loaded_locations["castle/yard"].name, "New Yard");
+        let problems = engine.current_problems(false);
+        assert!(problems.iter().any(|p| p.contains("`west` points at unknown location `castle/gone`")), "{:?}", problems);
+        // Nothing was written.
+        assert!(std::fs::read_to_string(&yard).unwrap().contains("title: Yard\n"));
+
+        // A new file adds the missing room and fixes the exit.
+        engine.set_file(&dir.path().join("castle/gone.md"), "---\nid: castle/gone\ntitle: Gone\ntype: location\n---\n");
+        assert!(engine.current_problems(false).iter().all(|p| !p.contains("castle/gone")));
+        assert!(engine.source_path(EntityKind::Location, "castle/gone").is_ok());
+    }
+
+    #[test]
+    fn a_file_that_stops_parsing_drops_its_entity_and_reports_why() {
+        let (dir, mut engine, _) = small_world();
+        let hall = dir.path().join("castle/hall.md");
+        engine.set_file(&hall, "---\nid: castle/hall\ntype: location\n---\n");
+        assert!(engine.get_location("castle/hall").is_none());
+        assert!(engine.source_path(EntityKind::Location, "castle/hall").is_err());
+        let problems = engine.current_problems(true);
+        assert!(problems.iter().any(|p| p.contains("hall.md") && p.contains("`title`")), "{:?}", problems);
+        assert!(problems.iter().any(|p| p.contains("`north` points at unknown location `castle/hall`")));
+        assert!(problems.iter().any(|p| p.starts_with("king: default_location `castle/hall`")));
+
+        // Fixing it brings everything back.
+        engine.set_file(&hall, "---\nid: castle/hall\ntitle: Hall\ntype: location\n---\n");
+        assert_eq!(engine.current_problems(true).len(), 1); // only broken.md
+    }
+
+    #[test]
+    fn duplicates_and_removal_resolve_like_a_load() {
+        let (dir, mut engine, _) = small_world();
+        let copy = dir.path().join("castle/yard-copy.md");
+        engine.set_file(&copy, "---\nid: castle/yard\ntitle: Copy\ntype: location\n---\n");
+        assert_eq!(engine.get_location("castle/yard").unwrap().name, "Copy"); // last one wins
+        assert!(engine.current_problems(false).iter().any(|p| p.contains("defined in 2 files")));
+        assert!(engine.source_path(EntityKind::Location, "castle/yard").is_err());
+
+        engine.remove_file(&copy);
+        assert_eq!(engine.get_location("castle/yard").unwrap().name, "Yard");
+        assert!(engine.source_path(EntityKind::Location, "castle/yard").is_ok());
+
+        engine.remove_file(&dir.path().join("npcs/king.md"));
+        assert!(!engine.characters.contains_key("king"));
+        assert!(!engine.sources.contains_key(&(EntityKind::Character, "king".to_string())));
+    }
+
+    #[test]
+    fn a_file_whose_id_changes_moves_its_entity() {
+        let (dir, mut engine, _) = small_world();
+        engine.set_file(&dir.path().join("castle/hall.md"), "---\nid: castle/great-hall\ntitle: Great Hall\ntype: location\n---\n");
+        assert!(engine.get_location("castle/hall").is_none());
+        assert_eq!(engine.get_location("castle/great-hall").unwrap().name, "Great Hall");
     }
 
     #[test]
