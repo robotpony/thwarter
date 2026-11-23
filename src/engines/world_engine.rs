@@ -3,6 +3,7 @@ use crate::models::character::Character;
 use crate::models::world::*;
 use crate::engines::bundles::{self, Chapter, ChapterKey, FileRecord, FileRole, Thing};
 use crate::engines::layers::{Layer, Merged};
+use crate::engines::variables;
 use crate::engines::world_def::WorldDef;
 use crate::models::game::{PlayState, SavedChapter};
 use crate::parsers::ParsedEntity;
@@ -571,6 +572,11 @@ impl WorldEngine {
         warnings
     }
 
+    /// Every thing, in no particular order.
+    pub fn things_iter(&self) -> impl Iterator<Item = &Thing> {
+        self.things.values()
+    }
+
     /// Every chapter, root ones first, each scope in chapter order.
     pub fn chapters(&self) -> &[Chapter] {
         &self.chapters
@@ -626,6 +632,7 @@ impl WorldEngine {
     pub fn current_warnings(&self) -> Vec<String> {
         let mut warnings = self.file_warnings.clone();
         warnings.extend(self.response_warnings());
+        warnings.extend(self.variable_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }
@@ -722,6 +729,16 @@ impl WorldEngine {
             ));
         }
         problems.extend(self.action_problems());
+        let mut reserved: Vec<&(EntityKind, String)> = self
+            .things
+            .keys()
+            .filter(|(_, id)| variables::LEVELS.contains(&id.as_str()) || id.contains('.'))
+            .collect();
+        reserved.sort();
+        for (kind, id) in reserved {
+            let why = if id.contains('.') { "ids can't contain a dot, which splits a variable's name" } else { "it's reserved as a variable level" };
+            problems.push(format!("{} `{}` can't be an id: {}", kind.type_name(), id, why));
+        }
         if let (Some(start), Some(source)) = (&self.world.start, &self.world.source) {
             if self.get_location(start).is_none() {
                 problems.push(format!("{}: the starting room `{}` is not a known location", source.display(), start));

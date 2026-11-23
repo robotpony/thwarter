@@ -30,6 +30,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.21.0 (2026-11-23)
+
+### Added
+
+- Variables in prose (REQ-CF-16, `design/STATES.md` › Variables): `{{ level.name }}`, with the level `game` (`turn`, `score`), `story` (`chapter`, and `world/story.md`'s `vars:`), `player` (`title`, and `world/player.md`'s `vars:`), `location` (the current room: `title`, `visits` and its `vars:`), `this` (the thing whose file it is) or a thing's id or link (`{{ lamp.lit }}`, `{{ castle/vault.lid }}`, split at the last dot). A value set in play holds; otherwise the declared starting value is used, and for a thing, the value in its current state and chapter. Hugo's `{{< >}}` and `{{% %}}` shortcodes are left alone.
+- Play fills variables in room descriptions, examine text and action responses (after the action's changes), and an unknown one shows as blank. `WorldEngine::fill`, `variable` and `undeclared` are there for the console.
+- `validate` warns about each undeclared variable in prose (things' files, chapters, the intro, the player) and each undeclared value an action's `sets:` names. A thing whose id is a level name (`game`, `story`, `player`, `location`, `this`) or contains a dot is a problem.
+
 ## 0.20.1 (2026-11-23)
 
 ### Fixed

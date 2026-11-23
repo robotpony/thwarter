@@ -2,6 +2,7 @@ pub mod world_engine;
 pub mod layers;
 pub mod bundles;
 pub mod world_def;
+pub mod variables;
 pub mod location_view;
 pub mod character_engine;
 pub mod narrative_engine;

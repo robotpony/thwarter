@@ -2,6 +2,7 @@
 //! here writes a world file (REQ-CON-3); the world is read-only.
 
 use crate::engines::location_view::{expand_direction, EntityRef, LocationView};
+use crate::engines::variables::Scope;
 use crate::engines::{At, EntityKind, WorldEngine};
 use crate::models::game::{ActionResult, Change, PlayAction, PlayState};
 use crate::render::{render_location_as, RenderStyle};
@@ -66,6 +67,7 @@ impl GameEngine {
     /// adds an object the player holds never shows a second one.
     pub fn view(&self, world: &WorldEngine, state: &PlayState) -> Option<LocationView> {
         let mut view = world.describe_location_at(&state.location, At::play(state))?;
+        view.body = world.fill(&view.body, &Scope { at: At::play(state), this: Some((EntityKind::Location, &state.location)), here: None });
         view.objects
             .retain(|o| !state.was_taken(&state.location, &o.id) && !state.inventory.contains(&o.id));
         Some(view)
@@ -157,7 +159,8 @@ impl GameEngine {
                             .into_iter()
                             .filter(|p| !p.is_empty())
                             .collect();
-                        ActionResult::say(parts.join("\n\n"))
+                        let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
+                        ActionResult::say(world.fill(&parts.join("\n\n"), &scope))
                     }
                     _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
                 }
@@ -167,7 +170,10 @@ impl GameEngine {
         }
         match resolve(noun, &view.characters, person) {
             Ok(Some(person)) => match world.character_at(&person.id, At::play(state)) {
-                Some(card) if !card.description.trim().is_empty() => ActionResult::say(card.description.trim()),
+                Some(card) if !card.description.trim().is_empty() => {
+                    let scope = Scope { at: At::play(state), this: Some((EntityKind::Character, &person.id)), here: None };
+                    ActionResult::say(world.fill(card.description.trim(), &scope))
+                }
                 _ => ActionResult::say(format!("You see nothing special about {}.", person.display_name())),
             },
             Err(which) => ActionResult::say((self.ask_which)("examine", &which)),
@@ -211,8 +217,9 @@ impl GameEngine {
 
         let name = object_name(&object);
         if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
+            let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
             return ActionResult::say(match card.responses.get(&format!("{} refused", key)) {
-                Some(text) if !text.trim().is_empty() => text.trim().to_string(),
+                Some(text) if !text.trim().is_empty() => world.fill(text.trim(), &scope),
                 _ => builtin_refusal(&verb, &name, state.turn),
             });
         }
@@ -247,8 +254,10 @@ impl GameEngine {
             }
         }
 
+        // Filled after the action's changes, so the reply can show them.
+        let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
         let text = match card.responses.get(&key) {
-            Some(text) if !text.trim().is_empty() => text.trim().to_string(),
+            Some(text) if !text.trim().is_empty() => world.fill(text.trim(), &scope),
             _ => builtin_reply(&verb, &name, state.turn),
         };
         let mut result = ActionResult { text, changes, note: None };
@@ -819,7 +828,7 @@ mod tests {
         ] {
             assert!(warnings.iter().any(|w| w.starts_with(expected)), "{}: {:?}", expected, warnings);
         }
-        assert!(!warnings.iter().any(|w| w.contains("action `pull`")), "{:?}", warnings);
+        assert!(!warnings.iter().any(|w| w.contains("action `pull`: has")), "{:?}", warnings);
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/yard").unwrap();
         let pull = PlayAction::Use { verb: "pull".into(), noun: "lever".into() };
