@@ -28,6 +28,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.10.0 (2026-11-23)
+
+### Added
+
+- `WorldWriter::replace_file_loaded` replaces a whole content file found by its path in the world, not by its id, so the console can fix a file that doesn't parse. The new text must parse, and it may hold any id and type. The path must be an existing `.md` file inside the world; a path with `..`, an absolute path or a symlink out of the world is refused. Given the text the editor opened, it refuses the write if the file on disk no longer matches, which closes the gap between the console's own check and the write. Afterwards the engine holds the new file, so a fixed file stops being a load error, and the report says which problems the write fixed or added.
+
 ## 0.9.0 (2026-11-23)
 
 ### Added

@@ -179,6 +179,51 @@ impl WorldWriter {
         Ok(ChangeReport::new(path, before, engine.current_problems(strict)))
     }
 
+    /// Replace a whole existing file, found by its path relative to the
+    /// world root rather than by `(kind, id)`, so it works on a file that
+    /// doesn't parse today (fixing one from the console). The new `text`
+    /// must parse; it may hold any id and type. If `expected` is given, it
+    /// is the text the caller opened, and the write is refused if the file
+    /// on disk no longer matches it. Then the same change goes into
+    /// `engine`, as `edit_loaded` does. On any refusal, nothing changes.
+    pub fn replace_file_loaded(
+        &self,
+        engine: &mut WorldEngine,
+        relative_path: &Path,
+        text: &str,
+        expected: Option<&str>,
+        strict: bool,
+    ) -> Result<ChangeReport> {
+        let shown = relative_path.display();
+        if relative_path.extension().and_then(|e| e.to_str()) != Some("md") {
+            bail!("{} isn't a `.md` content file", shown);
+        }
+        if relative_path.components().any(|c| !matches!(c, Component::Normal(_))) {
+            bail!("{} must be a path inside the world, relative to its root", shown);
+        }
+        let engine_root = engine
+            .world_root
+            .clone()
+            .ok_or_else(|| anyhow!("the engine has no loaded world to change {} in", shown))?;
+        let path = self.root.join(relative_path);
+        if !path.is_file() {
+            bail!("{} doesn't exist; create new things with /new", shown);
+        }
+        self.check_inside(&path)?;
+        if let Some(expected) = expected {
+            let on_disk = fs::read_to_string(&path).with_context(|| format!("can't read {}", shown))?;
+            if on_disk != expected {
+                bail!("{} changed on disk since it was opened; reload it first", shown);
+            }
+        }
+        let file = ContentFile::from_text(&path, text)?;
+        let before = engine.current_problems(strict);
+        file.save()?;
+        let engine_path = engine_root.join(relative_path);
+        engine.set_file(&engine_path, &file.text());
+        Ok(ChangeReport::new(engine_path, before, engine.current_problems(strict)))
+    }
+
     /// The absolute path a new `(kind, id)` would be written to, after
     /// checking the id can't escape the world directory.
     pub fn new_entity_path(&self, kind: EntityKind, id: &str) -> Result<PathBuf> {
@@ -607,5 +652,81 @@ mod tests {
         assert!(writer.edit_loaded(&mut engine, EntityKind::Location, "castle/yard", &[bad], true).is_err());
         assert_eq!(engine.current_problems(true), before);
         assert_eq!(engine.get_location("castle/yard").unwrap().name, "Yard");
+    }
+
+    #[test]
+    fn replace_file_loaded_fixes_a_file_that_does_not_parse() {
+        let dir = world();
+        let broken = "---\nid: castle/well\ntitle: Well\n---\nNo type.\n";
+        fs::write(dir.path().join("castle/well.md"), broken).unwrap();
+        let writer = WorldWriter::new(dir.path()).unwrap();
+        let mut engine = loaded(dir.path());
+        assert!(engine.current_problems(false).iter().any(|p| p.contains("well.md")));
+
+        let fixed = "---\nid: castle/well\ntitle: Well\ntype: location\n---\nA deep well.\n";
+        let report = writer
+            .replace_file_loaded(&mut engine, Path::new("castle/well.md"), fixed, Some(broken), false)
+            .unwrap();
+        assert_eq!(fs::read_to_string(dir.path().join("castle/well.md")).unwrap(), fixed);
+        assert_eq!(report.path, dir.path().join("castle/well.md"));
+        assert!(report.resolved.iter().any(|p| p.contains("well.md")), "{:?}", report);
+        assert!(!report.problems.iter().any(|p| p.contains("well.md")), "{:?}", report);
+        assert!(engine.get_location("castle/well").is_some());
+    }
+
+    #[test]
+    fn replace_file_loaded_may_change_id_and_type() {
+        let dir = world();
+        let writer = WorldWriter::new(dir.path()).unwrap();
+        let mut engine = loaded(dir.path());
+        let text = "---\nid: bucket\ntitle: Bucket\ntype: object\nobject_type: tool\n---\n";
+        writer.replace_file_loaded(&mut engine, Path::new("castle/hall.md"), text, None, false).unwrap();
+        assert!(engine.get_location("castle/hall").is_none());
+        assert!(engine.source_path(EntityKind::Object, "bucket").is_ok());
+    }
+
+    #[test]
+    fn replace_file_loaded_refuses_bad_text_paths_and_stale_files() {
+        let dir = world();
+        let writer = WorldWriter::new(dir.path()).unwrap();
+        let mut engine = loaded(dir.path());
+        let before = engine.current_problems(true);
+        let hall = dir.path().join("castle/hall.md");
+        let original = fs::read_to_string(&hall).unwrap();
+        let good = "---\nid: castle/hall\ntitle: Great Hall\ntype: location\n---\n";
+
+        let refused = [
+            ("castle/hall.md", "no frontmatter\n", None),
+            ("castle/hall.md", good, Some("not what's on disk")),
+            ("castle/gone.md", good, None),
+            ("castle/hall.txt", good, None),
+            ("../outside.md", good, None),
+            ("castle/../castle/hall.md", good, None),
+        ];
+        for (rel, text, expected) in refused {
+            let result = writer.replace_file_loaded(&mut engine, Path::new(rel), text, expected, true);
+            assert!(result.is_err(), "{} should be refused", rel);
+        }
+        let absolute = writer.replace_file_loaded(&mut engine, &hall, good, None, true);
+        assert!(absolute.is_err());
+        assert_eq!(fs::read_to_string(&hall).unwrap(), original);
+        assert!(!dir.path().join("castle/gone.md").exists());
+        assert_eq!(engine.current_problems(true), before);
+        assert_eq!(engine.get_location("castle/hall").unwrap().name, "Hall");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn replace_file_loaded_refuses_a_symlink_out_of_the_world() {
+        let dir = world();
+        let outside = tempfile::tempdir().unwrap();
+        let target = outside.path().join("secret.md");
+        fs::write(&target, "---\nid: x\ntitle: X\ntype: location\n---\n").unwrap();
+        std::os::unix::fs::symlink(&target, dir.path().join("castle/link.md")).unwrap();
+        let writer = WorldWriter::new(dir.path()).unwrap();
+        let mut engine = loaded(dir.path());
+        let text = "---\nid: x\ntitle: Changed\ntype: location\n---\n";
+        assert!(writer.replace_file_loaded(&mut engine, Path::new("castle/link.md"), text, None, false).is_err());
+        assert!(fs::read_to_string(&target).unwrap().contains("title: X"));
     }
 }
