@@ -154,8 +154,8 @@ Settled by the commander from the coder's review (2026-11-23).
 
 **Writing.**
 - Turning a one-file thing into a bundle writes the new files first, then renames the old file to `index.md` last. If that fails partway, both files exist and `validate` reports a duplicate `id`, so a half-done move is visible, never silent. The file watcher sees it as a delete and a create.
-- A bundle saves through one call that checks the merged thing before writing anything. Every file is written to a temporary file and checked, then renamed in turn; if a rename fails, the console reports exactly which files were written.
-- Renaming or deleting a state is a command (`/state rename`, `/state delete`), not an edit to a section header in the combined document. A rename also updates every `becomes:` and `state:` that names it.
+- A bundle saves through one call that checks the merged thing before writing anything. It takes each file's text as it was when the editor opened it, and if any of the bundle's files has changed on disk since then, the whole save is a conflict. Only sections that changed are written, so a one-word edit to `open.md` leaves `index.md` untouched on disk and in git. Every changed file is written to a temporary file and checked, then renamed in turn; if a rename fails, the console reports exactly which files were written.
+- Renaming or deleting a state is a command (`/state rename`, `/state delete`). A rename also updates every `becomes:` and `state:` that names it.
 
 ## Changing state
 
@@ -226,7 +226,9 @@ In files, a bundle is separate files. In the console, it is one document with a 
   The door hangs off one hinge now.
 ```
 
-Saving splits the document back into its files. Every section must parse before any file is written; if one fails, nothing is saved. A one-file thing opens as a document with one section.
+The section headers are not text. The editor draws each one (`--- state: open (starting)`) as a fixed separator, with one text area per section, and the cursor moves across them. So no body line ever needs escaping, and a header can't be renamed or deleted by editing. New states and overlays come only from commands (`/state new`, `/chapter overlay`), never by typing a header. Sections appear in this order: `index`, the starting state, the other states A to Z, then chapter overlays in chapter order. (Settled by the commander with the console coder, 2026-11-23.)
+
+Saving splits the document back into its files. Every section must parse before any file is written; if one fails, nothing is saved. A file that doesn't parse still opens, since editing is how an author fixes it. A one-file thing opens as a document with one section.
 
 Full editing is a full-screen editor in the terminal (Bruce, 2026-11-23; `design/CONSOLE_REQUIREMENTS.md` › REQ-CON-6), since a document with sections can't be edited inline.
 
