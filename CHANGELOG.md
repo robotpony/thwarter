@@ -28,6 +28,15 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.13.0 (2026-11-23)
+
+### Added
+
+- Play sees each thing's current version: its state in the game, in the game's chapter (`design/STATES.md` › Current version). `WorldEngine::describe_location_at`, `location_at`, `object_at` and `character_at` take an `At` (the starting versions, or a game's), and the play verbs use them, so a room's exits, prose and contents follow its state and chapter. A room never shows an object the player carries, so a chapter that adds one can't duplicate it.
+- `PlayState` keeps each thing's state as a delta from its starting state, the current chapter, values by full name (`story.king`), visits per room and the turn count. `switch_state` and `enter_chapter` change them; both can go back as well as forward. Its unused `flags` are gone.
+- Saves are `thwarter_save: 2`. Version 1 saves still load. On load, a state that no longer exists falls back to the starting state, a thing that's gone loses its entry, and a chapter that's gone falls back to the nearest earlier one in its scope, each with a warning.
+- `thwart show <location> --state <name> --chapter <name>` shows another version of a location. `--state` used to be a placeholder for loading a saved game, which was never built.
+
 ## 0.12.0 (2026-11-23)
 
 ### Added

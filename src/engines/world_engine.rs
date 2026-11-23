@@ -3,6 +3,7 @@ use crate::models::character::Character;
 use crate::models::world::*;
 use crate::engines::bundles::{self, Chapter, ChapterKey, FileRecord, Thing};
 use crate::engines::layers::{Layer, Merged};
+use crate::models::game::{PlayState, SavedChapter};
 use crate::parsers::ParsedEntity;
 use anyhow::Result;
 use std::collections::HashMap;
@@ -66,6 +67,19 @@ pub struct WorldEngine {
     /// Problems and warnings from the last rebuild, each prefixed with its file.
     file_problems: Vec<String>,
     file_warnings: Vec<String>,
+}
+
+/// Which version of each thing to see: the starting versions (the
+/// default), or those of a game in progress.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct At<'a> {
+    pub play: Option<&'a PlayState>,
+}
+
+impl<'a> At<'a> {
+    pub fn play(state: &'a PlayState) -> Self {
+        Self { play: Some(state) }
+    }
 }
 
 /// One version of a thing: its typed entity and the merged layers it came
@@ -413,9 +427,15 @@ impl WorldEngine {
 
     /// A location with every reference resolved (REQ-ENG-9): exits in
     /// compass order with whether each target exists, and characters and
-    /// objects with their card names, `None` where there's no card.
+    /// objects with their card names, `None` where there's no card. The
+    /// starting version of each; `describe_location_at` shows a game's.
     pub fn describe_location(&self, id: &str) -> Option<LocationView> {
-        let location = self.get_location(id)?;
+        self.describe_location_at(id, At::default())
+    }
+
+    /// `describe_location`, with each thing in the version `at` sees.
+    pub fn describe_location_at(&self, id: &str, at: At) -> Option<LocationView> {
+        let location = self.location_at(id, at)?;
         let mut exits: Vec<ExitView> = location
             .connections
             .iter()
@@ -432,7 +452,7 @@ impl WorldEngine {
             .iter()
             .map(|cid| EntityRef {
                 id: cid.clone(),
-                name: self.characters.get(cid).map(|c| c.name.clone()),
+                name: self.character_at(cid, at).map(|c| c.name),
             })
             .collect();
         let objects = location
@@ -440,7 +460,7 @@ impl WorldEngine {
             .iter()
             .map(|oid| EntityRef {
                 id: oid.clone(),
-                name: self.objects.get(oid).map(|o| o.title.clone()),
+                name: self.object_at(oid, at).map(|o| o.title),
             })
             .collect();
 
@@ -453,6 +473,80 @@ impl WorldEngine {
             characters,
             objects,
         })
+    }
+
+    /// A thing as `at` sees it: in a game, its current state in the
+    /// game's chapter; otherwise its starting version. A version that
+    /// doesn't type (a problem `validate` reports) falls back to the
+    /// starting one, so play never loses a thing that loaded.
+    pub fn current(&self, kind: EntityKind, id: &str, at: At) -> Option<ParsedEntity> {
+        let starting = || -> Option<ParsedEntity> {
+            match kind {
+                EntityKind::Location => self.get_location(id).cloned().map(ParsedEntity::Location),
+                EntityKind::Object => self.objects.get(id).cloned().map(ParsedEntity::Object),
+                EntityKind::Character => self.characters.get(id).cloned().map(ParsedEntity::Character),
+            }
+        };
+        let Some(play) = at.play else { return starting() };
+        let Some(thing) = self.thing(kind, id) else { return starting() };
+        let state = play
+            .state_of(kind.type_name(), id)
+            .filter(|s| thing.states.contains_key(*s))
+            .map(String::from)
+            .or_else(|| thing.starting_state.clone());
+        let chapter = play.chapter.as_ref().and_then(|c| self.chapter_key(c));
+        if state == thing.starting_state && chapter.is_none() {
+            return starting();
+        }
+        match thing.build(state.as_deref(), chapter.as_ref()) {
+            Ok((entity, _)) => Some(entity),
+            Err(_) => starting(),
+        }
+    }
+
+    pub fn location_at(&self, id: &str, at: At) -> Option<Location> {
+        match self.current(EntityKind::Location, id, at)? {
+            ParsedEntity::Location(l) => Some(l),
+            _ => None,
+        }
+    }
+
+    pub fn object_at(&self, id: &str, at: At) -> Option<GameObject> {
+        match self.current(EntityKind::Object, id, at)? {
+            ParsedEntity::Object(o) => Some(o),
+            _ => None,
+        }
+    }
+
+    pub fn character_at(&self, id: &str, at: At) -> Option<Character> {
+        match self.current(EntityKind::Character, id, at)? {
+            ParsedEntity::Character(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    /// The loaded chapter a save names, if it still exists.
+    pub fn chapter_key(&self, saved: &SavedChapter) -> Option<ChapterKey> {
+        let key = ChapterKey { scope: PathBuf::from(&saved.scope), path: saved.path.clone() };
+        self.chapters.iter().any(|c| c.key == key).then_some(key)
+    }
+
+    /// How a save names a loaded chapter.
+    pub fn saved_chapter(&self, chapter: &Chapter) -> SavedChapter {
+        SavedChapter {
+            scope: chapter.key.scope.to_string_lossy().replace('\\', "/"),
+            path: chapter.key.path.clone(),
+            order: chapter.order.clone(),
+        }
+    }
+
+    /// The chapter `name` names as seen from `scope` (a folder relative to
+    /// the world root; empty for the root): a sub-chapter path
+    /// (`after-the-king/the-funeral`) or a bare name.
+    pub fn find_chapter(&self, scope: &Path, name: &str) -> Option<&Chapter> {
+        let path: Vec<String> = name.split('/').map(String::from).collect();
+        bundles::resolve_chapter(&self.chapters, scope, &path)
+            .or_else(|| bundles::visible_chapters(&self.chapters, scope).into_iter().find(|c| c.name() == name))
     }
 }
 

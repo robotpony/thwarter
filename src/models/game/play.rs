@@ -4,7 +4,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Where the player is and what has changed since the game started.
+/// Where the player is and what has changed since the game started
+/// (`design/STATES.md` › Play state and saves).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct PlayState {
     /// The current location's id.
@@ -16,19 +17,81 @@ pub struct PlayState {
     /// room contents, so an author's mid-game edits to a room still show.
     #[serde(default)]
     pub taken: BTreeMap<String, Vec<String>>,
-    /// Story flags. Unused until narrative state is designed.
+    /// Each thing that has left its starting state, by kind (`location`,
+    /// `object`, `character`) and id, to the state it is in. Also a delta,
+    /// so a thing never switched follows its author's starting state.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub states: BTreeMap<String, BTreeMap<String, String>>,
+    /// The chapter the story is in; `None` before the first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chapter: Option<SavedChapter>,
+    /// Values set in play, by full name (`story.king`, `knife.sharp`).
+    /// Values are strings, and hold once set.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub values: BTreeMap<String, String>,
+    /// How many times the player has entered each room, the start included.
     #[serde(default)]
-    pub flags: BTreeMap<String, serde_yaml::Value>,
+    pub visits: BTreeMap<String, u32>,
+    /// Player actions the game understood; console commands don't count.
+    #[serde(default)]
+    pub turn: u64,
+}
+
+/// A chapter as a save names it: the folder that defines it (empty for
+/// the root), its names from the top-level chapter down, and the numbers
+/// that ordered it, kept so a chapter later deleted can fall back to the
+/// nearest earlier one.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SavedChapter {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub scope: String,
+    pub path: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub order: Vec<u64>,
+}
+
+impl SavedChapter {
+    pub fn name(&self) -> &str {
+        self.path.last().map(String::as_str).unwrap_or("")
+    }
 }
 
 impl PlayState {
     pub fn new(location: impl Into<String>) -> Self {
-        Self { location: location.into(), ..Default::default() }
+        let location = location.into();
+        let mut visits = BTreeMap::new();
+        visits.insert(location.clone(), 1);
+        Self { location, visits, ..Default::default() }
     }
 
     /// Whether `object` was taken from `room` in this game.
     pub fn was_taken(&self, room: &str, object: &str) -> bool {
         self.taken.get(room).map_or(false, |objects| objects.iter().any(|o| o == object))
+    }
+
+    /// The state a thing has been switched to in this game, if any.
+    pub fn state_of(&self, type_name: &str, id: &str) -> Option<&str> {
+        self.states.get(type_name)?.get(id).map(String::as_str)
+    }
+
+    /// Record a thing's state. Switching back to `starting` clears the
+    /// entry, so the delta holds only what differs.
+    pub fn set_state(&mut self, type_name: &str, id: &str, state: &str, starting: Option<&str>) {
+        if Some(state) == starting {
+            if let Some(by_id) = self.states.get_mut(type_name) {
+                by_id.remove(id);
+                if by_id.is_empty() {
+                    self.states.remove(type_name);
+                }
+            }
+        } else {
+            self.states.entry(type_name.to_string()).or_default().insert(id.to_string(), state.to_string());
+        }
+    }
+
+    /// How many times the player has entered `room`.
+    pub fn visits_to(&self, room: &str) -> u32 {
+        self.visits.get(room).copied().unwrap_or(0)
     }
 }
 

@@ -2,7 +2,7 @@
 //! here writes a world file (REQ-CON-3); the world is read-only.
 
 use crate::engines::location_view::{expand_direction, EntityRef, LocationView};
-use crate::engines::WorldEngine;
+use crate::engines::{At, EntityKind, WorldEngine};
 use crate::models::game::{ActionResult, Change, PlayAction, PlayState};
 use crate::render::{render_location_as, RenderStyle};
 use anyhow::{bail, Context, Result};
@@ -29,6 +29,7 @@ impl GameEngine {
     /// Apply one action. Only a success changes `state`, and its
     /// `changes` say how; every other reply leaves `state` as it was.
     pub fn act(&self, world: &WorldEngine, state: &mut PlayState, action: &PlayAction) -> ActionResult {
+        state.turn += 1;
         if world.get_location(&state.location).is_none() {
             return ActionResult::say("You're nowhere: this place no longer exists.")
                 .with_note(format!("location `{}` isn't in the world any more; use /play here to move", state.location));
@@ -42,10 +43,13 @@ impl GameEngine {
         }
     }
 
-    /// The current room as play mode shows it, without what's been taken.
+    /// The current room as play mode shows it: each thing in its current
+    /// version, without what's been taken or is carried, so a chapter that
+    /// adds an object the player holds never shows a second one.
     pub fn view(&self, world: &WorldEngine, state: &PlayState) -> Option<LocationView> {
-        let mut view = world.describe_location(&state.location)?;
-        view.objects.retain(|o| !state.was_taken(&state.location, &o.id));
+        let mut view = world.describe_location_at(&state.location, At::play(state))?;
+        view.objects
+            .retain(|o| !state.was_taken(&state.location, &o.id) && !state.inventory.contains(&o.id));
         Some(view)
     }
 
@@ -61,7 +65,9 @@ impl GameEngine {
         if direction.is_empty() {
             return ActionResult::say("Go where?");
         }
-        let here = world.get_location(&state.location).expect("checked in act");
+        let Some(here) = world.location_at(&state.location, At::play(state)) else {
+            return ActionResult::say("You're nowhere.");
+        };
         let Some(target) = here.connections.get(&direction) else {
             return ActionResult::say(format!("You can't go {} from here.", direction));
         };
@@ -70,6 +76,7 @@ impl GameEngine {
                 .with_note(format!("the {} exit leads to `{}`, which doesn't exist yet", direction, target));
         }
         let from = std::mem::replace(&mut state.location, target.clone());
+        *state.visits.entry(target.clone()).or_default() += 1;
         let mut result = self.look(world, state);
         result.changes.push(Change::Moved { from, to: target.clone() });
         result
@@ -97,7 +104,7 @@ impl GameEngine {
             Err(which) => return ActionResult::say(which),
         };
         let name = object_name(&object);
-        let Some(card) = world.objects.get(&object.id) else {
+        let Some(card) = world.object_at(&object.id, At::play(state)) else {
             return ActionResult::say(format!("You can't take the {}.", name))
                 .with_note(format!("`{}` is scenery with no card, so it can't be taken", object.id));
         };
@@ -125,7 +132,7 @@ impl GameEngine {
         things.extend(view.objects.iter().cloned());
         match resolve(noun, &things, the_object) {
             Ok(Some(object)) => {
-                return match world.objects.get(&object.id) {
+                return match world.object_at(&object.id, At::play(state)) {
                     Some(card) if !card.description.trim().is_empty() => ActionResult::say(card.description.trim()),
                     _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
                 }
@@ -134,7 +141,7 @@ impl GameEngine {
             Ok(None) => {}
         }
         match resolve(noun, &view.characters, person) {
-            Ok(Some(person)) => match world.characters.get(&person.id) {
+            Ok(Some(person)) => match world.character_at(&person.id, At::play(state)) {
                 Some(card) if !card.description.trim().is_empty() => ActionResult::say(card.description.trim()),
                 _ => ActionResult::say(format!("You see nothing special about {}.", person.display_name())),
             },
@@ -156,7 +163,7 @@ impl GameEngine {
         state
             .inventory
             .iter()
-            .map(|id| EntityRef { id: id.clone(), name: world.objects.get(id).map(|o| o.title.clone()) })
+            .map(|id| EntityRef { id: id.clone(), name: world.object_at(id, At::play(state)).map(|o| o.title) })
             .collect()
     }
 }
@@ -185,12 +192,82 @@ impl PlayState {
             }
             self.taken.retain(|_, v| !v.is_empty());
         }
+
+        // A state that's gone falls back to the starting state; a thing
+        // that's gone is dropped.
+        for (type_name, by_id) in self.states.iter_mut() {
+            let kind = EntityKind::from_type_name(type_name);
+            by_id.retain(|id, state| {
+                let Some(thing) = kind.and_then(|k| world.thing(k, id)) else {
+                    warnings.push(format!("{} `{}` no longer exists, so its state `{}` is dropped", type_name, id, state));
+                    return false;
+                };
+                if thing.states.contains_key(state.as_str()) {
+                    return true;
+                }
+                let start = thing.starting_state.as_deref().map_or("its index".to_string(), |s| format!("`{}`", s));
+                warnings.push(format!("{} `{}` has no state `{}` any more, so it is back in {}", type_name, id, state, start));
+                false
+            });
+        }
+        self.states.retain(|_, by_id| !by_id.is_empty());
+
+        // A chapter that's gone falls back to the nearest earlier one in
+        // its scope, or to no chapter.
+        if let Some(saved) = self.chapter.clone() {
+            if world.chapter_key(&saved).is_none() {
+                let earlier = world
+                    .chapters()
+                    .iter()
+                    .filter(|c| c.key.scope.to_string_lossy().replace('\\', "/") == saved.scope && c.order < saved.order)
+                    .max_by(|a, b| a.order.cmp(&b.order));
+                match earlier {
+                    Some(c) => {
+                        warnings.push(format!(
+                            "chapter `{}` no longer exists, so the story is back in `{}`",
+                            saved.name(),
+                            c.name()
+                        ));
+                        self.chapter = Some(world.saved_chapter(c));
+                    }
+                    None => {
+                        warnings.push(format!("chapter `{}` no longer exists, so the story is in no chapter", saved.name()));
+                        self.chapter = None;
+                    }
+                }
+            }
+        }
         warnings
+    }
+
+    /// Switch a thing to one of its states (`design/STATES.md` › Changing
+    /// state). States can go back as well as forward.
+    pub fn switch_state(&mut self, world: &WorldEngine, kind: EntityKind, id: &str, state: &str) -> Result<()> {
+        let thing = world
+            .thing(kind, id)
+            .ok_or_else(|| anyhow::anyhow!("no {} `{}` is loaded", kind.type_name(), id))?;
+        if !thing.states.contains_key(state) {
+            bail!("{} `{}` has no state `{}`", kind.type_name(), id, state);
+        }
+        self.set_state(kind.type_name(), id, state, thing.starting_state.as_deref());
+        Ok(())
+    }
+
+    /// Move the story to the chapter `name`, as seen from `scope` (the
+    /// folder of the thing whose action moves it; empty for the root).
+    /// Chapters can go back; only the new chapter and its parents apply.
+    pub fn enter_chapter(&mut self, world: &WorldEngine, scope: &Path, name: &str) -> Result<()> {
+        let chapter = world
+            .find_chapter(scope, name)
+            .ok_or_else(|| anyhow::anyhow!("no chapter `{}` can be seen from {}", name, if scope.as_os_str().is_empty() { "the root".to_string() } else { format!("{}/", scope.display()) }))?;
+        self.chapter = Some(world.saved_chapter(chapter));
+        Ok(())
     }
 }
 
-/// The current save format.
-const SAVE_VERSION: u32 = 1;
+/// The current save format. Version 1 (before states and chapters) loads
+/// as is; its unused `flags` are ignored.
+const SAVE_VERSION: u32 = 2;
 
 #[derive(Serialize, Deserialize)]
 struct SaveFile {
@@ -218,7 +295,7 @@ pub fn save_game(path: &Path, state: &PlayState) -> Result<()> {
 pub fn load_game(path: &Path, world: &WorldEngine) -> Result<(PlayState, Vec<String>)> {
     let text = std::fs::read_to_string(path).with_context(|| format!("can't read {}", path.display()))?;
     let save: SaveFile = serde_yaml::from_str(&text).with_context(|| format!("{} isn't a thwarter save", path.display()))?;
-    if save.thwarter_save != SAVE_VERSION {
+    if !(1..=SAVE_VERSION).contains(&save.thwarter_save) {
         bail!("{} is save format {}; this thwart reads format {}", path.display(), save.thwarter_save, SAVE_VERSION);
     }
     let mut state = save.state;
@@ -475,7 +552,7 @@ mod tests {
         let path = saves.path().join("my-world/quicksave.yaml");
         save_game(&path, &state).unwrap();
         let text = fs::read_to_string(&path).unwrap();
-        assert!(text.starts_with("thwarter_save: 1\n"), "{}", text);
+        assert!(text.starts_with("thwarter_save: 2\n"), "{}", text);
 
         let (loaded, warnings) = load_game(&path, &world).unwrap();
         assert_eq!(loaded, state);
@@ -490,5 +567,114 @@ mod tests {
         assert!(load_game(&path, &world).unwrap_err().to_string().contains("save format 9"));
         fs::write(&path, "not: a save\n").unwrap();
         assert!(load_game(&path, &world).is_err());
+    }
+    /// The yard world plus a vault bundle (closed, open), a lamp object the
+    /// chapter `after` puts in the yard, and root chapters 10-before, 20-after.
+    fn story() -> (tempfile::TempDir, WorldEngine) {
+        let (dir, mut world) = world();
+        let d = dir.path();
+        let set = |world: &mut WorldEngine, rel: &str, text: &str| world.set_file(&d.join(rel), text);
+        set(&mut world, "castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\nconnections:\n  south: castle/yard\n  down: castle/vault\n---\nStone.\n");
+        set(&mut world, "castle/vault/index.md", "---\nid: castle/vault\ntitle: Vault\ntype: location\nstate: closed\nconnections:\n  up: castle/hall\n---\n");
+        set(&mut world, "castle/vault/closed.md", "---\ninherits: index\n---\nA shut door.\n");
+        set(&mut world, "castle/vault/open.md", "---\ninherits: index\nconnections:\n  down: castle/hall\n---\nAn open door.\n");
+        set(&mut world, "objects/lamp.md", "---\nid: lamp\ntitle: Lamp\ntype: object\nobject_type: tool\n---\n");
+        set(&mut world, "castle/yard/index.md", "---\nid: castle/yard\ntitle: Yard\ntype: location\nconnections:\n  north: castle/hall\nobjects: [lamp]\n---\nGrass.\n");
+        world.remove_file(&d.join("castle/yard.md"));
+        set(&mut world, "castle/yard/chapters/after.md", "---\nobjects: [lamp, well]\n---\nAshes.\n");
+        set(&mut world, "chapters/10-before.md", "---\ntitle: Before\n---\n");
+        set(&mut world, "chapters/20-after.md", "---\ntitle: After\n---\n");
+        assert!(world.current_problems(false).is_empty(), "{:?}", world.current_problems(false));
+        (dir, world)
+    }
+
+    #[test]
+    fn play_sees_each_things_current_state_and_counts_visits_and_turns() {
+        let (_d, world) = story();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        assert_eq!(state.visits_to("castle/hall"), 1);
+        assert!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text.contains("A shut door."));
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text, "You can't go down from here.");
+
+        state.switch_state(&world, EntityKind::Location, "castle/vault", "open").unwrap();
+        assert_eq!(state.state_of("location", "castle/vault"), Some("open"));
+        assert!(game.act(&world, &mut state, &PlayAction::Look).text.contains("An open door."));
+        game.act(&world, &mut state, &PlayAction::Go("down".into()));
+        assert_eq!(state.location, "castle/hall");
+        assert_eq!(state.visits_to("castle/hall"), 2);
+        assert_eq!(state.turn, 4); // two goes, a refused go, a look
+
+        // Switching back to the starting state leaves no delta.
+        state.switch_state(&world, EntityKind::Location, "castle/vault", "closed").unwrap();
+        assert!(state.states.is_empty());
+        assert!(state.switch_state(&world, EntityKind::Location, "castle/vault", "ajar").is_err());
+    }
+
+    #[test]
+    fn a_chapter_applies_its_overlays_and_never_duplicates_a_carried_object() {
+        let (_d, world) = story();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        game.act(&world, &mut state, &PlayAction::Take("lamp".into()));
+        state.enter_chapter(&world, Path::new("castle/yard"), "after").unwrap();
+        let look = game.act(&world, &mut state, &PlayAction::Look).text;
+        assert!(look.contains("Ashes."), "{}", look);
+        assert!(look.contains("You see: Well.") && !look.contains("Lamp"), "{}", look);
+
+        // Chapters can go back; only the new one applies.
+        state.enter_chapter(&world, Path::new(""), "before").unwrap();
+        assert!(game.act(&world, &mut state, &PlayAction::Look).text.contains("Grass."));
+        assert!(state.enter_chapter(&world, Path::new(""), "never").is_err());
+    }
+
+    #[test]
+    fn reconcile_falls_back_for_states_things_and_chapters_that_are_gone() {
+        let (dir, mut world) = story();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        state.switch_state(&world, EntityKind::Location, "castle/vault", "open").unwrap();
+        state.enter_chapter(&world, Path::new(""), "after").unwrap();
+        state.states.entry("object".into()).or_default().insert("ghost".into(), "faint".into());
+
+        world.remove_file(&dir.path().join("castle/vault/open.md"));
+        world.remove_file(&dir.path().join("chapters/20-after.md"));
+        world.remove_file(&dir.path().join("castle/yard/chapters/after.md"));
+        let warnings = state.reconcile(&world);
+        assert!(warnings.iter().any(|w| w == "location `castle/vault` has no state `open` any more, so it is back in `closed`"), "{:?}", warnings);
+        assert!(warnings.iter().any(|w| w.contains("object `ghost` no longer exists")));
+        assert!(warnings.iter().any(|w| w == "chapter `after` no longer exists, so the story is back in `before`"));
+        assert!(state.states.is_empty());
+        assert_eq!(state.chapter.as_ref().unwrap().name(), "before");
+
+        world.remove_file(&dir.path().join("chapters/10-before.md"));
+        let warnings = state.reconcile(&world);
+        assert_eq!(warnings, vec!["chapter `before` no longer exists, so the story is in no chapter".to_string()]);
+        assert!(state.chapter.is_none());
+    }
+
+    #[test]
+    fn saves_keep_states_and_chapters_and_version_1_still_loads() {
+        let (_d, world) = story();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        state.switch_state(&world, EntityKind::Location, "castle/vault", "open").unwrap();
+        state.enter_chapter(&world, Path::new(""), "after").unwrap();
+        state.values.insert("story.king".into(), "dead".into());
+        game.act(&world, &mut state, &PlayAction::Look);
+        let saves = tempfile::tempdir().unwrap();
+        let path = saves.path().join("s.yaml");
+        save_game(&path, &state).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("castle/vault: open") && text.contains("story.king: dead"), "{}", text);
+        let (loaded, warnings) = load_game(&path, &world).unwrap();
+        assert_eq!(loaded, state);
+        assert!(warnings.is_empty(), "{:?}", warnings);
+
+        fs::write(&path, "thwarter_save: 1\nstate:\n  location: castle/hall\n  inventory: [lamp]\n  taken:\n    castle/yard: [lamp]\n  flags: {}\n").unwrap();
+        let (old, warnings) = load_game(&path, &world).unwrap();
+        assert_eq!(old.inventory, vec!["lamp"]);
+        assert!(old.states.is_empty() && old.chapter.is_none() && old.turn == 0);
+        assert!(warnings.is_empty());
     }
 }

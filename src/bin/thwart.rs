@@ -57,8 +57,10 @@ enum Commands {
         location: Option<String>,
         #[arg(long, help = "Show from specific player perspective")]
         player: Option<String>,
-        #[arg(long, help = "Load from saved game state")]
+        #[arg(long, help = "Show the location in one of its states (design/STATES.md)")]
         state: Option<String>,
+        #[arg(long, help = "Show the location in a chapter")]
+        chapter: Option<String>,
         #[arg(long, help = "Output format", default_value = "text")]
         format: String,
     },
@@ -123,8 +125,8 @@ fn main() -> ExitCode {
         Commands::Validate { location, strict, output, format, fix } => {
             thwarter::cli::commands::validate_command(world_path, location, strict, output, format, fix)
         },
-        Commands::Show { location, player, state, format } => {
-            thwarter::cli::commands::show_command(world_path, location, player, state, format, cli.verbose)
+        Commands::Show { location, player, state, chapter, format } => {
+            thwarter::cli::commands::show_command(world_path, location, player, state, chapter, format, cli.verbose)
         },
         Commands::Map { location, player, depth, style, output, connections } => {
             thwarter::cli::commands::map_command(location, player, depth, style, output, connections)
