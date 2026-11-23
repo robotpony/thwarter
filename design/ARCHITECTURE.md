@@ -18,6 +18,7 @@ src/
 ├── bin/thwart.rs        # CLI entry point, argument parsing, dispatch
 ├── console/              # The console: edit and play modes (REQUIREMENTS.md › 4.6)
 ├── render.rs             # Room view text, shared by `thwart show` and the console
+├── writer/               # Round-trip file writer: edits frontmatter in place (REQ-ENG-7)
 ├── models/               # Data structures, no behavior beyond simple constructors
 │   ├── world/            # Location, WorldGraph, Coordinate, GameObject
 │   ├── character/        # Character, Player, CharacterState
@@ -74,6 +75,23 @@ thwarter::console::run(world_path: &Path, mode: Mode) -> anyhow::Result<()>  // 
 
 Proposed for Phase 4, not built: `PlayState { location, inventory: Vec<String>, flags: BTreeMap<String, serde_yaml::Value> }` in models, and `ActionResult { text, changes: Vec<Change> }`.
 
+## File writer
+
+`thwarter::writer` writes entities back to their files (`REQUIREMENTS.md` › REQ-ENG-7), built 2026-11-23 (0.4.0).
+
+```rust
+WorldWriter::edit(&self, engine: &WorldEngine, kind: EntityKind, id: &str, edits: &[Edit]) -> Result<PathBuf>
+WorldWriter::create(&self, new: &NewEntity, edits: &[Edit]) -> Result<PathBuf>
+new_entity_relative_path(kind: EntityKind, id: &str) -> PathBuf   // the one place the new-file rule lives
+enum Edit { SetScalar, SetList, SetMapEntry, RemoveMapEntry, RemoveKey, SetBody, ReplaceAll }
+```
+
+- It edits the frontmatter as text, one key's lines at a time, and never re-serializes the file. After every edit it re-parses: the edited field must have the new value and every other top-level key must parse exactly as before, or the edit is refused and the file is untouched. Saves are atomic (temp file, then rename) and keep the file's permissions.
+- It handles the shapes `design/CONTENT_FORMAT.md` uses: one-line scalars, flow and block string lists, and one-level block maps. Block scalars, non-empty flow maps, nested list items and anchors are refused at the key being edited; `ReplaceAll` is the way around that. `relationships` and `actions` (lists of single-key maps) can only be changed with `ReplaceAll` for now.
+- An added list follows the file's existing style: block if the file already has a block list, flow otherwise. Added keys go in field-table order, from `parsers::known_keys`.
+- It refuses changes to `id` or `type`, and edits to an id defined in more than one file. An id can't contain `..`, empty, hidden or absolute segments, backslashes or colons, and any path that resolves outside the world is refused, symlinks included.
+- The engine records which file each id came from (`WorldEngine::sources`, `source_path`, `EntityKind`). Ids are unique within a kind; a location and an object may share one.
+
 ## Implementation status
 
 This table exists because status claims in this repo have previously drifted from what the code does. Update it in the same commit as any change that makes an entry true.
@@ -88,11 +106,13 @@ This table exists because status claims in this repo have previously drifted fro
 | `CharacterEngine` | Partially done | Loading, placement, and movement work, but nothing calls it from the CLI. `WorldEngine` keeps character cards for lookups (names in the room view); placement is still `CharacterEngine`'s job. |
 | `WorldEngine::describe_location` / `problems` | Done | The console interface above. `problems` backs both `validate` and `/reload`. |
 | Room renderer (`render::render_location`) | Done | One renderer for `thwart show` and the console. |
+| File writer (`writer`) | Done | See File writer above. Nothing in the console calls it yet. |
+| In-memory world changes (REQ-ENG-8) | Not implemented | Next for the coder. |
 | Console (`thwart edit`, `thwart play`) | Partially done | The loop, `/edit`, `/play`, `/reload`, `/help` and `/quit` work, and edit mode navigates the world's folders (`ls`, `cd`, `pwd`, `look`). Play mode shows the room but has no verbs yet (Phase 4), and the content-changing commands (`/new`, `/set`, `/link`, `/edit room`) say they aren't built (Phase 3). On a terminal the prompt has line editing and history (reedline); history isn't saved between sessions. It also watches the world's files and reloads when they change, printing the result above the prompt. Tested by transcripts in `tests/transcripts/` and 4 `/reload` unit tests. |
-| Unit tests | Started | 5 tests, in `render.rs` and `world_engine.rs`. Parser tests are next (`design/UNIT_TESTS.md` › 1). |
+| Unit tests | Started | 58 tests: renderer, world engine, parser, `/reload`, and the writer (including a byte-identical round trip of every `.md` in the repo and a one-field edit of every test-world entity). Console behaviour is also covered by transcripts. |
 | `NarrativeEngine` | Model only | Plot point prerequisite checking works; consequence execution and alternative-text condition evaluation are stubs. |
 | `GameEngine` | Model only | Action dispatch exists; move/take/look/examine handlers are stubs that report success without doing anything. |
-| `thwart validate` | Done | Loads the world, reports parse errors and broken connections; `--strict` additionally checks character `default_location` references. `--fix` and location-scoped validation are not implemented. |
+| `thwart validate` | Done | Loads the world, reports parse errors and broken connections; `--strict` additionally checks character `default_location` references. It also reports an `id` defined twice within a kind, and warns (without failing) about a key that differs only in case from a known one. `--fix` and location-scoped validation are not implemented. |
 | `thwart show` | Partially done | Loads and displays the world or a single location; text output is the shared room view. Objects without cards show "(no card)", missing exits "(missing)". `--player` (perspective) and `--state` (saved state) are not implemented. |
 | `thwart map` | Not implemented | Reports that it isn't implemented and exits non-zero. |
 | `thwart search` | Not implemented | Reports that it isn't implemented and exits non-zero. |
