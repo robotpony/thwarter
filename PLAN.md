@@ -39,7 +39,7 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 - [x] The `world/` folder: `index.md`, `story.md`, `player.md`, and the test world moved off `world.toml` [coder] (REQ-CF-20)
 - [x] The loader ignores other tools' files: dot-folders and Hugo's own [coder] (REQ-CF-24)
 - [x] Obsidian links wherever frontmatter takes an id, as a file path or an id [coder] (REQ-CF-25)
-- [ ] Variables by level, with warnings for undeclared ones [coder] (REQ-CF-16)
+- [x] Variables by level, with warnings for undeclared ones [coder] (REQ-CF-16)
 - [ ] Templates and built-ins, with `scenery` the first built-in [coder] (REQ-CF-15, REQ-CF-21)
 - [ ] `visibility:` in play: faint, hidden and absent [coder] (REQ-CF-18)
 - [ ] `reply ambiguous` from the candidates' shared template, else an in-world default [coder] (`design/STATES.md` › Ambiguity)
@@ -94,7 +94,7 @@ Done when a persona can package a world, and someone else can install it and pla
 
 - [ ] Persona files, and `author:` in `world/index.md` naming one [coder] (REQ-WS-4, REQ-WS-5)
 - [ ] Personal settings in `~/.config/thwarter/config.toml` [coder] (REQ-CFG-4)
-- [ ] First run asks who's writing; `/author` switches persona; the status bar shows it [console] (REQ-WS-4)
+- [ ] First run asks who's writing; `/author` switches persona; the status bar shows it; packaging says which contact details ship [console] (REQ-CON-34 to 37, REQ-WS-4)
 - [ ] Packaging a world with its persona, and installing one to play [coder] (REQ-CFG-5, REQ-CFG-7)
 - [ ] Play data for installed worlds kept apart from them [coder, console] (REQ-CFG-6)
 
