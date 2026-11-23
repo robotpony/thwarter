@@ -32,6 +32,19 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.26.0 (2026-11-23)
+
+### Added
+
+- The renderer builds styled blocks (REQ-CF-28): `Rendered` holds `Block`s (title, heading, paragraph, list item, quote, code, exits, here, notice, author note, response), each a list of `Span`s with a `Style` (strong, emphasis, code, a link with its target, tag, missing), in the shape agreed with the console coder. Nothing is wrapped. `Rendered::to_plain` prints them; `render_location` and `render_location_as` now go through it and print the same bytes as before, which a test checks for every room in the sample worlds. `location_blocks` gives the console the blocks.
+- Play renders prose as Markdown (REQ-CF-28): room descriptions, examine text and responses show headings, emphasis, lists, quotes and code as text, never as raw syntax. The author view (`thwart show`, edit mode) still shows prose as written.
+- Links in prose (REQ-CF-29): `[[lever]]`, `[[castle/vault|the vault]]` and `[the lever](objects/lever.md)` name a thing of any kind, by id, path or unique file name. In play a link shows as its alias, else the thing's title, else its name as written. `validate` warns about a link that names nothing, or names an ambiguous file name. `WorldEngine::link_for` resolves one.
+- Tags (REQ-CF-30): `#tag` in prose shows without its `#` in play, and `WorldEngine::tags()` lists every tag, from prose and from `tags:` in frontmatter, with the things that carry it, for search.
+
+### Changed
+
+- `design/ENGINE_REQUIREMENTS.md` and `design/ARCHITECTURE.md` point at REQ-ENG-10 rather than `design/STATES.md` › Engine rules, which now points at the requirements.
+
 ## 0.25.0 (2026-11-23)
 
 ### Added

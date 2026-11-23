@@ -5,7 +5,7 @@ use crate::engines::location_view::{expand_direction, EntityRef, LocationView};
 use crate::engines::variables::Scope;
 use crate::engines::{At, EntityKind, Visibility, WorldEngine};
 use crate::models::game::{ActionResult, Change, PlayAction, PlayState};
-use crate::render::{render_location_as, RenderStyle};
+use crate::render::{location_blocks, prose_plain, RenderStyle};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -111,7 +111,7 @@ impl GameEngine {
                 let block = crate::parsers::Body::parse(&template.body);
                 if let (true, Some(text)) = (shared, block.block("reply ambiguous")) {
                     if !text.trim().is_empty() {
-                        return world.fill(text.trim(), &Scope { at: At::play(state), this: None, here: None });
+                        return prose(world, &world.fill(text.trim(), &Scope { at: At::play(state), this: None, here: None }));
                     }
                 }
             }
@@ -157,7 +157,7 @@ impl GameEngine {
 
     fn look(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
         match self.view(world, state) {
-            Some(view) => ActionResult::say(render_location_as(&view, RenderStyle::Player)),
+            Some(view) => ActionResult::say(location_blocks(&view, RenderStyle::Player, &|n| world.link_for(n)).to_plain()),
             None => ActionResult::say("You're nowhere."),
         }
     }
@@ -238,7 +238,7 @@ impl GameEngine {
         let wanted = noun.trim().to_lowercase();
         let wanted = wanted.strip_prefix("the ").unwrap_or(&wanted);
         if ["room", "here", "around"].contains(&wanted) || wanted == view.title.to_lowercase() || wanted == view.id.to_lowercase() {
-            let look = render_location_as(&view, RenderStyle::Player);
+            let look = location_blocks(&view, RenderStyle::Player, &|n| world.link_for(n)).to_plain();
             let mut found = self.search(world, state, "You look closely");
             found.text = format!("{}\n\n{}", look, found.text);
             return found;
@@ -255,7 +255,7 @@ impl GameEngine {
                             .filter(|p| !p.is_empty())
                             .collect();
                         let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
-                        ActionResult::say(world.fill(&parts.join("\n\n"), &scope))
+                        ActionResult::say(prose(world, &world.fill(&parts.join("\n\n"), &scope)))
                     }
                     _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
                 }
@@ -267,7 +267,7 @@ impl GameEngine {
             Ok(Some(person)) => match world.character_at(&person.id, At::play(state)) {
                 Some(card) if !card.description.trim().is_empty() => {
                     let scope = Scope { at: At::play(state), this: Some((EntityKind::Character, &person.id)), here: None };
-                    ActionResult::say(world.fill(card.description.trim(), &scope))
+                    ActionResult::say(prose(world, &world.fill(card.description.trim(), &scope)))
                 }
                 _ => ActionResult::say(format!("You see nothing special about {}.", person.display_name())),
             },
@@ -324,7 +324,7 @@ impl GameEngine {
         if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
             let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
             return ActionResult::say(match card.responses.get(&format!("{} refused", key)) {
-                Some(text) if !text.trim().is_empty() => world.fill(text.trim(), &scope),
+                Some(text) if !text.trim().is_empty() => prose(world, &world.fill(text.trim(), &scope)),
                 _ => builtin_refusal(&verb, &name, state.turn),
             });
         }
@@ -362,7 +362,7 @@ impl GameEngine {
         // Filled after the action's changes, so the reply can show them.
         let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
         let text = match card.responses.get(&key) {
-            Some(text) if !text.trim().is_empty() => world.fill(text.trim(), &scope),
+            Some(text) if !text.trim().is_empty() => prose(world, &world.fill(text.trim(), &scope)),
             _ => builtin_reply(&verb, &name, state.turn),
         };
         let mut result = ActionResult { text, changes, note: None };
@@ -574,6 +574,11 @@ fn builtin_reply(verb: &str, name: &str, turn: u64) -> String {
 fn builtin_refusal(verb: &str, name: &str, turn: u64) -> String {
     let forms = ["You can't {verb} the {name} yet.", "Not yet: you can't {verb} the {name}."];
     forms[(turn as usize) % forms.len()].replace("{verb}", verb).replace("{name}", name)
+}
+
+/// Prose as play shows it: Markdown rendered, links shown as their text.
+fn prose(world: &WorldEngine, text: &str) -> String {
+    prose_plain(text, &|n| world.link_for(n))
 }
 
 /// Whether play shows a thing: visible, or faint and already found.
@@ -1090,5 +1095,26 @@ mod tests {
         let second = game.act(&world, &mut state, &PlayAction::Take("sword".into())).text;
         assert_ne!(first, second);
         assert!(first.contains("the rusty sword") && second.contains("the old sword"), "{} / {}", first, second);
+    }
+
+    #[test]
+    fn prose_renders_markdown_links_and_tags_in_play() {
+        let (dir, mut world) = world();
+        let d = dir.path();
+        world.set_file(&d.join("castle/hall.md"), "---\nid: castle/hall\ntitle: Hall\ntype: location\ntags: [indoors]\nconnections:\n  south: castle/yard\n---\nA **long** hall. The [[king]] sits by [the well](objects/well.md). #royal\n\nA door to [[castle/nowhere]].\n");
+        world.set_file(&d.join("objects/well.md"), "---\nid: well\ntitle: Well\ntype: object\nobject_type: environmental\nweight: immovable\n---\nDeep, and *very* old.\n");
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        let look = game.act(&world, &mut state, &PlayAction::Look).text;
+        assert!(look.contains("A long hall. The King Aldric sits by the well. royal\n\nA door to castle/nowhere."), "{}", look);
+        let warnings = world.current_warnings();
+        assert!(warnings.iter().any(|w| w.contains("castle/hall.md: the link to `castle/nowhere` names nothing in the world")), "{:?}", warnings);
+        assert!(!warnings.iter().any(|w| w.contains("`king`") || w.contains("objects/well")), "{:?}", warnings);
+        let tags = world.tags();
+        assert_eq!(tags["royal"], vec![(EntityKind::Location, "castle/hall".to_string())]);
+        assert_eq!(tags["indoors"], vec![(EntityKind::Location, "castle/hall".to_string())]);
+
+        game.act(&world, &mut state, &PlayAction::Go("south".into()));
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("well".into())).text, "Deep, and very old.");
     }
 }

@@ -1,6 +1,6 @@
 # Engine requirements
 
-Requirements for the engine: loading a world, building each thing's current version, play, saves and the writer. Owned by thwarter coder. RFC 2119 keywords are used as in `REQUIREMENTS.md`, and every requirement answers to its principles. The content rules the engine implements are in `design/CONTENT_REQUIREMENTS.md`; the engine rules settled during the states design (`design/STATES.md` › Engine rules) are REQ-ENG-10 to 29 below.
+Requirements for the engine: loading a world, building each thing's current version, play, saves and the writer. Owned by thwarter coder. RFC 2119 keywords are used as in `REQUIREMENTS.md`, and every requirement answers to its principles. The content rules the engine implements are in `design/CONTENT_REQUIREMENTS.md`; the engine rules settled during the states design are REQ-ENG-10 to 29 below.
 
 Split out of `REQUIREMENTS.md` on 2026-11-23. The REQ-ENG ids are stable. A change another component needs here goes to the commander as a message.
 
@@ -17,7 +17,7 @@ Split out of `REQUIREMENTS.md` on 2026-11-23. The REQ-ENG ids are stable. A chan
 - REQ-ENG-9: The engine's interface to the console MUST offer at least: a description of a location (title, body, exits with whether each target exists, characters, objects with whether each has a card); the play state (REQ-ENG-23); and an action result (the text to show, and what changed). The coder and console coder agree its Rust shape between them and record it in `design/ARCHITECTURE.md`.
 
 
-### Loading (`design/STATES.md` › Files, Engine rules › Loading)
+### Loading (`design/STATES.md` › Files)
 
 - REQ-ENG-10: The loader MUST decide what a file is from where it sits, never from its contents: a folder holding `index.md` is one thing (a bundle) whose other files are its states, and whose `chapters/` folder holds its chapter overlays; `_index.md` marks an area; in any `chapters/` folder a numbered file defines a chapter in that scope and an unnumbered one is an overlay (REQ-ENG-14); files in `world/` define the world (REQ-CF-20); everything else is a one-file thing. State and overlay files MUST NOT set `id`, `type` or `state:`; a layer that does is kept with those keys removed and reported, so one bad key doesn't cause more errors.
 - REQ-ENG-11: A bundle MUST be a leaf: it MAY hold state files, one `chapters/` folder and a `templates/` folder, and nothing else. A nested `index.md` is an error. `index`, `_index`, `chapters` and `templates` MUST NOT be state names.

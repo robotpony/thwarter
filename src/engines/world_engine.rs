@@ -376,6 +376,67 @@ impl WorldEngine {
         }
     }
 
+    /// What a link in prose names (REQ-CF-29): the thing's kind, id and
+    /// title, by id, path or unique file name, of any kind.
+    pub fn link_for(&self, name: &str) -> Option<(EntityKind, String, String)> {
+        let id = self.resolve_name(name, None);
+        let thing = self.thing_by_id(&id).ok()?;
+        let title = match self.current(thing.kind, &thing.id, At::default())? {
+            ParsedEntity::Location(l) => l.name,
+            ParsedEntity::Character(c) => c.name,
+            ParsedEntity::Object(o) => o.title,
+        };
+        Some((thing.kind, thing.id.clone(), title))
+    }
+
+    /// Every tag (REQ-CF-30), from `tags:` in a thing's starting version
+    /// and `#tags` in its own files' prose, to the things that carry it.
+    pub fn tags(&self) -> std::collections::BTreeMap<String, Vec<(EntityKind, String)>> {
+        let mut tags: std::collections::BTreeMap<String, Vec<(EntityKind, String)>> = std::collections::BTreeMap::new();
+        let mut things: Vec<&Thing> = self.things.values().collect();
+        things.sort_by(|a, b| (a.kind, &a.id).cmp(&(b.kind, &b.id)));
+        for thing in things {
+            let mut own: Vec<String> = Vec::new();
+            if let Ok((_, merged)) = thing.build(thing.starting_state.as_deref(), None) {
+                if let Some(list) = merged.metadata.get("tags").and_then(|v| v.as_sequence()) {
+                    own.extend(list.iter().filter_map(|t| t.as_str()).map(|t| t.trim_start_matches('#').to_string()));
+                }
+            }
+            let layers = std::iter::once(&thing.index).chain(thing.states.values()).chain(thing.overlays.values());
+            for layer in layers {
+                own.extend(crate::render::prose_tags(&layer.body));
+            }
+            own.sort();
+            own.dedup();
+            for tag in own {
+                tags.entry(tag).or_default().push((thing.kind, thing.id.clone()));
+            }
+        }
+        tags
+    }
+
+    /// Warnings for links in prose that name nothing (REQ-CF-29).
+    fn prose_link_warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let mut things: Vec<&Thing> = self.things.values().collect();
+        things.sort_by(|a, b| a.index.path.cmp(&b.index.path));
+        for thing in things {
+            let layers = std::iter::once(&thing.index).chain(thing.states.values()).chain(thing.overlays.values());
+            for layer in layers {
+                for name in crate::render::prose_links(&layer.body) {
+                    if self.link_for(&name).is_some() {
+                        continue;
+                    }
+                    match self.link_ambiguity(&name, None) {
+                        Some(why) => warnings.push(format!("{}: a link in the prose is ambiguous: {}", layer.path.display(), why)),
+                        None => warnings.push(format!("{}: the link to `{}` names nothing in the world", layer.path.display(), name)),
+                    }
+                }
+            }
+        }
+        warnings
+    }
+
     /// Why `name` names no one thing, if it's a file name more than one
     /// file has: "it matches more than one file: a.md, b.md".
     pub fn link_ambiguity(&self, name: &str, kind: Option<EntityKind>) -> Option<String> {
@@ -663,6 +724,7 @@ impl WorldEngine {
         let mut warnings = self.file_warnings.clone();
         warnings.extend(self.response_warnings());
         warnings.extend(self.variable_warnings());
+        warnings.extend(self.prose_link_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }

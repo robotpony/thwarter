@@ -3,7 +3,9 @@
 //! colour and no trailing newline, so it can be printed or compared in
 //! transcripts as is.
 
-use crate::engines::LocationView;
+use crate::engines::{EntityKind, LocationView};
+use crate::parsers::link_target;
+use pulldown_cmark::{Event, Options, Parser, Tag};
 
 /// Who a room view is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,83 +16,480 @@ pub enum RenderStyle {
     Player,
 }
 
+/// Text as logical blocks of styled spans (REQ-CF-28), for the console
+/// to style and wrap, and for `to_plain` to print. Blocks are never
+/// wrapped or hard-broken here; roles are semantic, never colours.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Rendered {
+    pub blocks: Vec<Block>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block {
+    pub kind: BlockKind,
+    pub spans: Vec<Span>,
+    /// A blank line comes before this block.
+    pub space_before: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockKind {
+    Title,
+    Heading(u8),
+    Paragraph,
+    /// A list item, with its depth (1 for the outermost list).
+    ListItem(u8),
+    Quote,
+    Code,
+    /// The ways out of a room.
+    Exits,
+    /// Who and what is here.
+    Here,
+    /// A message from the engine, such as "(no description yet)".
+    Notice,
+    /// An author's `<!-- note -->`.
+    AuthorNote,
+    /// An action's reply.
+    Response,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Span {
+    pub text: String,
+    pub style: Style,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Style {
+    pub strong: bool,
+    pub emphasis: bool,
+    pub code: bool,
+    pub link: Option<Link>,
+    /// A `#tag`, shown without its `#`.
+    pub tag: bool,
+    /// An exit or link to something not written yet.
+    pub missing: bool,
+}
+
+/// A link to a thing (REQ-CF-29), with its target if it resolves.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Link {
+    /// As written: `castle/vault`, `lever`, `objects/lever.md`.
+    pub name: String,
+    pub target: Option<(EntityKind, String)>,
+}
+
+/// What a link resolves to: the thing's kind, id and title.
+pub type Resolver<'a> = &'a dyn Fn(&str) -> Option<(EntityKind, String, String)>;
+
+fn no_links(_: &str) -> Option<(EntityKind, String, String)> {
+    None
+}
+
+impl Span {
+    pub fn plain(text: impl Into<String>) -> Self {
+        Span { text: text.into(), style: Style::default() }
+    }
+}
+
+impl Block {
+    pub fn new(kind: BlockKind, spans: Vec<Span>, space_before: bool) -> Self {
+        Block { kind, spans, space_before }
+    }
+
+    fn line(kind: BlockKind, text: impl Into<String>, space_before: bool) -> Self {
+        Block::new(kind, vec![Span::plain(text)], space_before)
+    }
+
+    /// The block's text, without styling.
+    pub fn text(&self) -> String {
+        self.spans.iter().map(|s| s.text.as_str()).collect()
+    }
+}
+
+impl Rendered {
+    /// Plain text: blocks one per line, a blank line where a block asks
+    /// for one, list items marked, nothing wrapped, no trailing newline.
+    pub fn to_plain(&self) -> String {
+        let mut out = String::new();
+        for (i, block) in self.blocks.iter().enumerate() {
+            if i > 0 {
+                out.push('\n');
+                if block.space_before {
+                    out.push('\n');
+                }
+            }
+            let text = block.text();
+            match block.kind {
+                BlockKind::ListItem(depth) => {
+                    out.push_str(&"  ".repeat(depth.saturating_sub(1) as usize));
+                    out.push_str("- ");
+                    out.push_str(&text);
+                }
+                BlockKind::Quote => {
+                    let quoted: Vec<String> = text.lines().map(|l| format!("  {}", l)).collect();
+                    out.push_str(&quoted.join("\n"));
+                }
+                _ => out.push_str(&text),
+            }
+        }
+        out
+    }
+}
+
 /// `render_location` in the given style.
 pub fn render_location_as(view: &LocationView, style: RenderStyle) -> String {
+    location_blocks(view, style, &no_links).to_plain()
+}
+
+/// A location as blocks, for the console: the same content
+/// `render_location_as` prints. `links` resolves links in the prose.
+pub fn location_blocks(view: &LocationView, style: RenderStyle, links: Resolver) -> Rendered {
     match style {
-        RenderStyle::Author => render_location(view),
-        RenderStyle::Player => render_for_player(view),
+        RenderStyle::Author => author_blocks(view),
+        RenderStyle::Player => player_blocks(view, links),
     }
 }
 
 /// A room as the player sees it: title, description, the ways out, then
 /// what and who is here, by name. No ids, coordinates or missing marks.
-fn render_for_player(view: &LocationView) -> String {
-    let mut out = vec![view.title.clone(), String::new()];
+fn player_blocks(view: &LocationView, links: Resolver) -> Rendered {
+    let mut blocks = vec![Block::line(BlockKind::Title, view.title.clone(), false)];
     let body = view.body.trim();
-    out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
-    out.push(String::new());
+    if body.is_empty() {
+        blocks.push(Block::line(BlockKind::Notice, "(no description yet)", true));
+    } else {
+        let mut prose = prose_blocks(body, links).blocks;
+        if let Some(first) = prose.first_mut() {
+            first.space_before = true;
+        }
+        blocks.extend(prose);
+    }
     if view.exits.is_empty() {
-        out.push("There's no way out.".to_string());
+        blocks.push(Block::line(BlockKind::Notice, "There's no way out.", true));
     } else {
         let dirs: Vec<&str> = view.exits.iter().map(|e| e.direction.as_str()).collect();
-        out.push(format!("Exits: {}.", dirs.join(", ")));
+        blocks.push(Block::line(BlockKind::Exits, format!("Exits: {}.", dirs.join(", ")), true));
     }
-    if !view.objects.is_empty() {
-        let names: Vec<String> = view.objects.iter().map(|o| o.display_name()).collect();
-        out.push(format!("You see: {}.", names.join(", ")));
-    }
-    if !view.characters.is_empty() {
-        let names: Vec<String> = view.characters.iter().map(|c| c.display_name()).collect();
-        out.push(format!("Here: {}.", names.join(", ")));
-    }
-    out.join("\n")
+    let names = |refs: &[crate::engines::EntityRef], kind: EntityKind, label: &str| -> Option<Block> {
+        if refs.is_empty() {
+            return None;
+        }
+        let mut spans = vec![Span::plain(format!("{}: ", label))];
+        for (i, r) in refs.iter().enumerate() {
+            if i > 0 {
+                spans.push(Span::plain(", "));
+            }
+            let link = Link { name: r.id.clone(), target: r.name.as_ref().map(|_| (kind, r.id.clone())) };
+            spans.push(Span { text: r.display_name(), style: Style { link: Some(link), ..Default::default() } });
+        }
+        spans.push(Span::plain("."));
+        Some(Block::new(BlockKind::Here, spans, false))
+    };
+    blocks.extend(names(&view.objects, EntityKind::Object, "You see"));
+    blocks.extend(names(&view.characters, EntityKind::Character, "Here"));
+    Rendered { blocks }
 }
 
 /// A location as an author checks it: title and id, coordinates,
-/// description (or `(no description yet)`), exits, then who and what is there. An exit to an unknown
-/// room says `(missing)`; an object with no card says `(no card)`; a
-/// character with no card says `(not found)`.
-pub fn render_location(view: &LocationView) -> String {
-    let mut out = Vec::new();
-    out.push(format!("{} ({})", view.title, view.id));
+/// description (or `(no description yet)`), exits, then who and what is
+/// there. An exit to an unknown room says `(missing)`; an object with no
+/// card says `(no card)`; a character with no card says `(not found)`.
+/// The description is shown as written.
+fn author_blocks(view: &LocationView) -> Rendered {
+    let mut blocks = vec![Block::line(BlockKind::Title, format!("{} ({})", view.title, view.id), false)];
     if let Some(c) = &view.coordinates {
-        out.push(format!("at ({}, {}, {})", c.x, c.y, c.z));
+        blocks.push(Block::line(BlockKind::Notice, format!("at ({}, {}, {})", c.x, c.y, c.z), false));
     }
-    out.push(String::new());
     let body = view.body.trim();
     // Matches the console's character and object views.
-    out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
-
-    out.push(String::new());
-    if view.exits.is_empty() {
-        out.push("Exits: none".to_string());
+    blocks.push(if body.is_empty() {
+        Block::line(BlockKind::Notice, "(no description yet)", true)
     } else {
-        out.push("Exits:".to_string());
+        Block::line(BlockKind::Paragraph, body, true)
+    });
+
+    if view.exits.is_empty() {
+        blocks.push(Block::line(BlockKind::Exits, "Exits: none", true));
+    } else {
+        blocks.push(Block::line(BlockKind::Exits, "Exits:", true));
         let width = view.exits.iter().map(|e| e.direction.len()).max().unwrap_or(0);
         for exit in &view.exits {
-            let missing = if exit.target_exists { "" } else { "  (missing)" };
-            out.push(format!("  {:<width$}  {}{}", exit.direction, exit.target, missing, width = width));
+            let target = Style {
+                link: Some(Link {
+                    name: exit.target.clone(),
+                    target: exit.target_exists.then(|| (EntityKind::Location, exit.target.clone())),
+                }),
+                missing: !exit.target_exists,
+                ..Default::default()
+            };
+            let mut spans = vec![
+                Span::plain(format!("  {:<width$}  ", exit.direction, width = width)),
+                Span { text: exit.target.clone(), style: target },
+            ];
+            if !exit.target_exists {
+                spans.push(Span { text: "  (missing)".into(), style: Style { missing: true, ..Default::default() } });
+            }
+            blocks.push(Block::new(BlockKind::Exits, spans, false));
         }
     }
 
-    push_refs(&mut out, "Characters", &view.characters, "not found");
-    push_refs(&mut out, "Objects", &view.objects, "no card");
-    out.join("\n")
+    push_refs(&mut blocks, "Characters", &view.characters, "not found", EntityKind::Character);
+    push_refs(&mut blocks, "Objects", &view.objects, "no card", EntityKind::Object);
+    Rendered { blocks }
 }
 
-fn push_refs(out: &mut Vec<String>, heading: &str, refs: &[crate::engines::EntityRef], missing_label: &str) {
-    out.push(String::new());
+/// `author_blocks` as text: what `thwart show` prints.
+pub fn render_location(view: &LocationView) -> String {
+    author_blocks(view).to_plain()
+}
+
+fn push_refs(blocks: &mut Vec<Block>, heading: &str, refs: &[crate::engines::EntityRef], missing_label: &str, kind: EntityKind) {
     if refs.is_empty() {
-        out.push(format!("{}: none", heading));
+        blocks.push(Block::line(BlockKind::Here, format!("{}: none", heading), true));
         return;
     }
-    out.push(format!("{}:", heading));
+    blocks.push(Block::line(BlockKind::Here, format!("{}:", heading), true));
     for r in refs {
-        match &r.name {
-            Some(name) => out.push(format!("  {} ({})", name, r.id)),
-            None => out.push(format!("  {}  ({})", r.id, missing_label)),
+        let link = |missing: bool| Style {
+            link: Some(Link { name: r.id.clone(), target: (!missing).then(|| (kind, r.id.clone())) }),
+            missing,
+            ..Default::default()
+        };
+        let spans = match &r.name {
+            Some(name) => vec![Span::plain(format!("  {} (", name)), Span { text: r.id.clone(), style: link(false) }, Span::plain(")")],
+            None => vec![
+                Span::plain("  "),
+                Span { text: r.id.clone(), style: link(true) },
+                Span { text: format!("  ({})", missing_label), style: Style { missing: true, ..Default::default() } },
+            ],
+        };
+        blocks.push(Block::new(BlockKind::Here, spans, false));
+    }
+}
+
+/// Prose as the player reads it (REQ-CF-28 to 30): Markdown's headings,
+/// emphasis, lists, quotes and code become blocks and styles, never raw
+/// syntax; `[[links]]` and `[text](file.md)` links become link spans
+/// showing their text (an alias, else the thing's title, else the name
+/// as written); `#tags` become tag spans without the `#`. An author note
+/// (`<!-- -->`) on its own is an `AuthorNote` block, kept as written.
+pub fn prose_blocks(text: &str, links: Resolver) -> Rendered {
+    let mut blocks: Vec<Block> = Vec::new();
+    let mut current: Option<Block> = None;
+    let mut style = Style::default();
+    let mut list_depth: u8 = 0;
+    let mut in_quote = false;
+    let mut item_open = false;
+
+    let mut open = |blocks: &mut Vec<Block>, current: &mut Option<Block>, kind: BlockKind, space: bool| {
+        if let Some(done) = current.take() {
+            if !done.spans.is_empty() {
+                blocks.push(done);
+            }
+        }
+        *current = Some(Block::new(kind, Vec::new(), space));
+    };
+    let close = |blocks: &mut Vec<Block>, current: &mut Option<Block>| {
+        if let Some(done) = current.take() {
+            if !done.spans.is_empty() {
+                blocks.push(done);
+            }
+        }
+    };
+    let push = |current: &mut Option<Block>, text: &str, style: &Style| {
+        let block = current.get_or_insert_with(|| Block::new(BlockKind::Paragraph, Vec::new(), false));
+        block.spans.push(Span { text: text.to_string(), style: style.clone() });
+    };
+
+    for event in Parser::new_ext(text, Options::empty()) {
+        match event {
+            Event::Start(Tag::Paragraph) => {
+                if !item_open {
+                    let kind = if in_quote { BlockKind::Quote } else { BlockKind::Paragraph };
+                    open(&mut blocks, &mut current, kind, true);
+                }
+            }
+            Event::End(Tag::Paragraph) => {
+                if item_open {
+                    push(&mut current, "\n", &Style::default());
+                }
+            }
+            Event::Start(Tag::Heading(level, _, _)) => open(&mut blocks, &mut current, BlockKind::Heading(level as u8), true),
+            Event::End(Tag::Heading(..)) => close(&mut blocks, &mut current),
+            Event::Start(Tag::BlockQuote) => in_quote = true,
+            Event::End(Tag::BlockQuote) => {
+                in_quote = false;
+                close(&mut blocks, &mut current);
+            }
+            Event::Start(Tag::List(_)) => list_depth += 1,
+            Event::End(Tag::List(_)) => {
+                list_depth = list_depth.saturating_sub(1);
+                if list_depth == 0 {
+                    close(&mut blocks, &mut current);
+                }
+            }
+            Event::Start(Tag::Item) => {
+                let first_in_list = !matches!(current.as_ref().map(|b| b.kind), Some(BlockKind::ListItem(_)));
+                open(&mut blocks, &mut current, BlockKind::ListItem(list_depth), first_in_list);
+                item_open = true;
+            }
+            Event::End(Tag::Item) => {
+                item_open = false;
+                if let Some(b) = current.as_mut() {
+                    while b.spans.last().map_or(false, |s| s.text == "\n") {
+                        b.spans.pop();
+                    }
+                }
+            }
+            Event::Start(Tag::CodeBlock(_)) => open(&mut blocks, &mut current, BlockKind::Code, true),
+            Event::End(Tag::CodeBlock(_)) => {
+                if let Some(b) = current.as_mut() {
+                    if let Some(last) = b.spans.last_mut() {
+                        last.text = last.text.trim_end_matches('\n').to_string();
+                    }
+                }
+                close(&mut blocks, &mut current);
+            }
+            Event::Start(Tag::Strong) => style.strong = true,
+            Event::End(Tag::Strong) => style.strong = false,
+            Event::Start(Tag::Emphasis) => style.emphasis = true,
+            Event::End(Tag::Emphasis) => style.emphasis = false,
+            Event::Start(Tag::Link(_, dest, _)) => {
+                let name = link_target(&dest);
+                let target = links(&name).map(|(k, id, _)| (k, id));
+                style.missing = target.is_none() && !dest.contains("://");
+                style.link = Some(Link { name, target });
+            }
+            Event::End(Tag::Link(..)) => {
+                style.link = None;
+                style.missing = false;
+            }
+            Event::Text(t) => push(&mut current, &t, &style),
+            Event::Code(t) => push(&mut current, &t, &Style { code: true, ..style.clone() }),
+            Event::SoftBreak | Event::HardBreak => push(&mut current, "\n", &style),
+            Event::Html(h) => {
+                let note = h.trim_end_matches('\n');
+                if current.as_ref().map_or(true, |b| b.spans.is_empty()) && note.trim_start().starts_with("<!--") {
+                    open(&mut blocks, &mut current, BlockKind::AuthorNote, true);
+                }
+                push(&mut current, note, &style);
+            }
+            _ => {}
         }
     }
+    if let Some(done) = current.take() {
+        if !done.spans.is_empty() {
+            blocks.push(done);
+        }
+    }
+    for block in blocks.iter_mut() {
+        block.spans = links_and_tags(std::mem::take(&mut block.spans), links, block.kind == BlockKind::Code);
+    }
+    if let Some(first) = blocks.first_mut() {
+        first.space_before = false;
+    }
+    Rendered { blocks }
+}
+
+/// Prose as plain text, as play shows it.
+pub fn prose_plain(text: &str, links: Resolver) -> String {
+    prose_blocks(text, links).to_plain()
+}
+
+/// Join adjacent spans of the same style (the parser splits text at
+/// brackets), then find `[[links]]` and `#tags` in plain text spans.
+fn links_and_tags(spans: Vec<Span>, links: Resolver, code: bool) -> Vec<Span> {
+    let mut joined: Vec<Span> = Vec::new();
+    for span in spans {
+        match joined.last_mut() {
+            Some(last) if last.style == span.style => last.text.push_str(&span.text),
+            _ => joined.push(span),
+        }
+    }
+    if code {
+        return joined;
+    }
+    let mut out = Vec::new();
+    for span in joined {
+        if span.style.code || span.style.link.is_some() {
+            out.push(span);
+            continue;
+        }
+        let mut rest = span.text.as_str();
+        while !rest.is_empty() {
+            let link_at = rest.find("[[").filter(|&i| rest[i..].contains("]]"));
+            let tag_at = tag_start(rest);
+            match (link_at, tag_at) {
+                (Some(l), t) if t.map_or(true, |t| l < t) => {
+                    push_text(&mut out, &rest[..l], &span.style);
+                    let end = l + rest[l..].find("]]").unwrap() + 2;
+                    let inner = &rest[l + 2..end - 2];
+                    let alias = inner.split_once('|').map(|(_, a)| a.trim().to_string());
+                    let name = link_target(&format!("[[{}]]", inner));
+                    let found = links(&name);
+                    let text = alias.or_else(|| found.as_ref().map(|(_, _, t)| t.clone())).unwrap_or_else(|| name.clone());
+                    let style = Style {
+                        missing: found.is_none(),
+                        link: Some(Link { name, target: found.map(|(k, id, _)| (k, id)) }),
+                        ..span.style.clone()
+                    };
+                    out.push(Span { text, style });
+                    rest = &rest[end..];
+                }
+                (_, Some(t)) => {
+                    push_text(&mut out, &rest[..t], &span.style);
+                    let len = rest[t + 1..].find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_' || c == '/')).unwrap_or(rest.len() - t - 1);
+                    out.push(Span { text: rest[t + 1..t + 1 + len].to_string(), style: Style { tag: true, ..span.style.clone() } });
+                    rest = &rest[t + 1 + len..];
+                }
+                _ => {
+                    push_text(&mut out, rest, &span.style);
+                    rest = "";
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Where a `#tag` starts: a `#` at the start or after whitespace,
+/// followed by a letter.
+fn tag_start(text: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    (0..bytes.len()).find(|&i| {
+        bytes[i] == b'#'
+            && (i == 0 || (bytes[i - 1] as char).is_whitespace())
+            && text[i + 1..].chars().next().map_or(false, char::is_alphabetic)
+    })
+}
+
+fn push_text(out: &mut Vec<Span>, text: &str, style: &Style) {
+    if !text.is_empty() {
+        out.push(Span { text: text.to_string(), style: style.clone() });
+    }
+}
+
+/// Every tag in prose (`#tag`, outside code), without the `#`.
+pub fn prose_tags(text: &str) -> Vec<String> {
+    let mut tags: Vec<String> = prose_blocks(text, &no_links)
+        .blocks
+        .iter()
+        .flat_map(|b| b.spans.iter().filter(|s| s.style.tag).map(|s| s.text.clone()))
+        .collect();
+    tags.sort();
+    tags.dedup();
+    tags
+}
+
+/// Every link in prose, by name as written: `[[name]]` and `[text](name)`,
+/// web links left out.
+pub fn prose_links(text: &str) -> Vec<String> {
+    prose_blocks(text, &no_links)
+        .blocks
+        .iter()
+        .flat_map(|b| b.spans.iter().filter_map(|s| s.style.link.as_ref().filter(|_| s.style.missing).map(|l| l.name.clone())))
+        .collect()
 }
 
 #[cfg(test)]
@@ -178,5 +577,72 @@ Here: Captain Marcus, Ghost.";
         v.body = "  \n".into();
         let text = render_location(&v);
         assert!(text.starts_with("Castle Courtyard (castle/courtyard)\n\n(no description yet)\n\nExits:\n"), "{}", text);
+    }
+
+    /// The player view as it was before blocks, kept to prove `to_plain`
+    /// prints the same bytes for prose with no Markdown in it.
+    fn legacy_player(view: &LocationView) -> String {
+        let mut out = vec![view.title.clone(), String::new()];
+        let body = view.body.trim();
+        out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
+        out.push(String::new());
+        if view.exits.is_empty() {
+            out.push("There's no way out.".to_string());
+        } else {
+            let dirs: Vec<&str> = view.exits.iter().map(|e| e.direction.as_str()).collect();
+            out.push(format!("Exits: {}.", dirs.join(", ")));
+        }
+        if !view.objects.is_empty() {
+            let names: Vec<String> = view.objects.iter().map(|o| o.display_name()).collect();
+            out.push(format!("You see: {}.", names.join(", ")));
+        }
+        if !view.characters.is_empty() {
+            let names: Vec<String> = view.characters.iter().map(|c| c.display_name()).collect();
+            out.push(format!("Here: {}.", names.join(", ")));
+        }
+        out.join("\n")
+    }
+
+    #[test]
+    fn plain_text_is_unchanged_for_every_room_in_the_sample_worlds() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        for world in ["authors/mx/test-world", "tests/transcripts/worlds/tiny"] {
+            let mut engine = crate::engines::WorldEngine::new();
+            engine.load_world(root.join(world)).unwrap();
+            let mut ids: Vec<&String> = engine.loaded_locations.keys().collect();
+            ids.sort();
+            assert!(!ids.is_empty());
+            for id in ids {
+                let view = engine.describe_location(id).unwrap();
+                assert_eq!(render_location_as(&view, RenderStyle::Player), legacy_player(&view), "{} in {}", id, world);
+            }
+        }
+    }
+
+    #[test]
+    fn markdown_renders_as_blocks_and_styles_never_raw_syntax() {
+        let links = |name: &str| match name {
+            "lever" | "objects/lever" => Some((EntityKind::Object, "lever".to_string(), "Iron lever".to_string())),
+            _ => None,
+        };
+        let text = "# The vault\n\nA **heavy** door and an *old* [[lever]], or [the lever](objects/lever.md), or [[gone|a ghost]].\nSee #secret and `code`.\n\n- one\n- two\n  - deeper\n\n> Said the guard.\n\n<!-- note to self -->";
+        let r = prose_blocks(text, &links);
+        let kinds: Vec<BlockKind> = r.blocks.iter().map(|b| b.kind).collect();
+        assert_eq!(kinds, [BlockKind::Heading(1), BlockKind::Paragraph, BlockKind::ListItem(1), BlockKind::ListItem(1), BlockKind::ListItem(2), BlockKind::Quote, BlockKind::AuthorNote]);
+        let para = &r.blocks[1];
+        assert!(para.spans.iter().any(|s| s.text == "heavy" && s.style.strong));
+        assert!(para.spans.iter().any(|s| s.text == "old" && s.style.emphasis));
+        let lever: Vec<&Span> = para.spans.iter().filter(|s| s.style.link.as_ref().map_or(false, |l| l.target.is_some())).collect();
+        assert_eq!(lever.iter().map(|s| s.text.as_str()).collect::<Vec<_>>(), ["Iron lever", "the lever"]);
+        assert!(para.spans.iter().any(|s| s.text == "a ghost" && s.style.missing));
+        assert!(para.spans.iter().any(|s| s.text == "secret" && s.style.tag));
+        assert!(para.spans.iter().any(|s| s.text == "code" && s.style.code));
+        assert_eq!(
+            r.to_plain(),
+            "The vault\n\nA heavy door and an old Iron lever, or the lever, or a ghost.\nSee secret and code.\n\n- one\n- two\n  - deeper\n\n  Said the guard.\n\n<!-- note to self -->"
+        );
+        assert_eq!(prose_tags(text), ["secret"]);
+        assert_eq!(prose_links(text), ["lever", "objects/lever", "gone"]);
+        assert_eq!(prose_links("See [the site](https://example.com)."), Vec::<String>::new());
     }
 }
