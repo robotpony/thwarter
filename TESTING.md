@@ -1,6 +1,6 @@
 # Testing Guide
 
-A prior version of this file specified dozens of flags (`--fow`, `--check-refs`, `--scale`, `--with-npcs`, `--all-endings`, `--trace-movements`, and more) that never existed in the CLI's actual argument parsing, alongside tools like `valgrind`/`perf`/`flamegraph`/`hyperfine` workflows for a binary with no performance-sensitive code yet to profile. This version covers what you can actually run today, plus a short pointer to what's planned.
+What you can run today, with a pointer to what's planned. The test plan is `design/UNIT_TESTS.md`.
 
 ## Unit testing with Cargo
 
@@ -11,7 +11,7 @@ cargo test parsers::        # one module
 cargo test --release        # release mode
 ```
 
-There are currently zero unit tests. See `tasks/unit-testing-plan.md` for what's planned and in what order.
+There are currently zero unit tests. See `design/UNIT_TESTS.md` for what's planned and in what order.
 
 ## Exercising the CLI against real content
 
@@ -34,7 +34,7 @@ thwart show --world authors/mx/test-world castle/courtyard
 thwart show --world authors/mx/test-world castle/courtyard --format json
 ```
 
-Expected result against the shipped sample world: `validate` exits non-zero and reports five broken connections (see `tasks/ISSUES.md`); `show` lists 28 locations.
+Expected result against the shipped sample world: `validate` exits non-zero and reports five broken connections (see `BUGS.md`); `show` lists 28 locations.
 
 ### What a broken world looks like
 
@@ -69,4 +69,4 @@ jobs:
       - run: ./target/debug/thwart validate --world authors/mx/test-world --strict
 ```
 
-Note that last step is expected to fail today (five broken connections in the sample world, see `tasks/ISSUES.md`); either fix the sample content first or drop `--strict`/accept non-zero before wiring this in for real.
+Note that last step is expected to fail today (five broken connections in the sample world, see `BUGS.md`); either fix the sample content first or drop `--strict`/accept non-zero before wiring this in for real.

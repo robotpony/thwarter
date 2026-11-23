@@ -20,7 +20,7 @@ For anything beyond this orientation, prefer these over re-deriving from source:
   - `src/parsers/` - Markdown and metadata file parsers
   - `src/cli/` - Command-line interface implementation
 - `design/` - Design documents and technical specifications
-- `tasks/` - Implementation planning and task tracking
+- `PLAN.md` - Phased work queue; `BUGS.md` - defect log; `CHANGELOG.md` - changes, plus a record of removed and replaced files
 - `authors/<author>/<world-name>/` - World content, one directory per author. The shipped example is `authors/mx/test-world/`.
   - Example locations: `castle/courtyard.md`, `forest/path.md`
   - Character files: `npcs/king.md`, `npcs/guard-captain.md`
@@ -37,7 +37,7 @@ For anything beyond this orientation, prefer these over re-deriving from source:
 ## Priority 0 (P0) Modules
 
 1. **Command Line Document Processor** - Shares models with other components, provides world state visualization, debugging tools, and ASCII map generation
-2. **Shared Models and Components** - World engine, character engine, narrative engine, and game engine, including action processing and narrative state (this is broader than "document processor" alone; see `design/ARCHITECTURE.md`'s Next Steps for the recommended build order within it)
+2. **Shared Models and Components** - World engine, character engine, narrative engine, and game engine, including action processing and narrative state (this is broader than "document processor" alone; see `PLAN.md` for the build order within it)
 
 ## Priority 1 (P1) Modules
 
@@ -62,10 +62,22 @@ This project has Claude Code permissions configured in `.claude/settings.local.j
 
 **World Structure**: Content is organized in `authors/<author>/<world-name>/`, see `design/CONTENT_FORMAT.md` for file format and `design/ARCHITECTURE.md` for the layout rationale.
 
+## Conventions
+
+**Git.** Commit straight to `main`. Stage only the files a task touched, by name, never `git add -A`. The subject line is one descriptive phrase with no conventional-commit prefix; a docs-only commit starts with the file (`PLAN.md: ...`). The why and how go in the body. Never add Claude as a co-author or a "Generated with Claude Code" line; `.claude/hooks/check-commit-message.sh` refuses those commits. Never force-push or rewrite pushed history.
+
+**Tasks.** `PLAN.md` holds phased work (`## Phase N · Name` headings, `- [ ]` items) and `BUGS.md` holds defects (`## Open` and `## Fixed`; keep those headings). Space Command reads both, so a tag written in prose goes in backticks. Each task is one short line pointing to its spec, never the spec itself. Done items are ticked in place, then squashed into one "Done (squashed)" line naming the commit that has the full list. No inline TODO comments as a tracking system.
+
+**Changelog.** `CHANGELOG.md` records changes by version and is also where removed or replaced things go: a deleted file, retired format or superseded plan gets a `### Removed` entry with the `git show <sha>:<path>` that recovers it. Working docs then describe only what's true now, without notes on what their earlier versions said.
+
+**Versions.** `0.x.y` semver in `Cargo.toml`. A patch is a fix, tweak or refactor; a minor adds or removes a capability. Bump with each code change; docs-only changes go under `## Unreleased`.
+
+**Docs.** Root working files are uppercase (`README`, `CLAUDE`, `PLAN`, `BUGS`, `CHANGELOG`, `TESTING`, `REQUIREMENTS`), as are files in `design/`. Writing follows Canadian spelling, no em-dashes, conclusions first.
+
 ## Project Status
 
-Do not mark a checklist item done here without also updating `design/ARCHITECTURE.md`'s implementation status table to match; the two describing different realities is exactly the problem an August 2026 audit found and fixed (broken build, five CLI commands that printed fabricated success output regardless of input, sample content in a format the parser couldn't read). Treat `design/ARCHITECTURE.md` as authoritative on what works; this section is a summary of it, not an independent claim.
+Do not mark a `PLAN.md` item done without also updating `design/ARCHITECTURE.md`'s implementation status table to match; docs drifting from the code is the problem the August 2026 audit fixed (`CHANGELOG.md` › 0.1.0). Treat `design/ARCHITECTURE.md` as authoritative on what works; this section is a summary of it, not an independent claim.
 
 **Current state**: builds cleanly, zero unit tests, `validate` and `show` do real work against real content, `map`/`search`/`debug` honestly report themselves as not implemented rather than faking output. Full detail in `design/ARCHITECTURE.md`.
 
-**Not ready for P1** until the P0 "Next steps" in `design/ARCHITECTURE.md` are further along, specifically `find_path`/`map`/`search`, then action processing and narrative state.
+**Not ready for P1** until `PLAN.md` Phases 3 and 4 are further along, specifically `find_path`/`map`/`search`, then action processing and narrative state.

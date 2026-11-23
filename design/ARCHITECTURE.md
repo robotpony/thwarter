@@ -61,9 +61,9 @@ This table exists because status claims in this repo have previously drifted fro
 | `GameEngine` | Model only | Action dispatch exists; move/take/look/examine handlers are stubs that report success without doing anything. |
 | `thwart validate` | Done | Loads the world, reports parse errors and broken connections; `--strict` additionally checks character `default_location` references. `--fix` and location-scoped validation are not implemented. |
 | `thwart show` | Partially done | Loads and displays the world/a single location. `--player` (perspective) and `--state` (saved state) are not implemented. |
-| `thwart map` | Not implemented | Was a hardcoded ASCII grid regardless of input; now reports its own absence instead. |
-| `thwart search` | Not implemented | Was fabricated results regardless of query; now reports its own absence. |
-| `thwart debug` | Not implemented | Was fabricated memory/performance numbers; now reports its own absence. For reference checking, use `thwart validate --strict` today. |
+| `thwart map` | Not implemented | Reports that it isn't implemented and exits non-zero. |
+| `thwart search` | Not implemented | Reports that it isn't implemented and exits non-zero. |
+| `thwart debug` | Not implemented | Reports that it isn't implemented and exits non-zero. For reference checking, use `thwart validate --strict` today. |
 | Save/load game state | Not implemented | |
 | Dialogue trees | Not implemented | `dialogue_tree` is loaded as an opaque string reference; nothing parses or executes what it points to. |
 | `ConfigManager` / `thwart.toml` | Built but unused | `src/cli/config.rs` can load and save `thwart.toml` and `world.toml`, but `src/bin/thwart.rs` never constructs a `ConfigManager`; the CLI's default world path is a hardcoded constant instead. `thwart.toml`'s `[world].path` is currently inert. |
@@ -74,7 +74,4 @@ World content lives at `authors/<author>/<world-name>/`, e.g. `authors/mx/test-w
 
 ## Next steps
 
-1. Wire `CharacterEngine` into `thwart show`/`validate` so character placement and `--strict` checks use live state, not just the parsed definitions
-2. Implement `WorldGraph::find_path` and build `thwart map` on top of it
-3. Implement `thwart search` over loaded locations/characters/objects
-4. Only after 1-3: action processing (`GameEngine`), narrative state, save/load. These are meaningfully larger scope (a real game loop) and shouldn't be started until the static-world tooling above is solid, per the "document processor first" ordering in the original P0/P1 split.
+The build order lives in `PLAN.md`, and known defects in `BUGS.md`.

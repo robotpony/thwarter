@@ -5,6 +5,7 @@ This document used to hold the full P0 design: language rationale, module archit
 - **`design/DECISIONS.md`** — standing decisions (language choice, format choice) with context, alternatives, and trade-offs
 - **`design/ARCHITECTURE.md`** — module layout, engine responsibilities, and current implementation status
 - **`design/CONTENT_FORMAT.md`** — the content file format authors write against
+- **`design/UNIT_TESTS.md`** — the unit test plan, in priority order
 - **`design/CLI_DESIGN.md`** — the command-line interface spec, with a status column showing what's actually built
 
 Start with `design/ARCHITECTURE.md`'s implementation status table if you want to know what works today versus what's still planned.

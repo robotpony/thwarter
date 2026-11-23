@@ -1,6 +1,6 @@
 # Unit Testing Plan
 
-Replaces a prior version of this plan that specified 200+ tests, 95% model coverage, a 6-week timeline, and a full CI/coverage/fuzzing pipeline, for a project that at the time had zero tests and didn't compile. That plan was sized for a team working on a mature codebase, not a solo P0 CLI tool. This version is sized for what's actually here.
+Sized for a solo P0 CLI tool, not a mature codebase: no coverage target, just tests for the parts that have real behaviour. The work is tracked in `PLAN.md` › Phase 2.
 
 ## Priority order
 
@@ -15,7 +15,7 @@ Test the parser first. It's the piece most likely to silently disagree with `des
    - The `Inventory:` / `inventory:` case-normalization edge case, since a real sample file had this
 2. **`WorldEngine`** — `load_world` against a small `tempfile`-built world directory; `broken_connections` against a world with a known-bad connection.
 3. **Models** (`Location`, `Character`, `GameObject`) — constructors and any non-trivial derived behavior. Thin right now; grows as engines gain real logic.
-4. **`CharacterEngine`** — placement and `get_characters_at_location`, once it's actually wired into a CLI command (see `design/ARCHITECTURE.md` Next Steps). Not worth testing in isolation before that.
+4. **`CharacterEngine`** — placement and `get_characters_at_location`, once it's actually wired into a CLI command (`PLAN.md` › Phase 3). Not worth testing in isolation before that.
 5. **CLI commands** — integration-style tests running the built binary against a fixture world directory, checking exit codes and key output lines (e.g., `validate` against a world with a known broken connection should exit non-zero and mention it).
 
 Everything downstream of the stub engines (`NarrativeEngine` consequence execution, `GameEngine` action effects) isn't worth testing yet: there's no behavior there to test, only `TODO`s. Add tests when the implementation lands, not before.
