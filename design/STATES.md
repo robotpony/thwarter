@@ -20,7 +20,7 @@ Agreed by Bruce, 2026-11-23. Every decision in this document should follow from 
 6. **Play never changes content.** Everything that happens in a game lives in the game state.
 7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
 
-Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). All 2026-11-23.
+Review status: decisions are being reviewed with Bruce group by group. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). Changing state: reviewed, with doors and templates designed in outline. All 2026-11-23.
 
 ## Terms
 
@@ -171,9 +171,9 @@ Settled by the commander from the coder's review (2026-11-23).
 
 **Current version.**
 - A thing's current version depends on play state, so it is built on request, not stored at load.
-- Edit mode, `show` and `validate` default to the starting state with no chapter. `thwart show --state <name> --chapter <name>` shows any other. `validate` checks every state against every chapter stack.
+- Edit mode shows a thing's starting version (starting state, no chapter) unless a playtest is running, and then the version the game is in; a header always says which (`castle/vault · open · after-the-king`). `show` and `validate` default to the starting version. `thwart show --state <name> --chapter <name>` shows any other. `validate` checks every state against every chapter stack.
 - Only `index.md` may set `state:`, and it means the starting state. No layer may change `id` or `type`. A bundle may leave out `state:`, in which case `index.md` alone is the version until something switches it.
-- What a room holds is its current `objects:` list, minus anything the player holds or has taken, so a chapter overlay can never duplicate an item the player already has.
+- What a room holds is its current `objects:` list, minus anything the player holds or has taken, so a chapter overlay can never duplicate an item the player already has. With counts (see Templates and copies), it's the count minus the number taken.
 
 **Ids and names.**
 - Once states exist, an `id` shared by two kinds is an error, not a warning, because `becomes:`, `requires:` and `{{ }}` name things by bare id.
@@ -194,6 +194,54 @@ Settled by the commander from the coder's review (2026-11-23).
 - A bundle saves through one call that checks the merged thing before writing anything. It takes each file's text as it was when the editor opened it, and if any of the bundle's files has changed on disk since then, the whole save is a conflict. Only sections that changed are written, so a one-word edit to `open.md` leaves `index.md` untouched on disk and in git. Every changed file is written to a temporary file and checked, then renamed in turn; if a rename fails, the console reports exactly which files were written.
 - Renaming or deleting a state is a command (`/state rename`, `/state delete`). A rename also updates every `becomes:` and `state:` that names it.
 
+## Templates and copies
+
+Agreed by Bruce, 2026-11-23.
+
+Two different things that share a definition are two files, each naming a template:
+
+```
+objects/
+  templates/book.md        # every book: can be read, weight: light
+  red-cookbook.md          # inherits: objects/templates/book
+  blue-diary.md            # inherits: objects/templates/book
+```
+
+A template is never placed in the world itself. *Proposed*: it's marked by living in a `templates/` folder, a reserved name like `chapters`. Most doors and many objects are expected to be global templates (`locked-door`, `magic-door`, `fortified-door`) that hold their whole definition, so a specific door or object is mostly just a name and a template.
+
+Identical copies (three healing potions) are one thing with a count: `objects: { potion: 3 }`, with play state tracking how many are left. A copy that needs to differ becomes its own thing with its own file. Counts come after templates, when a world needs them.
+
+## Doors
+
+Agreed in outline by Bruce, 2026-11-23; details still open.
+
+A door is its own type of thing, because doors can't be room states: a room with two doors would need four versions, and with three, eight. A door joins two rooms and has one state seen from both sides.
+
+```yaml
+# doors/vault-door.md
+id: vault-door
+title: Iron door
+type: door
+inherits: doors/templates/locked-door
+sides:
+  castle/hall:  { direction: down }
+  castle/vault: { direction: up }
+```
+
+- Each room's exit names the door rather than a room: `connections: { down: vault-door }`. The door says where each side leads, so the two rooms always agree.
+- Its states (`locked`, `shut`, `open`) are a bundle like any other thing's, with `passable:` saying whether the exit can be used. Unlocking is one of its actions: `unlock: { requires: { has: brass-key }, becomes: { vault-door: shut } }`.
+- The room view shows the door's current text beside its exits; the room's own prose never changes for a door.
+- Most doors will come from global templates (Bruce, 2026-11-23); doors defined per area are possible but expected to be rare.
+
+## Scope
+
+Where a thing's file lives is its scope (Bruce, 2026-11-23):
+- **Global**: the world's root folders (`objects/`, `npcs/`, `doors/`) and their `templates/`.
+- **Area**: inside an area folder, for things that belong to one part of the world.
+- **Local**: inside a thing's bundle.
+
+The console MUST make scope easy. While writing a room, an author can add several things and choose their scope as they go (for example, add three objects, all global), and can later change a thing's scope. Changing scope moves the file; because object, character and door ids don't include their folder, references to them stay valid. The commands are console work, still to be designed (`design/CONSOLE_REQUIREMENTS.md`).
+
 ## Changing state
 
 How states switch is mostly invisible to the author, who works in the console (Bruce, 2026-11-23). Underneath:
@@ -203,7 +251,7 @@ How states switch is mostly invisible to the author, who works in the console (B
 - An action moves the story to a chapter: `chapter: after-the-king`. Every overlay for that chapter then applies, with no list to keep up to date. Since chapters are siblings, going from one chapter to another applies only the new chapter (and its parents); nothing from chapters in between. States and chapters can move forward or back (Bruce, 2026-11-23).
 - An action changes a value: `sets: { knife.sharp: no }`. Values hold once set (Bruce, 2026-11-23).
 - The game itself updates some values on its own: time, weather, randomness and similar, under `game.`.
-- Doors are a special construct, still to be designed (Bruce, 2026-11-23). Options so far: the action sets both the door's and the room's state, or the room's exit goes `through:` the door.
+- Doors are their own type (see Doors). A door's state switches like any other thing's, so a room never needs versions for its doors.
 - Time-based change (bread going stale after 20 turns) needs a clock, which doesn't exist yet. *Proposed* for later: `after: { turns: 20, becomes: stale }` on a state.
 
 ```yaml
@@ -291,8 +339,9 @@ Commands the console will need, *proposed*: `/state new <name>`, `/state set <na
 
 ## Open questions
 
-1. **Doors**: a special construct, to be designed in its own discussion.
+1. **Doors, the details**: where a door's file lives when it isn't global, one-way and hidden doors, see-through windows, and whether a specific door can be just a template plus two rooms with no file of its own.
 2. **How chapters overlay, and local chapters.** Authors may use chapters globally, but also add "secret" chapters or sub-chapters inside an area or tied to an object. Where are those defined, what starts them, and how do they stack with root chapters (Bruce, 2026-11-23)?
 3. **World-level content**: `world.toml` alone, or also a `world/` or `game/` folder for world-level text and settings?
 4. **Clocks and game values**: when do time, weather and randomness come in, and is time turns or game time?
 5. **Showing play state in the editor**: what the author sees, and how they change it while playtesting.
+6. **Templates**: a reserved `templates/` folder, or a `template: true` marker?
