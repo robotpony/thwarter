@@ -41,8 +41,8 @@ For anything beyond this orientation, prefer these over re-deriving from source:
 
 ## Priority 1 (P1) Modules
 
-- Command line REPL client for interactive fiction interface  
-- RESTful world API abstraction
+- The console (`src/console/`): one interactive client for writing and playing a world, with an edit mode and a play mode. Authoring first, play second; engine work only as they need it (`REQUIREMENTS.md` › 4.6)
+- Later: RESTful world API abstraction
 
 ## Special Configuration
 
@@ -87,4 +87,4 @@ Do not mark a `PLAN.md` item done without also updating `design/ARCHITECTURE.md`
 
 **Current state**: builds cleanly, zero unit tests, `validate` and `show` do real work against real content, `map`/`search`/`debug` honestly report themselves as not implemented rather than faking output. Full detail in `design/ARCHITECTURE.md`.
 
-**Not ready for P1** until `PLAN.md` Phases 3 and 4 are further along, specifically `find_path`/`map`/`search`, then action processing and narrative state.
+**Next**: `PLAN.md` › Phase 2, the console shell.

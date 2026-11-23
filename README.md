@@ -26,8 +26,8 @@ See `design/ARCHITECTURE.md` for what's actually implemented today versus still 
     - can show specific states and screens as needed
     - can draw simple ASCII maps with FOW (fog of war) style visibility, or entire world-view (for testing and the REPL client)
 - (P0) shared models and components (world engine, character engine, narrative engine, game engine)
-- (P1) command line REPL client, a fully interactive variant of the document processor that provides a standard interactive fiction interface
-- (P1) RESTful world API as an abstration to the models (for the REPL and future clients), following RESTful API norms.
+- (P1) the console, one interactive terminal client for writing a world (edit mode) and playing it (play mode), opened with `thwart edit` or `thwart play`; authoring comes first
+- (later) RESTful world API as an abstraction to the models (for the console and future clients), following RESTful API norms.
 
 
 ## Basic Usage

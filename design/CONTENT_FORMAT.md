@@ -82,5 +82,5 @@ Object content is far more varied than location or character content (compare a 
 ## What's still open
 
 - **`id` vs. file path.** Nothing currently checks that `id` matches the file's location. An author who copies a file and forgets to update `id` gets a silent collision (last one loaded wins) instead of an error. `thwart validate` should check this.
-- **Object references aren't validated.** A location's `objects: [...]` list, or a character's `inventory: [...]`, can name an object `id` that doesn't exist anywhere, and nothing catches it yet.
-- **Dialogue tree format is unspecified.** `dialogue_tree` is loaded as an opaque string. What it points to, and how it's structured, is P1 work.
+- **Objects without cards are scenery.** A location's `objects: [...]` or a character's `inventory: [...]` can name an object `id` with no file. That's allowed: the object is scenery with a name only, and the console creates its card the first time an author edits it (`REQUIREMENTS.md` › REQ-CF-8). Tools should label it "no card", not report it as missing.
+- **Dialogue tree format is unspecified.** `dialogue_tree` is loaded as an opaque string. What it points to, and how it's structured, is undecided.

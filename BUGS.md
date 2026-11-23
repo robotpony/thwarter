@@ -1,6 +1,6 @@
 # Bugs
 
-Working log of defects. An entry under `## Open` is one line: the bug in bold, when it was found, and a pointer to detail if any. Diagnosis and fixes go in commit messages. When a bug is fixed, it moves to `## Fixed`, trimmed to the date, version, commit and one line. Missing features are work, not bugs, and go in `PLAN.md`.
+Working log of defects. An entry under `## Open` is one line: the bug in bold, when it was found, and a pointer to detail if any. Diagnosis and fixes go in commit messages. When a bug is fixed, it moves to `## Fixed`, trimmed to the date, version and one line, plus the commit when the fix landed in an earlier commit than the move. Missing features are work, not bugs, and go in `PLAN.md`.
 
 Keep the `## Open` and `## Fixed` headings as they are. Space Command's task parser reads them.
 
