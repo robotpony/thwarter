@@ -30,6 +30,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.19.0 (2026-11-23)
+
+### Added
+
+- Edit mode shows the files in `world/` as the world's settings (title, author, version, starting room, intro, story and player values) rather than as files that don't parse, and `/edit` opens them with any kind word.
+
+### Fixed
+
+- The console read the world's title and starting room from `world.toml` only, so a world moved to `world/index.md` (as the test world now is) started play in the first room by path. It now asks the engine, which reads `world/index.md` and falls back to `world.toml`.
+- Edit mode's file list and the file watcher follow the loader's ignore rule: dot-names and Hugo's `layouts/`, `static/`, `assets/` and `public/` are left out. The world's own `ignore` list in `world.toml` isn't applied by the console yet.
+
 ## 0.18.0 (2026-11-23)
 
 ### Added

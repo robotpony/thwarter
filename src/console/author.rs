@@ -379,7 +379,7 @@ pub(super) fn entity_kind(kind: Kind) -> Option<EntityKind> {
         Kind::Room => Some(EntityKind::Location),
         Kind::Character => Some(EntityKind::Character),
         Kind::Object => Some(EntityKind::Object),
-        Kind::Broken => None,
+        Kind::Broken | Kind::World => None,
     }
 }
 

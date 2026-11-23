@@ -455,6 +455,7 @@ impl Console {
                 Some(o) => view::object(o, &path),
                 None => format!("{} is not in the world.", entry.id),
             },
+            Kind::World => view::world(self.world.engine.world(), &path),
             Kind::Broken => {
                 let reason = self
                     .world

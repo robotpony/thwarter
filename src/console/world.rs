@@ -16,6 +16,9 @@ pub enum Kind {
     Object,
     /// The file is in the world but doesn't parse.
     Broken,
+    /// A file in `world/`: the world's own settings (title, start, intro,
+    /// story and player), not a thing.
+    World,
 }
 
 impl Kind {
@@ -25,6 +28,7 @@ impl Kind {
             Kind::Character => "character",
             Kind::Object => "object",
             Kind::Broken => "doesn't parse",
+            Kind::World => "world settings",
         }
     }
 }
@@ -61,7 +65,10 @@ impl World {
         }
         let mut engine = WorldEngine::new();
         let report = engine.load_world(root)?;
-        let (title, starting_location) = read_world_toml(root);
+        // world/index.md, or world.toml for a world not yet moved (the
+        // engine falls back by itself).
+        let title = engine.world().title.clone();
+        let starting_location = engine.world().start.clone();
         let (files, dirs) = index_files(root, &engine);
         Ok(World { root: root.to_path_buf(), engine, report, title, starting_location, files, dirs })
     }
@@ -92,6 +99,9 @@ impl World {
         let (files, dirs) = index_files(&self.root, &self.engine);
         self.files = files;
         self.dirs = dirs;
+        // A saved world/ file can change these too.
+        self.title = self.engine.world().title.clone();
+        self.starting_location = self.engine.world().start.clone();
     }
 
     pub fn path_of(&self, kind: Kind, id: &str) -> Option<String> {
@@ -114,19 +124,6 @@ impl World {
     }
 }
 
-fn read_world_toml(root: &Path) -> (Option<String>, Option<String>) {
-    let Ok(text) = std::fs::read_to_string(root.join("world.toml")) else {
-        return (None, None);
-    };
-    let Ok(value) = text.parse::<toml::Value>() else {
-        return (None, None);
-    };
-    let get = |table: &str, key: &str| {
-        value.get(table).and_then(|t| t.get(key)).and_then(|v| v.as_str()).map(str::to_string)
-    };
-    (get("metadata", "title"), get("settings", "starting_location"))
-}
-
 /// Every content file and folder under `root`. Each file's kind and id
 /// come from the engine's record of where it loaded them
 /// (`WorldEngine::sources`). A `.md` file the engine has no record of
@@ -143,7 +140,13 @@ fn index_files(root: &Path, engine: &WorldEngine) -> (BTreeMap<String, FileEntry
     let mut dirs = BTreeSet::new();
     dirs.insert(String::new());
 
-    for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+    // The loader's rule for files that belong to other tools: dot-names and
+    // Hugo's folders. The world's own `ignore` list isn't visible here yet.
+    let walk = WalkDir::new(root).into_iter().filter_entry(|e| {
+        let parts = relative_parts(root, e.path());
+        parts.is_empty() || !crate::engines::bundles::ignored(&parts, &[])
+    });
+    for entry in walk.filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
             continue;
@@ -163,6 +166,13 @@ fn index_files(root: &Path, engine: &WorldEngine) -> (BTreeMap<String, FileEntry
                 entry_for(Kind::Character, id, engine.characters.get(*id).map(|c| &c.name))
             }
             Some((EntityKind::Object, id)) => entry_for(Kind::Object, id, engine.objects.get(*id).map(|o| &o.title)),
+            None if key.starts_with("world/") => {
+                // `world/index.md` is the world itself; other files are named
+                // for what they hold (`world/player.md`).
+                let stem = key.rsplit('/').next().unwrap_or(&key);
+                let title = if stem == "index" { "World".to_string() } else { title_case(stem) };
+                FileEntry { kind: Kind::World, id: key.clone(), title }
+            }
             None => FileEntry { kind: Kind::Broken, id: key.clone(), title: String::new() },
         };
         files.insert(key, file);
@@ -172,4 +182,20 @@ fn index_files(root: &Path, engine: &WorldEngine) -> (BTreeMap<String, FileEntry
 
 fn entry_for(kind: Kind, id: &str, title: Option<&String>) -> FileEntry {
     FileEntry { kind, id: id.to_string(), title: title.cloned().unwrap_or_default() }
+}
+
+/// `path`'s components below `root`, as the loader's ignore rule takes them.
+pub(super) fn relative_parts(root: &Path, path: &Path) -> Vec<String> {
+    path.strip_prefix(root)
+        .map(|rel| rel.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect())
+        .unwrap_or_default()
+}
+
+/// `player` becomes `Player`.
+fn title_case(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
 }

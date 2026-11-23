@@ -63,6 +63,10 @@ fn content_files(paths: &[PathBuf], root: &Path) -> Vec<String> {
         if !is_content || name.starts_with('.') {
             continue;
         }
+        let parts = super::world::relative_parts(&canonical_root, path);
+        if !parts.is_empty() && crate::engines::bundles::ignored(&parts, &[]) {
+            continue;
+        }
         let relative = path
             .strip_prefix(&canonical_root)
             .or_else(|_| path.strip_prefix(root))

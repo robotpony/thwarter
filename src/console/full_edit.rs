@@ -114,6 +114,8 @@ impl Console {
             heading.push_str(" (new card)");
         } else if target.kind == Kind::Broken {
             heading = format!("/edit  {}.md (doesn't parse)", target.path);
+        } else if target.kind == Kind::World {
+            heading = format!("/edit  {}.md (world settings)", target.path);
         }
         let text = target.opened.clone().unwrap_or_else(|| scenery_card(&target.id));
         Document::single(heading, text)
@@ -200,6 +202,9 @@ impl Console {
             // Any kind opens a file that doesn't parse: what it holds is
             // what the author is fixing.
             Kind::Broken => self.open_target(Kind::Broken, entry.id.clone(), path.clone()),
+            // World settings aren't a room, character or object; any kind
+            // word opens them.
+            Kind::World => self.open_target(Kind::World, entry.id.clone(), path.clone()),
             found if found == kind => self.open_target(kind, entry.id.clone(), path.clone()),
             found => Err(format!("{} is a {}, not a {}: /edit {} opens it.", path, found.label(), label, found.label())),
         }
