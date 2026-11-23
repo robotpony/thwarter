@@ -64,6 +64,7 @@ Console commands, in either mode:
   /save [name]    save the game (quicksave if no name)
   /load [name]    load a saved game
   /reload         reload the world from disk, staying where you are
+  /restart        restart the console on the newest build, keeping your place
   /help           this list
   /quit           leave the console
 

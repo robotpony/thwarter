@@ -46,7 +46,7 @@ pub fn list_saves(world_root: &Path) -> Result<Vec<String>> {
     Ok(names)
 }
 
-fn state_home() -> Result<PathBuf> {
+pub(super) fn state_home() -> Result<PathBuf> {
     if let Some(dir) = std::env::var_os("XDG_STATE_HOME").filter(|d| !d.is_empty()) {
         return Ok(PathBuf::from(dir));
     }

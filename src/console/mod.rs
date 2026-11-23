@@ -10,6 +10,7 @@ mod author;
 mod editor;
 mod full_edit;
 mod play;
+mod restart;
 mod saves;
 mod session;
 mod verbs;
@@ -20,7 +21,7 @@ mod world;
 use anyhow::Result;
 use session::{Console, Flow};
 use reedline::{
-    ExternalPrinter, FileBackedHistory, Prompt, PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus, Reedline, Signal,
+    ExternalPrinter, FileBackedHistory, HistoryItem, Prompt, PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus, Reedline, Signal,
 };
 use std::borrow::Cow;
 use std::io::{self, BufRead, IsTerminal, Write};
@@ -52,7 +53,9 @@ pub fn run(world_path: &Path, mode: Mode) -> Result<()> {
     let mut console = Console::open(world_path, mode)?;
     let stdin = io::stdin();
     if stdin.is_terminal() && io::stdout().is_terminal() {
-        drive_terminal(console, world_path)
+        // After a /restart, the session the last build saved (REQ-CON-30).
+        let resumed = std::env::var_os(restart::RESUME_ENV).map(|path| console.resume(Path::new(&path)));
+        drive_terminal(console, world_path, resumed)
     } else {
         drive(&mut console, stdin.lock(), io::stdout().lock())
     }
@@ -62,7 +65,7 @@ pub fn run(world_path: &Path, mode: Mode) -> Result<()> {
 /// Ctrl-R search) on a real terminal. Ctrl-C clears the line; Ctrl-D
 /// leaves, like `/quit`. World files are watched, and a change reloads
 /// the world and prints what happened above the prompt (REQ-CON-7).
-fn drive_terminal(mut console: Console, world_path: &Path) -> Result<()> {
+fn drive_terminal(mut console: Console, world_path: &Path, resumed: Option<restart::Resumed>) -> Result<()> {
     console.interactive = true;
     let console = Arc::new(Mutex::new(console));
     let notices = ExternalPrinter::<String>::default();
@@ -76,7 +79,18 @@ fn drive_terminal(mut console: Console, world_path: &Path) -> Result<()> {
     let mut editor = Reedline::create()
         .with_history(Box::new(FileBackedHistory::new(HISTORY_LINES)?))
         .with_external_printer(notices);
-    println!("{}", lock(&console).greeting());
+    // Lines typed this session, oldest first, for /restart to carry over.
+    let mut history: Vec<String> = Vec::new();
+    match resumed {
+        Some(resumed) => {
+            for line in &resumed.history {
+                let _ = editor.history_mut().save(HistoryItem::from_command_line(line.clone()));
+            }
+            history = resumed.history;
+            println!("{}", resumed.greeting);
+        }
+        None => println!("{}", lock(&console).greeting()),
+    }
     loop {
         let prompt = ConsolePrompt(lock(&console).prompt());
         let line = match editor.read_line(&prompt)? {
@@ -85,12 +99,21 @@ fn drive_terminal(mut console: Console, world_path: &Path) -> Result<()> {
             Signal::CtrlD => return Ok(()),
             _ => continue,
         };
+        if !line.trim().is_empty() {
+            history.push(line.clone());
+            if history.len() > HISTORY_LINES {
+                history.remove(0);
+            }
+        }
         let (text, flow) = lock(&console).handle(&line);
         if !text.is_empty() {
             println!("{}", text);
         }
-        if flow == Flow::Quit {
-            return Ok(());
+        match flow {
+            Flow::Quit => return Ok(()),
+            // Returns only if the restart couldn't happen.
+            Flow::Restart => println!("{}", restart::restart(&lock(&console), &history)),
+            Flow::Continue => {}
         }
         let pending = lock(&console).take_pending_edit();
         if let Some(target) = pending {

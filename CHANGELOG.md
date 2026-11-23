@@ -28,6 +28,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.15.0 (2026-11-23)
+
+### Added
+
+- `/restart` (REQ-CON-30, 31): the console restarts onto the `thwart` binary now on disk, in the same terminal, and puts you back where you were: the mode, edit mode's place, the running game and the input history (Up still recalls what you typed before). Build in another pane (`cargo build`), then `/restart`. It checks the new binary starts before handing over, and stays on the running one if it doesn't. The session goes through a resume file under `$XDG_STATE_HOME/thwarter/restart/`, used once; the game travels as an ordinary save, so a save format the new build can't read resets the game with a notice, and a place that's gone moves up a folder. In scripts and transcripts, which have no terminal, `/restart` says so.
+
 ## 0.14.0 (2026-11-23)
 
 ### Added

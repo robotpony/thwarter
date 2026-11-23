@@ -18,6 +18,8 @@ use std::time::Instant;
 pub enum Flow {
     Continue,
     Quit,
+    /// `/restart`: the terminal loop restarts onto the new build.
+    Restart,
 }
 
 /// Where edit mode is, as a path relative to the world root: a folder
@@ -137,6 +139,9 @@ impl Console {
         let out = match (name, rest.as_slice()) {
             ("quit" | "q", _) => return ("Bye.".to_string(), Flow::Quit),
             ("help" | "?", _) => self.help(),
+            ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
+            ("restart", []) => "/restart restarts the console on the newest build, which needs a terminal.".to_string(),
+            ("restart", _) => "Usage: /restart".to_string(),
             ("edit", []) => self.switch_to_edit(),
             ("edit", args) => self.full_edit(args),
             ("play", []) => self.play(),
@@ -167,6 +172,7 @@ impl Console {
             "  /save [name]    save the game (quicksave if no name)".to_string(),
             "  /load [name]    load a saved game".to_string(),
             "  /reload         reload the world from disk, staying where you are".to_string(),
+            "  /restart        restart the console on the newest build, keeping your place".to_string(),
             "  /help           this list".to_string(),
             "  /quit           leave the console".to_string(),
         ];
@@ -471,7 +477,7 @@ impl Console {
         }
     }
 
-    fn place_exists(&self) -> bool {
+    pub(super) fn place_exists(&self) -> bool {
         match &self.place {
             Place::Dir(dir) => self.world.dirs.contains(dir),
             Place::File(path) => self.world.files.contains_key(path),
@@ -488,7 +494,7 @@ impl Console {
 
     /// After the place's file or folder vanished: up to the nearest
     /// folder that still exists.
-    fn move_to_existing_folder(&mut self) {
+    pub(super) fn move_to_existing_folder(&mut self) {
         let mut dir = self.parent_dir();
         while !dir.is_empty() && !self.world.dirs.contains(&dir) {
             dir = parent_of(&dir);
