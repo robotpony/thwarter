@@ -26,6 +26,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.1.6 (2026-11-23)
+
+### Added
+
+- Parser unit tests (`design/UNIT_TESTS.md` › 1), 16 of them. They cover each entity type's fields, missing `type` and required fields, unclosed or absent frontmatter, invalid YAML, a `---` inside the body, and the capitalized `Inventory:` key, which is not read.
+- `MarkdownParser::parse_content(text, path)`, which parses text already in memory. `parse_file` is now a read followed by this.
+
 ## 0.1.5 (2026-11-23)
 
 ### Added

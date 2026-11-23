@@ -37,7 +37,14 @@ impl MarkdownParser {
     pub fn parse_file<P: AsRef<Path>>(&self, file_path: P) -> Result<ParsedEntity> {
         let content = fs::read_to_string(&file_path)
             .map_err(|e| anyhow!("Failed to read file {:?}: {}", file_path.as_ref(), e))?;
-        let parsed = self.split_frontmatter(&content)?;
+        self.parse_content(&content, file_path)
+    }
+
+    /// Parse a content file's text, dispatching on its frontmatter `type`.
+    /// `file_path` is used only in error messages. `parse_file` is this
+    /// plus the read; tests and the console can call it on text directly.
+    pub fn parse_content<P: AsRef<Path>>(&self, content: &str, file_path: P) -> Result<ParsedEntity> {
+        let parsed = self.split_frontmatter(content)?;
 
         let entity_type = parsed
             .metadata
@@ -319,5 +326,240 @@ fn value_to_display_string(value: &serde_yaml::Value) -> String {
 impl Default for MarkdownParser {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::character::CharacterType;
+
+    fn parse(content: &str) -> Result<ParsedEntity> {
+        MarkdownParser::new().parse_content(content, "test.md")
+    }
+
+    fn err(content: &str) -> String {
+        parse(content).unwrap_err().to_string()
+    }
+
+    const LOCATION: &str = "\
+---
+id: castle/courtyard
+title: Castle Courtyard
+type: location
+coordinates: [0, 2, -1]
+connections:
+  north: castle/great-hall
+  down: castle/cellar
+characters: [guard-captain]
+objects: [fountain, stone-bench]
+---
+
+You stand in the courtyard.
+
+A fountain sits in the centre.
+";
+
+    #[test]
+    fn location_fields_land() {
+        let ParsedEntity::Location(loc) = parse(LOCATION).unwrap() else { panic!("not a location") };
+        assert_eq!(loc.id, "castle/courtyard");
+        assert_eq!(loc.name, "Castle Courtyard");
+        assert_eq!(loc.coordinates, Some(Coordinate::new(0, 2, -1)));
+        assert_eq!(loc.connections.len(), 2);
+        assert_eq!(loc.connections["north"], "castle/great-hall");
+        assert_eq!(loc.connections["down"], "castle/cellar");
+        assert_eq!(loc.characters, vec!["guard-captain"]);
+        assert_eq!(loc.objects, vec!["fountain", "stone-bench"]);
+        // The body is trimmed, with inner blank lines kept.
+        assert_eq!(loc.description, "You stand in the courtyard.\n\nA fountain sits in the centre.");
+    }
+
+    #[test]
+    fn location_optional_fields_default_empty() {
+        let ParsedEntity::Location(loc) = parse("---\nid: a/b\ntitle: B\ntype: location\n---\n").unwrap() else {
+            panic!("not a location")
+        };
+        assert_eq!(loc.coordinates, None);
+        assert!(loc.connections.is_empty() && loc.characters.is_empty() && loc.objects.is_empty());
+        assert_eq!(loc.description, "");
+    }
+
+    #[test]
+    fn short_coordinates_are_ignored() {
+        let ParsedEntity::Location(loc) =
+            parse("---\nid: a/b\ntitle: B\ntype: location\ncoordinates: [1, 2]\n---\n").unwrap()
+        else {
+            panic!("not a location")
+        };
+        assert_eq!(loc.coordinates, None);
+    }
+
+    #[test]
+    fn character_fields_land() {
+        let content = "\
+---
+id: king
+title: King Aldric
+type: character
+character_type: Hero
+default_location: castle/throne-room
+attributes:
+  health: 80
+  wisdom: 95
+dialogue_tree: king-dialogue.yml
+inventory: [royal-scepter, crown-of-kings]
+relationships:
+  - guard-captain: trusted
+  - old-servant: fond
+---
+An elderly monarch.
+";
+        let ParsedEntity::Character(c) = parse(content).unwrap() else { panic!("not a character") };
+        assert_eq!(c.id, "king");
+        assert_eq!(c.name, "King Aldric");
+        assert!(matches!(c.character_type, CharacterType::Hero));
+        assert_eq!(c.default_location.as_deref(), Some("castle/throne-room"));
+        assert_eq!(c.attributes["health"], 80);
+        assert_eq!(c.attributes["wisdom"], 95);
+        assert_eq!(c.dialogue_tree.as_deref(), Some("king-dialogue.yml"));
+        assert_eq!(c.inventory, vec!["royal-scepter", "crown-of-kings"]);
+        assert_eq!(c.relationships["guard-captain"], "trusted");
+        assert_eq!(c.relationships["old-servant"], "fond");
+        assert_eq!(c.description, "An elderly monarch.");
+    }
+
+    #[test]
+    fn unknown_character_type_is_npc() {
+        let ParsedEntity::Character(c) =
+            parse("---\nid: x\ntitle: X\ntype: character\ncharacter_type: wizard\n---\n").unwrap()
+        else {
+            panic!("not a character")
+        };
+        assert!(matches!(c.character_type, CharacterType::Npc));
+    }
+
+    #[test]
+    fn object_fields_land_and_extras_are_kept() {
+        let content = "\
+---
+id: rusty-sword
+title: Rusty Sword
+type: object
+object_type: weapon
+category: blade
+weight: 3 kg
+value: 15
+actions:
+  - wield: It feels heavy.
+  - examine: Rust flakes off.
+damage: 4
+tags: [old, iron]
+---
+A sword past its best.
+";
+        let ParsedEntity::Object(o) = parse(content).unwrap() else { panic!("not an object") };
+        assert_eq!(o.id, "rusty-sword");
+        assert_eq!(o.title, "Rusty Sword");
+        assert_eq!(o.object_type, "weapon");
+        assert_eq!(o.category.as_deref(), Some("blade"));
+        assert_eq!(o.weight.as_deref(), Some("3 kg"));
+        // A numeric value is kept as its display string.
+        assert_eq!(o.value.as_deref(), Some("15"));
+        assert_eq!(o.actions["wield"], "It feels heavy.");
+        assert_eq!(o.actions["examine"], "Rust flakes off.");
+        // Fields the engine doesn't model are preserved (REQ-CF-6).
+        assert_eq!(o.extra.len(), 2);
+        assert_eq!(o.extra["damage"], serde_yaml::Value::from(4));
+        assert!(o.extra["tags"].is_sequence());
+        assert_eq!(o.description, "A sword past its best.");
+    }
+
+    #[test]
+    fn missing_type_is_an_error() {
+        let e = err("---\nid: a/b\ntitle: B\n---\nBody.\n");
+        assert!(e.contains("missing required frontmatter field `type`"), "{}", e);
+    }
+
+    #[test]
+    fn unknown_type_is_an_error() {
+        let e = err("---\nid: a/b\ntitle: B\ntype: room\n---\n");
+        assert!(e.contains("unknown type `room`"), "{}", e);
+    }
+
+    #[test]
+    fn missing_required_fields_are_errors() {
+        for (content, field) in [
+            ("---\ntitle: B\ntype: location\n---\n", "id"),
+            ("---\nid: a/b\ntype: location\n---\n", "title"),
+            ("---\ntitle: K\ntype: character\n---\n", "id"),
+            ("---\nid: k\ntype: character\n---\n", "title"),
+            ("---\ntitle: S\ntype: object\nobject_type: weapon\n---\n", "id"),
+            ("---\nid: s\ntype: object\nobject_type: weapon\n---\n", "title"),
+            ("---\nid: s\ntitle: S\ntype: object\n---\n", "object_type"),
+        ] {
+            let e = err(content);
+            assert!(e.contains(&format!("missing required frontmatter field `{}`", field)), "{}: {}", field, e);
+        }
+    }
+
+    #[test]
+    fn unclosed_frontmatter_is_an_error() {
+        let e = err("---\nid: a/b\ntitle: B\ntype: location\nBody with no closing delimiter.\n");
+        assert!(e.contains("never closed"), "{}", e);
+    }
+
+    #[test]
+    fn no_frontmatter_is_an_error() {
+        let e = err("# Courtyard\n\nJust prose.\n");
+        assert!(e.contains("must start with `---`"), "{}", e);
+        // A blank first line counts as no frontmatter, too.
+        assert!(err("\n---\nid: a/b\ntitle: B\ntype: location\n---\n").contains("must start with `---`"));
+    }
+
+    #[test]
+    fn empty_frontmatter_reports_missing_type() {
+        assert!(err("---\n---\nBody.\n").contains("missing required frontmatter field `type`"));
+    }
+
+    #[test]
+    fn invalid_yaml_is_an_error() {
+        let e = err("---\nid: [unclosed\ntype: location\n---\n");
+        assert!(e.contains("failed to parse YAML frontmatter"), "{}", e);
+    }
+
+    #[test]
+    fn a_second_delimiter_in_the_body_stays_in_the_body() {
+        let ParsedEntity::Location(loc) =
+            parse("---\nid: a/b\ntitle: B\ntype: location\n---\nAbove.\n---\nBelow.\n").unwrap()
+        else {
+            panic!("not a location")
+        };
+        assert_eq!(loc.description, "Above.\n---\nBelow.");
+    }
+
+    /// Keys are case-sensitive: `Inventory:` is not `inventory:`, so it is
+    /// not read (a real sample file once had this). This pins today's
+    /// behaviour, which drops the key silently.
+    #[test]
+    fn capitalized_inventory_key_is_not_read() {
+        let ParsedEntity::Character(c) =
+            parse("---\nid: k\ntitle: K\ntype: character\nInventory: [sword]\n---\n").unwrap()
+        else {
+            panic!("not a character")
+        };
+        assert!(c.inventory.is_empty());
+    }
+
+    #[test]
+    fn parse_file_reads_from_disk_and_reports_unreadable_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("courtyard.md");
+        std::fs::write(&path, LOCATION).unwrap();
+        assert!(matches!(MarkdownParser::new().parse_file(&path).unwrap(), ParsedEntity::Location(_)));
+
+        let missing = dir.path().join("missing.md");
+        let e = MarkdownParser::new().parse_file(&missing).unwrap_err().to_string();
+        assert!(e.contains("Failed to read file"), "{}", e);
     }
 }

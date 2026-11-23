@@ -15,7 +15,7 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 - [ ] Edit-mode navigation by area and room, like folders [console] (REQ-CON-4)
 - [ ] Room view in the console, from the same renderer as `thwart show` [console, coder] (REQ-CON-8)
 - [ ] Transcript test runner [console] (REQ-CON-9)
-- [ ] Parser tests, before any writer work starts [coder] (`design/UNIT_TESTS.md` › 1)
+- [x] Parser tests, before any writer work starts [coder] (`design/UNIT_TESTS.md` › 1)
 
 ## Phase 3 · Authoring
 
