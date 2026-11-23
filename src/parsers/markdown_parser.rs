@@ -9,23 +9,53 @@ use std::path::Path;
 pub struct MarkdownParser;
 
 /// The keys `design/CONTENT_FORMAT.md` defines for a `type`, in its table
-/// order: `id`, `title`, `type`, then the type's own fields. This is the
+/// order: `id`, `title`, `type`, the layer keys `inherits` and `state`
+/// (`design/STATES.md`), then the type's own fields, then `vars` and `can`. This is the
 /// order a writer adds keys in. Empty for an unknown type.
 pub fn known_keys(type_name: &str) -> &'static [&'static str] {
     match type_name {
-        "location" => &["id", "title", "type", "coordinates", "connections", "characters", "objects"],
+        "location" => &[
+            "id",
+            "title",
+            "type",
+            "inherits",
+            "state",
+            "coordinates",
+            "connections",
+            "characters",
+            "objects",
+            "vars",
+            "can",
+        ],
         "character" => &[
             "id",
             "title",
             "type",
+            "inherits",
+            "state",
             "character_type",
             "default_location",
             "attributes",
             "dialogue_tree",
             "inventory",
             "relationships",
+            "vars",
+            "can",
         ],
-        "object" => &["id", "title", "type", "object_type", "category", "weight", "value", "actions"],
+        "object" => &[
+            "id",
+            "title",
+            "type",
+            "inherits",
+            "state",
+            "object_type",
+            "category",
+            "weight",
+            "value",
+            "vars",
+            "can",
+            "actions",
+        ],
         _ => &[],
     }
 }
@@ -106,8 +136,13 @@ impl MarkdownParser {
 
     /// `parse_content`, plus warnings such as keys that differ only in case.
     pub fn parse_content_with_warnings<P: AsRef<Path>>(&self, content: &str, file_path: P) -> Result<ParseOutcome> {
-        let parsed = self.split_frontmatter(content)?;
+        let parsed = self.split_document(content)?;
+        self.build_entity(&parsed, file_path)
+    }
 
+    /// Type an already split document (one file's, or several layers merged)
+    /// as the entity its `type` names. `file_path` is used only in errors.
+    pub fn build_entity<P: AsRef<Path>>(&self, parsed: &ParsedDocument, file_path: P) -> Result<ParseOutcome> {
         let entity_type = parsed
             .metadata
             .get("type")
@@ -120,9 +155,9 @@ impl MarkdownParser {
             })?;
 
         let entity = match entity_type {
-            "location" => ParsedEntity::Location(self.build_location(&parsed, &file_path)?),
-            "character" => ParsedEntity::Character(self.build_character(&parsed, &file_path)?),
-            "object" => ParsedEntity::Object(self.build_object(&parsed, &file_path)?),
+            "location" => ParsedEntity::Location(self.build_location(parsed, &file_path)?),
+            "character" => ParsedEntity::Character(self.build_character(parsed, &file_path)?),
+            "object" => ParsedEntity::Object(self.build_object(parsed, &file_path)?),
             other => return Err(anyhow!(
                 "{:?}: unknown type `{}` (expected location, character, or object)",
                 file_path.as_ref(),
@@ -136,21 +171,21 @@ impl MarkdownParser {
     pub fn parse_location_file<P: AsRef<Path>>(&self, file_path: P) -> Result<Location> {
         let content = fs::read_to_string(&file_path)
             .map_err(|e| anyhow!("Failed to read file {:?}: {}", file_path.as_ref(), e))?;
-        let parsed = self.split_frontmatter(&content)?;
+        let parsed = self.split_document(&content)?;
         self.build_location(&parsed, &file_path)
     }
 
     pub fn parse_character_file<P: AsRef<Path>>(&self, file_path: P) -> Result<Character> {
         let content = fs::read_to_string(&file_path)
             .map_err(|e| anyhow!("Failed to read file {:?}: {}", file_path.as_ref(), e))?;
-        let parsed = self.split_frontmatter(&content)?;
+        let parsed = self.split_document(&content)?;
         self.build_character(&parsed, &file_path)
     }
 
     pub fn parse_object_file<P: AsRef<Path>>(&self, file_path: P) -> Result<GameObject> {
         let content = fs::read_to_string(&file_path)
             .map_err(|e| anyhow!("Failed to read file {:?}: {}", file_path.as_ref(), e))?;
-        let parsed = self.split_frontmatter(&content)?;
+        let parsed = self.split_document(&content)?;
         self.build_object(&parsed, &file_path)
     }
 
@@ -315,7 +350,7 @@ impl MarkdownParser {
     /// is Hugo-standard: a `---`-delimited block at the very top of the
     /// file. Everything after the closing `---` is the body, used as-is
     /// (trimmed) as the entity's description.
-    fn split_frontmatter(&self, content: &str) -> Result<ParsedDocument> {
+    pub fn split_document(&self, content: &str) -> Result<ParsedDocument> {
         let mut lines = content.lines();
 
         match lines.next() {

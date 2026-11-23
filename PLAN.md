@@ -36,7 +36,7 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 - [x] Play-mode verbs and aliases, v1 [console] (REQ-CON-10)
 - [x] Action effects for move, look, take, examine and inventory [coder] (REQ-ENG-5)
 - [x] Design states, bundles and chapters, replacing flags, conditions and alternative text; agreed with Bruce 2026-11-23, with open questions [commander] (`design/STATES.md`)
-- [ ] Bundle loading, layers and merging, with key sources and the comment-only prose rule [coder] (`design/STATES.md` › Engine rules › Loading)
+- [x] Bundle loading, layers and merging, with key sources and the comment-only prose rule [coder] (`design/STATES.md` › Engine rules › Loading)
 - [ ] Current versions on request, play state v2 and saves v2 [coder] (`design/STATES.md` › Engine rules)
 - [ ] Actions as a map, with `becomes:`, `sets:`, `chapter:` and `requires: { has: }`, and the 9 object cards migrated [coder] (`design/STATES.md` › Changing state)
 - [ ] Variables by level, with warnings for undeclared ones [coder] (`design/STATES.md` › Variables)

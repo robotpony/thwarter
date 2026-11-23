@@ -1,4 +1,6 @@
 pub mod world_engine;
+pub mod layers;
+pub mod bundles;
 pub mod location_view;
 pub mod character_engine;
 pub mod narrative_engine;

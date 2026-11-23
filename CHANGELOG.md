@@ -28,6 +28,22 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.12.0 (2026-11-23)
+
+### Added
+
+- Bundles, states and chapters load (`design/STATES.md` › Engine rules › Loading). A folder holding `index.md` is one thing; its other files are its states, and its `chapters/` folder holds its chapter overlays. In any `chapters/` folder, a numbered file (`20-after-the-king.md`, or a numbered folder with `_index.md` for one with sub-chapters) defines a chapter in that scope, and an unnumbered one is an overlay for the chapter of that name, found from its folder outward to the root. `_index.md` marks an area.
+- Layers merge as raw YAML before typing (`engines/layers.rs`): maps merge key by key all the way down, scalars and lists replace, `null` removes an inherited key, and prose replaces the prose below only if something is left once author comments are removed. Every key remembers the file it came from.
+- The world tables hold each thing's starting version (its starting state, no chapter). `WorldEngine::version(kind, id, state, chapter)` builds any other version, with `thing()` and `chapters()` to see what exists. Layers stack by lineage only: overlays from the folders above, the thing, its state, then its own overlays, a parent chapter before its sub-chapter.
+- `validate` and the console's problems check every state against every chapter visible from the thing, and report misplaced files: state files that set `id`, `type` or `state:` or don't say `inherits: index`, a nested bundle, reserved names (`index`, `_index`, `chapters`, `templates`), a `state:` naming no state file, an overlay naming no chapter, an unnumbered root chapter, and a sub-chapter whose folder has no `_index.md`.
+- New warnings: a layer that replaces an inherited list, an empty value that removes an inherited key, each overlay (it applies by where it sits), a bundle whose `id` doesn't match its folder, a scoped chapter that hides an outer one of the same name, and keys in an area's `_index.md` other than `title`.
+
+### Changed
+
+- The known keys (key order and case warnings) gain `inherits`, `state`, `vars` and `can`.
+- `load_world` reads files in sorted path order, so which duplicate wins no longer depends on the file system.
+- `world/` and `game/` at the root, any `templates/` folder, and files with `template: true` are kept out of the world, until their formats are built.
+
 ## 0.11.1 (2026-11-23)
 
 ### Changed

@@ -1,7 +1,9 @@
 use crate::engines::location_view::{direction_rank, EntityRef, ExitView, LocationView};
 use crate::models::character::Character;
 use crate::models::world::*;
-use crate::parsers::{MarkdownParser, ParsedEntity};
+use crate::engines::bundles::{self, Chapter, ChapterKey, FileRecord, Thing};
+use crate::engines::layers::{Layer, Merged};
+use crate::parsers::ParsedEntity;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -44,39 +46,36 @@ pub struct WorldEngine {
     /// Character cards by id, as loaded. A read-only catalog for lookups
     /// and validation; placement and state belong to `CharacterEngine`.
     pub characters: HashMap<String, Character>,
-    /// Every file each `(kind, id)` was loaded from, in load order. More
-    /// than one file means a duplicate id: the last one loaded wins in
-    /// the tables above, `problems` reports it, and the writer refuses to
-    /// edit it (REQ-ENG-7).
+    /// Every file each `(kind, id)` was loaded from, in load order (a
+    /// bundle's `index.md`). More than one file means a duplicate id: the
+    /// last one loaded wins in the tables above, `problems` reports it,
+    /// and the writer refuses to edit it (REQ-ENG-7).
     pub sources: HashMap<(EntityKind, String), Vec<PathBuf>>,
     /// The directory `load_world` walked, as it was given.
     pub world_root: Option<PathBuf>,
-    /// Each file's parse result, in load order. The tables above are kept
-    /// in step with this, so an in-memory change (REQ-ENG-8) resolves
-    /// duplicates and errors exactly as a fresh load would.
+    /// Each thing with every file that can apply to it, for building any
+    /// version on request (`design/STATES.md`). The tables above hold
+    /// each thing's starting version.
+    things: HashMap<(EntityKind, String), Thing>,
+    /// Every chapter, root ones first.
+    chapters: Vec<Chapter>,
+    /// Each file's split, in load order. Everything above is rebuilt from
+    /// these, so an in-memory change (REQ-ENG-8) resolves duplicates,
+    /// bundles and errors exactly as a fresh load would.
     files: Vec<FileRecord>,
+    /// Problems and warnings from the last rebuild, each prefixed with its file.
+    file_problems: Vec<String>,
+    file_warnings: Vec<String>,
 }
 
+/// One version of a thing: its typed entity and the merged layers it came
+/// from, with which file each part came from.
 #[derive(Debug, Clone)]
-struct FileRecord {
-    path: PathBuf,
-    /// The entity, or the parse error, without the path prefix.
-    parsed: std::result::Result<ParsedEntity, String>,
-    warnings: Vec<String>,
-}
-
-impl FileRecord {
-    fn key(&self) -> Option<(EntityKind, String)> {
-        self.parsed.as_ref().ok().map(entity_key)
-    }
-}
-
-fn entity_key(entity: &ParsedEntity) -> (EntityKind, String) {
-    match entity {
-        ParsedEntity::Location(l) => (EntityKind::Location, l.id.clone()),
-        ParsedEntity::Character(c) => (EntityKind::Character, c.id.clone()),
-        ParsedEntity::Object(o) => (EntityKind::Object, o.id.clone()),
-    }
+pub struct Version {
+    pub entity: ParsedEntity,
+    pub merged: Merged,
+    pub state: Option<String>,
+    pub chapter: Option<ChapterKey>,
 }
 
 /// Summary of a `load_world` pass: what was loaded, and every file that
@@ -93,8 +92,9 @@ pub struct WorldLoadReport {
     pub characters: Vec<Character>,
     pub errors: Vec<String>,
     /// Problems that don't fail validation: a key that differs only in
-    /// case from a known one (prefixed with its file), or an id shared
-    /// between kinds.
+    /// case from a known one, a list a layer replaces, an overlay that
+    /// applies by where it sits (each prefixed with its file), or an id
+    /// shared between kinds.
     pub warnings: Vec<String>,
 }
 
@@ -107,46 +107,80 @@ impl WorldEngine {
             characters: HashMap::new(),
             sources: HashMap::new(),
             world_root: None,
+            things: HashMap::new(),
+            chapters: Vec::new(),
             files: Vec::new(),
+            file_problems: Vec::new(),
+            file_warnings: Vec::new(),
         }
     }
 
-    /// Walk every `.md` file under `world_path`, parse it per
-    /// `design/CONTENT_FORMAT.md`, and load locations and objects into
-    /// this engine. Files that fail to parse are collected as errors
-    /// rather than aborting the whole load, so `validate` can report every
-    /// problem in one pass instead of stopping at the first one.
+    /// Walk every `.md` file under `world_path`, sort each into its role
+    /// (a thing, a state, a chapter, an overlay, an area) by where it sits,
+    /// and load each thing's starting version. Files that fail are
+    /// collected as errors rather than aborting the whole load, so
+    /// `validate` can report every problem in one pass.
     pub fn load_world<P: AsRef<Path>>(&mut self, world_path: P) -> Result<WorldLoadReport> {
-        let parser = MarkdownParser::new();
-        let mut report = WorldLoadReport::default();
         self.world_root = Some(world_path.as_ref().to_path_buf());
-
-        for entry in WalkDir::new(&world_path).into_iter().filter_map(|e| e.ok()) {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("md") {
-                continue;
-            }
-            let record = match parser.parse_file_with_warnings(path) {
-                Ok(outcome) => FileRecord { path: path.to_path_buf(), parsed: Ok(outcome.entity), warnings: outcome.warnings },
-                Err(e) => FileRecord { path: path.to_path_buf(), parsed: Err(e.to_string()), warnings: Vec::new() },
+        self.files.clear();
+        let mut paths: Vec<PathBuf> = WalkDir::new(&world_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .map(|e| e.into_path())
+            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("md"))
+            .collect();
+        paths.sort();
+        for path in paths {
+            let layer = match std::fs::read_to_string(&path) {
+                Ok(text) => Layer::parse(&path, &text),
+                Err(e) => Err(format!("Failed to read file {:?}: {}", path, e)),
             };
-            for warning in &record.warnings {
-                report.warnings.push(format!("{}: {}", path.display(), warning));
-            }
-            match &record.parsed {
-                Ok(entity) => {
-                    let key = entity_key(entity);
-                    self.sources.entry(key).or_default().push(path.to_path_buf());
-                    self.add_parsed(entity.clone(), &mut report);
-                }
-                Err(e) => report.errors.push(format!("{}: {}", path.display(), e)),
-            }
-            self.files.push(record);
+            self.files.push(FileRecord { path, layer });
         }
+        let built = self.rebuild();
 
-        self.loaded_locations = self.world_graph.locations.clone();
-        report.warnings.extend(self.shared_id_warnings());
+        let mut report = WorldLoadReport::default();
+        for (_, entity) in &built {
+            match entity {
+                ParsedEntity::Location(_) => report.locations_loaded += 1,
+                ParsedEntity::Object(_) => report.objects_loaded += 1,
+                ParsedEntity::Character(c) => report.characters.push(c.clone()),
+            }
+        }
+        report.errors = self.file_problems.clone();
+        report.warnings = self.current_warnings();
         Ok(report)
+    }
+
+    /// Recompute everything from the file records, returning each thing
+    /// whose starting version typed, in load order.
+    fn rebuild(&mut self) -> Vec<(Thing, ParsedEntity)> {
+        let root = self.world_root.clone().unwrap_or_default();
+        let built = bundles::build(&root, &self.files);
+        self.world_graph.locations.clear();
+        self.objects.clear();
+        self.characters.clear();
+        self.sources.clear();
+        self.things.clear();
+        for (thing, entity) in &built.things {
+            let key = (thing.kind, thing.id.clone());
+            self.sources.entry(key.clone()).or_default().push(thing.index.path.clone());
+            self.things.insert(key, thing.clone());
+            match entity.clone() {
+                ParsedEntity::Location(l) => self.world_graph.add_location(l),
+                ParsedEntity::Object(o) => {
+                    self.objects.insert(o.id.clone(), o);
+                }
+                ParsedEntity::Character(c) => {
+                    self.characters.insert(c.id.clone(), c);
+                }
+            }
+        }
+        self.loaded_locations = self.world_graph.locations.clone();
+        self.chapters = built.chapters;
+        self.file_problems = built.problems;
+        self.file_warnings = built.warnings;
+        built.things
     }
 
     /// Every id used by more than one kind, with those kinds, sorted. Ids
@@ -177,112 +211,88 @@ impl WorldEngine {
             .collect()
     }
 
-    fn add_parsed(&mut self, entity: ParsedEntity, report: &mut WorldLoadReport) {
-        match entity {
-            ParsedEntity::Location(location) => {
-                self.world_graph.add_location(location);
-                report.locations_loaded += 1;
-            }
-            ParsedEntity::Object(object) => {
-                self.objects.insert(object.id.clone(), object);
-                report.objects_loaded += 1;
-            }
-            ParsedEntity::Character(character) => {
-                self.characters.insert(character.id.clone(), character.clone());
-                report.characters.push(character);
-            }
-        }
-    }
-
     /// Change the loaded world in memory (REQ-ENG-8): replace whatever
-    /// `path` defined with what `text` defines, as if the file had been
-    /// loaded with that text. A parse error becomes that file's problem,
-    /// as it would on a load. Nothing is read from or written to disk.
-    /// `path` is in the form `load_world` uses (its root joined with the
-    /// file's relative path), the same form as `sources`.
+    /// `path` held with `text`, as if the file had been loaded with it. A
+    /// parse error becomes that file's problem, as it would on a load.
+    /// Nothing is read from or written to disk. `path` is in the form
+    /// `load_world` uses (its root joined with the file's relative path),
+    /// the same form as `sources`. A state or overlay file changes its
+    /// thing; an `index.md` can turn its folder into a bundle.
     pub fn set_file(&mut self, path: &Path, text: &str) {
-        let record = match MarkdownParser::new().parse_content_with_warnings(text, path) {
-            Ok(outcome) => FileRecord { path: path.to_path_buf(), parsed: Ok(outcome.entity), warnings: outcome.warnings },
-            Err(e) => FileRecord { path: path.to_path_buf(), parsed: Err(e.to_string()), warnings: Vec::new() },
-        };
-        let new_key = record.key();
-        let old_key = match self.files.iter_mut().find(|r| r.path == path) {
-            Some(existing) => std::mem::replace(existing, record).key(),
-            None => {
-                self.files.push(record);
-                None
-            }
-        };
-        for key in [old_key, new_key].into_iter().flatten() {
-            self.refresh_key(&key);
+        let record = FileRecord { path: path.to_path_buf(), layer: Layer::parse(path, text) };
+        match self.files.iter_mut().find(|r| r.path == path) {
+            Some(existing) => *existing = record,
+            None => self.files.push(record),
         }
+        self.rebuild();
     }
 
     /// Forget a file and everything it defined, in memory only.
     pub fn remove_file(&mut self, path: &Path) {
         if let Some(i) = self.files.iter().position(|r| r.path == path) {
-            let removed = self.files.remove(i);
-            if let Some(key) = removed.key() {
-                self.refresh_key(&key);
-            }
+            self.files.remove(i);
+            self.rebuild();
         }
     }
 
-    /// Recompute one `(kind, id)` from the file records: its sources in
-    /// load order, and its table entry from the last file defining it.
-    fn refresh_key(&mut self, key: &(EntityKind, String)) {
-        let defining: Vec<&FileRecord> = self.files.iter().filter(|r| r.key().as_ref() == Some(key)).collect();
-        let paths: Vec<PathBuf> = defining.iter().map(|r| r.path.clone()).collect();
-        let winner = defining.last().and_then(|r| r.parsed.as_ref().ok()).cloned();
-        if paths.is_empty() {
-            self.sources.remove(key);
-        } else {
-            self.sources.insert(key.clone(), paths);
-        }
-        let id = &key.1;
-        match (key.0, winner) {
-            (EntityKind::Location, Some(ParsedEntity::Location(l))) => {
-                self.loaded_locations.insert(id.clone(), l.clone());
-                self.world_graph.add_location(l);
+    /// A thing with all its files: index, states and overlays.
+    pub fn thing(&self, kind: EntityKind, id: &str) -> Option<&Thing> {
+        self.things.get(&(kind, id.to_string()))
+    }
+
+    /// Every chapter, root ones first, each scope in chapter order.
+    pub fn chapters(&self) -> &[Chapter] {
+        &self.chapters
+    }
+
+    /// One version of a thing (`design/STATES.md` › Current version):
+    /// `state` or its starting state, in `chapter` (a name, resolved from
+    /// the thing's folder outward) or in no chapter.
+    pub fn version(&self, kind: EntityKind, id: &str, state: Option<&str>, chapter: Option<&str>) -> Result<Version> {
+        let thing = self
+            .thing(kind, id)
+            .ok_or_else(|| anyhow::anyhow!("no {} `{}` is loaded", kind.type_name(), id))?;
+        let state = match state {
+            Some(name) if thing.states.contains_key(name) => Some(name.to_string()),
+            Some(name) => {
+                let known: Vec<&str> = thing.states.keys().map(String::as_str).collect();
+                if known.is_empty() {
+                    anyhow::bail!("{} `{}` has no states, so it has no state `{}`", kind.type_name(), id, name);
+                }
+                anyhow::bail!("{} `{}` has no state `{}` (it has {})", kind.type_name(), id, name, known.join(", "));
             }
-            (EntityKind::Location, _) => {
-                self.world_graph.locations.remove(id);
-                self.loaded_locations.remove(id);
+            None => thing.starting_state.clone(),
+        };
+        let chapter = match chapter {
+            None => None,
+            Some(name) => {
+                let path: Vec<String> = name.split('/').map(String::from).collect();
+                let found = bundles::resolve_chapter(&self.chapters, &thing.scope, &path)
+                    .or_else(|| {
+                        bundles::visible_chapters(&self.chapters, &thing.scope)
+                            .into_iter()
+                            .find(|c| c.name() == name)
+                    })
+                    .ok_or_else(|| anyhow::anyhow!("no chapter `{}` can be seen from {} `{}`", name, kind.type_name(), id))?;
+                Some(found.key.clone())
             }
-            (EntityKind::Character, Some(ParsedEntity::Character(c))) => {
-                self.characters.insert(id.clone(), c);
-            }
-            (EntityKind::Character, _) => {
-                self.characters.remove(id);
-            }
-            (EntityKind::Object, Some(ParsedEntity::Object(o))) => {
-                self.objects.insert(id.clone(), o);
-            }
-            (EntityKind::Object, _) => {
-                self.objects.remove(id);
-            }
-        }
+        };
+        let (entity, merged) = thing
+            .build(state.as_deref(), chapter.as_ref())
+            .map_err(|e| anyhow::anyhow!(e))?;
+        Ok(Version { entity, merged, state, chapter })
     }
 
     /// `problems` for the world as it is now, after any in-memory changes:
     /// each file's parse error, then the same checks. No load report needed.
     pub fn current_problems(&self, strict: bool) -> Vec<String> {
-        let errors = self
-            .files
-            .iter()
-            .filter_map(|r| r.parsed.as_ref().err().map(|e| format!("{}: {}", r.path.display(), e)))
-            .collect();
-        self.problems_from(errors, strict)
+        self.problems_from(self.file_problems.clone(), strict)
     }
 
     /// The warnings for the world as it is now: each file's (prefixed with
     /// its path), then ids shared between kinds.
     pub fn current_warnings(&self) -> Vec<String> {
-        let mut warnings: Vec<String> = self
-            .files
-            .iter()
-            .flat_map(|r| r.warnings.iter().map(move |w| format!("{}: {}", r.path.display(), w)))
-            .collect();
+        let mut warnings = self.file_warnings.clone();
         warnings.extend(self.shared_id_warnings());
         warnings
     }
