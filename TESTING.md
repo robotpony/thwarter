@@ -24,6 +24,8 @@ THWART_BLESS=1 cargo test --test transcripts      # accept new output after a de
 
 To add one, write the session you expect as a new `.txt` file. A transcript is the place to pin a console behaviour that a unit test can't reach.
 
+A transcript that changes content (`/new`, `/set`, `/link`, `/unlink`) MUST add `# copy: yes` to its header, so it runs against a temporary copy of the fixture world rather than the fixture itself. The runner fails a transcript that uses those commands without it. Saves made during a transcript go to a temporary folder, never `~/.local/state`.
+
 ## Exercising the CLI against real content
 
 The commands below are real: they're the ones `src/bin/thwart.rs` actually defines, run against the sample world at `authors/mx/test-world/`.
