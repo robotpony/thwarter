@@ -371,6 +371,12 @@ Prose can include variables, written `{{ name }}`. Every name starts with the le
 | A thing | `<id>.` | `box.lid`, `knife.sharp` | the thing's `vars:` |
 | This thing | `this.` | `this.lid` | the thing's `vars:` |
 
+Built in 0.21.0 (0ebc0e4), and confirmed by the commander:
+- The engine supplies `game.turn`, `game.score` (0 until set), `story.chapter` (the chapter's name, or blank), `player.title` ("you" with no `player.md`), `location.title`, `location.visits`, and `<id>.title` for every thing.
+- `location.` means the player's room in play. When checking declarations, it means the room the prose is in, or, for prose outside a room, any room.
+- A thing's value is the one set in play if there is one, else its current version's `vars:` (state and chapter applied). Values hold once set.
+- `sets:` on an undeclared name warns, like an undeclared variable. `this.` in `sets:` means the thing the action belongs to.
+
 A thing separates its values from its abilities:
 
 ```yaml
