@@ -44,7 +44,7 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 - [x] `visibility:` in play: faint, hidden and absent [coder] (REQ-CF-18)
 - [x] `reply ambiguous` from the candidates' shared template, else an in-world default [coder] (`design/STATES.md` › Ambiguity)
 - [ ] Links in prose, Markdown rendered in play, and tags [coder] (REQ-CF-28 to 30)
-- [ ] `design/STATES.md` › Engine rules written as REQ-ENG items [coder] (`design/ENGINE_REQUIREMENTS.md`)
+- [x] `design/STATES.md` › Engine rules written as REQ-ENG items [coder] (`design/ENGINE_REQUIREMENTS.md`)
 
 ## Phase 5 · Authoring the model
 
