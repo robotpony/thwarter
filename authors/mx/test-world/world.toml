@@ -1,31 +1,5 @@
-[metadata]
-title = "Castle Adventure - Extended World"
-author = "Thwarter Testing Team"
-version = "2.0.0"
-description = "Large-scale testing world with 28 locations and 18 NPCs"
+# Tool settings only. The world's title, author, version and starting room
+# are in world/index.md (design/STATES.md).
 
 [settings]
-starting_location = "castle/courtyard"
 default_map_style = "ascii"
-world_size = "large"
-locations_count = 28
-npcs_count = 18
-
-[areas]
-castle_locations = 16
-forest_locations = 12
-
-[characters]
-default_health = 100
-default_mood = "neutral"
-relationship_system = true
-
-[objects]
-dedicated_definitions = true
-object_interactions = true
-containers_enabled = true
-
-[validation]
-strict_references = true
-coordinate_checking = true
-connection_validation = true

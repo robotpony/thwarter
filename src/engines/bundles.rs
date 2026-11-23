@@ -9,11 +9,15 @@
 //!   and an unnumbered one (`after-the-king.md`) is an overlay, changing
 //!   that folder's things in the chapter of that name seen from there;
 //! - `_index.md` marks an area;
-//! - `world/` and `game/` at the root, any `templates/` folder, and any
-//!   file with `template: true` are kept out of the world;
+//! - `world/` holds the world's own definition (`world_def`), not things;
+//! - `game/` at the root, any `templates/` folder, any file with
+//!   `template: true`, and other tools' files (names starting with `.`,
+//!   Hugo's `layouts/`, `static/`, `assets/` and `public/`, and whatever
+//!   `world.toml` lists under `ignore`) are kept out of the world;
 //! - everything else is a one-file thing.
 
 use super::layers::{Layer, Merged};
+use super::world_def::{world_file, WorldDef, WorldFile};
 use super::world_engine::EntityKind;
 use crate::parsers::{key_case_warnings, MarkdownParser, ParsedEntity};
 use serde_yaml::Value;
@@ -192,6 +196,10 @@ pub(crate) struct Built {
     pub things: Vec<(Thing, ParsedEntity)>,
     /// Every chapter, sorted by scope and then chapter order.
     pub chapters: Vec<Chapter>,
+    /// What `world/` defines; empty fields where it has no file.
+    pub world: WorldDef,
+    /// Whether `world/index.md` exists, so `world.toml` isn't read for it.
+    pub has_world_index: bool,
     pub problems: Vec<String>,
     pub warnings: Vec<String>,
 }
@@ -217,8 +225,23 @@ fn names(path: &Path) -> Vec<String> {
         .collect()
 }
 
+/// Hugo's own folders at a world's root, which double as a site (REQ-CF-24).
+const HUGO_FOLDERS: &[&str] = &["layouts", "static", "assets", "public"];
+
+/// Files that belong to other tools, or to the world's own extra list of
+/// folders to ignore (`ignore` in `world.toml`, paths from the root).
+pub(crate) fn ignored(parts: &[String], extra: &[PathBuf]) -> bool {
+    parts.iter().any(|p| p.starts_with('.'))
+        || (parts.len() > 1 && HUGO_FOLDERS.contains(&parts[0].as_str()))
+        || extra.iter().any(|e| {
+            let e = names(e);
+            !e.is_empty() && parts.len() >= e.len() && parts[..e.len()] == e[..]
+        })
+}
+
 fn excluded(parts: &[String]) -> bool {
-    matches!(parts.first().map(String::as_str), Some("world") | Some("game")) && parts.len() > 1
+    (parts.first().map(String::as_str) == Some("game") && parts.len() > 1)
+        || world_file(parts).is_some()
         || parts[..parts.len().saturating_sub(1)].iter().any(|p| p == "templates")
 }
 
@@ -299,7 +322,7 @@ struct PendingOverlay {
     layer: Layer,
 }
 
-pub(crate) fn build(root: &Path, files: &[FileRecord]) -> Built {
+pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Built {
     let mut built = Built::default();
     let rel = |p: &Path| p.strip_prefix(root).unwrap_or(p).to_path_buf();
 
@@ -322,8 +345,42 @@ pub(crate) fn build(root: &Path, files: &[FileRecord]) -> Built {
 
     for file in files {
         let shown = file.path.display();
-        // world/ and game/ have their own formats, not built yet.
-        if excluded(&names(&rel(&file.path))) {
+        let parts = names(&rel(&file.path));
+        // Only the part inside the world counts: a world kept in a folder
+        // such as `.tmpX/` or `~/.worlds/` is not itself ignored.
+        if file.path.starts_with(root) && ignored(&parts, ignore) {
+            continue;
+        }
+        if let Some(which) = world_file(&parts) {
+            let layer = match (&which, &file.layer) {
+                (WorldFile::Styles, _) => continue,
+                (WorldFile::Other, _) => {
+                    built.warnings.push(format!(
+                        "{}: world/ holds index.md, story.md, player.md and styles/, so this file is ignored",
+                        shown
+                    ));
+                    continue;
+                }
+                (_, Err(e)) => {
+                    built.problems.push(format!("{}: {}", shown, e));
+                    continue;
+                }
+                (_, Ok(layer)) => layer,
+            };
+            let (problems, warnings) = (&mut built.problems, &mut built.warnings);
+            match which {
+                WorldFile::Index => {
+                    built.has_world_index = true;
+                    built.world.read_index(layer, problems, warnings);
+                }
+                WorldFile::Story => built.world.read_story(layer, problems, warnings),
+                WorldFile::Player => built.world.read_player(layer, problems, warnings),
+                WorldFile::Styles | WorldFile::Other => {}
+            }
+            continue;
+        }
+        // game/ has its own format, not built yet.
+        if excluded(&parts) {
             continue;
         }
         let mut layer = match &file.layer {

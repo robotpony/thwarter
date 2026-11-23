@@ -3,6 +3,7 @@ use crate::models::character::Character;
 use crate::models::world::*;
 use crate::engines::bundles::{self, Chapter, ChapterKey, FileRecord, Thing};
 use crate::engines::layers::{Layer, Merged};
+use crate::engines::world_def::WorldDef;
 use crate::models::game::{PlayState, SavedChapter};
 use crate::parsers::ParsedEntity;
 use anyhow::Result;
@@ -67,6 +68,14 @@ pub struct WorldEngine {
     /// Problems and warnings from the last rebuild, each prefixed with its file.
     file_problems: Vec<String>,
     file_warnings: Vec<String>,
+    /// The world's definition: `world/`, or `world.toml` for a world not
+    /// yet moved.
+    world: WorldDef,
+    /// What `world.toml` says, read at load: the old definition keys and
+    /// the extra folders to ignore.
+    world_toml: WorldDef,
+    ignore: Vec<PathBuf>,
+    world_toml_warning: Option<String>,
 }
 
 /// Which version of each thing to see: the starting versions (the
@@ -126,7 +135,17 @@ impl WorldEngine {
             files: Vec::new(),
             file_problems: Vec::new(),
             file_warnings: Vec::new(),
+            world: WorldDef::default(),
+            world_toml: WorldDef::default(),
+            ignore: Vec::new(),
+            world_toml_warning: None,
         }
+    }
+
+    /// The world's own definition: title, author, starting room, intro,
+    /// story values and the player.
+    pub fn world(&self) -> &WorldDef {
+        &self.world
     }
 
     /// Walk every `.md` file under `world_path`, sort each into its role
@@ -135,10 +154,19 @@ impl WorldEngine {
     /// collected as errors rather than aborting the whole load, so
     /// `validate` can report every problem in one pass.
     pub fn load_world<P: AsRef<Path>>(&mut self, world_path: P) -> Result<WorldLoadReport> {
-        self.world_root = Some(world_path.as_ref().to_path_buf());
+        let root = world_path.as_ref().to_path_buf();
+        self.world_root = Some(root.clone());
         self.files.clear();
+        self.read_world_toml(&root);
+        let ignore = self.ignore.clone();
         let mut paths: Vec<PathBuf> = WalkDir::new(&world_path)
             .into_iter()
+            .filter_entry(|e| {
+                // Don't descend into other tools' folders (.git, .obsidian, public/).
+                let rel = e.path().strip_prefix(&root).unwrap_or(e.path());
+                let parts: Vec<String> = rel.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+                parts.is_empty() || !bundles::ignored(&parts, &ignore) || e.file_type().is_file()
+            })
             .filter_map(|e| e.ok())
             .map(|e| e.into_path())
             .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("md"))
@@ -170,7 +198,7 @@ impl WorldEngine {
     /// whose starting version typed, in load order.
     fn rebuild(&mut self) -> Vec<(Thing, ParsedEntity)> {
         let root = self.world_root.clone().unwrap_or_default();
-        let built = bundles::build(&root, &self.files);
+        let built = bundles::build(&root, &self.files, &self.ignore);
         self.world_graph.locations.clear();
         self.objects.clear();
         self.characters.clear();
@@ -192,9 +220,39 @@ impl WorldEngine {
         }
         self.loaded_locations = self.world_graph.locations.clone();
         self.chapters = built.chapters;
+        self.world = if built.has_world_index {
+            built.world
+        } else {
+            WorldDef { story: built.world.story, player: built.world.player, ..self.world_toml.clone() }
+        };
         self.file_problems = built.problems;
         self.file_warnings = built.warnings;
+        if let Some(w) = &self.world_toml_warning {
+            self.file_warnings.insert(0, w.clone());
+        }
         built.things
+    }
+
+    /// Read `world.toml`: the extra folders to ignore (`ignore = [...]`,
+    /// paths from the root) and, for a world not yet moved to `world/`,
+    /// its old `[metadata]` and `[settings] starting_location`.
+    fn read_world_toml(&mut self, root: &Path) {
+        self.ignore.clear();
+        self.world_toml = WorldDef::default();
+        self.world_toml_warning = None;
+        let path = root.join("world.toml");
+        let Ok(text) = std::fs::read_to_string(&path) else { return };
+        let value = match text.parse::<toml::Value>() {
+            Ok(v) => v,
+            Err(e) => {
+                self.world_toml_warning = Some(format!("{}: doesn't parse, so it is ignored: {}", path.display(), e.message()));
+                return;
+            }
+        };
+        if let Some(list) = value.get("ignore").and_then(|v| v.as_array()) {
+            self.ignore = list.iter().filter_map(|v| v.as_str()).map(PathBuf::from).collect();
+        }
+        self.world_toml = WorldDef::from_world_toml(root, &value);
     }
 
     /// Every id used by more than one kind, with those kinds, sorted. Ids
@@ -500,6 +558,11 @@ impl WorldEngine {
             ));
         }
         problems.extend(self.action_problems());
+        if let (Some(start), Some(source)) = (&self.world.start, &self.world.source) {
+            if self.get_location(start).is_none() {
+                problems.push(format!("{}: the starting room `{}` is not a known location", source.display(), start));
+            }
+        }
         for (from, direction, target) in self.broken_connections() {
             problems.push(format!(
                 "{}: connection `{}` points at unknown location `{}`",

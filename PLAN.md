@@ -36,8 +36,8 @@ Authoring comes first, play second (Bruce, 2026-11-23). Each phase from 4 on say
 The engine side of `design/STATES.md` (run by the commander with the coder). Done when `validate` and `show` handle every construct in `design/STATES.md` except doors.
 
 - [x] Done (squashed; 0.7.0 to 0.14.0, f987904 to e4e87e6): play verbs, action effects, and save and load from the console; the states, bundles and chapters design, agreed with Bruce; bundle loading, layers and merging with key sources; current versions on request, play state v2 and saves v2; actions as a map of mechanics with responses as body blocks, and the 9 object cards migrated. The old Phase 4 list is in `git show e4e87e6:PLAN.md`.
-- [ ] The `world/` folder: `index.md`, `story.md`, `player.md`, and the test world moved off `world.toml` [coder] (REQ-CF-20)
-- [ ] The loader ignores other tools' files: dot-folders and Hugo's own [coder] (REQ-CF-24)
+- [x] The `world/` folder: `index.md`, `story.md`, `player.md`, and the test world moved off `world.toml` [coder] (REQ-CF-20)
+- [x] The loader ignores other tools' files: dot-folders and Hugo's own [coder] (REQ-CF-24)
 - [ ] Obsidian links wherever frontmatter takes an id, as a file path or an id [coder] (REQ-CF-25)
 - [ ] Variables by level, with warnings for undeclared ones [coder] (REQ-CF-16)
 - [ ] Templates and built-ins, with `scenery` the first built-in [coder] (REQ-CF-15, REQ-CF-21)

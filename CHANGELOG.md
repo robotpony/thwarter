@@ -30,6 +30,21 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.16.0 (2026-11-23)
+
+### Added
+
+- The `world/` folder (REQ-CF-20, `design/STATES.md`). `world/index.md` (`type: world`) gives the title, author, version and starting room (`start:`), and its prose is the intro. `world/story.md` (`type: story`) declares `story.` values with `vars:`, and `world/player.md` (a character with `character_type: player`) declares `player.` values, with its `title` as the player's name. `WorldEngine::world()` returns all of it. `world/styles/` is left to the writing helpers. Wrong types, unread keys, other files in `world/`, values that aren't single values, and a starting room that doesn't exist are reported.
+- The loader ignores other tools' files (REQ-CF-24): any name starting with `.` (`.obsidian/`, `.vscode/`, `.git/`, which it no longer walks into) and Hugo's `layouts/`, `static/`, `assets/` and `public/` at the world's root. A world can add folders with `ignore = ["drafts"]` in `world.toml`.
+
+### Changed
+
+- The test world's title, author, version and starting room move from `world.toml` to `world/index.md`, and its description becomes the intro. A world with no `world/index.md` still has its `world.toml` `[metadata]` and `[settings] starting_location` read, so older worlds and the transcript fixture keep working.
+
+### Removed
+
+- From the test world's `world.toml`, keys nothing read: `world_size`, `locations_count`, `npcs_count`, the `[areas]` counts, `[characters]` (`default_health`, `default_mood`, `relationship_system`), `[objects]` (`dedicated_definitions`, `object_interactions`, `containers_enabled`) and `[validation]` (`strict_references`, `coordinate_checking`, `connection_validation`). Recover them with `git show 02e8fe8:authors/mx/test-world/world.toml`.
+
 ## 0.15.0 (2026-11-23)
 
 ### Added
