@@ -32,6 +32,8 @@ thwart show [location] [options]
 thwart show                                    # Show current player state
 thwart show castle/throne-room                 # Show specific location state
 thwart show castle/vault --state open --chapter after-the-king  # One version of a thing
+thwart show master-sword                       # Any thing, by id or link
+thwart show --template scenery                 # A template or built-in
 thwart show --format=json                      # Output as JSON
 ```
 
@@ -39,6 +41,8 @@ thwart show --format=json                      # Output as JSON
 - `--player=<name>` - Show from specific player perspective
 - `--state=<name>` - Show the thing in that state (`design/STATES.md`)
 - `--chapter=<name>` - Show the thing in that chapter, resolved from the thing outward
+- `--kind=<location|object|character>` - Which kind, when an id is shared across kinds
+- `--template=<name>` - Print a template or built-in as written, with where it came from
 - `--format=<text|json|yaml>` - Output format (default: text)
 - `--verbose` - Include detailed object/character information
 
