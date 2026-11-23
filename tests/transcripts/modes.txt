@@ -1,24 +1,24 @@
 # world: worlds/tiny
 # mode: play
+# copy: yes
 Playing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
 1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
 
-Village Square (village/square)
+Village Square
 
 A small square of packed earth. An old well stands to the north.
 
-Exits:
-  north  village/well
-  east   village/inn  (missing)
-
-Characters:
-  The Elder (elder)
-
-Objects:
-  Brass Lantern (lantern)
-  bench  (no card)
+Exits: north, east.
+You see: Brass Lantern, Bench.
+Here: The Elder.
 > look
-Play mode doesn't understand `look` yet: in-game verbs come in PLAN.md › Phase 4.
+Village Square
+
+A small square of packed earth. An old well stands to the north.
+
+Exits: north, east.
+You see: Brass Lantern, Bench.
+Here: The Elder.
 > /edit
 Edit mode, at village/square.
 > pwd
@@ -28,16 +28,13 @@ The Well (room)
 > /play
 Play mode.
 
-The Well (village/well)
+Village Square
 
-A mossy stone well. The rope is long gone.
+A small square of packed earth. An old well stands to the north.
 
-Exits:
-  south  village/square
-
-Characters: none
-
-Objects: none
+Exits: north, east.
+You see: Brass Lantern, Bench.
+Here: The Elder.
 > /set title Foo
 /set changes content, so it only works in edit mode. Type /edit to switch.
 > /edit
@@ -47,25 +44,25 @@ Name the new room: /new room north <id> [title]
 > /play
 Play mode.
 
-The Well (village/well)
+Village Square
 
-A mossy stone well. The rope is long gone.
+A small square of packed earth. An old well stands to the north.
 
-Exits:
-  south  village/square
-
-Characters: none
-
-Objects: none
+Exits: north, east.
+You see: Brass Lantern, Bench.
+Here: The Elder.
 > /edit room
-Edit mode, at village/well.
+Edit mode, at village/square.
 /edit room isn't built yet (PLAN.md › Phase 3).
 > /edit spaceship
 `/edit spaceship`: the kinds are room, object and character.
 > /help
 Console commands, in either mode:
   /edit           switch to edit mode
-  /play           switch to play mode
+  /play           switch to play mode, resuming the game
+  /play here      play from the room edit mode is in
+  /save [name]    save the game (quicksave if no name)
+  /load [name]    load a saved game
   /reload         reload the world from disk, staying where you are
   /help           this list
   /quit           leave the console
@@ -78,7 +75,7 @@ Edit mode moves through the world's folders:
   pwd             where you are
   look            show the room, character or object you're in
 
-Changing content (each saves the file, then reloads):
+Changing content (each saves the file):
   /new room <direction> <id> [title]   a room through a new exit from this one
   /new room <id> [title]               a room with no exits, outside a room
   /new character <id> [title]          a character, placed here if in a room
@@ -96,4 +93,4 @@ Reloaded: 2 room(s), 1 character(s), 1 object(s).
 1 warning(s):
   village/square: connection `east` points at unknown location `village/inn`
 > pwd
-village/well
+village/square

@@ -7,7 +7,10 @@
 //! transcript (REQ-CON-9).
 
 mod author;
+mod play;
+mod saves;
 mod session;
+mod verbs;
 mod view;
 mod watch;
 mod world;

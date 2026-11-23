@@ -10,6 +10,8 @@
 //! # copy: yes              (optional: run on a throwaway copy of the world)
 //! ```
 //!
+//! Game saves go to a temp folder for the run (`XDG_STATE_HOME`).
+//!
 //! A transcript that changes files (`/new`, `/set`, ...) MUST use
 //! `# copy: yes`, so the fixture world never changes. The copy's path is
 //! shown as the world's own path in the output, so the transcript is the
@@ -25,6 +27,12 @@ use std::path::{Path, PathBuf};
 use thwarter::console::{run_script, Mode};
 
 const DIR: &str = "tests/transcripts";
+
+/// Commands that write content files. A transcript using any of them must
+/// run on a copy, or it would change the fixture world.
+/// (`/edit` alone only switches mode; `/edit room` and the like will
+/// write once full editing exists.)
+const CHANGES_CONTENT: &[&str] = &["/new", "/set", "/link", "/unlink"];
 
 struct Transcript {
     header: String,
@@ -95,6 +103,10 @@ fn copy_world(from: &Path) -> tempfile::TempDir {
 
 #[test]
 fn transcripts() {
+    // Game saves (`/save`) go to a temp folder, never the real state folder.
+    // Safe here: this is the only test in this binary.
+    let state = tempfile::tempdir().expect("temp dir");
+    std::env::set_var("XDG_STATE_HOME", state.path());
     let bless = std::env::var_os("THWART_BLESS").is_some();
     let mut paths: Vec<PathBuf> = fs::read_dir(DIR)
         .expect("tests/transcripts exists")
@@ -114,9 +126,16 @@ fn transcripts() {
                 continue;
             }
         };
+        let input = input_of(&t.expected);
+        if !t.copy {
+            if let Some(line) = input.lines().find(|l| CHANGES_CONTENT.iter().any(|c| l.split_whitespace().next() == Some(*c))) {
+                failures.push(format!("{}: `{}` changes files, so this transcript needs `# copy: yes`", name, line));
+                continue;
+            }
+        }
         let scratch = t.copy.then(|| copy_world(&t.world));
         let world = scratch.as_ref().map(|d| d.path().to_path_buf()).unwrap_or_else(|| t.world.clone());
-        let actual = match run_script(&world, t.mode, &input_of(&t.expected)) {
+        let actual = match run_script(&world, t.mode, &input) {
             Ok(out) => out.replace(&world.display().to_string(), &t.world.display().to_string()),
             Err(e) => {
                 failures.push(format!("{}: console failed: {:#}", name, e));

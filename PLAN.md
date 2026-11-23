@@ -33,11 +33,11 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 
 ## Phase 4 · Play
 
-- [ ] Play-mode verbs and aliases, v1 [console] (REQ-CON-10)
+- [x] Play-mode verbs and aliases, v1 [console] (REQ-CON-10)
 - [x] Action effects for move, look, take, examine and inventory [coder] (REQ-ENG-5)
 - [ ] Design story flags, conditions and alternative text in the content format [commander] (`design/CONTENT_FORMAT.md`)
 - [ ] Narrative state: flags, conditions and alternative text [coder] (`design/ARCHITECTURE.md` › Narrative Engine)
-- [ ] Save and load from the console [console, coder] (REQ-CON-11)
+- [x] Save and load from the console [console, coder] (REQ-CON-11)
 
 ## Phase 5 · Tooling, as needed
 

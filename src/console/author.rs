@@ -103,7 +103,6 @@ impl Console {
         match self.world.path_of(Kind::Room, &id) {
             Some(path) => {
                 self.place = Place::File(path);
-                self.room = Some(id);
                 format!("{}\nNow at {}.", report, self.pwd())
             }
             None => report,
@@ -335,13 +334,15 @@ impl Console {
             self.own_writes.push((relative, now));
         }
         self.world.refresh_index();
+        let game_warnings = self.reconcile_game();
         let before = self.warnings_before.take().unwrap_or_default();
         let new_problems: Vec<String> = self.world.warnings().into_iter().filter(|w| !before.contains(w)).collect();
-        if new_problems.is_empty() {
-            summary
-        } else {
-            format!("{}\nThis adds {} problem(s):\n  {}", summary, new_problems.len(), new_problems.join("\n  "))
+        let mut out = vec![summary];
+        if !new_problems.is_empty() {
+            out.push(format!("This adds {} problem(s):\n  {}", new_problems.len(), new_problems.join("\n  ")));
         }
+        out.extend(game_warnings.iter().map(|w| format!("Game: {}", w)));
+        out.join("\n")
     }
 
     /// Drops the changed paths the console wrote itself in the last few

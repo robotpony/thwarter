@@ -1,10 +1,13 @@
 //! The console's state and its commands: the `/` commands that work in
 //! both modes (REQ-CON-2), edit-mode navigation (REQ-CON-4) and
-//! `/reload` (REQ-CON-7).
+//! `/reload` (REQ-CON-7). Play mode is in `play.rs`, authoring in
+//! `author.rs`.
 
 use super::view;
 use super::world::{Kind, World};
 use super::Mode;
+use crate::engines::GameEngine;
+use crate::models::game::PlayState;
 use crate::render::render_location;
 use anyhow::Result;
 use std::path::Path;
@@ -29,10 +32,12 @@ pub(super) enum Place {
 pub struct Console {
     pub(super) world: World,
     pub(super) mode: Mode,
+    /// Where edit mode is. Separate from the player's room: moving around
+    /// in edit mode never moves the player (REQ-CON-12).
     pub(super) place: Place,
-    /// The room the player is in, shared by both modes, so switching mode
-    /// or reloading keeps it (REQ-CON-7).
-    pub(super) room: Option<String>,
+    /// The game in progress, if one has started.
+    pub(super) game: Option<PlayState>,
+    pub(super) game_engine: GameEngine,
     /// Files the console saved itself, relative to the world root, with
     /// when, so the file watcher doesn't announce them a second time.
     pub(super) own_writes: Vec<(String, Instant)>,
@@ -56,10 +61,20 @@ pub(super) const COMPASS_ALIASES: &[(&str, &str)] = &[
 impl Console {
     pub fn open(world_path: &Path, mode: Mode) -> Result<Console> {
         let world = World::load(world_path)?;
-        let room = world.default_room();
-        let mut console = Console { world, mode, place: Place::Dir(String::new()), room, own_writes: Vec::new(), warnings_before: None };
+        let mut console = Console {
+            world,
+            mode,
+            place: Place::Dir(String::new()),
+            game: None,
+            game_engine: GameEngine::new(),
+            own_writes: Vec::new(),
+            warnings_before: None,
+        };
         if mode == Mode::Play {
-            console.place_at_room();
+            if let Some(room) = console.world.default_room() {
+                console.start_game(&room).map_err(anyhow::Error::msg)?;
+                console.place_at_room();
+            }
         }
         Ok(console)
     }
@@ -67,7 +82,7 @@ impl Console {
     pub fn prompt(&self) -> String {
         let at = match self.mode {
             Mode::Edit => self.pwd(),
-            Mode::Play => self.room.clone().unwrap_or_else(|| "nowhere".to_string()),
+            Mode::Play => self.game.as_ref().map(|g| g.location.clone()).unwrap_or_else(|| "nowhere".to_string()),
         };
         format!("{} {}> ", self.mode.name(), at)
     }
@@ -87,7 +102,7 @@ impl Console {
         out.extend(self.problem_summary());
         if self.mode == Mode::Play {
             out.push(String::new());
-            out.push(self.look());
+            out.push(self.play_look());
         }
         out.join("\n")
     }
@@ -103,10 +118,7 @@ impl Console {
         }
         let out = match self.mode {
             Mode::Edit => self.edit_input(line),
-            Mode::Play => format!(
-                "Play mode doesn't understand `{}` yet: in-game verbs come in PLAN.md › Phase 4.",
-                line
-            ),
+            Mode::Play => self.play_input(line),
         };
         (out, Flow::Continue)
     }
@@ -118,9 +130,13 @@ impl Console {
         let out = match (name, rest.as_slice()) {
             ("quit" | "q", _) => return ("Bye.".to_string(), Flow::Quit),
             ("help" | "?", _) => self.help(),
-            ("edit", []) => self.switch(Mode::Edit),
+            ("edit", []) => self.switch_to_edit(),
             ("edit", [kind, ..]) => self.full_edit(kind),
-            ("play", _) => self.switch(Mode::Play),
+            ("play", []) => self.play(),
+            ("play", ["here"]) => self.play_here(),
+            ("play", _) => "Usage: /play, or /play here".to_string(),
+            ("save", args) => self.save_game_as(args),
+            ("load", args) => self.load_game_named(args),
             ("reload", _) => self.reload(),
             ("new", args) if self.mode == Mode::Edit => self.new_entity(args),
             ("set", args) if self.mode == Mode::Edit => self.set(args),
@@ -139,7 +155,10 @@ impl Console {
         let mut lines = vec![
             "Console commands, in either mode:".to_string(),
             "  /edit           switch to edit mode".to_string(),
-            "  /play           switch to play mode".to_string(),
+            "  /play           switch to play mode, resuming the game".to_string(),
+            "  /play here      play from the room edit mode is in".to_string(),
+            "  /save [name]    save the game (quicksave if no name)".to_string(),
+            "  /load [name]    load a saved game".to_string(),
             "  /reload         reload the world from disk, staying where you are".to_string(),
             "  /help           this list".to_string(),
             "  /quit           leave the console".to_string(),
@@ -155,7 +174,7 @@ impl Console {
                 "  pwd             where you are".to_string(),
                 "  look            show the room, character or object you're in".to_string(),
                 String::new(),
-                "Changing content (each saves the file, then reloads):".to_string(),
+                "Changing content (each saves the file):".to_string(),
                 "  /new room <direction> <id> [title]   a room through a new exit from this one".to_string(),
                 "  /new room <id> [title]               a room with no exits, outside a room".to_string(),
                 "  /new character <id> [title]          a character, placed here if in a room".to_string(),
@@ -167,36 +186,24 @@ impl Console {
             ]),
             Mode::Play => lines.extend([
                 String::new(),
-                "In-game verbs (look, go, take, ...) come in PLAN.md › Phase 4.".to_string(),
+                "In the game:".to_string(),
+                "  look, l                   look around".to_string(),
+                "  go <direction>, north, n  go somewhere (ne, up, u, ...)".to_string(),
+                "  take <thing>, get         pick something up".to_string(),
+                "  examine <thing>, x        look closely (also: look at)".to_string(),
+                "  inventory, i              what you're carrying".to_string(),
             ]),
         }
         lines.join("\n")
     }
 
-    fn switch(&mut self, mode: Mode) -> String {
-        if self.mode == mode {
-            return format!("Already in {} mode.", mode.name());
+    /// `/edit`: back to where edit mode was (REQ-CON-12).
+    fn switch_to_edit(&mut self) -> String {
+        if self.mode == Mode::Edit {
+            return "Already in edit mode.".to_string();
         }
-        self.mode = mode;
-        match mode {
-            Mode::Edit => {
-                self.place_at_room();
-                format!("Edit mode, at {}.", self.pwd())
-            }
-            Mode::Play => {
-                if let Place::File(path) = &self.place {
-                    if let Some(entry) = self.world.files.get(path) {
-                        if entry.kind == Kind::Room {
-                            self.room = Some(entry.id.clone());
-                        }
-                    }
-                }
-                if self.room.is_none() {
-                    self.room = self.world.default_room();
-                }
-                format!("Play mode.\n\n{}", self.look())
-            }
-        }
+        self.mode = Mode::Edit;
+        format!("Edit mode, at {}.", self.pwd())
     }
 
     /// `/edit room`, `/edit object`, `/edit character` (REQ-CON-6). From
@@ -216,17 +223,21 @@ impl Console {
         out.join("\n")
     }
 
-    /// Reloads from disk, keeping the room and place (REQ-CON-7). Keeps the
-    /// old world if a file fails to parse or the current room is gone.
+    /// Reloads from disk, keeping the game and edit mode's place
+    /// (REQ-CON-7). Keeps the old world if a file fails to parse or the
+    /// player's room is gone.
     pub(crate) fn reload(&mut self) -> String {
         let fresh = match World::load(&self.world.root) {
             Ok(world) => world,
             Err(e) => return format!("Reload failed, keeping the previous world: {}", e),
         };
         let mut blockers: Vec<String> = fresh.blocking_problems().to_vec();
-        if let Some(room) = &self.room {
-            if fresh.engine.get_location(room).is_none() {
-                blockers.push(format!("the current room `{}` no longer exists", room));
+        if let Some(game) = &self.game {
+            if fresh.engine.get_location(&game.location).is_none() {
+                blockers.push(format!(
+                    "the player's room `{}` no longer exists (/play here from another room moves the player)",
+                    game.location
+                ));
             }
         }
         if !blockers.is_empty() {
@@ -244,9 +255,11 @@ impl Console {
         )];
         if !self.place_exists() {
             let gone = self.pwd();
-            self.place = Place::Dir(String::new());
-            self.place_at_room();
+            self.move_to_existing_folder();
             out.push(format!("{} is gone; now at {}.", gone, self.pwd()));
+        }
+        for warning in self.reconcile_game() {
+            out.push(format!("Game: {}", warning));
         }
         let warnings = self.world.warnings();
         if !warnings.is_empty() {
@@ -341,10 +354,7 @@ impl Console {
 
     fn look(&self) -> String {
         let path = match (&self.mode, &self.place) {
-            (Mode::Play, _) => match self.room.as_ref().and_then(|r| self.world.path_of(Kind::Room, r)) {
-                Some(path) => path,
-                None => return "You are nowhere: this world has no rooms.".to_string(),
-            },
+            (Mode::Play, _) => return self.play_look(),
             (Mode::Edit, Place::Dir(dir)) => return self.list_dir(dir),
             (Mode::Edit, Place::File(path)) => path.clone(),
         };
@@ -384,9 +394,6 @@ impl Console {
                 self.place = place;
                 if let Place::File(path) = &self.place {
                     if let Some(entry) = self.world.files.get(path) {
-                        if entry.kind == Kind::Room {
-                            self.room = Some(entry.id.clone());
-                        }
                         if entry.kind != Kind::Broken {
                             return format!("{} ({})", entry.title, entry.kind.label());
                         }
@@ -477,11 +484,22 @@ impl Console {
         }
     }
 
-    /// Moves edit mode's place to the current room's file, if there is one.
+    /// Moves edit mode's place to the player's room, if there is one.
     pub(super) fn place_at_room(&mut self) {
-        if let Some(path) = self.room.as_ref().and_then(|r| self.world.path_of(Kind::Room, r)) {
+        let room = self.game.as_ref().map(|g| g.location.clone());
+        if let Some(path) = room.and_then(|r| self.world.path_of(Kind::Room, &r)) {
             self.place = Place::File(path);
         }
+    }
+
+    /// After the place's file or folder vanished: up to the nearest
+    /// folder that still exists.
+    fn move_to_existing_folder(&mut self) {
+        let mut dir = self.parent_dir();
+        while !dir.is_empty() && !self.world.dirs.contains(&dir) {
+            dir = parent_of(&dir);
+        }
+        self.place = Place::Dir(dir);
     }
 }
 
@@ -516,7 +534,7 @@ mod tests {
     fn console_at_well(dir: &tempfile::TempDir) -> Console {
         let mut console = Console::open(dir.path(), Mode::Edit).unwrap();
         console.handle("cd village/well");
-        assert_eq!(console.room.as_deref(), Some("village/well"));
+        assert_eq!(console.pwd(), "village/well");
         console
     }
 
@@ -546,24 +564,47 @@ mod tests {
     }
 
     #[test]
-    fn reload_keeps_the_old_world_when_the_current_room_is_gone() {
+    fn reload_keeps_the_old_world_when_the_players_room_is_gone() {
+        let dir = copy_fixture();
+        let mut console = console_at_well(&dir);
+        console.handle("/play here");
+        fs::remove_file(dir.path().join("village/well.md")).unwrap();
+
+        let (out, _) = console.handle("/reload");
+        assert!(out.contains("the player's room `village/well` no longer exists"), "{}", out);
+        assert!(console.handle("look").0.starts_with("The Well"), "old world still loaded");
+    }
+
+    #[test]
+    fn reload_without_a_game_moves_edit_mode_up_when_its_room_is_gone() {
         let dir = copy_fixture();
         let mut console = console_at_well(&dir);
         fs::remove_file(dir.path().join("village/well.md")).unwrap();
 
         let (out, _) = console.handle("/reload");
-        assert!(out.contains("the current room `village/well` no longer exists"), "{}", out);
-        assert_eq!(console.pwd(), "village/well");
+        assert!(out.contains("village/well is gone; now at village/."), "{}", out);
     }
 
     #[test]
-    fn reload_moves_to_the_room_when_the_current_card_is_gone() {
+    fn reload_drops_carried_objects_whose_cards_are_gone() {
+        let dir = copy_fixture();
+        let mut console = Console::open(dir.path(), Mode::Play).unwrap();
+        assert!(console.handle("take lantern").0.starts_with("You take"));
+        fs::remove_file(dir.path().join("objects/lantern.md")).unwrap();
+
+        let (out, _) = console.handle("/reload");
+        assert!(out.contains("Game: "), "{}", out);
+        assert_eq!(console.handle("i").0, "You aren't carrying anything.");
+    }
+
+    #[test]
+    fn reload_moves_up_a_folder_when_the_current_card_is_gone() {
         let dir = copy_fixture();
         let mut console = console_at_well(&dir);
         console.handle("cd /npcs/elder");
         fs::remove_file(dir.path().join("npcs/elder.md")).unwrap();
 
         let (out, _) = console.handle("/reload");
-        assert!(out.contains("npcs/elder is gone; now at village/well."), "{}", out);
+        assert!(out.contains("npcs/elder is gone; now at /."), "{}", out);
     }
 }

@@ -26,6 +26,21 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.8.0 (2026-11-23)
+
+### Added
+
+- Play mode's verbs, v1 (REQ-CON-10): `look`/`l`, `go <direction>`, bare directions with `n` ... `nw`, `u`, `d`, `take`/`get`/`pick up`, `examine`/`x`/`look at`, and `inventory`/`i`. Articles are dropped (`take the lantern`). A bare `take` asks "Take what?", and anything else gets "I don't understand `...`." with no change. The engine's replies are player-facing, and its author notes print on their own line as `Author note: ...`.
+- `/save [name]` and `/load [name]` (REQ-CON-11), `quicksave` by default, in `$XDG_STATE_HOME/thwarter/saves/<world>-<hash>/` (`~/.local/state` without it). The hash is a stable FNV-1a of the world's full path. Save names are letters, digits, `-` and `_` only. `/load` of a missing save lists the saves there are.
+- `/play here` (REQ-CON-12) starts the game in, or moves the player to, the room edit mode is in.
+- Transcripts: `play.txt`. The runner sends game saves to a temp folder, and fails a transcript that uses `/new`, `/set`, `/link` or `/unlink` without `# copy: yes`.
+
+### Changed
+
+- Play state and edit-mode navigation are separate (REQ-CON-12). `/play` resumes the game where it was, `/edit` returns to where edit mode was, and `cd` never moves the player. Play mode's room view is the player view (`RenderStyle::Player`).
+- `/reload` refuses only when the player's room is gone, not edit mode's place. When edit mode's file or folder is gone, it moves up to the nearest folder that exists. After a reload or an authoring change, carried objects whose cards are gone are dropped, with a `Game:` warning.
+- `modes.txt` now runs on a copy, because it uses `/set` and `/new`, even though both are refused there.
+
 ## 0.7.0 (2026-11-23)
 
 ### Added

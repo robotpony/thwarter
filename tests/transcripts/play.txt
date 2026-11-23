@@ -1,0 +1,138 @@
+# world: worlds/tiny
+# mode: play
+# copy: yes
+Playing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
+
+Village Square
+
+A small square of packed earth. An old well stands to the north.
+
+Exits: north, east.
+You see: Brass Lantern, Bench.
+Here: The Elder.
+> l
+Village Square
+
+A small square of packed earth. An old well stands to the north.
+
+Exits: north, east.
+You see: Brass Lantern, Bench.
+Here: The Elder.
+> take the lantern
+You take the Brass Lantern.
+> take lantern
+You already have the Brass Lantern.
+> get bench
+You can't take the bench.
+Author note: `bench` is scenery with no card, so it can't be taken
+> take elder
+You can't take people.
+> take
+Take what?
+> x lantern
+A dented brass lantern with a little oil left.
+> examine bench
+You see nothing special about the bench.
+> look at the elder
+A stooped woman who remembers when the well still had water.
+> i
+You're carrying: Brass Lantern.
+> dance wildly
+I don't understand `dance wildly`.
+> n please
+I don't understand `n please`.
+> e
+You can't go east from here.
+Author note: the east exit leads to `village/inn`, which doesn't exist yet
+> go behind
+You can't go behind from here.
+> n
+The Well
+
+A mossy stone well. The rope is long gone.
+
+Exits: south.
+> look
+The Well
+
+A mossy stone well. The rope is long gone.
+
+Exits: south.
+> /save
+Saved the game as `quicksave`.
+> s
+Village Square
+
+A small square of packed earth. An old well stands to the north.
+
+Exits: north, east.
+You see: Bench.
+Here: The Elder.
+> /load
+Loaded `quicksave`.
+
+The Well
+
+A mossy stone well. The rope is long gone.
+
+Exits: south.
+> i
+You're carrying: Brass Lantern.
+> /load nothing
+There's no save called `nothing`. Saves: quicksave.
+> /save ../escape
+Not saved: save names use letters, digits, `-` and `_`: `../escape` doesn't.
+> /edit
+Edit mode, at village/square.
+> pwd
+village/square
+> cd /village/well
+The Well (room)
+> /new object rope tool
+Created object rope, Rope, placed in village/well.
+> /play
+Play mode.
+
+The Well
+
+A mossy stone well. The rope is long gone.
+
+Exits: south.
+You see: Rope.
+> n
+You can't go north from here.
+> /play here
+Play mode.
+
+The Well
+
+A mossy stone well. The rope is long gone.
+
+Exits: south.
+You see: Rope.
+> take rope
+You take the rope.
+> inventory
+You're carrying: Brass Lantern, Rope.
+> /save after-rope
+Saved the game as `after-rope`.
+> /load
+Loaded `quicksave`.
+
+The Well
+
+A mossy stone well. The rope is long gone.
+
+Exits: south.
+You see: Rope.
+> /load after-rope
+Loaded `after-rope`.
+
+The Well
+
+A mossy stone well. The rope is long gone.
+
+Exits: south.
+> /quit
+Bye.
