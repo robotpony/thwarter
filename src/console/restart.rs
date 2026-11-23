@@ -32,6 +32,9 @@ struct Snapshot {
     place: (String, String),
     /// The input history, oldest first.
     history: Vec<String>,
+    /// The output so far, so the screen looks the same after.
+    #[serde(default)]
+    scrollback: Vec<String>,
     /// The game save beside this file, if a game was running.
     game: Option<PathBuf>,
 }
@@ -39,13 +42,14 @@ struct Snapshot {
 /// What a resumed console starts with.
 pub struct Resumed {
     pub history: Vec<String>,
+    pub scrollback: Vec<String>,
     /// Shown in place of the usual greeting.
     pub greeting: String,
 }
 
 impl Console {
     /// Writes the session to a resume file in `dir` and returns its path.
-    pub(super) fn write_snapshot(&self, history: &[String], dir: &Path) -> Result<PathBuf> {
+    pub(super) fn write_snapshot(&self, history: &[String], scrollback: &[String], dir: &Path) -> Result<PathBuf> {
         std::fs::create_dir_all(dir).with_context(|| format!("can't create {}", dir.display()))?;
         let stem = format!("restart-{}", std::process::id());
         let game = match &self.game {
@@ -65,6 +69,7 @@ impl Console {
             mode: self.mode.name().to_string(),
             place,
             history: history.to_vec(),
+            scrollback: scrollback.to_vec(),
             game,
         };
         let path = dir.join(format!("{}.yaml", stem));
@@ -85,6 +90,7 @@ impl Console {
         let Some(snapshot) = snapshot else {
             return Resumed {
                 history: Vec::new(),
+                scrollback: Vec::new(),
                 greeting: format!("{}\nThe session couldn't be carried over, so this is a fresh start.", restarted_on()),
             };
         };
@@ -120,14 +126,14 @@ impl Console {
 
         let mut greeting = vec![format!("{} You're where you were.", restarted_on())];
         greeting.extend(notes);
-        Resumed { history: snapshot.history, greeting: greeting.join("\n") }
+        Resumed { history: snapshot.history, scrollback: snapshot.scrollback, greeting: greeting.join("\n") }
     }
 }
 
 /// Saves the session and replaces this process with the `thwart` on disk.
 /// Returns only if that couldn't happen, with the reason; the console then
 /// carries on as it was.
-pub fn restart(console: &Console, history: &[String]) -> String {
+pub fn restart(console: &Console, history: &[String], scrollback: &[String]) -> String {
     let exe = match current_exe() {
         Ok(exe) => exe,
         Err(e) => return format!("Can't restart: {:#}", e),
@@ -149,7 +155,7 @@ pub fn restart(console: &Console, history: &[String]) -> String {
         Ok(home) => home.join("thwarter").join("restart"),
         Err(e) => return format!("Not restarted: {:#}", e),
     };
-    let snapshot = match console.write_snapshot(history, &dir) {
+    let snapshot = match console.write_snapshot(history, scrollback, &dir) {
         Ok(path) => path,
         Err(e) => return format!("Not restarted: can't save the session: {:#}", e),
     };
@@ -221,12 +227,13 @@ mod tests {
         before.handle("/edit");
         before.handle("go /npcs/elder");
         let history = vec!["take lantern".to_string(), "n".to_string()];
-        let snapshot = before.write_snapshot(&history, &dir.path().join("restart")).unwrap();
+        let snapshot = before.write_snapshot(&history, &["before".to_string()], &dir.path().join("restart")).unwrap();
 
         let mut after = Console::open(&root, Mode::Edit).unwrap();
         let resumed = after.resume(&snapshot);
         assert!(resumed.greeting.contains("You're where you were."), "{}", resumed.greeting);
         assert_eq!(resumed.history, history);
+        assert_eq!(resumed.scrollback, vec!["before".to_string()]);
         assert_eq!(after.mode, Mode::Edit);
         assert_eq!(after.pwd(), "npcs/elder");
         let game = after.game.as_ref().unwrap();
@@ -240,7 +247,7 @@ mod tests {
         let (dir, root) = tiny_copy();
         let mut before = Console::open(&root, Mode::Edit).unwrap();
         before.handle("go /village/well");
-        let snapshot = before.write_snapshot(&[], &dir.path().join("restart")).unwrap();
+        let snapshot = before.write_snapshot(&[], &[], &dir.path().join("restart")).unwrap();
         fs::remove_file(root.join("village/well.md")).unwrap();
 
         let mut after = Console::open(&root, Mode::Edit).unwrap();

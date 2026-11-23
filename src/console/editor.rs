@@ -15,8 +15,10 @@ use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
+#[cfg(test)]
 use ratatui::{backend::Backend, Terminal};
 use ratatui_textarea::{CursorMove, Input, Key, TextArea};
+#[cfg(test)]
 use std::io;
 
 /// What the editor shows: a heading, and one section per file.
@@ -89,7 +91,7 @@ pub struct Closed {
 const KEYS_HINT: &str = "ctrl-s save · esc close";
 
 /// The editor's state between keys.
-struct Editor<'a> {
+pub struct Editor<'a> {
     document: Document,
     area: TextArea<'a>,
     /// The text as last saved (or opened), to know whether there are
@@ -104,7 +106,7 @@ struct Editor<'a> {
 }
 
 impl<'a> Editor<'a> {
-    fn new(document: Document) -> Self {
+    pub fn new(document: Document) -> Self {
         let text = document.combined();
         let mut area = TextArea::new(text.lines().map(str::to_string).collect());
         area.set_line_number_style(Style::default().add_modifier(Modifier::DIM));
@@ -156,7 +158,7 @@ impl<'a> Editor<'a> {
     }
 
     /// Handles one key. Returns false when the editor should close.
-    fn key(&mut self, input: Input, files: &mut impl Files) -> bool {
+    pub fn key(&mut self, input: Input, files: &mut impl Files) -> bool {
         match input {
             Input { key: Key::Esc, .. } => {
                 if !self.dirty() || self.discard_armed {
@@ -194,9 +196,22 @@ impl<'a> Editor<'a> {
         true
     }
 
-    fn draw(&self, frame: &mut ratatui::Frame) {
+    /// Takes a change on disk to the files, if there is one.
+    pub fn check_disk(&mut self, files: &mut impl Files) {
+        if let Some(sections) = files.changed_on_disk() {
+            self.disk_changed(sections);
+        }
+    }
+
+    /// What the editor closed with.
+    pub fn closed(self) -> Closed {
+        Closed { reports: self.reports }
+    }
+
+    /// Draws the editor in `area`: its heading, the text, and a status line.
+    pub fn draw(&self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect) {
         let [top, middle, bottom] =
-            Layout::vertical([Constraint::Length(1), Constraint::Min(1), Constraint::Length(1)]).areas(frame.area());
+            Layout::vertical([Constraint::Length(1), Constraint::Min(1), Constraint::Length(1)]).areas(area);
         let width = top.width as usize;
         let gap = width.saturating_sub(self.document.heading.chars().count() + KEYS_HINT.chars().count()).max(2);
         let heading = format!("{}{}{}", self.document.heading, " ".repeat(gap), KEYS_HINT);
@@ -207,9 +222,10 @@ impl<'a> Editor<'a> {
     }
 }
 
-/// Runs the editor on `terminal` until the author closes it. `next_key`
-/// waits a short while for the next key, and returns `None` when none
-/// came (or for a resize); the editor then checks the files on disk.
+/// Runs the editor on its own `terminal` until the author closes it, for
+/// tests; the full-screen console hosts `Editor` itself. `next_key`
+/// returns `None` when no key came, and the editor then checks the disk.
+#[cfg(test)]
 pub fn run<B: Backend>(
     terminal: &mut Terminal<B>,
     document: Document,
@@ -221,39 +237,15 @@ where
 {
     let mut editor = Editor::new(document);
     loop {
-        terminal.draw(|frame| editor.draw(frame)).map_err(io::Error::other)?;
+        terminal.draw(|frame| editor.draw(frame, frame.area())).map_err(io::Error::other)?;
         let Some(input) = next_key()? else {
-            if let Some(sections) = files.changed_on_disk() {
-                editor.disk_changed(sections);
-            }
+            editor.check_disk(&mut files);
             continue;
         };
         if !editor.key(input, &mut files) {
-            return Ok(Closed { reports: editor.reports });
+            return Ok(editor.closed());
         }
     }
-}
-
-/// How often the editor looks at its files on disk while no key comes.
-const DISK_CHECK: std::time::Duration = std::time::Duration::from_millis(500);
-
-/// Opens the editor full-screen on the real terminal, and puts the
-/// terminal back as it was when it closes, even after an error.
-pub fn run_in_terminal(document: Document, files: impl Files) -> io::Result<Closed> {
-    use ratatui::crossterm::event::{self, Event, KeyEventKind};
-    let mut terminal = ratatui::try_init()?;
-    let next_key = || -> io::Result<Option<Input>> {
-        if !event::poll(DISK_CHECK)? {
-            return Ok(None);
-        }
-        Ok(match event::read()? {
-            Event::Key(key) if key.kind != KeyEventKind::Release => Some(Input::from(key)),
-            _ => None,
-        })
-    };
-    let result = run(&mut terminal, document, next_key, files);
-    ratatui::restore();
-    result
 }
 
 /// Text compared for unsaved changes: line endings and a missing final

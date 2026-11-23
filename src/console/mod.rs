@@ -9,9 +9,11 @@
 mod author;
 mod editor;
 mod full_edit;
+mod panels;
 mod play;
 mod restart;
 mod saves;
+mod screen;
 mod session;
 mod verbs;
 mod view;
@@ -20,10 +22,6 @@ mod world;
 
 use anyhow::Result;
 use session::{Console, Flow};
-use reedline::{
-    ExternalPrinter, FileBackedHistory, HistoryItem, Prompt, PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus, Reedline, Signal,
-};
-use std::borrow::Cow;
 use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -61,112 +59,26 @@ pub fn run(world_path: &Path, mode: Mode) -> Result<()> {
     }
 }
 
-/// The interactive loop: a line editor with history (arrow keys,
-/// Ctrl-R search) on a real terminal. Ctrl-C clears the line; Ctrl-D
-/// leaves, like `/quit`. World files are watched, and a change reloads
-/// the world and prints what happened above the prompt (REQ-CON-7).
+/// The full-screen console on a real terminal (REQ-CON-22). World files
+/// are watched, and a change reloads the world and says what happened in
+/// the output (REQ-CON-7).
 fn drive_terminal(mut console: Console, world_path: &Path, resumed: Option<restart::Resumed>) -> Result<()> {
     console.interactive = true;
     let console = Arc::new(Mutex::new(console));
-    let notices = ExternalPrinter::<String>::default();
-    let _watching = match watch::watch(world_path, console.clone(), notices.sender()) {
+    let (send, notices) = std::sync::mpsc::sync_channel(256);
+    let _watching = match watch::watch(world_path, console.clone(), send.clone()) {
         Ok(handle) => Some(handle),
         Err(e) => {
-            println!("Can't watch the world's files ({}); use /reload after changes.", e);
+            let _ = send.try_send(format!("Can't watch the world's files ({}); use /reload after changes.", e));
             None
         }
     };
-    let mut editor = Reedline::create()
-        .with_history(Box::new(FileBackedHistory::new(HISTORY_LINES)?))
-        .with_external_printer(notices);
-    // Lines typed this session, oldest first, for /restart to carry over.
-    let mut history: Vec<String> = Vec::new();
-    match resumed {
-        Some(resumed) => {
-            for line in &resumed.history {
-                let _ = editor.history_mut().save(HistoryItem::from_command_line(line.clone()));
-            }
-            history = resumed.history;
-            println!("{}", resumed.greeting);
-        }
-        None => println!("{}", lock(&console).greeting()),
-    }
-    loop {
-        let prompt = ConsolePrompt(lock(&console).prompt());
-        let line = match editor.read_line(&prompt)? {
-            Signal::Success(line) => line,
-            Signal::CtrlC(_) => continue,
-            Signal::CtrlD => return Ok(()),
-            _ => continue,
-        };
-        if !line.trim().is_empty() {
-            history.push(line.clone());
-            if history.len() > HISTORY_LINES {
-                history.remove(0);
-            }
-        }
-        let (text, flow) = lock(&console).handle(&line);
-        if !text.is_empty() {
-            println!("{}", text);
-        }
-        match flow {
-            Flow::Quit => return Ok(()),
-            // Returns only if the restart couldn't happen.
-            Flow::Restart => println!("{}", restart::restart(&lock(&console), &history)),
-            Flow::Continue => {}
-        }
-        let pending = lock(&console).take_pending_edit();
-        if let Some(target) = pending {
-            println!("{}", edit_full_screen(&console, target));
-        }
-    }
-}
-
-/// Runs the full-screen editor for a `/edit <kind>` (REQ-CON-6). The
-/// console is locked only while a save is written, so the file watcher
-/// keeps working; its notices wait until the prompt is back. The editor
-/// itself looks for changes to its file, and takes them when it's safe.
-fn edit_full_screen(console: &Mutex<Console>, mut target: full_edit::EditTarget) -> String {
-    let document = lock(console).edit_document(&target);
-    let closed = editor::run_in_terminal(document, full_edit::EditFiles { console, target: &mut target });
-    match closed {
-        Ok(closed) => lock(console).edit_closed(&target, closed),
-        Err(e) => format!("The editor failed: {}. Nothing more was saved.", e),
-    }
+    screen::run(console, notices, resumed)
 }
 
 /// The console, even if a watcher reload panicked while holding it.
 fn lock(console: &Mutex<Console>) -> std::sync::MutexGuard<'_, Console> {
     console.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-/// Lines of history kept for the session. History isn't saved between
-/// sessions yet.
-const HISTORY_LINES: usize = 500;
-
-/// The console's prompt (`edit castle/courtyard> `) in reedline's terms.
-struct ConsolePrompt(String);
-
-impl Prompt for ConsolePrompt {
-    fn render_prompt_left(&self) -> Cow<'_, str> {
-        Cow::Borrowed(&self.0)
-    }
-    fn render_prompt_right(&self) -> Cow<'_, str> {
-        Cow::Borrowed("")
-    }
-    fn render_prompt_indicator(&self, _mode: PromptEditMode) -> Cow<'_, str> {
-        Cow::Borrowed("")
-    }
-    fn render_prompt_multiline_indicator(&self) -> Cow<'_, str> {
-        Cow::Borrowed("... ")
-    }
-    fn render_prompt_history_search_indicator(&self, search: PromptHistorySearch) -> Cow<'_, str> {
-        let status = match search.status {
-            PromptHistorySearchStatus::Passing => "",
-            PromptHistorySearchStatus::Failing => "failing ",
-        };
-        Cow::Owned(format!("({}search: {}) ", status, search.term))
-    }
 }
 
 /// Runs the console over `input` as if typed, and returns everything it

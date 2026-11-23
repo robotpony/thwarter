@@ -32,6 +32,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.25.0 (2026-11-23)
+
+### Added
+
+- The full-screen console (REQ-CON-22, 23), in the layout Bruce chose: a status bar across the top (world, mode, warnings, and with a game the chapter and turn; the build on the right, with "newer build: /restart" once one is built), the output on the left, a sidebar on the right, and the input line at the bottom. The sidebar's GAME panel shows where the player is, the chapter and what they carry, which stay put, then what has changed from its starting state and the values in play. In edit mode, HERE shows the room as a game master's notes: its exits and which aren't written, the people and things in it with their scope (global, area or local), and its warnings. HERE scrolls with Alt-Up and Alt-Down when the sidebar is short. Under 100 columns, the sidebar folds into one line above the input.
+- The editor opens over the output and keeps the sidebar. Watcher notices go into the output. Page Up and Page Down scroll the output; Up and Down recall input; Ctrl-C clears the line and Ctrl-D on an empty line leaves.
+- `/restart` also carries the output's scrollback, so the screen looks the same after it.
+
+### Removed
+
+- reedline, the line editor the console used before the full-screen view. Recover the old terminal loop with `git show aec429a:src/console/mod.rs`.
+
 ## 0.24.0 (2026-11-23)
 
 ### Added
