@@ -167,6 +167,24 @@ The console restarts itself onto a new build in place, so it can be changed and 
      rope      not here: objects/rope.md
   ```
 
+## Authors
+
+Who is writing, as a persona (`REQUIREMENTS.md` › 5.2, REQ-WS-4 to 6). Decided by Bruce, 2026-11-23; built after the lines above (`PLAN.md`).
+
+- REQ-CON-34: On first run, the console MUST ask who's writing. It lists the personas in `authors/` or offers to create one, writes `authors/<name>/index.md` for a new one, and records the choice in `~/.config/thwarter/config.toml`.
+
+  ```
+  Who's writing?
+    1. mx      Bruce Alderson
+    2. (a new persona)
+  > 1
+  Writing as mx. /author switches.
+  ```
+
+- REQ-CON-35: `/author` MUST switch persona, and the status bar MUST show who you're writing as.
+- REQ-CON-36: A new world MUST go under the current persona, with `author: <id>` in its `world/index.md`.
+- REQ-CON-37: A persona's contact details ship with every packaged world (REQ-WS-6), so before packaging the console MUST say which details will go with it.
+
 ## Open questions
 
 1. ~~What does full editing look like on screen?~~ Decided 2026-11-23 (Bruce): in the terminal, inside the console, and it may take the whole terminal; REQ-CON-6.
