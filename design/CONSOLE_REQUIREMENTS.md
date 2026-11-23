@@ -8,6 +8,8 @@ The ids REQ-CON-1 onwards are stable; code, tests and other docs cite them. Requ
 
 The console is the interactive terminal client for writing and playing a world. It lives in `src/console/`. Decided by Bruce, 2026-11-23, except where marked as proposed.
 
+The author is a player of sorts, like a game master running a table (Bruce, 2026-11-23). Editing SHOULD feel like being in the world and running it: standing in a room, adding things to it, checking how it plays, and nudging the game's state. It should not feel like filling in forms. New commands are judged against that, and each requirement below gives an example of how it reads at the prompt.
+
 - REQ-CON-1: `thwart edit <world>` MUST open the console in edit mode and `thwart play <world>` in play mode. Both are subcommands of the one `thwart` binary.
 - REQ-CON-2: Commands to the console itself MUST start with `/`; anything else is input to the current mode. `/edit` and `/play` MUST switch modes inside a running console (`/edit` followed by a kind, such as `/edit room`, opens full editing instead, REQ-CON-6; from play mode it switches to edit mode and opens the current room), and `/help` and `/quit` MUST work in both.
 - REQ-CON-3: Edit mode MUST be able to see everything in the world, including hidden state, and change content. Play mode MUST NOT change content files; it MAY write game saves. (Play mode's limits beyond that are proposed, not decided: Open question 2 below.)
@@ -35,6 +37,79 @@ Edit-mode tools that use a large language model (an AI) on the author's prose. B
 - REQ-CON-20: *Proposed*: helpers are authoring tools only. Play mode MUST NOT call a model, so generated text reaches a player only after an author has accepted it into a file (principle 6).
 - REQ-CON-21: *Proposed*: the model is configurable, defaulting to a current Claude model.
 
+## Screen and play state
+
+Decided by Bruce, 2026-11-23, except where marked as proposed.
+
+- REQ-CON-22: On a terminal, the console MUST be one full-screen view: scrolling output, an input line, and a play-state sidebar that is always visible. Watcher notices go into the output. The full-screen editor (REQ-CON-6) opens inside this view. Scripts and transcripts stay line-based, with the same output and no sidebar (REQ-CON-9).
+
+  ```
+  play village/square                    │ GAME
+                                         │ at: village/square
+  > take lantern                         │ chapter: arrival
+  You take the brass lantern.            │
+  > n                                    │ carrying
+  The Well                               │   lantern
+  A mossy stone well. The rope is long   │
+  gone.                                  │ changed
+  Exits: south                           │   bread: stale
+                                         │   vault-door: locked
+  > _                                    │ values
+                                         │   tasty: no
+  ```
+
+- REQ-CON-23: The sidebar MUST show the play state: where the player is, the current chapter, what they carry, every thing that has left its starting state, and the values in play. It shows the game in both modes, so an author writing in edit mode can see the playtest they are running. *Proposed*: on a terminal too narrow for both (under 100 columns), the sidebar folds into one line above the input, and `cd /game` still shows everything.
+- REQ-CON-24: The running game MUST appear as a virtual `game/` folder at the world root. It isn't on disk, and it is navigated like any other folder. A real `game/` folder on disk only sets the starting state (`design/STATES.md`).
+
+  ```
+  edit /> cd /game
+  edit game/> ls
+  location     village/square
+  chapter      arrival
+  carrying/    1 thing
+  things/      2 changed from their starting state
+  values/      1 value
+  edit game/> cd things/bread
+  edit game/things/bread> look
+  bread: fresh (its starting state)
+  ```
+
+- REQ-CON-25: Inside `game/`, `/set` MUST change only the running game, never a file, and say so. It can set a thing's state, the chapter, the player's location, what they carry and values, so an author can set a scene up the way a game master would, then play it.
+
+  ```
+  edit game/things/bread> /set state stale
+  Game: bread is now stale. No file changed.
+  edit game/> /set chapter after-the-king
+  Game: now in chapter after-the-king. No file changed.
+  ```
+
+## Scope
+
+Where a thing's file lives is its scope: global, area or local (`design/STATES.md` › Scope). Decided by Bruce, 2026-11-23, except where marked as proposed.
+
+- REQ-CON-26: `/scope global|area|local` MUST set the scope that the following `/new` commands use, and the prompt MUST show it. The default is global, since most objects and doors are expected to be global.
+
+  ```
+  edit castle/hall> /scope global
+  edit castle/hall [global]> /new object lantern, rope, key tool
+  Created 3 objects in objects/, placed in castle/hall.
+  ```
+
+- REQ-CON-27: A trailing `in global`, `in area` or `in here` MUST override the scope for one command. `/new object a, b, c <type>` creates several things of one type in one command.
+
+  ```
+  edit castle/hall [global]> /new object torch tool in area
+  Created object torch in castle/objects/, placed in castle/hall.
+  ```
+
+- REQ-CON-28: An area's things go in a folder for their kind inside the area (`castle/objects/torch.md`, `castle/npcs/guard.md`). The console writes them there, and `ls castle/` lists those folders after the rooms. A thing's file placed directly in the area (`castle/torch.md`) MUST also load and edit normally, for authors who prefer it.
+- REQ-CON-29: `/move <id> global|area|local` MUST change a thing's scope by moving its file. References stay valid, since object, character and door ids don't include their folder. It refuses if a file is already at the target, and the file watcher reports the move as one change.
+
+  ```
+  edit castle/hall [global]> /move torch global
+  Moved torch: castle/objects/torch.md → objects/torch.md.
+  ```
+
 ## Open questions
 
 1. ~~What does full editing look like on screen?~~ Decided 2026-11-23 (Bruce): in the terminal, inside the console, and it may take the whole terminal; REQ-CON-6.
@@ -42,3 +117,5 @@ Edit-mode tools that use a large language model (an AI) on the author's prose. B
 3. Should `/new room north` also add the return exit (`south`) to the new room? Proposed: yes for compass directions and `up`/`down`, no for free-text directions. Implemented as proposed in 0.6.1, pending Bruce.
 4. Writing helpers: which model services to support (one, several, or a local model), and can "flesh out" also propose new things, such as rooms from an outline, or only prose?
 5. Writing helpers: where styles live, until `world/`'s layout is settled (`design/STATES.md` › Open questions).
+6. Scope: what does `local` mean in a room? Making an object local to a room turns the room into a bundle (`castle/hall.md` becomes `castle/hall/index.md`, with `torch.md` beside it). Proposed: `/new ... in here` asks first, or works only in a room that is already a bundle.
+7. Scope: must object, character and door ids be unique across the whole world, so a room's `torch` always means one file? Proposed: yes; `/move` keeps it so. This touches the content format, so it goes to the commander.
