@@ -20,6 +20,8 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 ## Phase 3 · Authoring
 
 - [ ] Round-trip file writer: change one field and keep everything else as it was [coder] (REQ-ENG-7)
+- [ ] The loader records which file each `id` came from, and `validate` reports an `id` defined in two files [coder] (REQ-ENG-7)
+- [ ] `validate` warns about a key that differs only in case from a known one, such as `Inventory:` [coder] (`design/CONTENT_FORMAT.md` › Keys, order and file locations)
 - [ ] Changes to the loaded world in memory, checked after each one [coder] (REQ-ENG-8)
 - [ ] `/new room <direction>`, `/new object`, `/new character` [console] (REQ-CON-5)
 - [ ] `/set` and `/link` for single fields and exits [console] (REQ-CON-5)
@@ -43,7 +45,7 @@ Built when authoring or play asks for them, most likely as console commands. Unt
 - [ ] Search over locations, characters and objects [coder] (`design/CLI_DESIGN.md` › `search`)
 - [ ] `CharacterEngine` wired into `show` and `validate --strict` [coder] (`design/ARCHITECTURE.md` › Character Engine)
 - [ ] Read `thwart.toml` through `ConfigManager` [coder] (REQ-CFG-1)
-- [ ] `validate` checks `id` against the file path, and `id` collisions [coder] (`design/CONTENT_FORMAT.md` › What's still open)
+- [ ] `validate` checks a location's `id` against its file path [coder] (`design/CONTENT_FORMAT.md` › What's still open)
 - [ ] Minimal CI: `cargo build` and `cargo test` on push [coder] (`TESTING.md` › CI)
 
 ## Open questions

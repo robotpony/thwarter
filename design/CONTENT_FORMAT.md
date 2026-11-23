@@ -36,6 +36,19 @@ This repo's first pass put frontmatter at the *end* of the file. That matched ne
 | `title` | yes | Human-readable name. |
 | `type` | yes | `location`, `character`, or `object`. |
 
+## Keys, order and file locations
+
+Keys are lowercase and case-sensitive. The loader ignores a key it doesn't know, so `Inventory:` is dropped rather than read as `inventory:`; `thwart validate` should warn about a key that differs only in case from a known one (`PLAN.md` › Phase 3). Objects may carry any extra keys (see `type: object`), so only the case check applies to them.
+
+When a tool writes a file, it writes the keys in the order of this document's tables: `id`, `title`, `type`, then the type's own fields in table order, then any extra keys in the order they already had. Editing a file keeps its existing order; only a key being added is placed by this rule.
+
+A new entity's file goes where its `id` says:
+- a location at `<id>.md` from the world root (`castle/gate` → `castle/gate.md`)
+- a character at `npcs/<id>.md`, whatever its `character_type`
+- an object at `objects/<id>.md`
+
+Existing files can live anywhere in the world; the loader finds them by walking the directory and keeps track of which file each `id` came from. These defaults match the test world (decided by the commander, 2026-11-23; Bruce may change them).
+
 ## `type: location`
 
 | Field | Required | Meaning |
@@ -81,6 +94,6 @@ Object content is far more varied than location or character content (compare a 
 
 ## What's still open
 
-- **`id` vs. file path.** Nothing currently checks that `id` matches the file's location. An author who copies a file and forgets to update `id` gets a silent collision (last one loaded wins) instead of an error. `thwart validate` should check this.
+- **`id` vs. file path.** Nothing currently checks that `id` matches the file's location. An author who copies a file and forgets to update `id` gets a silent collision (last one loaded wins) instead of an error. Duplicate ids get reported along with the file writer (`PLAN.md` › Phase 3); checking a location's `id` against its path waits for Phase 5.
 - **Objects without cards are scenery.** A location's `objects: [...]` or a character's `inventory: [...]` can name an object `id` with no file. That's allowed: the object is scenery with a name only, and the console creates its card the first time an author edits it (`REQUIREMENTS.md` › REQ-CF-8). Tools should label it "no card", not report it as missing.
 - **Dialogue tree format is unspecified.** `dialogue_tree` is loaded as an opaque string. What it points to, and how it's structured, is undecided.
