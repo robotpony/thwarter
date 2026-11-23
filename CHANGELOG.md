@@ -28,6 +28,21 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.11.0 (2026-11-23)
+
+### Added
+
+- `/edit` opens a file that doesn't parse (any kind word works, since what the file holds is unknown), so an author can fix it in the console. Saving text that parses brings it into the world, and the save says what it now holds ("it parses now, as object `rope`"). Saves go through the writer's new `replace_file_loaded`, which also checks the file on disk still matches what the editor opened as it writes, closing the gap between the console's check and the write.
+
+### Changed
+
+- A full-edit save that changes the `id` or `type` is refused by the console with its own message, since ids can't be renamed yet.
+- The console's parse-error list reflects files fixed since the load, so a fixed file no longer counts as blocking.
+
+### Fixed
+
+- The file-watcher test waited for the first notice, and on macOS that is sometimes one about a file written just before watching began. It now waits for the notice about the file it changed.
+
 ## 0.10.0 (2026-11-23)
 
 ### Added

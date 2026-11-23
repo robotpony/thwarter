@@ -3,20 +3,20 @@
 //! back; `editor.rs` is the full-screen editor itself.
 //!
 //! The editor opens the file as it is, frontmatter and body. A save goes
-//! through the writer as one whole-file replacement, which must still
-//! parse as the same thing, and is then reported like any other change
-//! (REQ-CON-5). Scenery, an object a room names with no card, opens as a
+//! through the writer as one whole-file replacement, which must parse and,
+//! for a file that parsed before, still hold the same thing, and is then reported like any other change
+//! (REQ-CON-5). A file that doesn't parse opens too, since editing is how
+//! an author fixes it. Scenery, an object a room names with no card, opens as a
 //! new card with `object_type: scenery`, written on the first save
 //! (REQ-CF-8).
 
-use super::author::title_or_default;
-use super::author::bare_id_problem;
+use super::author::{bare_id_problem, entity_kind, title_or_default};
 use super::editor::{Closed, Document, Saved};
 use super::session::{Console, Place};
 use super::world::Kind;
 use super::Mode;
 use crate::engines::EntityKind;
-use crate::writer::{Edit, NewEntity};
+use crate::writer::{ContentFile, Edit, NewEntity};
 use std::fs;
 
 /// The file a `/edit` opened, held while the editor is open.
@@ -78,6 +78,8 @@ impl Console {
         let mut heading = format!("/edit {}  {}.md", target.kind.label(), target.path);
         if target.opened.is_none() {
             heading.push_str(" (new card)");
+        } else if target.kind == Kind::Broken {
+            heading = format!("/edit  {}.md (doesn't parse)", target.path);
         }
         let text = target.opened.clone().unwrap_or_else(|| scenery_card(&target.id));
         Document::single(heading, text)
@@ -105,7 +107,13 @@ impl Console {
                     }
                     Ok(_) => {}
                 }
-                self.save(target.kind, &target.id, &[Edit::ReplaceAll(text.to_string())])
+                if let Err(why) = same_thing(target, text) {
+                    return Saved::No(why);
+                }
+                // The writer checks the file again as it writes, so a change
+                // on disk between that read and this write is refused too.
+                let expected = (!force).then_some(opened.as_str());
+                self.replace_file(&target.path, text, expected)
             }
             None => {
                 let new = NewEntity {
@@ -120,7 +128,20 @@ impl Console {
         match written {
             Ok(path) => {
                 target.opened = Some(fs::read_to_string(&file).unwrap_or_else(|_| text.to_string()));
-                Saved::Yes(self.after_writes(&[path], format!("Saved {}.md.", target.path)))
+                let was_broken = target.kind == Kind::Broken;
+                self.world.refresh_index();
+                // A file that didn't parse is now known: later saves check
+                // it still holds the same thing.
+                if let Some(entry) = self.world.files.get(&target.path) {
+                    target.kind = entry.kind;
+                    target.id = entry.id.clone();
+                }
+                let summary = if was_broken && target.kind != Kind::Broken {
+                    format!("Saved {}.md; it parses now, as {} `{}`.", target.path, target.kind.label(), target.id)
+                } else {
+                    format!("Saved {}.md.", target.path)
+                };
+                Saved::Yes(self.after_writes(&[path], summary))
             }
             Err(why) => Saved::No(why),
         }
@@ -142,10 +163,9 @@ impl Console {
         };
         let entry = self.world.files.get(path).ok_or_else(|| format!("{} is not in the world.", path))?;
         match entry.kind {
-            Kind::Broken => Err(format!(
-                "{}.md doesn't parse, so /edit can't open it yet. Fix it in another editor; the console reloads when it's saved.",
-                path
-            )),
+            // Any kind opens a file that doesn't parse: what it holds is
+            // what the author is fixing.
+            Kind::Broken => self.open_target(Kind::Broken, entry.id.clone(), path.clone()),
             found if found == kind => self.open_target(kind, entry.id.clone(), path.clone()),
             found => Err(format!("{} is a {}, not a {}: /edit {} opens it.", path, found.label(), label, found.label())),
         }
@@ -182,6 +202,23 @@ impl Console {
         let text = fs::read_to_string(&file).map_err(|e| format!("Can't open {}.md: {}", path, e))?;
         Ok(EditTarget { kind, id, path, opened: Some(text) })
     }
+}
+
+/// Refuses text that no longer holds the thing the editor opened: ids
+/// can't be renamed yet, and a room can't turn into an object.
+fn same_thing(target: &EditTarget, text: &str) -> Result<(), String> {
+    let Some(kind) = entity_kind(target.kind) else { return Ok(()) };
+    let file = ContentFile::from_text(format!("{}.md", target.path), text).map_err(|e| format!("Not saved: {:#}", e))?;
+    if file.type_name() != kind.type_name() || file.id() != target.id {
+        return Err(format!(
+            "Not saved: this file holds {} `{}`, and the text now says {} `{}`. Ids and types can't be changed here yet.",
+            kind.type_name(),
+            target.id,
+            file.type_name(),
+            file.id()
+        ));
+    }
+    Ok(())
 }
 
 /// The card scenery starts with (REQ-CF-8), as `/new object <id>` writes it.
@@ -295,6 +332,36 @@ mod tests {
         assert_eq!(console.handle("/edit room").0, "/edit room edits the room you're in. cd to one, or /edit room <id>.");
         assert_eq!(console.handle("/edit object rope").0, "No object `rope` here or in the world. /new object rope <type> makes one.");
         assert!(console.take_pending_edit().is_none());
+    }
+
+    #[test]
+    fn a_file_that_doesnt_parse_opens_and_can_be_fixed() {
+        let (_dir, root) = tiny_copy();
+        fs::write(root.join("objects/rope.md"), "---\nid: rope\ntitle: [unclosed\n---\n").unwrap();
+        let mut console = console_at(&root, "objects/rope");
+        assert_eq!(console.world.blocking_problems().len(), 1);
+        let mut target = open(&mut console, "/edit object");
+        assert_eq!(console.edit_document(&target).heading, "/edit  objects/rope.md (doesn't parse)");
+
+        assert!(matches!(console.save_full_edit(&mut target, "---\nid: [still\n---\n", false), Saved::No(_)));
+        let fixed = "---\nid: rope\ntitle: Rope\ntype: object\nobject_type: tool\n---\n";
+        let saved = console.save_full_edit(&mut target, fixed, false);
+        assert!(matches!(&saved, Saved::Yes(r) if r.starts_with("Saved objects/rope.md; it parses now, as object `rope`.")), "{:?}", saved);
+        assert!(console.world.blocking_problems().is_empty());
+        assert_eq!(console.world.files["objects/rope"].kind, Kind::Object);
+        assert!(console.world.engine.objects.contains_key("rope"));
+    }
+
+    #[test]
+    fn changing_the_id_is_refused() {
+        let (_dir, root) = tiny_copy();
+        let mut console = console_at(&root, "village/square");
+        let mut target = open(&mut console, "/edit room");
+        let original = fs::read_to_string(root.join("village/square.md")).unwrap();
+        let renamed = original.replace("id: village/square", "id: village/plaza");
+        let saved = console.save_full_edit(&mut target, &renamed, false);
+        assert!(matches!(&saved, Saved::No(why) if why.contains("can't be changed here yet")), "{:?}", saved);
+        assert_eq!(fs::read_to_string(root.join("village/square.md")).unwrap(), original);
     }
 
     #[test]

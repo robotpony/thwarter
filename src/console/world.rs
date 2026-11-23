@@ -67,9 +67,11 @@ impl World {
     }
 
     /// Problems that make a reload unsafe: files that fail to parse, whose
-    /// entities would silently drop out of the world (REQ-CON-7).
-    pub fn blocking_problems(&self) -> &[String] {
-        &self.report.errors
+    /// entities would silently drop out of the world (REQ-CON-7). A file
+    /// fixed in the console since the load no longer counts.
+    pub fn blocking_problems(&self) -> Vec<String> {
+        let current = self.engine.current_problems(false);
+        self.report.errors.iter().filter(|e| current.contains(e)).cloned().collect()
     }
 
     /// Problems that are normal while a world is being written, such as

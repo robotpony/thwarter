@@ -112,8 +112,17 @@ mod tests {
         )
         .unwrap();
 
-        let notice = receive.recv_timeout(Duration::from_secs(10)).expect("a reload notice");
-        assert!(notice.starts_with("Changed on disk: cellar.md."), "{}", notice);
+        // macOS can also report `hall.md`, written just before watching
+        // began, in a notice of its own; wait for the one about the cellar.
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let notice = loop {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            let notice = receive.recv_timeout(left).expect("a reload notice naming cellar.md");
+            if notice.contains("cellar.md") {
+                break notice;
+            }
+        };
+        assert!(notice.starts_with("Changed on disk:"), "{}", notice);
         assert!(notice.contains("Reloaded: 2 room(s)"), "{}", notice);
     }
 }

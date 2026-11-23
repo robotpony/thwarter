@@ -225,7 +225,7 @@ impl Console {
             Ok(world) => world,
             Err(e) => return format!("Reload failed, keeping the previous world: {}", e),
         };
-        let mut blockers: Vec<String> = fresh.blocking_problems().to_vec();
+        let mut blockers: Vec<String> = fresh.blocking_problems();
         if let Some(game) = &self.game {
             if fresh.engine.get_location(&game.location).is_none() {
                 blockers.push(format!(

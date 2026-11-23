@@ -316,6 +316,19 @@ impl Console {
         Ok(report.path)
     }
 
+    /// Replaces the whole file at `relative` (from the world root, without
+    /// `.md`), even one that doesn't parse now. With `expected`, refused if
+    /// the file on disk no longer holds that text.
+    pub(super) fn replace_file(&mut self, relative: &str, text: &str, expected: Option<&str>) -> Result<PathBuf, String> {
+        let writer = self.writer()?;
+        self.note_warnings_before();
+        let path = PathBuf::from(format!("{}.md", relative));
+        let report = writer
+            .replace_file_loaded(&mut self.world.engine, &path, text, expected, false)
+            .map_err(|e| format!("Not saved: {}", within(&writer, &e)))?;
+        Ok(report.path)
+    }
+
     /// Keeps the world's warnings from before a command's first change, so
     /// `after_writes` can say which ones the command added.
     fn note_warnings_before(&mut self) {
@@ -361,7 +374,7 @@ fn within(writer: &WorldWriter, error: &anyhow::Error) -> String {
     format!("{:#}", error).replace(&root, "")
 }
 
-fn entity_kind(kind: Kind) -> Option<EntityKind> {
+pub(super) fn entity_kind(kind: Kind) -> Option<EntityKind> {
     match kind {
         Kind::Room => Some(EntityKind::Location),
         Kind::Character => Some(EntityKind::Character),
