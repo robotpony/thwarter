@@ -88,7 +88,7 @@ This table exists because status claims in this repo have previously drifted fro
 | `CharacterEngine` | Partially done | Loading, placement, and movement work, but nothing calls it from the CLI. `WorldEngine` keeps character cards for lookups (names in the room view); placement is still `CharacterEngine`'s job. |
 | `WorldEngine::describe_location` / `problems` | Done | The console interface above. `problems` backs both `validate` and `/reload`. |
 | Room renderer (`render::render_location`) | Done | One renderer for `thwart show` and the console. |
-| Console (`thwart edit`, `thwart play`) | Stub | The subcommands and `console::run` exist; `run` loads the world, then reports that the console isn't built. |
+| Console (`thwart edit`, `thwart play`) | Partially done | The loop, `/edit`, `/play`, `/reload`, `/help` and `/quit` work, and edit mode navigates the world's folders (`ls`, `cd`, `pwd`, `look`). Play mode shows the room but has no verbs yet (Phase 4), and the content-changing commands (`/new`, `/set`, `/link`, `/edit room`) say they aren't built (Phase 3). No line editing or history yet. Tested by transcripts in `tests/transcripts/` and 4 `/reload` unit tests. |
 | Unit tests | Started | 5 tests, in `render.rs` and `world_engine.rs`. Parser tests are next (`design/UNIT_TESTS.md` › 1). |
 | `NarrativeEngine` | Model only | Plot point prerequisite checking works; consequence execution and alternative-text condition evaluation are stubs. |
 | `GameEngine` | Model only | Action dispatch exists; move/take/look/examine handlers are stubs that report success without doing anything. |

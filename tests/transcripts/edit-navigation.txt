@@ -1,0 +1,71 @@
+# world: worlds/tiny
+# mode: edit
+Editing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
+> pwd
+/
+> ls
+npcs/     1 file(s)
+objects/  1 file(s)
+village/  2 file(s)
+> cd village
+village/
+> ls
+square  Village Square  (room)
+well    The Well  (room)
+> cd square
+Village Square (room)
+> look
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  village/well
+  east   village/inn  (missing)
+
+Characters:
+  The Elder (elder)
+
+Objects:
+  Brass Lantern (lantern)
+  bench  (no card)
+> cd n
+The Well (room)
+> cd s
+Village Square (room)
+> cd east
+The east exit leads to `village/inn`, which isn't written yet.
+> cd elder
+The Elder (character)
+> pwd
+npcs/elder
+> cd ..
+npcs/
+> ls
+elder  The Elder  (character)
+> cd /
+/
+> cd village/square
+Village Square (room)
+> cd lantern
+Brass Lantern (object)
+> look
+Brass Lantern (lantern)
+objects/lantern.md, tool
+
+A dented brass lantern with a little oil left.
+
+Actions: light
+> cd /village/square
+Village Square (room)
+> cd bench
+`bench` is scenery, with no card yet. /edit object will create one (PLAN.md › Phase 3).
+> cd nowhere
+No folder, room, exit, character or object called `nowhere` here.
+> dance
+Edit mode doesn't know `dance`. Type /help for commands.
+> ls extra
+`ls` takes no name here; cd to it first.
+> /quit
+Bye.

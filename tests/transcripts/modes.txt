@@ -1,0 +1,91 @@
+# world: worlds/tiny
+# mode: play
+Playing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
+
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  village/well
+  east   village/inn  (missing)
+
+Characters:
+  The Elder (elder)
+
+Objects:
+  Brass Lantern (lantern)
+  bench  (no card)
+> look
+Play mode doesn't understand `look` yet: in-game verbs come in PLAN.md › Phase 4.
+> /edit
+Edit mode, at village/square.
+> pwd
+village/square
+> cd n
+The Well (room)
+> /play
+Play mode.
+
+The Well (village/well)
+
+A mossy stone well. The rope is long gone.
+
+Exits:
+  south  village/square
+
+Characters: none
+
+Objects: none
+> /set title Foo
+/set changes content, so it only works in edit mode. Type /edit to switch.
+> /edit
+Edit mode, at village/well.
+> /new room north
+/new isn't built yet (PLAN.md › Phase 3).
+> /play
+Play mode.
+
+The Well (village/well)
+
+A mossy stone well. The rope is long gone.
+
+Exits:
+  south  village/square
+
+Characters: none
+
+Objects: none
+> /edit room
+Edit mode, at village/well.
+/edit room isn't built yet (PLAN.md › Phase 3).
+> /edit spaceship
+`/edit spaceship`: the kinds are room, object and character.
+> /help
+Console commands, in either mode:
+  /edit           switch to edit mode
+  /play           switch to play mode
+  /reload         reload the world from disk, staying where you are
+  /help           this list
+  /quit           leave the console
+
+Edit mode moves through the world's folders:
+  ls              list this folder, or show this file
+  cd <name>       go into a folder, room, character or object
+  cd <direction>  follow an exit from this room (north, n, up, ...)
+  cd ..           go up one folder;  cd /  goes to the world root
+  pwd             where you are
+  look            show the room, character or object you're in
+
+Not built yet: /new, /set, /link, /edit room (PLAN.md › Phase 3).
+> /bogus
+Unknown command `/bogus`. Type /help for commands.
+> /
+Type /help for commands.
+> /reload
+Reloaded: 2 room(s), 1 character(s), 1 object(s).
+1 warning(s):
+  village/square: connection `east` points at unknown location `village/inn`
+> pwd
+village/well

@@ -1,0 +1,118 @@
+//! The console's acceptance tests (REQ-CON-9): every `.txt` file in
+//! `tests/transcripts/` is a console session, written exactly as the
+//! console prints it, input lines included as `> line`.
+//!
+//! A transcript starts with a header of `# key: value` lines:
+//!
+//! ```text
+//! # world: worlds/tiny     (relative to tests/transcripts/)
+//! # mode: edit             (or play)
+//! ```
+//!
+//! Everything after the header is the expected output. The runner feeds
+//! the `> ` lines to the console as input and compares what it prints with
+//! the file. To accept new output after a deliberate change, run
+//! `THWART_BLESS=1 cargo test --test transcripts` and review the diff.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use thwarter::console::{run_script, Mode};
+
+const DIR: &str = "tests/transcripts";
+
+struct Transcript {
+    header: String,
+    world: PathBuf,
+    mode: Mode,
+    expected: String,
+}
+
+fn parse(path: &Path) -> Result<Transcript, String> {
+    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let mut header = String::new();
+    let mut world = None;
+    let mut mode = Mode::Edit;
+    let mut lines = text.split_inclusive('\n').peekable();
+    while let Some(line) = lines.peek() {
+        let Some(directive) = line.strip_prefix("# ") else { break };
+        let (key, value) = directive.split_once(':').ok_or(format!("bad header line: {}", line.trim()))?;
+        match (key.trim(), value.trim()) {
+            ("world", value) => world = Some(Path::new(DIR).join(value)),
+            ("mode", "edit") => mode = Mode::Edit,
+            ("mode", "play") => mode = Mode::Play,
+            (key, value) => return Err(format!("unknown header `{}: {}`", key, value)),
+        }
+        header.push_str(line);
+        lines.next();
+    }
+    let world = world.ok_or("missing `# world:` header")?;
+    Ok(Transcript { header, world, mode, expected: lines.collect() })
+}
+
+fn input_of(expected: &str) -> String {
+    expected.lines().filter_map(|l| l.strip_prefix("> ").or(if l == ">" { Some("") } else { None })).map(|l| format!("{}\n", l)).collect()
+}
+
+/// The first line where `actual` and `expected` differ, for a readable failure.
+fn first_difference(expected: &str, actual: &str) -> String {
+    let (e, a): (Vec<&str>, Vec<&str>) = (expected.lines().collect(), actual.lines().collect());
+    for i in 0..e.len().max(a.len()) {
+        let (el, al) = (e.get(i).copied(), a.get(i).copied());
+        if el != al {
+            return format!(
+                "line {} after the header\n  expected: {}\n  actual:   {}",
+                i + 1,
+                el.unwrap_or("<end of transcript>"),
+                al.unwrap_or("<end of output>")
+            );
+        }
+    }
+    "trailing newline differs".to_string()
+}
+
+#[test]
+fn transcripts() {
+    let bless = std::env::var_os("THWART_BLESS").is_some();
+    let mut paths: Vec<PathBuf> = fs::read_dir(DIR)
+        .expect("tests/transcripts exists")
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("txt"))
+        .collect();
+    paths.sort();
+    assert!(!paths.is_empty(), "no transcripts in {}", DIR);
+
+    let mut failures = Vec::new();
+    for path in &paths {
+        let name = path.display();
+        let t = match parse(path) {
+            Ok(t) => t,
+            Err(e) => {
+                failures.push(format!("{}: {}", name, e));
+                continue;
+            }
+        };
+        let actual = match run_script(&t.world, t.mode, &input_of(&t.expected)) {
+            Ok(out) => out,
+            Err(e) => {
+                failures.push(format!("{}: console failed: {:#}", name, e));
+                continue;
+            }
+        };
+        if actual == t.expected {
+            continue;
+        }
+        if bless {
+            fs::write(path, format!("{}{}", t.header, actual)).expect("write transcript");
+            eprintln!("blessed {}", name);
+        } else {
+            failures.push(format!("{}: {}", name, first_difference(&t.expected, &actual)));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} of {} transcript(s) failed (THWART_BLESS=1 accepts new output):\n\n{}",
+        failures.len(),
+        paths.len(),
+        failures.join("\n\n")
+    );
+}

@@ -1,0 +1,5 @@
+[metadata]
+title = "Tiny World"
+
+[settings]
+starting_location = "village/square"

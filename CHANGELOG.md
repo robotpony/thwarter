@@ -26,6 +26,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.2.0 (2026-11-23)
+
+### Added
+
+- The console loop behind `thwart edit` and `thwart play` (REQ-CON-2). `/edit` and `/play` switch modes and keep the current room, `/help` lists the commands for the current mode, and `/quit` (or end of input) leaves. `/edit room|object|character`, `/new`, `/set` and `/link` say they aren't built yet (Phase 3), and play mode says the same of its verbs (Phase 4).
+- Edit-mode navigation of the world's folders, as plain input (REQ-CON-4): `ls`, `cd <folder, room, character or object>`, `cd <direction>` (with `n`, `ne`, ... `u`, `d`), `cd ..`, `cd /`, `pwd` and `look`. From a room, `cd <id>` reaches the characters and objects it holds, and an object with no card is reported as scenery.
+- `/reload` (REQ-CON-7). It keeps the current room. It keeps the previous world if a file fails to parse or the current room is gone, and it shows broken references as warnings without blocking.
+- Rooms in the console use the shared renderer (`render::render_location`, REQ-CON-8). Characters and objects get a short card view.
+- Transcript tests (REQ-CON-9): `tests/transcripts.rs` runs each `tests/transcripts/*.txt` session against the `worlds/tiny` fixture. `THWART_BLESS=1` accepts new output. Also 4 unit tests for the `/reload` cases that change files mid-session.
+- `console::run_script(world, mode, input)`, which runs the console over scripted input and returns its output.
+
 ## 0.1.6 (2026-11-23)
 
 ### Added
