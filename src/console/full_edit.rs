@@ -12,6 +12,7 @@
 
 use super::author::{bare_id_problem, entity_kind, title_or_default};
 use super::editor::{Closed, Document, Files, Saved};
+use super::theme::Lookup;
 use super::session::{Console, Place};
 use super::world::Kind;
 use super::Mode;
@@ -49,6 +50,31 @@ impl EditTarget {
     }
 }
 
+/// What the editor's highlighting asks of the world, for one file.
+pub struct EditLookup<'a> {
+    console: &'a Console,
+    this: Option<(EntityKind, String)>,
+}
+
+impl Lookup for EditLookup<'_> {
+    fn resolves(&self, id: &str) -> bool {
+        let engine = &self.console.world.engine;
+        engine.get_location(id).is_some() || engine.characters.contains_key(id) || engine.objects.contains_key(id)
+    }
+    fn declared(&self, name: &str) -> bool {
+        let engine = &self.console.world.engine;
+        let this = self.this.as_ref().and_then(|(kind, id)| engine.thing(*kind, id));
+        engine.undeclared(name, this).is_none()
+    }
+}
+
+impl Console {
+    /// The lookup the editor's highlighting uses for `target`.
+    pub(super) fn lookup_for(&self, target: &EditTarget) -> EditLookup<'_> {
+        EditLookup { console: self, this: entity_kind(target.kind).map(|kind| (kind, target.id.clone())) }
+    }
+}
+
 /// The editor's view of a `/edit` target's files: saves lock the console
 /// just while they write, and checks for changes on disk don't lock it.
 pub struct EditFiles<'a> {
@@ -69,15 +95,16 @@ impl Console {
     /// `/edit <kind> [id]`. From play mode, switches to edit mode at the
     /// player's room first (REQ-CON-2). On a terminal, the editor opens
     /// once this returns; in a script, there's no screen to open it on.
+    /// `/edit` alone opens where edit mode is, whatever it is (REQ-CON-2).
     pub(super) fn full_edit(&mut self, args: &[&str]) -> String {
-        let Some((kind_word, rest)) = args.split_first() else {
-            return "Usage: /edit room|object|character [id]".to_string();
-        };
-        let kind = match *kind_word {
-            "room" => Kind::Room,
-            "object" => Kind::Object,
-            "character" => Kind::Character,
-            other => return format!("`/edit {}`: the kinds are room, object and character.", other),
+        let (kind, rest) = match args.split_first() {
+            None => (None, &[][..]),
+            Some((word, rest)) => match *word {
+                "room" => (Some(Kind::Room), rest),
+                "object" => (Some(Kind::Object), rest),
+                "character" => (Some(Kind::Character), rest),
+                other => return format!("`/edit {}`: the kinds are room, object and character.", other),
+            },
         };
         let mut out = Vec::new();
         if self.mode == Mode::Play {
@@ -85,18 +112,17 @@ impl Console {
             self.place_at_room();
             out.push(format!("Edit mode, at {}.", self.pwd()));
         }
-        let target = match rest {
-            [] => self.edit_target_here(kind),
-            [id] => self.edit_target_named(kind, id),
-            _ => Err(format!("Usage: /edit {} [id]", kind.label())),
+        let target = match (kind, rest) {
+            (_, []) => self.edit_target_here(kind),
+            (Some(kind), [id]) => self.edit_target_named(kind, id),
+            (Some(kind), _) => Err(format!("Usage: /edit {} [id]", kind.label())),
+            (None, _) => unreachable!("a kind word comes before an id"),
         };
         match target {
             Err(why) => out.push(why),
-            Ok(target) if !self.interactive => out.push(format!(
-                "/edit {} opens {}.md in a full-screen editor, which needs a terminal.",
-                kind.label(),
-                target.path
-            )),
+            Ok(target) if !self.interactive => {
+                out.push(format!("/edit opens {}.md in a full-screen editor, which needs a terminal.", target.path))
+            }
             Ok(target) => self.pending_edit = Some(target),
         }
         out.join("\n")
@@ -192,10 +218,19 @@ impl Console {
     }
 
     /// `/edit <kind>` with no id: the file edit mode is in.
-    fn edit_target_here(&self, kind: Kind) -> Result<EditTarget, String> {
-        let label = kind.label();
+    /// The file edit mode is in, if it fits `kind` (any kind for `None`).
+    fn edit_target_here(&self, kind: Option<Kind>) -> Result<EditTarget, String> {
         let Place::File(path) = &self.place else {
-            return Err(format!("/edit {} edits the {} you're in. Go to one, or /edit {} <id>.", label, label, label));
+            return Err(match kind {
+                Some(kind) => {
+                    let label = kind.label();
+                    format!("/edit {} edits the {} you're in. Go to one, or /edit {} <id>.", label, label, label)
+                }
+                None => format!(
+                    "{} is a folder, with nothing to edit. Go to a room or thing, or /edit room|object|character <id>.",
+                    self.pwd()
+                ),
+            });
         };
         let entry = self.world.files.get(path).ok_or_else(|| format!("{} is not in the world.", path))?;
         match entry.kind {
@@ -210,8 +245,11 @@ impl Console {
                 path,
                 found.label()
             )),
-            found if found == kind => self.open_target(kind, entry.id.clone(), path.clone()),
-            found => Err(format!("{} is a {}, not a {}: /edit {} opens it.", path, found.label(), label, found.label())),
+            found if kind.is_none_or(|k| k == found) => self.open_target(found, entry.id.clone(), path.clone()),
+            found => {
+                let label = kind.map(Kind::label).unwrap_or_default();
+                Err(format!("{} is a {}, not a {}: /edit opens it.", path, found.label(), label))
+            }
         }
     }
 
@@ -373,7 +411,7 @@ mod tests {
     fn the_wrong_kind_or_a_folder_says_what_would_work() {
         let (_dir, root) = tiny_copy();
         let mut console = console_at(&root, "village/square");
-        assert_eq!(console.handle("/edit character").0, "village/square is a room, not a character: /edit room opens it.");
+        assert_eq!(console.handle("/edit character").0, "village/square is a room, not a character: /edit opens it.");
         console.handle("go /");
         assert_eq!(console.handle("/edit room").0, "/edit room edits the room you're in. Go to one, or /edit room <id>.");
         assert_eq!(console.handle("/edit object rope").0, "No object `rope` here or in the world. /new object rope <type> makes one.");
@@ -424,6 +462,21 @@ mod tests {
         // Having seen it, a save is no longer a conflict.
         let mine = format!("{}Mine.\n", pulled);
         assert!(matches!(console.save_full_edit(&mut target, &mine, false), Saved::Yes(_)));
+    }
+
+    #[test]
+    fn edit_alone_opens_where_you_are() {
+        let (_dir, root) = tiny_copy();
+        let mut console = console_at(&root, "/npcs/elder");
+        assert_eq!(open(&mut console, "/edit").path, "npcs/elder");
+        console.handle("go /");
+        assert!(console.handle("/edit").0.starts_with("/ is a folder, with nothing to edit."));
+        // From play mode: edit mode at the player's room, opened.
+        console.handle("go /village/well");
+        console.handle("/play here");
+        let (out, _) = console.handle("/edit");
+        assert_eq!(out, "Edit mode, at village/well.");
+        assert_eq!(console.take_pending_edit().unwrap().path, "village/well");
     }
 
     #[test]

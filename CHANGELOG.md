@@ -32,6 +32,24 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.28.0 (2026-11-23)
+
+### Added
+
+- Colour from the terminal (REQ-CON-38): the console uses only the terminal's default colours and its 16 named ones, by role, so it follows whatever theme the terminal has. What you typed is bold; console messages (Saved, Reloaded, Restarted) green; errors and refusals red; warnings and what isn't written yet yellow; author notes dim; sidebar headings bold blue; the prompt bold green in edit mode and bold magenta in play mode. `NO_COLOR` drops the colours and keeps bold, dim and the rest.
+- The editor highlights what it shows (REQ-CON-39): frontmatter fences dim, keys blue, ids cyan when they resolve and yellow when they don't; Markdown headings and strong bold, emphasis italic, links cyan, `#tags` magenta, code dim; Thwarter's markers dim; `{{ values }}` cyan when declared and yellow when not. The current line's number is bold, and the status line is green when saved, red when refused and yellow when something needs watching.
+- `/status`: the world and its folder, the mode and where edit mode is, the game (where, chapter, turn, what's carried), the saves, problem counts and the build.
+- `/clear` empties the output; the session, game and history carry on.
+
+### Changed
+
+- `/edit` with nothing after it opens where edit mode is, whatever it is, and from play mode switches to edit mode at the player's room and opens that (REQ-CON-2, Bruce, 2026-11-23). It used to only switch modes.
+- Transcripts show the build as `thwart <version>`, so a version bump doesn't change them.
+
+### Fixed
+
+- The full-screen console cleared the screen at start with a call that asks the terminal for its cursor position, so a terminal that didn't answer stopped it starting. It now clears without asking.
+
 ## 0.27.1 (2026-11-23)
 
 ### Fixed

@@ -84,22 +84,19 @@ There's no save called `nothing`. Saves: quicksave.
 > /save ../escape
 Not saved: save names use letters, digits, `-` and `_`: `../escape` doesn't.
 > /edit
-Edit mode, at village/square.
+Edit mode, at village/well.
+/edit opens village/well.md in a full-screen editor, which needs a terminal.
 > look
-Village Square (village/square)
+The Well (village/well)
 
-A small square of packed earth. An old well stands to the north.
+A mossy stone well. The rope is long gone.
 
 Exits:
-  north  village/well
-  east   village/inn  (missing)
+  south  village/square
 
-Characters:
-  The Elder (elder)
+Characters: none
 
-Objects:
-  Brass Lantern (lantern)
-  bench  (no card)
+Objects: none
 > go /village/well
 The Well (room)
 > /new object rope tool

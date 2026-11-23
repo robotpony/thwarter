@@ -21,6 +21,8 @@ pub enum Flow {
     Quit,
     /// `/restart`: the terminal loop restarts onto the new build.
     Restart,
+    /// `/clear`: the screen empties its output.
+    Clear,
 }
 
 /// Where edit mode is, as a path relative to the world root: a folder
@@ -146,10 +148,13 @@ impl Console {
         let out = match (name, rest.as_slice()) {
             ("quit" | "q", _) => return ("Bye.".to_string(), Flow::Quit),
             ("help" | "?", _) => self.help(),
+            ("clear", []) if self.interactive => return (String::new(), Flow::Clear),
+            ("clear", []) => "/clear empties the screen's output, which needs a terminal.".to_string(),
+            ("status", []) => self.status_report(),
+            ("clear" | "status", _) => format!("Usage: /{}", name),
             ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
             ("restart", []) => "/restart restarts the console on the newest build, which needs a terminal.".to_string(),
             ("restart", _) => "Usage: /restart".to_string(),
-            ("edit", []) => self.switch_to_edit(),
             ("edit", args) => self.full_edit(args),
             ("play", []) => self.play(),
             ("play", ["here"]) => self.play_here(),
@@ -173,12 +178,14 @@ impl Console {
     fn help(&self) -> String {
         let mut lines = vec![
             "Console commands, in either mode:".to_string(),
-            "  /edit           switch to edit mode".to_string(),
+            "  /edit           edit where you are (from play: the player's room)".to_string(),
             "  /play           switch to play mode, resuming the game".to_string(),
             "  /play here      play from the room edit mode is in".to_string(),
             "  /save [name]    save the game (quicksave if no name)".to_string(),
             "  /load [name]    load a saved game".to_string(),
             "  /reload         reload the world from disk, staying where you are".to_string(),
+            "  /status         the world, where you are, the game, saves and the build".to_string(),
+            "  /clear          empty the output (the session carries on)".to_string(),
             "  /restart        restart the console on the newest build, keeping your place".to_string(),
             "  /help           this list".to_string(),
             "  /quit           leave the console".to_string(),
@@ -218,15 +225,6 @@ impl Console {
             ]),
         }
         lines.join("\n")
-    }
-
-    /// `/edit`: back to where edit mode was (REQ-CON-12).
-    fn switch_to_edit(&mut self) -> String {
-        if self.mode == Mode::Edit {
-            return "Already in edit mode.".to_string();
-        }
-        self.mode = Mode::Edit;
-        format!("Edit mode, at {}.", self.pwd())
     }
 
     /// Reloads from disk, keeping the game and edit mode's place

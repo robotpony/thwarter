@@ -12,8 +12,11 @@ use super::Mode;
 pub enum Row {
     Heading(String),
     Text(String),
-    /// Something to notice but not act on: an unwritten exit, no game yet.
+    /// Something to notice but not act on, such as no game yet.
     Dim(String),
+    /// Something not written yet: an exit's room, a thing's card.
+    Missing(String),
+    Warning(String),
     Blank,
 }
 
@@ -52,6 +55,40 @@ impl Console {
             right = format!("newer build: /restart · {}", right);
         }
         Status { left: left.join(" · "), right }
+    }
+
+    /// `/status`: the world, where you are, the game, saves and the build.
+    pub(super) fn status_report(&self) -> String {
+        let mut out = vec![format!("{}, at {}", self.world.display_name(), self.world.root.display())];
+        out.push(format!("Mode: {}; edit mode is at {}", self.mode.name(), self.pwd()));
+        out.push(match &self.game {
+            Some(game) => {
+                let chapter = game.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_else(|| "none".to_string());
+                let carrying = game.inventory.len();
+                format!(
+                    "Game: at {}, chapter {}, turn {}, carrying {} thing{}",
+                    game.location,
+                    chapter,
+                    game.turn,
+                    carrying,
+                    if carrying == 1 { "" } else { "s" }
+                )
+            }
+            None => "Game: none yet (/play here starts one)".to_string(),
+        });
+        let saves = super::saves::list_saves(&self.world.root).unwrap_or_default();
+        out.push(if saves.is_empty() { "Saves: none".to_string() } else { format!("Saves: {}", saves.join(", ")) });
+        let broken = self.world.files.values().filter(|e| e.kind == Kind::Broken).count();
+        let warnings = self.world.warnings().len();
+        out.push(format!(
+            "Problems: {} file{} that don't load, {} warning{}",
+            broken,
+            if broken == 1 { "" } else { "s" },
+            warnings,
+            if warnings == 1 { "" } else { "s" }
+        ));
+        out.push(format!("Build: thwart {}", env!("CARGO_PKG_VERSION")));
+        out.join("\n")
     }
 
     /// GAME, then HERE in edit mode.
@@ -126,7 +163,7 @@ impl Console {
             if self.world.engine.get_location(to).is_some() {
                 rows.push(Row::Text(format!("  {}  {}", direction, to)));
             } else {
-                rows.push(Row::Dim(format!("  {}  {}  (not written)", direction, to)));
+                rows.push(Row::Missing(format!("  {}  {}  (not written)", direction, to)));
             }
         }
         if !location.characters.is_empty() {
@@ -134,7 +171,7 @@ impl Console {
             for id in &location.characters {
                 rows.push(match self.world.path_of(Kind::Character, id) {
                     Some(path) => Row::Text(format!("  {}  {}", id, self.scope_of(&path))),
-                    None => Row::Dim(format!("  {}  no card", id)),
+                    None => Row::Missing(format!("  {}  no card", id)),
                 });
             }
         }
@@ -143,7 +180,7 @@ impl Console {
             for id in &location.objects {
                 rows.push(match self.world.path_of(Kind::Object, id) {
                     Some(path) => Row::Text(format!("  {}  {}", id, self.scope_of(&path))),
-                    None => Row::Dim(format!("  {}  scenery, no card", id)),
+                    None => Row::Missing(format!("  {}  scenery, no card", id)),
                 });
             }
         }
@@ -155,7 +192,7 @@ impl Console {
             .collect();
         if !warnings.is_empty() {
             rows.push(Row::Heading("warnings".to_string()));
-            rows.extend(warnings.into_iter().map(|w| Row::Dim(format!("  {}", w))));
+            rows.extend(warnings.into_iter().map(|w| Row::Warning(format!("  {}", w))));
         }
         rows
     }
@@ -191,7 +228,7 @@ pub fn folded(sidebar: &Sidebar) -> String {
         .fixed
         .iter()
         .filter_map(|r| match r {
-            Row::Text(t) | Row::Dim(t) => Some(t.as_str()),
+            Row::Text(t) | Row::Dim(t) | Row::Missing(t) | Row::Warning(t) => Some(t.as_str()),
             _ => None,
         })
         .collect();
@@ -212,7 +249,7 @@ mod tests {
             .map(|r| match r {
                 Row::Heading(t) => format!("# {}", t),
                 Row::Text(t) => t.clone(),
-                Row::Dim(t) => format!("~ {}", t),
+                Row::Dim(t) | Row::Missing(t) | Row::Warning(t) => format!("~ {}", t),
                 Row::Blank => String::new(),
             })
             .collect()

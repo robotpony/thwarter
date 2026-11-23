@@ -136,7 +136,11 @@ fn transcripts() {
         let scratch = t.copy.then(|| copy_world(&t.world));
         let world = scratch.as_ref().map(|d| d.path().to_path_buf()).unwrap_or_else(|| t.world.clone());
         let actual = match run_script(&world, t.mode, &input) {
-            Ok(out) => out.replace(&world.display().to_string(), &t.world.display().to_string()),
+            // The build's version changes with every release, so it reads
+            // as `<version>` in transcripts.
+            Ok(out) => out
+                .replace(&world.display().to_string(), &t.world.display().to_string())
+                .replace(&format!("thwart {}", env!("CARGO_PKG_VERSION")), "thwart <version>"),
             Err(e) => {
                 failures.push(format!("{}: console failed: {:#}", name, e));
                 continue;

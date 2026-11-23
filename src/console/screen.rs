@@ -13,10 +13,11 @@ use super::panels::{folded, Row};
 use super::restart::{self, Resumed};
 use super::session::{Console, Flow};
 use super::lock;
+use super::theme::{line_role, style, Role};
 use anyhow::Result;
 use ratatui::backend::Backend;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{Frame, Terminal};
@@ -158,6 +159,10 @@ impl<'a> Screen<'a> {
         match flow {
             Flow::Quit => self.quit = true,
             Flow::Restart => self.restart = true,
+            Flow::Clear => {
+                self.output.clear();
+                self.scroll = 0;
+            }
             Flow::Continue => {}
         }
         let mut console = lock(console);
@@ -214,8 +219,7 @@ impl<'a> Screen<'a> {
         let bar = console.status(self.newer_build);
         let gap = (status.width as usize).saturating_sub(bar.left.chars().count() + bar.right.chars().count() + 2).max(1);
         frame.render_widget(
-            Paragraph::new(format!(" {}{}{} ", bar.left, " ".repeat(gap), bar.right))
-                .style(Style::default().add_modifier(Modifier::REVERSED)),
+            Paragraph::new(format!(" {}{}{} ", bar.left, " ".repeat(gap), bar.right)).style(style(Role::Bar)),
             status,
         );
 
@@ -225,18 +229,19 @@ impl<'a> Screen<'a> {
             self.draw_sidebar(frame, right, &sidebar.fixed, &sidebar.rest);
             left
         } else {
-            frame.render_widget(Paragraph::new(folded(&sidebar)).style(Style::default().add_modifier(Modifier::DIM)), parts[2]);
+            frame.render_widget(Paragraph::new(folded(&sidebar)).style(style(Role::Note)), parts[2]);
             body
         };
         match &self.editing {
-            Some((editor, _)) => editor.draw(frame, output_area),
+            Some((editor, target)) => editor.draw(frame, output_area, &console.lookup_for(target)),
             None => self.draw_output(frame, output_area),
         }
 
         let prompt = console.prompt();
         let [left, right] =
             Layout::horizontal([Constraint::Length(prompt.chars().count() as u16 + 1), Constraint::Min(1)]).areas(input);
-        frame.render_widget(Paragraph::new(format!(" {}", prompt)).style(Style::default().add_modifier(Modifier::BOLD)), left);
+        let role = if console.mode == super::Mode::Play { Role::PromptPlay } else { Role::PromptEdit };
+        frame.render_widget(Paragraph::new(format!(" {}", prompt)).style(style(role)), left);
         if self.editing.is_none() {
             frame.render_widget(&self.input, right);
         }
@@ -271,7 +276,7 @@ impl<'a> Screen<'a> {
         let mut lines: Vec<Line> = rest.iter().skip(start).take(height).map(row_line).collect();
         if rest.len() > start + height && height > 0 {
             lines.pop();
-            lines.push(Line::styled(" ↓ more (alt-↓)", Style::default().add_modifier(Modifier::DIM)));
+            lines.push(Line::styled(" ↓ more (alt-↓)", style(Role::Note)));
         }
         frame.render_widget(Paragraph::new(lines), bottom);
     }
@@ -284,7 +289,7 @@ pub fn run(console: Arc<Mutex<Console>>, notices: Receiver<String>, resumed: Opt
     let mut screen = Screen::new(&greeting, resumed);
     let mut terminal = ratatui::try_init()?;
     // After a /restart, the screen still shows the last build's frame.
-    terminal.clear()?;
+    clear_screen()?;
     let result = (|| -> Result<()> {
         loop {
             draw(&mut terminal, &screen, &console)?;
@@ -306,7 +311,7 @@ pub fn run(console: Arc<Mutex<Console>>, notices: Receiver<String>, resumed: Opt
                 ratatui::restore();
                 let why = restart::restart(&lock(&console), &screen.history, &screen.output);
                 terminal = ratatui::try_init()?;
-                terminal.clear()?;
+                clear_screen()?;
                 screen.push(&why);
             }
         }
@@ -324,6 +329,14 @@ where
     Ok(())
 }
 
+/// Clears the screen without asking the terminal where its cursor is, as
+/// `Terminal::clear` does; a terminal that doesn't answer would stop the
+/// console starting. A new `Terminal`'s buffer is blank already.
+fn clear_screen() -> std::io::Result<()> {
+    use ratatui::crossterm::{execute, terminal::{Clear, ClearType}};
+    execute!(std::io::stdout(), Clear(ClearType::All))
+}
+
 fn input_line<'a>() -> TextArea<'a> {
     let mut area = TextArea::default();
     area.set_cursor_line_style(Style::default());
@@ -336,6 +349,8 @@ fn wrap_row(row: &Row, width: usize) -> Vec<Row> {
         Row::Heading(t) => (t, Row::Heading),
         Row::Text(t) => (t, Row::Text),
         Row::Dim(t) => (t, Row::Dim),
+        Row::Missing(t) => (t, Row::Missing),
+        Row::Warning(t) => (t, Row::Warning),
         Row::Blank => return vec![Row::Blank],
     };
     let indent = text.chars().take_while(|c| *c == ' ').count();
@@ -347,24 +362,20 @@ fn wrap_row(row: &Row, width: usize) -> Vec<Row> {
 }
 
 fn row_line(row: &Row) -> Line<'static> {
+    let styled = |text: &str, role: Role| Line::from(Span::styled(format!(" {}", text), style(role)));
     match row {
-        Row::Heading(text) => Line::from(Span::styled(format!(" {}", text), Style::default().add_modifier(Modifier::BOLD))),
+        Row::Heading(text) => styled(text, Role::Heading),
         Row::Text(text) => Line::from(format!(" {}", text)),
-        Row::Dim(text) => Line::from(Span::styled(format!(" {}", text), Style::default().add_modifier(Modifier::DIM))),
+        Row::Dim(text) => styled(text, Role::Note),
+        Row::Missing(text) => styled(text, Role::Missing),
+        Row::Warning(text) => styled(text, Role::Warning),
         Row::Blank => Line::from(""),
     }
 }
 
-/// How a line of output is drawn: what you typed stands out, and notes
-/// for the author step back.
+/// How a line of output is drawn, from what it says (REQ-CON-38).
 fn style_of(line: &str) -> Style {
-    if line.starts_with("> ") {
-        Style::default().add_modifier(Modifier::BOLD)
-    } else if line.starts_with("Author note:") || line.starts_with("Game:") {
-        Style::default().add_modifier(Modifier::DIM)
-    } else {
-        Style::default()
-    }
+    line_role(line).map(style).unwrap_or_default()
 }
 
 /// `line` broken into rows of at most `width` characters, at spaces where
@@ -489,6 +500,33 @@ mod tests {
         screen.key(Input { key: Key::Esc, ..Input::default() }, &console);
         assert!(screen.editing.is_none());
         assert!(screen.output.last().unwrap().starts_with("Closed village/square.md"));
+    }
+
+    #[test]
+    fn the_editor_colours_ids_by_whether_they_resolve() {
+        let console = tiny();
+        let mut screen = Screen::new("", None);
+        typed(&mut screen, &console, "go /village/square");
+        typed(&mut screen, &console, "/edit");
+        let mut terminal = Terminal::new(TestBackend::new(110, 24)).unwrap();
+        draw(&mut terminal, &screen, &console).unwrap();
+        let buffer = terminal.backend().buffer();
+        let find = |text: &str| -> (u16, u16) {
+            for y in 0..24 {
+                let row: String = (0..110).map(|x| buffer[(x, y)].symbol().to_string()).collect();
+                if let Some(at) = row.find(text) {
+                    return (row[..at].chars().count() as u16, y);
+                }
+            }
+            panic!("{} isn't on screen", text)
+        };
+        use ratatui::style::Color;
+        let (x, y) = find("village/well");
+        assert_eq!(buffer[(x, y)].fg, Color::Cyan, "an exit to a written room");
+        let (x, y) = find("village/inn");
+        assert_eq!(buffer[(x, y)].fg, Color::Yellow, "an exit to a room not written yet");
+        let (x, y) = find("connections");
+        assert_eq!(buffer[(x, y)].fg, Color::Blue, "a key");
     }
 
     #[test]

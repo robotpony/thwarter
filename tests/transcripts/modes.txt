@@ -21,6 +21,7 @@ You see: Brass Lantern, Bench.
 Here: The Elder.
 > /edit
 Edit mode, at village/square.
+/edit opens village/square.md in a full-screen editor, which needs a terminal.
 > look
 Village Square (village/square)
 
@@ -51,7 +52,8 @@ Here: The Elder.
 > /set title Foo
 /set changes content, so it only works in edit mode. Type /edit to switch.
 > /edit
-Edit mode, at village/well.
+Edit mode, at village/square.
+/edit opens village/square.md in a full-screen editor, which needs a terminal.
 > /new room north
 Name the new room: /new room north <id> [title]
 > /play
@@ -66,17 +68,19 @@ You see: Brass Lantern, Bench.
 Here: The Elder.
 > /edit room
 Edit mode, at village/square.
-/edit room opens village/square.md in a full-screen editor, which needs a terminal.
+/edit opens village/square.md in a full-screen editor, which needs a terminal.
 > /edit spaceship
 `/edit spaceship`: the kinds are room, object and character.
 > /help
 Console commands, in either mode:
-  /edit           switch to edit mode
+  /edit           edit where you are (from play: the player's room)
   /play           switch to play mode, resuming the game
   /play here      play from the room edit mode is in
   /save [name]    save the game (quicksave if no name)
   /load [name]    load a saved game
   /reload         reload the world from disk, staying where you are
+  /status         the world, where you are, the game, saves and the build
+  /clear          empty the output (the session carries on)
   /restart        restart the console on the newest build, keeping your place
   /help           this list
   /quit           leave the console
@@ -101,6 +105,15 @@ Full editing, in a full-screen editor (ctrl-s saves, esc closes):
   /edit room [id]                      the room you're in, or the one named
   /edit character [id]                 the character you're in, or the one named
   /edit object [id]                    an object; scenery here gets its card
+> /status
+Tiny World, at tests/transcripts/worlds/tiny
+Mode: edit; edit mode is at village/square
+Game: at village/square, chapter none, turn 1, carrying 0 things
+Saves: none
+Problems: 0 files that don't load, 1 warning
+Build: thwart <version>
+> /clear
+/clear empties the screen's output, which needs a terminal.
 > /bogus
 Unknown command `/bogus`. Type /help for commands.
 > /

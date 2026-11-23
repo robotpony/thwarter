@@ -11,7 +11,9 @@
 //! Keys and drawing are separate from the terminal, so tests drive the
 //! editor with a list of keys and ratatui's test backend.
 
-use ratatui::layout::{Constraint, Layout};
+use super::theme::{highlight, line_role, style, Lookup, Role};
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
@@ -209,16 +211,33 @@ impl<'a> Editor<'a> {
     }
 
     /// Draws the editor in `area`: its heading, the text, and a status line.
-    pub fn draw(&self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect) {
+    /// Draws the editor in `area`: its heading, the text highlighted
+    /// (REQ-CON-39), and a status line coloured by what it says.
+    pub fn draw(&self, frame: &mut ratatui::Frame, area: ratatui::layout::Rect, lookup: &dyn Lookup) {
         let [top, middle, bottom] =
             Layout::vertical([Constraint::Length(1), Constraint::Min(1), Constraint::Length(1)]).areas(area);
         let width = top.width as usize;
-        let gap = width.saturating_sub(self.document.heading.chars().count() + KEYS_HINT.chars().count()).max(2);
-        let heading = format!("{}{}{}", self.document.heading, " ".repeat(gap), KEYS_HINT);
-        frame.render_widget(Paragraph::new(Line::from(heading)).style(Style::default().add_modifier(Modifier::REVERSED)), top);
+        let gap = width.saturating_sub(self.document.heading.chars().count() + KEYS_HINT.chars().count() + 1).max(2);
+        let heading = format!(" {}{}{}", self.document.heading, " ".repeat(gap), KEYS_HINT);
+        frame.render_widget(Paragraph::new(Line::from(heading)).style(style(Role::Bar)), top);
         frame.render_widget(&self.area, middle);
+        let roles = highlight(self.area.lines(), lookup);
+        paint(frame.buffer_mut(), middle, self.area.lines(), &roles, self.area.cursor().0);
         let status = if self.status.is_empty() && self.dirty() { "Modified." } else { self.status.as_str() };
-        frame.render_widget(Paragraph::new(Line::from(status.to_string())), bottom);
+        frame.render_widget(Paragraph::new(Line::from(format!(" {}", status))).style(status_style(status)), bottom);
+    }
+}
+
+/// A world with nothing in it, for tests that don't need one.
+#[cfg(test)]
+struct NoLookup;
+#[cfg(test)]
+impl Lookup for NoLookup {
+    fn resolves(&self, _: &str) -> bool {
+        false
+    }
+    fn declared(&self, _: &str) -> bool {
+        false
     }
 }
 
@@ -237,7 +256,7 @@ where
 {
     let mut editor = Editor::new(document);
     loop {
-        terminal.draw(|frame| editor.draw(frame, frame.area())).map_err(io::Error::other)?;
+        terminal.draw(|frame| editor.draw(frame, frame.area(), &NoLookup)).map_err(io::Error::other)?;
         let Some(input) = next_key()? else {
             editor.check_disk(&mut files);
             continue;
@@ -246,6 +265,50 @@ where
             return Ok(editor.closed());
         }
     }
+}
+
+/// Colours what the text area drew, from each line's roles. The text area
+/// draws each line after its number, so a row's number says which line it
+/// shows; a row it scrolled sideways, or wrapped, is left as drawn.
+fn paint(buf: &mut Buffer, area: Rect, lines: &[String], roles: &[Vec<Option<Role>>], cursor_row: usize) {
+    let digits = lines.len().max(1).to_string().len();
+    let gutter = digits + 2;
+    for y in area.y..area.bottom() {
+        let row: String = (area.x..area.right()).map(|x| buf[(x, y)].symbol().to_string()).collect();
+        let Some(number) = row.get(..gutter).and_then(|g| g.trim().parse::<usize>().ok()) else { continue };
+        let Some(line) = number.checked_sub(1).and_then(|n| lines.get(n)) else { continue };
+        let shown: String = row.chars().skip(gutter).collect();
+        let expected: String = line.chars().take(shown.chars().count()).collect();
+        if shown.trim_end() != expected.trim_end() {
+            continue;
+        }
+        if number - 1 == cursor_row {
+            for x in area.x..(area.x + gutter as u16).min(area.right()) {
+                let cell = &mut buf[(x, y)];
+                cell.set_style(cell.style().remove_modifier(Modifier::DIM).add_modifier(Modifier::BOLD));
+            }
+        }
+        for (i, role) in roles[number - 1].iter().enumerate() {
+            let x = area.x + (gutter + i) as u16;
+            if x >= area.right() {
+                break;
+            }
+            if let Some(role) = role {
+                let cell = &mut buf[(x, y)];
+                cell.set_style(cell.style().patch(style(*role)));
+            }
+        }
+    }
+}
+
+/// The editor's status line: green when saved, red when refused, yellow
+/// for anything to watch out for.
+fn status_style(status: &str) -> Style {
+    let warn = ["Unsaved", "Changed on disk too", "Modified."];
+    if warn.iter().any(|w| status.starts_with(w)) || status.contains("changed on disk since") || status.contains("more when you close") {
+        return style(Role::Warning);
+    }
+    line_role(status).map(style).unwrap_or_default()
 }
 
 /// Text compared for unsaved changes: line endings and a missing final

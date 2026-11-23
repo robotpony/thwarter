@@ -15,6 +15,7 @@ mod restart;
 mod saves;
 mod screen;
 mod session;
+mod theme;
 mod verbs;
 mod view;
 mod watch;
