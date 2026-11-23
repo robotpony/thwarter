@@ -1,5 +1,5 @@
 use crate::models::character::Character;
-use crate::models::world::{Coordinate, GameObject, Location};
+use crate::models::world::{Coordinate, GameObject, Location, ObjectAction};
 use anyhow::{anyhow, Result};
 use serde_yaml;
 use std::fs;
@@ -211,7 +211,7 @@ impl MarkdownParser {
         let id = self.required_str(&parsed.metadata, "id", path)?;
         let title = self.required_str(&parsed.metadata, "title", path)?;
 
-        let mut location = Location::new(id, title, parsed.body.clone());
+        let mut location = Location::new(id, title, Body::parse(&parsed.body).description);
 
         if let Some(coords) = parsed.metadata.get("coordinates").and_then(|v| v.as_sequence()) {
             if coords.len() >= 3 {
@@ -245,7 +245,7 @@ impl MarkdownParser {
         let id = self.required_str(&parsed.metadata, "id", path)?;
         let title = self.required_str(&parsed.metadata, "title", path)?;
 
-        let mut character = Character::new(id, title, parsed.body.clone());
+        let mut character = Character::new(id, title, Body::parse(&parsed.body).description);
 
         if let Some(char_type) = parsed.metadata.get("character_type").and_then(|v| v.as_str()) {
             character.character_type = match char_type.to_lowercase().as_str() {
@@ -317,17 +317,30 @@ impl MarkdownParser {
             .map(|s| s.to_string());
         object.value = parsed.metadata.get("value").map(value_to_display_string);
 
-        if let Some(action_seq) = parsed.metadata.get("actions").and_then(|v| v.as_sequence()) {
-            // Author-friendly shape: a list of single-key maps, e.g.
-            //   actions:
-            //     - wield: "The sword feels like an extension of your arm"
-            for entry in action_seq {
-                if let Some(map) = entry.as_mapping() {
-                    for (k, v) in map {
-                        if let (Some(k), Some(v)) = (k.as_str(), v.as_str()) {
-                            object.actions.insert(k.to_string(), v.to_string());
-                        }
-                    }
+        let body = Body::parse(&parsed.body);
+        object.description = body.description.clone();
+        match parsed.metadata.get("actions") {
+            Some(serde_yaml::Value::Mapping(map)) => {
+                for (name, value) in map {
+                    let name = name.as_str().ok_or_else(|| anyhow!("{:?}: an action's name must be text", path))?;
+                    object.actions.insert(name.to_string(), parse_action(name, value, path)?);
+                }
+            }
+            Some(serde_yaml::Value::Sequence(_)) => {
+                return Err(anyhow!(
+                    "{:?}: `actions` is a map of mechanics now, and each reply goes in the body after `<!-- thwarter:action <name> -->` (design/STATES.md › Responses)",
+                    path
+                ))
+            }
+            Some(serde_yaml::Value::Null) | None => {}
+            Some(_) => return Err(anyhow!("{:?}: `actions` must be a map of action names", path)),
+        }
+        for (key, text) in &body.blocks {
+            if let Some(rest) = key.strip_prefix("action ") {
+                object.responses.insert(rest.to_string(), text.clone());
+                // A response with no mechanics is a whole action.
+                if !rest.ends_with(" refused") {
+                    object.actions.entry(rest.to_string()).or_insert_with(ObjectAction::reply_only);
                 }
             }
         }
@@ -395,6 +408,150 @@ impl MarkdownParser {
             body: body_lines.join("\n").trim().to_string(),
         })
     }
+}
+
+/// A body split into its description and its response blocks
+/// (`design/STATES.md` › Responses). Each block starts at a marker line,
+/// `<!-- thwarter:action pull -->`, `<!-- thwarter:action pull refused -->`
+/// or `<!-- thwarter:reply ambiguous -->`, and is keyed by the marker's
+/// words: `action pull`, `action pull refused`, `reply ambiguous`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Body {
+    pub description: String,
+    pub blocks: Vec<(String, String)>,
+}
+
+/// The key a response marker line opens, if the line is one.
+pub fn response_marker(line: &str) -> Option<String> {
+    let inner = line.trim().strip_prefix("<!--")?.strip_suffix("-->")?.trim();
+    let rest = inner.strip_prefix("thwarter:")?;
+    let words: Vec<&str> = rest.split_whitespace().collect();
+    match words.as_slice() {
+        ["action", name] => Some(format!("action {}", name)),
+        ["action", name, "refused"] => Some(format!("action {} refused", name)),
+        ["reply", name] => Some(format!("reply {}", name)),
+        _ => None,
+    }
+}
+
+impl Body {
+    pub fn parse(body: &str) -> Body {
+        let mut out = Body::default();
+        let mut current: Option<String> = None;
+        let mut text: Vec<&str> = Vec::new();
+        let mut flush = |current: &Option<String>, text: &mut Vec<&str>, out: &mut Body| {
+            let joined = text.join("\n").trim().to_string();
+            match current {
+                None => out.description = joined,
+                Some(key) => {
+                    out.blocks.retain(|(k, _)| k != key);
+                    out.blocks.push((key.clone(), joined));
+                }
+            }
+            text.clear();
+        };
+        for line in body.lines() {
+            if let Some(key) = response_marker(line) {
+                flush(&current, &mut text, &mut out);
+                current = Some(key);
+            } else {
+                text.push(line);
+            }
+        }
+        flush(&current, &mut text, &mut out);
+        out
+    }
+
+    pub fn block(&self, key: &str) -> Option<&str> {
+        self.blocks.iter().find(|(k, _)| k == key).map(|(_, t)| t.as_str())
+    }
+
+    /// Back to text, each block after its marker.
+    pub fn render(&self) -> String {
+        let mut out = self.description.clone();
+        for (key, text) in &self.blocks {
+            if !out.is_empty() {
+                out.push_str("\n\n");
+            }
+            out.push_str(&format!("<!-- thwarter:{} -->\n{}", key, text));
+        }
+        out
+    }
+}
+
+/// One action's mechanics: `becomes`, `sets`, `chapter` and `requires: {
+/// has: ... }`. Its reply is prose, in the body (`design/STATES.md` ›
+/// Responses); an empty value is an action with no mechanics of its own.
+fn parse_action(name: &str, value: &serde_yaml::Value, path: &Path) -> Result<ObjectAction> {
+    use serde_yaml::Value;
+    let bad = |what: &str| anyhow!("{:?}: action `{}`: {}", path, name, what);
+    let text_of = |v: &Value| -> Option<String> {
+        match v {
+            Value::String(s) => Some(s.clone()),
+            Value::Bool(b) => Some(if *b { "yes".into() } else { "no".into() }),
+            Value::Number(n) => Some(n.to_string()),
+            _ => None,
+        }
+    };
+    let map = match value {
+        Value::Null => return Ok(ObjectAction { mechanics: true, ..Default::default() }),
+        Value::Mapping(map) => map,
+        Value::String(_) => {
+            return Err(bad(&format!(
+                "its reply goes in the body after `<!-- thwarter:action {} -->`, not in frontmatter",
+                name
+            )))
+        }
+        _ => return Err(bad("must be a map of its mechanics")),
+    };
+    let mut action = ObjectAction { mechanics: true, ..Default::default() };
+    for (key, v) in map {
+        match key.as_str() {
+            Some("text") => {
+                return Err(bad(&format!(
+                    "its reply goes in the body after `<!-- thwarter:action {} -->`, not in `text:`",
+                    name
+                )))
+            }
+            Some("chapter") => action.chapter = Some(v.as_str().ok_or_else(|| bad("`chapter` names one chapter"))?.to_string()),
+            Some(field @ ("becomes" | "sets")) => {
+                let entries = v.as_mapping().ok_or_else(|| bad(&format!("`{}` must be a map", field)))?;
+                for (k, val) in entries {
+                    let k = k.as_str().ok_or_else(|| bad(&format!("`{}` keys must be text", field)))?;
+                    let val = text_of(val).ok_or_else(|| bad(&format!("`{}.{}` must be a single value", field, k)))?;
+                    if field == "becomes" {
+                        action.becomes.insert(k.to_string(), val);
+                    } else {
+                        action.sets.insert(k.to_string(), val);
+                    }
+                }
+            }
+            Some("requires") => {
+                let req = v.as_mapping().ok_or_else(|| bad("`requires` must be a map, like `requires: { has: brass-key }`"))?;
+                for (k, val) in req {
+                    match k.as_str() {
+                        Some("has") => match val {
+                            Value::String(s) => action.requires_has.push(s.clone()),
+                            Value::Sequence(items) => {
+                                for item in items {
+                                    action.requires_has.push(item.as_str().ok_or_else(|| bad("`has` names objects"))?.to_string());
+                                }
+                            }
+                            _ => return Err(bad("`has` names an object or a list of them")),
+                        },
+                        other => {
+                            return Err(bad(&format!(
+                                "`requires` only takes `has` for now, not `{}`",
+                                other.unwrap_or("?")
+                            )))
+                        }
+                    }
+                }
+            }
+            other => return Err(bad(&format!("unknown key `{}`; an action takes becomes, sets, chapter and requires", other.unwrap_or("?")))),
+        }
+    }
+    Ok(action)
 }
 
 fn string_sequence(metadata: &serde_yaml::Value, field: &str) -> Vec<String> {
@@ -540,13 +697,13 @@ object_type: weapon
 category: blade
 weight: 3 kg
 value: 15
-actions:
-  - wield: It feels heavy.
-  - examine: Rust flakes off.
 damage: 4
 tags: [old, iron]
 ---
 A sword past its best.
+
+<!-- thwarter:action wield -->
+It feels heavy.
 ";
         let ParsedEntity::Object(o) = parse(content).unwrap() else { panic!("not an object") };
         assert_eq!(o.id, "rusty-sword");
@@ -556,8 +713,7 @@ A sword past its best.
         assert_eq!(o.weight.as_deref(), Some("3 kg"));
         // A numeric value is kept as its display string.
         assert_eq!(o.value.as_deref(), Some("15"));
-        assert_eq!(o.actions["wield"], "It feels heavy.");
-        assert_eq!(o.actions["examine"], "Rust flakes off.");
+        assert_eq!(o.responses["wield"], "It feels heavy.");
         // Fields the engine doesn't model are preserved (REQ-CF-6).
         assert_eq!(o.extra.len(), 2);
         assert_eq!(o.extra["damage"], serde_yaml::Value::from(4));
@@ -677,5 +833,48 @@ A sword past its best.
         let missing = dir.path().join("missing.md");
         let e = MarkdownParser::new().parse_file(&missing).unwrap_err().to_string();
         assert!(e.contains("Failed to read file"), "{}", e);
+    }
+
+    #[test]
+    fn actions_are_mechanics_and_responses_are_body_blocks() {
+        let text = "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull:\n    becomes: { castle/vault: open }\n    sets: { story.vault: open, this.pulled: yes }\n    chapter: after-the-king\n    requires: { has: [lamp, key] }\n  wiggle:\n---\nAn iron lever.\n\n<!-- thwarter:action pull -->\nGears grind.\n\n<!-- thwarter:action pull refused -->\nIt's stuck.\n<!-- thwarter:action kick -->\nOw.\n";
+        let ParsedEntity::Object(o) = MarkdownParser::new().parse_content(text, "lever.md").unwrap() else { panic!() };
+        assert_eq!(o.description, "An iron lever.");
+        let pull = &o.actions["pull"];
+        assert!(pull.mechanics);
+        assert_eq!(pull.becomes["castle/vault"], "open");
+        assert_eq!(pull.sets["this.pulled"], "yes");
+        assert_eq!(pull.chapter.as_deref(), Some("after-the-king"));
+        assert_eq!(pull.requires_has, vec!["lamp", "key"]);
+        assert!(o.actions["wiggle"].mechanics);
+        assert_eq!(o.actions["kick"], ObjectAction::reply_only());
+        assert!(!o.actions.contains_key("pull refused"));
+        assert_eq!(o.responses["pull"], "Gears grind.");
+        assert_eq!(o.responses["pull refused"], "It's stuck.");
+        assert_eq!(o.responses["kick"], "Ow.");
+
+        for (bad, why) in [
+            ("actions:\n  pull: Ow.", "goes in the body after `<!-- thwarter:action pull -->`"),
+            ("actions:\n  pull: { text: Ow. }", "not in `text:`"),
+            ("actions:\n- kick: Ow.", "a map of mechanics now"),
+            ("actions:\n  pull: { teleport: yes }", "unknown key `teleport`"),
+            ("actions:\n  pull: { requires: { knows: secret } }", "only takes `has`"),
+            ("actions:\n  pull: { becomes: open }", "`becomes` must be a map"),
+        ] {
+            let text = format!("---\nid: x\ntitle: X\ntype: object\nobject_type: x\n{}\n---\n", bad);
+            let err = MarkdownParser::new().parse_content(&text, "x.md").unwrap_err().to_string();
+            assert!(err.contains(why), "{}: {}", bad, err);
+        }
+    }
+
+    #[test]
+    fn a_body_splits_into_description_and_blocks_and_back() {
+        let body = Body::parse("A room.\n\n<!-- thwarter:action pull -->\nCreak.\n<!-- thwarter:reply ambiguous -->\nWhich?\n<!-- just a note -->");
+        assert_eq!(body.description, "A room.");
+        assert_eq!(body.block("action pull"), Some("Creak."));
+        assert_eq!(body.block("reply ambiguous"), Some("Which?\n<!-- just a note -->"));
+        assert_eq!(Body::parse(&body.render()), body);
+        assert_eq!(response_marker("  <!--thwarter:action pull refused-->  ").as_deref(), Some("action pull refused"));
+        assert_eq!(response_marker("<!-- thwarter:section state open -->"), None);
     }
 }

@@ -38,7 +38,7 @@ Authoring comes first, play second (Bruce, 2026-11-23). The console is where bot
 - [x] Design states, bundles and chapters, replacing flags, conditions and alternative text; agreed with Bruce 2026-11-23, with open questions [commander] (`design/STATES.md`)
 - [x] Bundle loading, layers and merging, with key sources and the comment-only prose rule [coder] (`design/STATES.md` › Engine rules › Loading)
 - [x] Current versions on request, play state v2 and saves v2 [coder] (`design/STATES.md` › Engine rules)
-- [ ] Actions as a map, with `becomes:`, `sets:`, `chapter:` and `requires: { has: }`, and the 9 object cards migrated [coder] (`design/STATES.md` › Changing state)
+- [x] Actions as a map, with `becomes:`, `sets:`, `chapter:` and `requires: { has: }`, and the 9 object cards migrated [coder] (`design/STATES.md` › Changing state)
 - [ ] Variables by level, with warnings for undeclared ones [coder] (`design/STATES.md` › Variables)
 - [ ] Templates, kept out of the world [coder] (`design/STATES.md` › Templates and copies)
 - [ ] Renaming an id with every reference updated, and proposed renames for shared ids [coder, console] (`design/STATES.md` › Engine rules › Ids and names)

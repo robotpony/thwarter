@@ -28,6 +28,22 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.14.0 (2026-11-23)
+
+### Added
+
+- Actions are mechanics in frontmatter and responses in prose (`design/STATES.md` › Changing state, Responses). `actions: { pull: { becomes, sets, chapter, requires: { has } } }` holds what an action does. Its reply is a body block after `<!-- thwarter:action pull -->`, and the reply when `requires:` isn't met is a block after `<!-- thwarter:action pull refused -->`. A block with no mechanics is a whole action. `becomes:` switches things to states by bare id, `sets:` sets values by full name (`this.` means the object itself), `chapter:` moves the story to a chapter seen from the object's folder, and `requires: { has: }` names objects the player must carry.
+- Bodies merge block by block: a layer's description replaces the description below it, and each response block replaces only its namesake. A folder's chapter overlay adds its description after each thing's beneath it, rather than replacing it, so "the castle in mourning" reads as each room's own text plus the castle's. Its frontmatter still sits below the thing's.
+- `PlayAction::Use { verb, noun }` runs an object's named action in play, for an object carried or in the room. With no response block, play makes a reply from the verb and the object's name ("You pull the iron lever."), varied by turn, and the same for a refusal. A target that can't be switched is skipped with an author note. `Change` gains `Became`, `Set` and `EnteredChapter`. Examine shows an object's `examine` response after its description.
+- `validate` reports what an action names that doesn't exist: a `becomes:` thing or state, a `chapter:` not visible from the object, or a `requires: { has: }` object. A bare id shared by two kinds is reported as ambiguous. It warns about an action with no response, a `requires:` with no refusal, and a response with no mechanics.
+- The "Which do you mean" reply is `GameEngine::ask_which(verb, candidates)`, replaceable per story.
+
+### Changed
+
+- The test world's 9 object cards move their action strings into response blocks, each ending with a full stop. Frontmatter `actions` written as strings, `text:`, or the old list of one-key maps are now load errors that say where the reply goes.
+- Locations and characters read only the description part of the body, before any response block.
+- `Edit::SetBody` checks the body it wrote by reading back the raw body, response blocks included.
+
 ## 0.13.0 (2026-11-23)
 
 ### Added

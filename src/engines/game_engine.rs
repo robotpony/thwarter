@@ -10,12 +10,29 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Dispatches player actions to one handler per action.
-#[derive(Debug, Clone, Default)]
-pub struct GameEngine;
+#[derive(Debug, Clone)]
+pub struct GameEngine {
+    /// The reply when a noun matches more than one thing: given the verb
+    /// (`take`, `examine`, `pull`) and the candidates, already phrased
+    /// ("the rusty sword"). Replaceable, since such replies are part of a
+    /// story's voice ("Which door do you want to open?").
+    pub ask_which: fn(verb: &str, candidates: &[String]) -> String,
+}
+
+/// "Which do you mean: the rusty sword or the old sword?"
+pub fn default_ask_which(_verb: &str, candidates: &[String]) -> String {
+    format!("Which do you mean: {}?", join_or(candidates))
+}
+
+impl Default for GameEngine {
+    fn default() -> Self {
+        Self { ask_which: default_ask_which }
+    }
+}
 
 impl GameEngine {
     pub fn new() -> Self {
-        Self
+        Self::default()
     }
 
     /// A new game at `location`, which must exist.
@@ -40,6 +57,7 @@ impl GameEngine {
             PlayAction::Take(noun) => self.take(world, state, noun),
             PlayAction::Examine(noun) => self.examine(world, state, noun),
             PlayAction::Inventory => self.inventory(world, state),
+            PlayAction::Use { verb, noun } => self.use_object(world, state, verb, noun),
         }
     }
 
@@ -101,7 +119,7 @@ impl GameEngine {
                 }
                 return ActionResult::say(format!("There's no {} here.", noun.trim()));
             }
-            Err(which) => return ActionResult::say(which),
+            Err(which) => return ActionResult::say((self.ask_which)("take", &which)),
         };
         let name = object_name(&object);
         let Some(card) = world.object_at(&object.id, At::play(state)) else {
@@ -132,12 +150,19 @@ impl GameEngine {
         things.extend(view.objects.iter().cloned());
         match resolve(noun, &things, the_object) {
             Ok(Some(object)) => {
+                // The description, then an `examine` response if the author wrote one.
                 return match world.object_at(&object.id, At::play(state)) {
-                    Some(card) if !card.description.trim().is_empty() => ActionResult::say(card.description.trim()),
+                    Some(card) if !card.description.trim().is_empty() || card.responses.contains_key("examine") => {
+                        let parts: Vec<&str> = [card.description.trim(), card.responses.get("examine").map_or("", |t| t.trim())]
+                            .into_iter()
+                            .filter(|p| !p.is_empty())
+                            .collect();
+                        ActionResult::say(parts.join("\n\n"))
+                    }
                     _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
                 }
             }
-            Err(which) => return ActionResult::say(which),
+            Err(which) => return ActionResult::say((self.ask_which)("examine", &which)),
             Ok(None) => {}
         }
         match resolve(noun, &view.characters, person) {
@@ -145,9 +170,92 @@ impl GameEngine {
                 Some(card) if !card.description.trim().is_empty() => ActionResult::say(card.description.trim()),
                 _ => ActionResult::say(format!("You see nothing special about {}.", person.display_name())),
             },
-            Err(which) => ActionResult::say(which),
+            Err(which) => ActionResult::say((self.ask_which)("examine", &which)),
             Ok(None) => ActionResult::say(format!("There's no {} here.", noun.trim())),
         }
+    }
+
+    /// Run an object's named action: check `requires`, then switch states
+    /// (`becomes`), set values (`sets`) and move the story (`chapter`).
+    /// A target that can't be found is skipped with an author note, which
+    /// `validate` also reports.
+    fn use_object(&self, world: &WorldEngine, state: &mut PlayState, verb: &str, noun: &str) -> ActionResult {
+        let verb = verb.trim().to_lowercase();
+        if noun.trim().is_empty() {
+            return ActionResult::say(format!("What do you want to {}?", verb));
+        }
+        let view = match self.view(world, state) {
+            Some(v) => v,
+            None => return ActionResult::say("You're nowhere."),
+        };
+        let mut things = self.carried(world, state);
+        things.extend(view.objects.iter().cloned());
+        let object = match resolve(noun, &things, the_object) {
+            Ok(Some(o)) => o,
+            Err(which) => return ActionResult::say((self.ask_which)(&verb, &which)),
+            Ok(None) => {
+                return match resolve(noun, &view.characters, person) {
+                    Ok(Some(p)) => ActionResult::say(format!("You can't {} {}.", verb, person(&p))),
+                    Err(which) => ActionResult::say((self.ask_which)(&verb, &which)),
+                    Ok(None) => ActionResult::say(format!("There's no {} here.", noun.trim())),
+                }
+            }
+        };
+        let cant = || ActionResult::say(format!("You can't {} {}.", verb, the_object(&object)));
+        let Some(card) = world.object_at(&object.id, At::play(state)) else { return cant() };
+        let key = verb.replace(' ', "-");
+        let Some((found, action)) = card.actions.iter().find(|(name, _)| name.eq_ignore_ascii_case(&key)) else {
+            return cant();
+        };
+        let (key, action) = (found.clone(), action.clone());
+
+        let name = object_name(&object);
+        if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
+            return ActionResult::say(match card.responses.get(&format!("{} refused", key)) {
+                Some(text) if !text.trim().is_empty() => text.trim().to_string(),
+                _ => builtin_refusal(&verb, &name, state.turn),
+            });
+        }
+
+        let mut changes = Vec::new();
+        let mut notes = Vec::new();
+        for (target, to) in &action.becomes {
+            match world.thing_by_id(target) {
+                Ok(thing) => {
+                    let (kind, id) = (thing.kind, thing.id.clone());
+                    match state.switch_state(world, kind, &id, to) {
+                        Ok(()) => changes.push(Change::Became { type_name: kind.type_name().to_string(), id, state: to.clone() }),
+                        Err(e) => notes.push(e.to_string()),
+                    }
+                }
+                Err(e) => notes.push(format!("`becomes:` {}", e)),
+            }
+        }
+        for (name, value) in &action.sets {
+            let name = match name.strip_prefix("this.") {
+                Some(rest) => format!("{}.{}", object.id, rest),
+                None => name.clone(),
+            };
+            state.values.insert(name.clone(), value.clone());
+            changes.push(Change::Set { name, value: value.clone() });
+        }
+        if let Some(chapter) = &action.chapter {
+            let scope = world.thing(EntityKind::Object, &object.id).map(|t| t.scope.clone()).unwrap_or_default();
+            match state.enter_chapter(world, &scope, chapter) {
+                Ok(()) => changes.push(Change::EnteredChapter { name: state.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_default() }),
+                Err(e) => notes.push(e.to_string()),
+            }
+        }
+
+        let text = match card.responses.get(&key) {
+            Some(text) if !text.trim().is_empty() => text.trim().to_string(),
+            _ => builtin_reply(&verb, &name, state.turn),
+        };
+        let mut result = ActionResult { text, changes, note: None };
+        if !notes.is_empty() {
+            result.note = Some(notes.join("; "));
+        }
+        result
     }
 
     fn inventory(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
@@ -305,8 +413,8 @@ pub fn load_game(path: &Path, world: &WorldEngine) -> Result<(PlayState, Vec<Str
 
 /// The thing `noun` names among `things`: an exact id, the id with spaces
 /// for hyphens, the name ignoring case, then a unique whole word of
-/// either. `Err` asks which, when more than one matches.
-fn resolve(noun: &str, things: &[EntityRef], phrase: fn(&EntityRef) -> String) -> std::result::Result<Option<EntityRef>, String> {
+/// either. `Err` holds the candidates, phrased, when more than one matches.
+fn resolve(noun: &str, things: &[EntityRef], phrase: fn(&EntityRef) -> String) -> std::result::Result<Option<EntityRef>, Vec<String>> {
     let noun = noun.trim().to_lowercase();
     let noun = noun.strip_prefix("the ").unwrap_or(&noun).trim().to_string();
     if noun.is_empty() {
@@ -337,11 +445,21 @@ fn resolve(noun: &str, things: &[EntityRef], phrase: fn(&EntityRef) -> String) -
     match unique.len() {
         0 => Ok(None),
         1 => Ok(Some(unique[0].clone())),
-        _ => {
-            let names: Vec<String> = unique.iter().map(|t| phrase(t)).collect();
-            Err(format!("Which do you mean: {}?", join_or(&names)))
-        }
+        _ => Err(unique.iter().map(|t| phrase(t)).collect()),
     }
+}
+
+/// The reply to an action with no response block, from its verb and the
+/// object's name, varied by turn so repeats don't read the same.
+fn builtin_reply(verb: &str, name: &str, turn: u64) -> String {
+    let forms = ["You {verb} the {name}.", "You {verb} the {name}. Something changes."];
+    forms[(turn as usize) % forms.len()].replace("{verb}", verb).replace("{name}", name)
+}
+
+/// The reply to a refused action with no `refused` block.
+fn builtin_refusal(verb: &str, name: &str, turn: u64) -> String {
+    let forms = ["You can't {verb} the {name} yet.", "Not yet: you can't {verb} the {name}."];
+    forms[(turn as usize) % forms.len()].replace("{verb}", verb).replace("{name}", name)
 }
 
 fn join_or(items: &[String]) -> String {
@@ -676,5 +794,88 @@ mod tests {
         assert_eq!(old.inventory, vec!["lamp"]);
         assert!(old.states.is_empty() && old.chapter.is_none() && old.turn == 0);
         assert!(warnings.is_empty());
+    }
+    fn with_lever(world: &mut WorldEngine, dir: &Path) {
+        world.set_file(
+            &dir.join("objects/lever.md"),
+            "---\nid: lever\ntitle: Iron lever\ntype: object\nobject_type: mechanism\nweight: immovable\nactions:\n  pull:\n    becomes: { castle/vault: open }\n    sets: { story.vault: open, this.pulled: yes }\n    chapter: after\n    requires: { has: lamp }\n  shove:\n    requires: { has: lamp }\n---\nA lever.\n\n<!-- thwarter:action pull -->\nGears grind somewhere below.\n\n<!-- thwarter:action pull refused -->\nIt won't move without light.\n\n<!-- thwarter:action kick -->\nOw.\n",
+        );
+        world.set_file(
+            &dir.join("castle/hall.md"),
+            "---\nid: castle/hall\ntitle: Hall\ntype: location\nconnections:\n  south: castle/yard\n  down: castle/vault\nobjects: [lever]\n---\nStone.\n",
+        );
+    }
+
+    #[test]
+    fn an_objects_action_switches_states_sets_values_and_moves_the_story() {
+        let (dir, mut world) = story();
+        with_lever(&mut world, dir.path());
+        assert!(world.current_problems(false).is_empty(), "{:?}", world.current_problems(false));
+        let warnings = world.current_warnings();
+        for expected in [
+            "object `lever`, action `kick`: has a response but no mechanics",
+            "object `lever`, action `shove`: has no response",
+            "object `lever`, action `shove`: has `requires:` but no refusal",
+        ] {
+            assert!(warnings.iter().any(|w| w.starts_with(expected)), "{}: {:?}", expected, warnings);
+        }
+        assert!(!warnings.iter().any(|w| w.contains("action `pull`")), "{:?}", warnings);
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        let pull = PlayAction::Use { verb: "pull".into(), noun: "lever".into() };
+        let shove = PlayAction::Use { verb: "shove".into(), noun: "lever".into() };
+
+        game.act(&world, &mut state, &PlayAction::Go("north".into()));
+        assert_eq!(game.act(&world, &mut state, &pull).text, "It won't move without light.");
+        assert_eq!(game.act(&world, &mut state, &shove).text, "Not yet: you can't shove the iron lever.");
+        assert!(state.states.is_empty());
+
+        game.act(&world, &mut state, &PlayAction::Go("south".into()));
+        game.act(&world, &mut state, &PlayAction::Take("lamp".into()));
+        game.act(&world, &mut state, &PlayAction::Go("north".into()));
+        assert_eq!(game.act(&world, &mut state, &shove).text, "You shove the iron lever. Something changes.");
+        let r = game.act(&world, &mut state, &pull);
+        assert_eq!(r.text, "Gears grind somewhere below.");
+        assert!(r.note.is_none(), "{:?}", r.note);
+        assert_eq!(state.state_of("location", "castle/vault"), Some("open"));
+        assert_eq!(state.values["story.vault"], "open");
+        assert_eq!(state.values["lever.pulled"], "yes");
+        assert_eq!(state.chapter.as_ref().unwrap().name(), "after");
+        assert!(r.changes.contains(&Change::EnteredChapter { name: "after".into() }));
+
+        let kick = |noun: &str| PlayAction::Use { verb: "kick".into(), noun: noun.into() };
+        assert_eq!(game.act(&world, &mut state, &kick("iron lever")).text, "Ow.");
+        let lick = PlayAction::Use { verb: "lick".into(), noun: "lever".into() };
+        assert_eq!(game.act(&world, &mut state, &lick).text, "You can't lick the iron lever.");
+        assert_eq!(game.act(&world, &mut state, &kick("dragon")).text, "There's no dragon here.");
+        assert_eq!(game.act(&world, &mut state, &kick("")).text, "What do you want to kick?");
+    }
+
+    #[test]
+    fn validate_reports_what_an_action_names_that_does_not_exist() {
+        let (dir, mut world) = story();
+        world.set_file(
+            &dir.path().join("objects/lever.md"),
+            "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: mechanism\nactions:\n  pull:\n    becomes: { castle/vault: ajar, castle/nowhere: open }\n    chapter: never\n    requires: { has: unicorn }\n---\n",
+        );
+        let problems = world.current_problems(false);
+        for expected in [
+            "object `lever`, action `pull`: `becomes:` names state `ajar`, but location `castle/vault` has no such state file",
+            "object `lever`, action `pull`: `becomes:` nothing has the id `castle/nowhere`",
+            "object `lever`, action `pull`: `chapter: never` names no chapter",
+            "object `lever`, action `pull`: `requires: { has: unicorn }` names no object",
+        ] {
+            assert!(problems.iter().any(|p| p.starts_with(expected)), "{}: {:?}", expected, problems);
+        }
+    }
+
+    #[test]
+    fn the_which_reply_can_be_replaced() {
+        let (_d, world) = world();
+        let mut game = GameEngine::new();
+        game.ask_which = |verb, c| format!("Which one do you want to {}? {}", verb, c.join(" or "));
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        let r = game.act(&world, &mut state, &PlayAction::Take("sword".into()));
+        assert_eq!(r.text, "Which one do you want to take? the rusty sword or the old sword");
     }
 }

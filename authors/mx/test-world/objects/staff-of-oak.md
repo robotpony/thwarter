@@ -6,10 +6,6 @@ object_type: magical-weapon
 category: druidic-focus
 weight: medium
 value: 1500
-actions:
-- channel: Natural energy flows through the staff
-- plant: The staff could take root if planted
-- commune: You feel connected to all growing things
 properties:
   material: living-wood
   magical: true
@@ -25,3 +21,12 @@ stats:
 ---
 
 A gnarled staff carved from ancient oakwood, still showing signs of life with small leaves sprouting from its surface. The wood is warm to the touch and seems to pulse with the slow rhythm of growing trees. Runes spiral around its length, glowing faintly with natural magic.
+
+<!-- thwarter:action channel -->
+Natural energy flows through the staff.
+
+<!-- thwarter:action plant -->
+The staff could take root if planted.
+
+<!-- thwarter:action commune -->
+You feel connected to all growing things.

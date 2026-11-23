@@ -106,6 +106,9 @@ pub enum PlayAction {
     Take(String),
     Examine(String),
     Inventory,
+    /// An object's own named action (`design/STATES.md` › Changing
+    /// state): `pull lever` is `verb` "pull", `noun` "lever".
+    Use { verb: String, noun: String },
 }
 
 /// What an action did: the text to show, and the state changes made.
@@ -135,4 +138,8 @@ impl ActionResult {
 pub enum Change {
     Moved { from: String, to: String },
     Took { object: String, from: String },
+    /// A thing switched state; `type_name` is `location`, `object` or `character`.
+    Became { type_name: String, id: String, state: String },
+    EnteredChapter { name: String },
+    Set { name: String, value: String },
 }

@@ -275,12 +275,9 @@ impl ContentFile {
         Ok(())
     }
 
+    /// The body as the parser reads it back, response blocks included.
     fn parsed_body(&self) -> Result<String> {
-        Ok(match MarkdownParser::new().parse_content(&self.text(), &self.path)? {
-            ParsedEntity::Location(l) => l.description,
-            ParsedEntity::Character(c) => c.description,
-            ParsedEntity::Object(o) => o.description,
-        })
+        Ok(MarkdownParser::new().split_document(&self.text())?.body)
     }
 
     fn render_body(&self, text: &str) -> String {

@@ -254,6 +254,102 @@ impl WorldEngine {
         self.things.get(&(kind, id.to_string()))
     }
 
+    /// The kinds that have a thing with this id, in kind order. More than
+    /// one makes a bare reference such as `becomes:` ambiguous.
+    pub fn kinds_with_id(&self, id: &str) -> Vec<EntityKind> {
+        let mut kinds: Vec<EntityKind> = self.things.keys().filter(|(_, i)| i == id).map(|(k, _)| *k).collect();
+        kinds.sort();
+        kinds
+    }
+
+    /// The one thing a bare id names, for an action's `becomes:`.
+    pub fn thing_by_id(&self, id: &str) -> Result<&Thing> {
+        match self.kinds_with_id(id).as_slice() {
+            [] => anyhow::bail!("nothing has the id `{}`", id),
+            [kind] => Ok(&self.things[&(*kind, id.to_string())]),
+            kinds => {
+                let names: Vec<&str> = kinds.iter().map(|k| k.type_name()).collect();
+                anyhow::bail!("`{}` is the id of more than one kind ({}), so it's ambiguous", id, names.join(", "))
+            }
+        }
+    }
+
+    /// Problems with what each object's actions name: a `becomes:` that
+    /// names no thing or no state of it, a `chapter:` that can't be seen
+    /// from the object, a `requires: { has: }` naming no object.
+    fn action_problems(&self) -> Vec<String> {
+        let mut problems = Vec::new();
+        let mut ids: Vec<&String> = self.objects.keys().collect();
+        ids.sort();
+        for id in ids {
+            let object = &self.objects[id];
+            let scope = self.thing(EntityKind::Object, id).map(|t| t.scope.clone()).unwrap_or_default();
+            let mut names: Vec<&String> = object.actions.keys().collect();
+            names.sort();
+            for name in names {
+                let action = &object.actions[name];
+                let at = format!("object `{}`, action `{}`", id, name);
+                for (target, state) in &action.becomes {
+                    match self.thing_by_id(target) {
+                        Err(e) => problems.push(format!("{}: `becomes:` {}", at, e)),
+                        Ok(thing) if !thing.states.contains_key(state) => problems.push(format!(
+                            "{}: `becomes:` names state `{}`, but {} `{}` has no such state file",
+                            at,
+                            state,
+                            thing.kind.type_name(),
+                            target
+                        )),
+                        Ok(_) => {}
+                    }
+                }
+                if let Some(chapter) = &action.chapter {
+                    if self.find_chapter(&scope, chapter).is_none() {
+                        problems.push(format!("{}: `chapter: {}` names no chapter that can be seen from the object", at, chapter));
+                    }
+                }
+                for needed in &action.requires_has {
+                    if !self.objects.contains_key(needed) {
+                        problems.push(format!("{}: `requires: {{ has: {} }}` names no object", at, needed));
+                    }
+                }
+            }
+        }
+        problems
+    }
+
+    /// Authoring warnings for responses (`design/STATES.md` › Responses):
+    /// an action with mechanics but no response, a `requires:` with no
+    /// refusal, and a response with no mechanics. All three still play.
+    fn response_warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let mut ids: Vec<&String> = self.objects.keys().collect();
+        ids.sort();
+        for id in ids {
+            let object = &self.objects[id];
+            let mut names: Vec<&String> = object.actions.keys().collect();
+            names.sort();
+            for name in names {
+                let action = &object.actions[name];
+                let at = format!("object `{}`, action `{}`", id, name);
+                if !action.mechanics {
+                    warnings.push(format!("{}: has a response but no mechanics in frontmatter", at));
+                } else if !object.responses.contains_key(name) {
+                    warnings.push(format!(
+                        "{}: has no response, so play makes one up; add it after `<!-- thwarter:action {} -->`",
+                        at, name
+                    ));
+                }
+                if !action.requires_has.is_empty() && !object.responses.contains_key(&format!("{} refused", name)) {
+                    warnings.push(format!(
+                        "{}: has `requires:` but no refusal; add one after `<!-- thwarter:action {} refused -->`",
+                        at, name
+                    ));
+                }
+            }
+        }
+        warnings
+    }
+
     /// Every chapter, root ones first, each scope in chapter order.
     pub fn chapters(&self) -> &[Chapter] {
         &self.chapters
@@ -307,6 +403,7 @@ impl WorldEngine {
     /// its path), then ids shared between kinds.
     pub fn current_warnings(&self) -> Vec<String> {
         let mut warnings = self.file_warnings.clone();
+        warnings.extend(self.response_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }
@@ -402,6 +499,7 @@ impl WorldEngine {
                 join_paths(&paths)
             ));
         }
+        problems.extend(self.action_problems());
         for (from, direction, target) in self.broken_connections() {
             problems.push(format!(
                 "{}: connection `{}` points at unknown location `{}`",

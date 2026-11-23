@@ -7,7 +7,7 @@
 //! location, object or character. Every key remembers the file it came
 //! from, for error messages and the console's "(from index)" labels.
 
-use crate::parsers::{MarkdownParser, ParsedDocument};
+use crate::parsers::{Body, MarkdownParser, ParsedDocument};
 use serde_yaml::{Mapping, Value};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -42,11 +42,11 @@ impl Layer {
         self.metadata.contains_key(key)
     }
 
-    /// Whether this layer's prose replaces the prose below it: only if
-    /// something is left once author comments are removed, so an overlay
-    /// holding only a note never blanks a room.
+    /// Whether this layer's description replaces the one below it: only
+    /// if something is left once author comments are removed, so an
+    /// overlay holding only a note never blanks a room.
     pub fn has_prose(&self) -> bool {
-        !strip_comments(&self.body).trim().is_empty()
+        !strip_comments(&Body::parse(&self.body).description).trim().is_empty()
     }
 }
 
@@ -77,16 +77,24 @@ pub struct Merged {
     /// (`connections.north`). A map set whole is one entry; use
     /// `source_of` to look up a key inside it.
     pub sources: BTreeMap<String, PathBuf>,
+    /// The description: the thing's own, then each folder layer's added
+    /// after it.
     pub body: String,
-    /// The file the prose came from; `None` if no layer had any.
+    /// The file the thing's own description came from; `None` if no
+    /// layer had one.
     pub body_source: Option<PathBuf>,
+    /// Response blocks (`action pull`, `action pull refused`), each with
+    /// the file it came from, in the order first seen.
+    pub blocks: Vec<(String, String, PathBuf)>,
     /// Each list a layer replaced and each key a `null` removed. These
     /// warn, never fail (Bruce, 2026-11-23).
     pub warnings: Vec<String>,
+    own: String,
+    added: Vec<String>,
 }
 
 impl Merged {
-    /// Stack `layers`, first at the bottom.
+    /// Stack `layers`, first at the bottom, all as the thing's own.
     pub fn of<'a>(layers: impl IntoIterator<Item = &'a Layer>) -> Merged {
         let mut merged = Merged::default();
         for layer in layers {
@@ -95,10 +103,41 @@ impl Merged {
         merged
     }
 
-    /// Put `layer` on top. Scalars and lists replace what's below, maps
-    /// merge key by key all the way down, and `null` removes an inherited
-    /// key. Prose replaces the prose below only if the layer has some.
+    /// Put one of the thing's own layers on top. Scalars and lists replace
+    /// what's below, maps merge key by key all the way down, and `null`
+    /// removes an inherited key. The description replaces the one below
+    /// only if the layer has one; each response block replaces only its
+    /// namesake.
     pub fn apply(&mut self, layer: &Layer) {
+        self.merge_frontmatter(layer);
+        let body = Body::parse(&layer.body);
+        if layer.has_prose() {
+            self.own = body.description.clone();
+            self.body_source = Some(layer.path.clone());
+        }
+        self.merge_blocks(&body, &layer.path);
+        self.compose();
+    }
+
+    /// Put a layer from a folder above the thing on top: frontmatter and
+    /// blocks merge as for `apply`, but its description is added after
+    /// the thing's rather than replacing it (Bruce, 2026-11-23).
+    pub fn apply_area(&mut self, layer: &Layer) {
+        self.merge_frontmatter(layer);
+        let body = Body::parse(&layer.body);
+        if layer.has_prose() {
+            self.added.push(body.description.clone());
+        }
+        self.merge_blocks(&body, &layer.path);
+        self.compose();
+    }
+
+    /// A response block's text, if any layer has one.
+    pub fn block(&self, key: &str) -> Option<&str> {
+        self.blocks.iter().find(|(k, _, _)| k == key).map(|(_, t, _)| t.as_str())
+    }
+
+    fn merge_frontmatter(&mut self, layer: &Layer) {
         let mut over = layer.metadata.clone();
         for key in DIRECTIVES {
             over.remove(*key);
@@ -106,10 +145,23 @@ impl Merged {
         let mut metadata = std::mem::take(&mut self.metadata);
         self.merge_map(&mut metadata, &over, "", &layer.path);
         self.metadata = metadata;
-        if layer.has_prose() {
-            self.body = layer.body.clone();
-            self.body_source = Some(layer.path.clone());
+    }
+
+    fn merge_blocks(&mut self, body: &Body, path: &Path) {
+        for (key, text) in &body.blocks {
+            match self.blocks.iter_mut().find(|(k, _, _)| k == key) {
+                Some(existing) => *existing = (key.clone(), text.clone(), path.to_path_buf()),
+                None => self.blocks.push((key.clone(), text.clone(), path.to_path_buf())),
+            }
         }
+    }
+
+    fn compose(&mut self) {
+        let parts: Vec<&str> = std::iter::once(self.own.as_str())
+            .chain(self.added.iter().map(String::as_str))
+            .filter(|p| !p.trim().is_empty())
+            .collect();
+        self.body = parts.join("\n\n");
     }
 
     fn merge_map(&mut self, base: &mut Mapping, over: &Mapping, prefix: &str, path: &Path) {
@@ -175,7 +227,11 @@ impl Merged {
 
     /// The merged result, ready to be typed.
     pub fn document(&self) -> ParsedDocument {
-        ParsedDocument { metadata: Value::Mapping(self.metadata.clone()), body: self.body.clone() }
+        let body = Body {
+            description: self.body.clone(),
+            blocks: self.blocks.iter().map(|(k, t, _)| (k.clone(), t.clone())).collect(),
+        };
+        ParsedDocument { metadata: Value::Mapping(self.metadata.clone()), body: body.render() }
     }
 }
 

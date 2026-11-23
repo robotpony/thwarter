@@ -105,6 +105,12 @@ impl Thing {
     /// above it, then its index, its state, then its own overlays. Within
     /// each level a parent chapter comes before its sub-chapter.
     pub fn layers<'a>(&'a self, state: Option<&str>, chapter: Option<&ChapterKey>) -> Vec<&'a Layer> {
+        self.stack(state, chapter).into_iter().map(|(layer, _)| layer).collect()
+    }
+
+    /// `layers`, each marked whether it comes from a folder above (whose
+    /// description is added to the thing's rather than replacing it).
+    fn stack<'a>(&'a self, state: Option<&str>, chapter: Option<&ChapterKey>) -> Vec<(&'a Layer, bool)> {
         let lineage = chapter.map(ChapterKey::lineage).unwrap_or_default();
         let mut layers = Vec::new();
         let mut areas: Vec<&Path> = Vec::new();
@@ -116,17 +122,17 @@ impl Thing {
         for area in areas {
             for key in &lineage {
                 if let Some(o) = self.area_overlays.iter().find(|o| o.area == area && o.chapter == *key) {
-                    layers.push(&o.layer);
+                    layers.push((&o.layer, true));
                 }
             }
         }
-        layers.push(&self.index);
+        layers.push((&self.index, false));
         if let Some(layer) = state.and_then(|s| self.states.get(s)) {
-            layers.push(layer);
+            layers.push((layer, false));
         }
         for key in &lineage {
             if let Some(layer) = self.overlays.get(key) {
-                layers.push(layer);
+                layers.push((layer, false));
             }
         }
         layers
@@ -134,7 +140,14 @@ impl Thing {
 
     /// Merge and type one version. The error is the parser's.
     pub fn build(&self, state: Option<&str>, chapter: Option<&ChapterKey>) -> Result<(ParsedEntity, Merged), String> {
-        let merged = Merged::of(self.layers(state, chapter));
+        let mut merged = Merged::default();
+        for (layer, from_area) in self.stack(state, chapter) {
+            if from_area {
+                merged.apply_area(layer);
+            } else {
+                merged.apply(layer);
+            }
+        }
         let outcome = MarkdownParser::new()
             .build_entity(&merged.document(), &self.index.path)
             .map_err(|e| e.to_string())?;
@@ -883,5 +896,23 @@ mod tests {
         assert_eq!(engine.objects["bread"].description, "Fresh."); // no `state:`, so the index alone
         let stale = engine.version(EntityKind::Object, "bread", Some("stale"), None).unwrap();
         assert_eq!(stale.merged.metadata["vars"]["tasty"], serde_yaml::Value::from("no"));
+    }
+
+    #[test]
+    fn an_areas_chapter_prose_is_added_and_blocks_merge_by_name() {
+        let (dir, mut engine) = castle();
+        let d = dir.path();
+        engine.set_file(&d.join("castle/chapters/after-the-king.md"), "---\n---\nBlack banners hang from every wall.\n");
+        let hall = engine.version(EntityKind::Location, "castle/hall", None, Some("after-the-king")).unwrap();
+        assert_eq!(location(&hall).description, "Stone.\n\nBlack banners hang from every wall.");
+
+        engine.set_file(&d.join("objects/lever/index.md"), "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull: { becomes: { castle/vault: open } }\n---\nA lever.\n\n<!-- thwarter:action pull -->\nClunk.\n\n<!-- thwarter:action kick -->\nOw.\n");
+        engine.set_file(&d.join("objects/lever/rusted.md"), "---\ninherits: index\n---\n<!-- thwarter:action pull -->\nIt grinds and sticks.\n");
+        let rusted = engine.version(EntityKind::Object, "lever", Some("rusted"), None).unwrap();
+        let ParsedEntity::Object(o) = &rusted.entity else { panic!() };
+        assert_eq!(o.description, "A lever."); // a state with only a block keeps the description
+        assert_eq!(o.responses["pull"], "It grinds and sticks.");
+        assert_eq!(o.responses["kick"], "Ow.");
+        assert!(rusted.merged.blocks.iter().any(|(k, _, p)| k == "action pull" && p.ends_with("rusted.md")));
     }
 }

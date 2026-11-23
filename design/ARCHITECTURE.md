@@ -51,7 +51,7 @@ src/
 
 ## Console interface
 
-The engine's interface to the console (`REQUIREMENTS.md` › REQ-ENG-9), as agreed between the coder and the console coder on 2026-11-23. The Phase 2 part is built; play state and action results come with Phase 4.
+The engine's interface to the console (`design/ENGINE_REQUIREMENTS.md` › REQ-ENG-9), as agreed between the coder and the console coder on 2026-11-23. The Phase 2 part is built; play state and action results come with Phase 4.
 
 ```rust
 // thwarter::engines (src/engines/location_view.rs)
@@ -104,7 +104,7 @@ render::RenderStyle { Author, Player }; render_location_as(&LocationView, Render
 
 ## File writer
 
-`thwarter::writer` writes entities back to their files (`REQUIREMENTS.md` › REQ-ENG-7), built 2026-11-23 (0.4.0).
+`thwarter::writer` writes entities back to their files (`design/ENGINE_REQUIREMENTS.md` › REQ-ENG-7), built 2026-11-23 (0.4.0).
 
 ```rust
 WorldWriter::edit(&self, engine: &WorldEngine, kind: EntityKind, id: &str, edits: &[Edit]) -> Result<PathBuf>
@@ -139,7 +139,7 @@ This table exists because status claims in this repo have previously drifted fro
 | Console (`thwart edit`, `thwart play`) | Partially done | The loop, `/edit`, `/play`, `/reload`, `/help` and `/quit` work, and edit mode navigates the world's folders (`ls`, `cd`, `pwd`, `look`). Play mode has the v1 verbs (look, go and bare directions, take, examine, inventory, with aliases), prints author notes on their own line, and keeps its own position: `/play` resumes and `/play here` moves the player to edit mode's room. `/save` and `/load` keep games outside the world folder. `/new room|character|object`, `/set`, `/link` and `/unlink` save through the writer and report the problems a change adds. `/edit room|object|character [id]` opens the file as it is in a full-screen editor (ratatui; ctrl-s saves, esc closes). A save must parse and still hold the same thing, takes a change on disk by itself when nothing is unsaved and otherwise warns once before saving over it, and reports problems as `/new` does; scenery opens as a new card with `object_type: scenery`, and a file that doesn't parse opens so it can be fixed. Bundles, with a section per file, aren't built (`design/STATES.md`). On a terminal the prompt has line editing and history (reedline); history isn't saved between sessions. It also watches the world's files and reloads when they change, printing the result above the prompt. Tested by transcripts in `tests/transcripts/` (edit navigation, modes, authoring, play) and unit tests for `/reload`, verbs, save paths, the editor's keys and full-edit saves. |
 | Unit tests | Started | 85 tests: renderer, world engine, parser, `/reload`, the writer (including a byte-identical round trip of every `.md` in the repo and a one-field edit of every test-world entity), and play. Console behaviour is also covered by transcripts. |
 | `NarrativeEngine` | Model only | Plot point prerequisite checking works; consequence execution and alternative-text condition evaluation are stubs. |
-| `GameEngine` | Partially done | Look, go, take, examine and inventory work against `PlayState` (see Play above), each thing in its current version: its state in the game and the game's chapter (`WorldEngine::describe_location_at` and `location_at`/`object_at`/`character_at`). `PlayState` keeps states (as a delta from the starting state), the chapter, values, visits and the turn count; `switch_state` and `enter_chapter` change them. Actions that do so (`becomes:`, `chapter:`, `sets:`) are the next step. |
+| `GameEngine` | Partially done | Look, go, take, examine and inventory work against `PlayState` (see Play above), each thing in its current version: its state in the game and the game's chapter (`WorldEngine::describe_location_at` and `location_at`/`object_at`/`character_at`). `PlayState` keeps states (as a delta from the starting state), the chapter, values, visits and the turn count; `switch_state` and `enter_chapter` change them, and so does `PlayAction::Use { verb, noun }`, which runs an object's named action: `requires: { has: }`, then `becomes:`, `sets:` and `chapter:`, replying with the object's response block or a built-in reply. The "Which do you mean" reply is `GameEngine::ask_which`, replaceable per story. |
 | `thwart validate` | Done | Loads the world, reports parse errors and broken connections; `--strict` additionally checks character `default_location` references. It also reports an `id` defined twice within a kind, and warns (without failing) about a key that differs only in case from a known one. `--fix` and location-scoped validation are not implemented. |
 | `thwart show` | Partially done | Loads and displays the world or a single location; text output is the shared room view. Objects without cards show "(no card)", missing exits "(missing)". `--state <name>` and `--chapter <name>` show a location's other versions (`design/STATES.md`). `--player` (perspective) is not implemented. |
 | `thwart map` | Not implemented | Reports that it isn't implemented and exits non-zero. |

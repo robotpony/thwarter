@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// A physical or environmental item: weapons, containers, furniture,
 /// scenery, and similar world dressing. Object content is far more varied
@@ -24,9 +24,12 @@ pub struct GameObject {
     /// Stored as text because sample content mixes numbers ("1000") with
     /// descriptive values ("priceless", "unknown").
     pub value: Option<String>,
-    /// Named action -> response text, e.g. "wield" -> "The sword feels
-    /// like an extension of your arm".
-    pub actions: HashMap<String, String>,
+    /// Named actions (`design/STATES.md` › Changing state), e.g. `pull`
+    /// with its reply and what it changes.
+    pub actions: HashMap<String, ObjectAction>,
+    /// Response prose by action (`pull`, `pull refused`), from the body's
+    /// `<!-- thwarter:action ... -->` blocks.
+    pub responses: HashMap<String, String>,
     /// Everything else an author attaches: properties, effects, stats,
     /// contents, security, or any future section. Validated loosely (must
     /// be a YAML mapping); interpreted by whatever engine code cares.
@@ -44,7 +47,33 @@ impl GameObject {
             weight: None,
             value: None,
             actions: HashMap::new(),
+            responses: HashMap::new(),
             extra: HashMap::new(),
         }
+    }
+}
+
+/// What one of an object's actions does: `actions: { pull: { becomes: {
+/// castle/vault: open } } }`. Its reply is prose in the body.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ObjectAction {
+    /// Whether frontmatter defines it; `false` for an action that is only
+    /// a response block.
+    pub mechanics: bool,
+    /// Thing id to the state it switches to.
+    pub becomes: BTreeMap<String, String>,
+    /// Values to set, by full name (`story.king`, `knife.sharp`, or
+    /// `this.lit` for the object's own). Values are strings.
+    pub sets: BTreeMap<String, String>,
+    /// The chapter the story moves to, seen from the object's folder.
+    pub chapter: Option<String>,
+    /// Object ids the player must carry first (`requires: { has: key }`).
+    pub requires_has: Vec<String>,
+}
+
+impl ObjectAction {
+    /// An action that is only a response block in the body.
+    pub fn reply_only() -> Self {
+        Self::default()
     }
 }
