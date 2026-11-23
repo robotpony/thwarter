@@ -63,7 +63,7 @@ The loaf has gone hard. It would still keep you alive.
 
 Chapters follow the same lineage as everything else: they can exist at the world root or inside any thing (Bruce, 2026-11-23).
 
-At the root, a chapter defines the chapter itself and what changes for the whole world (story values, and later anything global). It is one file, the same shape as a thing's chapter overlay:
+At the root, a chapter defines the chapter itself and what changes for the whole world (story values, and later anything global). It is one file, the same shape as a thing's chapter overlay, or a folder when it has sub-chapters (below):
 
 ```
 chapters/
@@ -98,15 +98,38 @@ npcs/guard/
 
 An overlay's file name MUST match a root chapter's name, without its number. A thing that's one file becomes a bundle when it gets its first state or overlay; the console does that move (see Console).
 
+Chapters are siblings: one chapter's changes never carry into the next (Bruce, 2026-11-23). A chapter applies to another only when it is its parent. A root chapter with sub-chapters is a folder, and its sub-chapters inherit from it:
+
+```
+chapters/
+  10-the-summons.md
+  20-after-the-king/
+    _index.md                # the chapter itself
+    21-the-funeral.md        # a sub-chapter; after-the-king applies too
+```
+
+A thing's overlays follow the same shape: `castle/courtyard/chapters/after-the-king.md` applies in `after-the-king` and in its sub-chapters, and `castle/courtyard/chapters/after-the-king/the-funeral.md` only in `the-funeral`. So an author can tell what applies from the folder tree.
+
 ### What applies, in order
 
-A thing's current version is built in layers, each overriding only what it states (order agreed by Bruce, 2026-11-23):
+A thing's current version is built in layers, each overriding only what it states. Stacking is inheritance, and it follows lineage only: global definitions, then the folders above the thing, then the thing itself, never a sibling beside it (Bruce, 2026-11-23). An author can think about parent folders and globals, and nothing else.
 
-1. `index.md`
-2. the current state's file, if the thing has states
-3. the thing's own chapter overlays. *Proposed*: every chapter up to and including the current one, in chapter order, so a change made in chapter 2 still holds in chapter 3 unless chapter 3 changes it again
+For the courtyard, in the sub-chapter `the-funeral`, in its `burning` state:
 
-An overlay applies on top of whichever state is current; it can't vary by state. A chapter that needs the vault's open and closed text to differ is out of scope for now (*proposed*).
+```
+1. globals ................ chapters/20-after-the-king/_index.md, then 21-the-funeral.md
+                            (global settings only)
+2. folders above it ....... castle/chapters/after-the-king.md, then .../the-funeral.md
+3. the thing .............. castle/courtyard/index.md
+4. its current state ...... castle/courtyard/burning.md
+5. its chapter overlays ... castle/courtyard/chapters/after-the-king.md, then .../the-funeral.md
+
+  never: castle/gardens/*, or chapters/10-the-summons.md
+```
+
+Within each level, a parent chapter comes before its sub-chapter. An area can therefore change every room in it for a chapter (the whole castle in mourning) through its own `chapters/` folder (Bruce, 2026-11-23).
+
+An overlay applies on top of whichever state is current; it can't vary by state. Bruce sees no case for that yet (2026-11-23), so it's out of scope.
 
 Frontmatter merges by the inheritance rules below. Prose replaces the layer below only if the layer has prose; a body that is empty once author comments are removed counts as no prose, so an overlay holding only a note never blanks a room.
 
@@ -163,8 +186,10 @@ How states switch is mostly invisible to the author, who works in the console (B
 
 - An action sets a thing's state directly: `becomes: { castle/vault: open }`.
 - An action can need something first: `requires: { has: brass-key }`. This is the only remaining condition, a small YAML map.
-- An action moves the story on: `chapter: after-the-king`. Every overlay for that chapter then applies, with no list to keep up to date.
-- A door and its room: the action changes both, by setting each one's state (option (a), Bruce leaning that way, to be tested). The alternative, an exit that goes `through:` a door object, stays open until testing.
+- An action moves the story to a chapter: `chapter: after-the-king`. Every overlay for that chapter then applies, with no list to keep up to date. Since chapters are siblings, going from one chapter to another applies only the new chapter (and its parents); nothing from chapters in between. States and chapters can move forward or back (Bruce, 2026-11-23).
+- An action changes a value: `sets: { knife.sharp: no }`. Values hold once set (Bruce, 2026-11-23).
+- The game itself updates some values on its own: time, weather, randomness and similar, under `game.`.
+- Doors are a special construct, still to be designed (Bruce, 2026-11-23). Options so far: the action sets both the door's and the room's state, or the room's exit goes `through:` the door.
 - Time-based change (bread going stale after 20 turns) needs a clock, which doesn't exist yet. *Proposed* for later: `after: { turns: 20, becomes: stale }` on a state.
 
 ```yaml
@@ -248,13 +273,10 @@ Commands the console will need, *proposed*: `/state new <name>`, `/state set <na
 - The loader reads bundles and root chapters, and builds each thing's current version from its layers.
 - `PlayState` gains each thing's current state, the current chapter, and variable values; `flags` becomes these. Saves store all of it.
 - The writer gains file moves (one file to a bundle) and multi-file saves for the combined document.
+- The play engine and the edit engine both keep the current game and player state: the location, each thing's state, the chapter and values. Showing that state in the editor is central to authoring (Bruce, 2026-11-23); how it looks is console work, still to be designed.
 
 ## Open questions
 
-1. **Overlay order** (*proposed* above): do chapter overlays stack, so chapter 2's change holds in chapter 3, or does only the current chapter's overlay apply?
-2. **Values set in play versus states.** Minor changes are values, so actions need `sets:` (for example `sets: { knife.sharp: no }`). *Proposed*: a value set in play holds until something sets it again, except that switching a thing to a state resets the values that state declares. If the dulled knife later switches to a state with `sharp: yes`, it is sharp.
-3. **Chapter jumps.** *Proposed*: going from chapter 1 to chapter 3 applies chapter 2's `sets:` on the way. Play never goes back a chapter; edit mode can set any chapter for playtesting.
-4. **State by chapter**: is it really out of scope for a chapter to vary by state (*proposed* above)?
-5. **Areas**: can an area (`castle/`) have chapter overlays that apply to every room in it, for example the whole castle in mourning?
-6. **The door**: option (a), setting both states from the action, to be tested against option (b), an exit through a door object.
-7. **Clocks**: when do time-based changes come in, and is it turns or game time?
+1. **Doors**: a special construct, to be designed in its own discussion.
+2. **Clocks and game values**: when do time, weather and randomness come in, and is time turns or game time?
+3. **Showing play state in the editor**: what the author sees, and how they change it while playtesting.
