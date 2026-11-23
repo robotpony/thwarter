@@ -26,7 +26,7 @@ Build Thwarter in phases:
 
 ## 4. Principles
 
-Agreed by Bruce, 2026-11-23. Every requirement in every component's document answers to these.
+Agreed by Bruce, 2026-11-23. Every requirement in every component's document answers to these. A component MAY add principles of its own at the top of its requirements, such as the console's game-master principle (`design/CONSOLE_REQUIREMENTS.md`).
 
 1. **Lineage only.** A thing takes values from global definitions, the folders above it, and templates it names; never from a sibling beside it.
 2. **Explicit, never hidden.** Inheritance is written down, and the console shows where every value came from.

@@ -38,6 +38,7 @@ Written from `design/STATES.md` as agreed with Bruce on 2026-11-23. Where this l
 - REQ-CF-19: A door MUST be its own type, joining two rooms with one state seen from both sides; a portal MAY join more. Each room's exit names the door, and the door names its sides.
 - REQ-CF-20: The world's definition MUST live in a `world/` folder: `index.md` (title, author, starting room, and the intro as its prose), `story.md` (`story.` values), `player.md` (the player, a character, with `player.` values) and `styles/`. `world.toml` MAY hold tool settings only.
 - REQ-CF-21: The engine MUST supply built-in templates that any world can name without defining them, and a world template of the same name MUST override one. Phase 4 ships `scenery`; the door templates ship with doors.
+- REQ-CF-22: An object, character or door `id` MUST be unique across the whole world, whatever scope its file lives in, so a room's `torch` always means one file. Moving a thing between scopes (`/move`) keeps its `id`. Templates and chapters are named per scope instead, and are looked up along the lineage (REQ-CF-11, REQ-CF-14). Decided by the commander, 2026-11-23, at the console coder's proposal.
 
 ## Open questions
 
