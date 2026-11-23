@@ -27,7 +27,7 @@ Written from `design/STATES.md` as agreed with Bruce on 2026-11-23. Where this l
 
 - REQ-CF-9: A room, object, character or door MUST be either one Markdown file or a bundle: a folder holding an `index.md`. A folder without an `index.md`, or with an `_index.md`, MUST be read as an area. `index`, `_index`, `chapters`, `templates`, `world` and `game` are reserved names.
 - REQ-CF-10: A bundle MAY hold state files beside its `index.md`. A state's name MUST be its file name, and a state file MUST NOT set `id`, `type` or `state:`. Only `index.md` names the starting state, and MAY leave it out.
-- REQ-CF-11: A file MUST inherit only when it says `inherits:`. A bare name names a file in the same bundle; anything else is a path from the world root, or a built-in. One parent only; cycles are an error.
+- REQ-CF-11: A file MUST inherit only when it says `inherits:`. A bare name is looked up along the lineage: the same bundle, then `templates/` folders from the thing's scope outward, then the engine's built-ins. Anything with a slash is a path from the world root. One parent only; cycles are an error.
 - REQ-CF-12: A thing's current version MUST be built from its lineage only, in this order: globals, the folders above it, the thing's `index.md`, its current state, then its chapter versions, with a parent chapter before its sub-chapter. Nothing MUST come from a sibling beside it.
 - REQ-CF-13: Frontmatter merges by key, all the way down for maps; a list or a scalar replaces the one below it, and `null` removes a key. The body merges by block: the description replaces the description below, and each response block replaces only its namesake. A thing's own layers replace prose; an area's layers add theirs after the description.
 - REQ-CF-14: Chapters MAY be defined at the root or in any scope, in a `chapters/` folder. A numbered file defines a chapter in that scope; an unnumbered one is a thing's or an area's version for the nearest chapter of that name. Chapters are siblings and MUST NOT carry into each other; only a parent chapter applies to its sub-chapters.
@@ -36,7 +36,8 @@ Written from `design/STATES.md` as agreed with Bruce on 2026-11-23. Where this l
 - REQ-CF-17: An action's mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`) MUST be in frontmatter, and what the player reads MUST be in the body, after a `<!-- thwarter:action <name> -->` marker (`<name> refused` for a failed `requires:`). A response block MAY stand alone with no mechanics.
 - REQ-CF-18: A state MAY set `visibility:` to `visible` (the default), `faint`, `hidden` or `absent`.
 - REQ-CF-19: A door MUST be its own type, joining two rooms with one state seen from both sides; a portal MAY join more. Each room's exit names the door, and the door names its sides.
-- REQ-CF-20: The world's definition (title, intro, starting room, `story.` and `player.` declarations) MUST live in a `world/` folder. Its layout is still open (`design/STATES.md` › Open questions).
+- REQ-CF-20: The world's definition MUST live in a `world/` folder: `index.md` (title, author, starting room, and the intro as its prose), `story.md` (`story.` values), `player.md` (the player, a character, with `player.` values) and `styles/`. `world.toml` MAY hold tool settings only.
+- REQ-CF-21: The engine MUST supply built-in templates that any world can name without defining them, and a world template of the same name MUST override one. Phase 4 ships `scenery`; the door templates ship with doors.
 
 ## Open questions
 

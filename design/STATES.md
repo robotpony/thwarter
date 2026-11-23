@@ -87,7 +87,49 @@ sets: { story.king: dead }          # story values on entering the chapter
 
 The number prefix only orders the chapters; the chapter's name is the rest (`after-the-king`), and that's what overlays and actions use. Leave gaps (10, 20, 30) so a chapter can be inserted by naming one file. A root chapter can exist before any overlay does, as a placeholder for the arc. Root chapters don't change individual things; that's what a thing's own overlays are for. What a root chapter can change is world-level settings (starting room, title, intro text) and story values (Bruce, 2026-11-23).
 
-The world's definition gets its own `world/` folder (Bruce, 2026-11-23): its title, intro, starting room, and the `story.` and `player.` declarations, which move out of `world.toml`. The running game is a virtual `game/` folder the console shows but that isn't on disk. A real `game/` folder, if one exists, can only set the game's starting state. *Proposed*: `world.toml` stays for tool settings, such as the default map style.
+The world's definition gets its own `world/` folder (Bruce, 2026-11-23). The running game is a virtual `game/` folder the console shows but that isn't on disk. A real `game/` folder, if one exists, can only set the game's starting state.
+
+The layout of `world/`, settled by the commander for Phase 4 (2026-11-23; Bruce may overrule):
+
+```
+world/
+  index.md      # the world: title, author, starting room; the intro is its prose
+  story.md      # story. values, declared with their starting values
+  player.md     # the player: a character, with player. values
+  styles/       # writing styles for the writing helpers
+```
+
+```yaml
+# world/index.md
+title: Castle Adventure
+type: world
+author: Bruce Alderson
+start: castle/courtyard
+---
+The intro a player reads when a new game starts.
+```
+
+```yaml
+# world/story.md
+type: story
+vars: { king: alive }
+---
+<!-- Story notes for the author. -->
+```
+
+```yaml
+# world/player.md
+title: Traveller                 # the player's default name
+type: character
+character_type: player
+vars: { health: 100 }
+---
+What the player sees when they examine themselves.
+```
+
+- Values use `vars:` everywhere, as things do, so `story.king` is declared in `story.md` and `player.health` in `player.md`. `{{ player.title }}` is the player's name.
+- `world.toml` keeps tool settings only, such as the default map style. The world's title, author, version and starting room move to `world/index.md`, and its description becomes the intro prose.
+- The test world's `world.toml` also holds counts and flags that nothing reads (`locations_count`, `relationship_system` and the like). They're dropped in the move, and `CHANGELOG.md` records them.
 
 Inside a thing, a chapter is an overlay for that thing:
 
@@ -218,7 +260,13 @@ Identical copies (three healing potions) are one thing with a count: `objects: {
 
 ## Built-in mechanics
 
-Every world gets a set of mechanics from the engine itself (Bruce, 2026-11-23): the basic kinds of thing (room, location, object, character) and a common selection of doors (`door`, `locked-door`, `portal` and similar). They are templates the engine supplies, so a world can use them by name without defining them, and a world template of the same name overrides one. Which built-ins ship, and how a world lists them, is still to design.
+Every world gets a set of mechanics from the engine itself (Bruce, 2026-11-23): the basic kinds of thing (room, location, object, character) and a common selection of doors (`door`, `locked-door`, `portal` and similar). They are templates the engine supplies, so a world can use them by name without defining them, and a world template of the same name overrides one.
+
+Settled by the commander for Phase 4 (2026-11-23; Bruce may overrule):
+- The kinds of thing (location, object, character, door) are types the engine knows, not templates.
+- Built-in templates ship with the engine as ordinary Markdown template files, compiled in, so an author can read one with `thwart show` and copy it to change it. A world never lists the built-ins it uses; naming one is enough.
+- A bare template name is looked up along the lineage: first the same bundle, then `templates/` folders from the thing's scope outward to the root, then the built-ins. So `inherits: locked-door` finds the world's own `locked-door` if it has one, and the engine's otherwise.
+- Phase 4 ships the mechanism and one built-in, `scenery`, the template a cardless object's new card starts from (`object_type: scenery`, an empty description). The door built-ins (`door`, `locked-door`, `portal`) ship with doors in Phase 6.
 
 ## Doors
 
@@ -398,7 +446,6 @@ Commands the console will need, *proposed*: `/state new <name>`, `/state set <na
 
 ## Open questions
 
-1. **Built-ins**: which mechanics the engine ships (rooms, objects, characters, door kinds, portals), and how a world lists or overrides them.
-2. **Clocks and game values**: Bruce wants them (2026-11-23). Still to settle: is time counted in turns or in game time, and how weather and randomness are declared.
-3. **Showing play state**: it MUST be visible in a sidebar in the console and be queryable (Bruce, 2026-11-23). The layout and the query commands are console work for `design/CONSOLE_REQUIREMENTS.md`.
-4. **What's in `world/`**: its file layout, and what stays in `world.toml`.
+1. **Clocks and game values**: Bruce wants them (2026-11-23). Still to settle: is time counted in turns or in game time, and how weather and randomness are declared. Phase 6.
+2. **Showing play state**: it MUST be visible in a sidebar in the console and be queryable (Bruce, 2026-11-23). The layout and the query commands are console work for `design/CONSOLE_REQUIREMENTS.md`. Phase 5.
+3. **Keys for built-in locked doors**: a `locked-door` template needs to say which key opens each door, which means `requires: { has: this.key }`, a variable inside a condition. Phase 6.
