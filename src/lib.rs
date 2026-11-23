@@ -2,6 +2,7 @@ pub mod models;
 pub mod engines;
 pub mod parsers;
 pub mod cli;
+pub mod render;
 pub mod console;
 
 pub use models::*;

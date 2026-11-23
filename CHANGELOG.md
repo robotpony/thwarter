@@ -26,6 +26,20 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.1.4 (2026-11-23)
+
+### Added
+
+- `WorldEngine::describe_location`, returning a `LocationView` (title, body, exits with whether each target exists, characters and objects with their card names, `None` for no card), as agreed with the console for REQ-ENG-9.
+- `thwarter::render::render_location`, the room view shared by `thwart show` and the console (REQ-CON-8). It returns plain text without colour.
+- `WorldEngine::problems(report, strict)`, the check behind `thwart validate`, for the console's `/reload` to share (REQ-CON-7).
+- `WorldEngine::characters`, the loaded character cards by id.
+- The first unit tests: the renderer, `describe_location` and `problems`.
+
+### Changed
+
+- `show` and `validate` call those shared functions. Their output is unchanged.
+
 ## 0.1.3 (2026-11-23)
 
 ### Added

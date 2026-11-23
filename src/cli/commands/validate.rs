@@ -32,26 +32,7 @@ pub fn validate_command(
         report.objects_loaded
     ));
 
-    let mut problems = report.errors.clone();
-    for (from, direction, target) in engine.broken_connections() {
-        problems.push(format!(
-            "{}: connection `{}` points at unknown location `{}`",
-            from, direction, target
-        ));
-    }
-
-    if strict {
-        for character in &report.characters {
-            if let Some(default_location) = &character.default_location {
-                if engine.get_location(default_location).is_none() {
-                    problems.push(format!(
-                        "{}: default_location `{}` is not a known location",
-                        character.id, default_location
-                    ));
-                }
-            }
-        }
-    }
+    let problems = engine.problems(&report, strict);
 
     if problems.is_empty() {
         formatter.print_success("Validation passed: no broken references found");
