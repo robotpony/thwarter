@@ -56,6 +56,17 @@ Each component's requirements live in their own document, with one owner. A chan
 - REQ-CFG-2: A per-world `world.toml` MAY set world metadata (title, author, version) and world-specific settings (starting location, default map style); it is not required for a world to load or validate.
 - REQ-CFG-3: Configuration parsing MUST NOT fail on unrecognized fields in either file; an author adding a custom `world.toml` section for their own tooling MUST NOT break `thwart`.
 
+### 5.2 Authors, installed worlds and play data
+
+Decided with Bruce, 2026-11-23. The person at the keyboard is the local user, and their identity and private settings live in their home folder, not in a world. Each folder in `authors/` is a persona: a pen name the person writes as. One person MAY have several. In a later online version each author gets their own instance, and personas work the same way inside it.
+
+Paths follow the XDG base directories on every platform, falling back to `~/.config`, `~/.local/share` and `~/.local/state`.
+
+- REQ-CFG-4: A person's own settings MUST live in `$XDG_CONFIG_HOME/thwarter/config.toml`, never in a world or a repository: the persona they write as by default, and the writing helpers' service settings and keys (`design/CONSOLE_REQUIREMENTS.md` › REQ-CON-19).
+- REQ-CFG-5: A world installed to be played (someone else's, or a published one) MUST go in `$XDG_DATA_HOME/thwarter/worlds/<persona>/<world>/`. An author's own worlds stay where they write them, under `authors/<persona>/`.
+- REQ-CFG-6: Play data MUST go in `$XDG_STATE_HOME/thwarter/`: saves as REQ-CON-11 already says, and any other per-player state, so neither an author's worlds nor installed ones ever change by being played (principle 6).
+- REQ-CFG-7: A world MUST be shareable as one archive holding the world and its persona's file, so the author's details travel with the game. Packaging leaves out what the world's ignore list names. Installing an archive puts it under REQ-CFG-5's folder. The archive format and the commands are the coder's to specify in `design/CLI_REQUIREMENTS.md`. *Proposed*: `thwart package` and `thwart install`.
+
 ## 6. Alternatives considered
 
 **Implementation language.** Rust was chosen for startup time (target: under 1 second, achieved: single-digit milliseconds) and single-binary distribution to content authors who shouldn't need a language runtime installed. No alternative was formally evaluated and recorded at the time; the most likely alternative given the same constraints would have been a compiled-to-native scripting language. See `design/DECISIONS.md` for the full record, including the acknowledgment that this gap in the original rationale exists.

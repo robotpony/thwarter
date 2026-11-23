@@ -88,7 +88,17 @@ AI tools for prose in edit mode. Done when an author can review and rewrite a ro
 - [ ] Styles as files in `world/styles/` [console, coder] (REQ-CON-18)
 - [ ] Turning helpers on per world, with the service and model shown [console] (REQ-CON-19, REQ-CON-21)
 
-## Phase 9 · Tooling, as needed
+## Phase 9 · Authors and sharing
+
+Done when a persona can package a world, and someone else can install it and play it.
+
+- [ ] Persona files, and `author:` in `world/index.md` naming one [coder] (REQ-WS-4, REQ-WS-5)
+- [ ] Personal settings in `~/.config/thwarter/config.toml` [coder] (REQ-CFG-4)
+- [ ] First run asks who's writing; `/author` switches persona; the status bar shows it [console] (REQ-WS-4)
+- [ ] Packaging a world with its persona, and installing one to play [coder] (REQ-CFG-5, REQ-CFG-7)
+- [ ] Play data for installed worlds kept apart from them [coder, console] (REQ-CFG-6)
+
+## Phase 10 · Tooling, as needed
 
 
 Built when authoring or play asks for them, most likely as console commands. Until then they stay as they are.

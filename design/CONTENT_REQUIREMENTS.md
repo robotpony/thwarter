@@ -21,6 +21,10 @@ Split out of `REQUIREMENTS.md` on 2026-11-23. The REQ-CF and REQ-WS ids are stab
 - REQ-WS-2: A location's `id` SHOULD read as a place a human would recognize (`castle/courtyard`), not an opaque identifier (a UUID or sequence number).
 - REQ-WS-3: A world directory MAY include a `world.toml` (title, author, starting location, and world-specific settings) and the tool's own `thwart.toml` (default world path, output preferences); neither is required for a world to load.
 
+- REQ-WS-4: A persona is `authors/<persona>/index.md`, Markdown with frontmatter (Bruce, 2026-11-23): `type: author`, `title` (the pen name readers see), and contact details (`email`, `website` and similar), with the bio as its prose. It MAY also name a default writing style and a default world. A persona folder without `index.md` still works, with its folder name as the pen name. A TOML form may follow later if it's needed.
+- REQ-WS-5: A world's `world/index.md` MUST name its author by persona id (`author: bob`), so the pen name and contact details come from the persona file and changing them there changes every world.
+- REQ-WS-6: A persona's contact details are published with every archive of its worlds (REQ-CFG-7). The console MUST say so before packaging.
+
 ## World model
 
 Written from `design/STATES.md` as agreed with Bruce on 2026-11-23. Where this list and that document disagree, it's a bug in one of them.

@@ -103,7 +103,7 @@ world/
 # world/index.md
 title: Castle Adventure
 type: world
-author: Bruce Alderson
+author: bob                      # a persona id (REQ-WS-5)
 start: castle/courtyard
 ---
 The intro a player reads when a new game starts.
