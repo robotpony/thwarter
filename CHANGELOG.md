@@ -26,6 +26,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.6.2 (2026-11-23)
+
+### Changed
+
+- The room view (`thwart show` and the console) prints `(no description yet)` for a room with an empty body, as the console's character and object views do, instead of a run of blank lines.
+
 ## 0.6.1 (2026-11-23)
 
 ### Changed

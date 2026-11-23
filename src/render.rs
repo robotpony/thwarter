@@ -6,7 +6,7 @@
 use crate::engines::LocationView;
 
 /// A location as an author checks it: title and id, coordinates,
-/// description, exits, then who and what is there. An exit to an unknown
+/// description (or `(no description yet)`), exits, then who and what is there. An exit to an unknown
 /// room says `(missing)`; an object with no card says `(no card)`; a
 /// character with no card says `(not found)`.
 pub fn render_location(view: &LocationView) -> String {
@@ -16,7 +16,9 @@ pub fn render_location(view: &LocationView) -> String {
         out.push(format!("at ({}, {}, {})", c.x, c.y, c.z));
     }
     out.push(String::new());
-    out.push(view.body.trim().to_string());
+    let body = view.body.trim();
+    // Matches the console's character and object views.
+    out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
 
     out.push(String::new());
     if view.exits.is_empty() {
@@ -107,5 +109,14 @@ Objects:
         assert!(text.contains("Exits: none"));
         assert!(text.contains("Characters: none"));
         assert!(text.ends_with("Objects: none"));
+    }
+
+    #[test]
+    fn an_empty_body_says_so() {
+        let mut v = view();
+        v.coordinates = None;
+        v.body = "  \n".into();
+        let text = render_location(&v);
+        assert!(text.starts_with("Castle Courtyard (castle/courtyard)\n\n(no description yet)\n\nExits:\n"), "{}", text);
     }
 }
