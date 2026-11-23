@@ -90,7 +90,8 @@ enum Edit { SetScalar, SetList, SetMapEntry, RemoveMapEntry, RemoveKey, SetBody,
 - It handles the shapes `design/CONTENT_FORMAT.md` uses: one-line scalars, flow and block string lists, and one-level block maps. Block scalars, non-empty flow maps, nested list items and anchors are refused at the key being edited; `ReplaceAll` is the way around that. `relationships` and `actions` (lists of single-key maps) can only be changed with `ReplaceAll` for now.
 - An added list follows the file's existing style: block if the file already has a block list, flow otherwise. Added keys go in field-table order, from `parsers::known_keys`.
 - It refuses changes to `id` or `type`, and edits to an id defined in more than one file. An id can't contain `..`, empty, hidden or absolute segments, backslashes or colons, and any path that resolves outside the world is refused, symlinks included.
-- The engine records which file each id came from (`WorldEngine::sources`, `source_path`, `EntityKind`). Ids are unique within a kind; a location and an object may share one.
+- The engine records which file each id came from (`WorldEngine::sources`, `source_path`, `EntityKind`). Ids are unique within a kind; a location and an object may share one, with a warning (`WorldEngine::shared_ids`).
+- `WorldWriter::edit_loaded` and `create_loaded` write the file, apply the same text to the loaded engine (REQ-ENG-8, `WorldEngine::set_file`), and return `ChangeReport { path, problems, added, resolved }`: the problems the change added and the ones it resolved. Nothing re-reads the world from disk. There's no writer-side delete yet.
 
 ## Implementation status
 
@@ -106,10 +107,10 @@ This table exists because status claims in this repo have previously drifted fro
 | `CharacterEngine` | Partially done | Loading, placement, and movement work, but nothing calls it from the CLI. `WorldEngine` keeps character cards for lookups (names in the room view); placement is still `CharacterEngine`'s job. |
 | `WorldEngine::describe_location` / `problems` | Done | The console interface above. `problems` backs both `validate` and `/reload`. |
 | Room renderer (`render::render_location`) | Done | One renderer for `thwart show` and the console. |
-| File writer (`writer`) | Done | See File writer above. Nothing in the console calls it yet. |
-| In-memory world changes (REQ-ENG-8) | Not implemented | Next for the coder. |
+| File writer (`writer`) | Done | See File writer above. The console's `/new`, `/set` and `/link` call it through `edit_loaded` and `create_loaded`. |
+| In-memory world changes (REQ-ENG-8) | Done | `WorldEngine::set_file` and `remove_file` apply one file's new text and recompute only the affected ids, with the same results a fresh load would give. `current_problems` and `current_warnings` check the world as it is now. |
 | Console (`thwart edit`, `thwart play`) | Partially done | The loop, `/edit`, `/play`, `/reload`, `/help` and `/quit` work, and edit mode navigates the world's folders (`ls`, `cd`, `pwd`, `look`). Play mode shows the room but has no verbs yet (Phase 4), `/new room|character|object`, `/set`, `/link` and `/unlink` save through the writer, reload, and report the problems a change adds. Full editing (`/edit room`) isn't built yet (Phase 3). On a terminal the prompt has line editing and history (reedline); history isn't saved between sessions. It also watches the world's files and reloads when they change, printing the result above the prompt. Tested by transcripts in `tests/transcripts/` and 4 `/reload` unit tests. |
-| Unit tests | Started | 58 tests: renderer, world engine, parser, `/reload`, and the writer (including a byte-identical round trip of every `.md` in the repo and a one-field edit of every test-world entity). Console behaviour is also covered by transcripts. |
+| Unit tests | Started | 69 tests: renderer, world engine, parser, `/reload`, and the writer (including a byte-identical round trip of every `.md` in the repo and a one-field edit of every test-world entity). Console behaviour is also covered by transcripts. |
 | `NarrativeEngine` | Model only | Plot point prerequisite checking works; consequence execution and alternative-text condition evaluation are stubs. |
 | `GameEngine` | Model only | Action dispatch exists; move/take/look/examine handlers are stubs that report success without doing anything. |
 | `thwart validate` | Done | Loads the world, reports parse errors and broken connections; `--strict` additionally checks character `default_location` references. It also reports an `id` defined twice within a kind, and warns (without failing) about a key that differs only in case from a known one. `--fix` and location-scoped validation are not implemented. |
