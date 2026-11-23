@@ -13,6 +13,17 @@ cargo test --release        # release mode
 
 There are currently zero unit tests. See `design/UNIT_TESTS.md` for what's planned and in what order.
 
+## Console transcripts
+
+The console's acceptance tests (`REQUIREMENTS.md` › REQ-CON-9) are transcripts in `tests/transcripts/*.txt`: a console session written exactly as the console prints it, with input lines as `> line`. Each starts with a `# world:` and `# mode:` header and runs against a fixture world in `tests/transcripts/worlds/`. The format is described in the header comment of `tests/transcripts.rs`.
+
+```bash
+cargo test --test transcripts                     # run every transcript
+THWART_BLESS=1 cargo test --test transcripts      # accept new output after a deliberate change, then review the diff
+```
+
+To add one, write the session you expect as a new `.txt` file. A transcript is the place to pin a console behaviour that a unit test can't reach.
+
 ## Exercising the CLI against real content
 
 The commands below are real: they're the ones `src/bin/thwart.rs` actually defines, run against the sample world at `authors/mx/test-world/`.
