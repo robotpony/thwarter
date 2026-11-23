@@ -221,27 +221,51 @@ A template is never placed in the world itself. It's marked either way (Bruce, 2
 
 Identical copies (three healing potions) are one thing with a count: `objects: { potion: 3 }`, with play state tracking how many are left. A copy that needs to differ becomes its own thing with its own file. Counts come after templates, when a world needs them.
 
+## Built-in mechanics
+
+Every world gets a set of mechanics from the engine itself (Bruce, 2026-11-23): the basic kinds of thing (room, location, object, character) and a common selection of doors (`door`, `locked-door`, `portal` and similar). They are templates the engine supplies, so a world can use them by name without defining them, and a world template of the same name overrides one. Which built-ins ship, and how a world lists them, is still to design.
+
 ## Doors
 
-Agreed in outline by Bruce, 2026-11-23; details still open.
+Agreed by Bruce, 2026-11-23, to be tested in play.
 
 A door is its own type of thing, because doors can't be room states: a room with two doors would need four versions, and with three, eight. A door joins two rooms and has one state seen from both sides.
 
 ```yaml
-# doors/vault-door.md
+# castle/doors/vault-door.md
 id: vault-door
 title: Iron door
 type: door
-inherits: doors/templates/locked-door
+inherits: locked-door            # a built-in, or a world template
 sides:
   castle/hall:  { direction: down }
   castle/vault: { direction: up }
 ```
 
 - Each room's exit names the door rather than a room: `connections: { down: vault-door }`. The door says where each side leads, so the two rooms always agree.
-- Its states (`locked`, `shut`, `open`) are a bundle like any other thing's, with `passable:` saying whether the exit can be used. Unlocking is one of its actions: `unlock: { requires: { has: brass-key }, becomes: { vault-door: shut } }`.
+- A specific door always has a file, but authors rarely write one. The console creates it when an author links two rooms through a door template. Most doors will come from built-ins, globals or templates.
+- The file lives in the nearest scope that contains both rooms: `castle/doors/` for two castle rooms, the root `doors/` between the castle and the forest. The console chooses this.
+- Door states are `locked`, `closed` and `open`, a bundle like any other thing's. `passable:` says whether the exit can be used in a state, and `transparent:` whether the other side can be seen through it (opaque is the default). A transparent door, such as a window or a grate, shows a line about the other side in the room view. Unlocking is one of its actions: `unlock: { requires: { has: brass-key }, becomes: { vault-door: closed } }`.
+- A one-way door has one side that is never passable (a trapdoor you fall through, a door that locks behind you). To be tested.
+- A standard door joins exactly two rooms. A portal is a special type of door that can join more.
 - The room view shows the door's current text beside its exits; the room's own prose never changes for a door.
-- Most doors will come from global templates (Bruce, 2026-11-23); doors defined per area are possible but expected to be rare.
+
+## Hidden things
+
+Hidden means several things in stories (Bruce, 2026-11-23), and they apply to any thing, not only doors. *Proposed*: a state's `visibility:` says which:
+
+| `visibility:` | In the story | In play |
+|---|---|---|
+| `visible` (default) | plainly there | listed in the room |
+| `faint` | hard to see: a faint outline, a shadow | not listed; found by examining the room or searching |
+| `hidden` | properly invisible | not listed or found by looking; an action reveals it |
+| `absent` | not there at all until something happens | can't be named or examined; only an action elsewhere brings it into being |
+
+Revealing is ordinary state switching: an action `becomes:` a state with a different `visibility:`. Special activation, such as magic, is a `requires:` on that action (`requires: { has: wand }`).
+
+## Ambiguity
+
+When a command could mean more than one thing ("open door" with two doors), the reply is part of the story, not a fixed system message (Bruce, 2026-11-23): "Which door do you want to open?", "You stare at both doors, not sure which to open." The engine has a set of such replies and varies them. *Proposed*: an author can override them per world, and per thing for a thing with something to say.
 
 ## Scope
 
@@ -361,7 +385,7 @@ Commands the console will need, *proposed*: `/state new <name>`, `/state set <na
 
 ## Open questions
 
-1. **Doors, the details**: one-way, hidden and see-through doors, where a door's file lives when it isn't global, and whether a door can exist without a file of its own. Being worked through with Bruce.
+1. **Built-ins**: which mechanics the engine ships (rooms, objects, characters, door kinds, portals), and how a world lists or overrides them.
 2. **Clocks and game values**: Bruce wants them (2026-11-23). Still to settle: is time counted in turns or in game time, and how weather and randomness are declared.
 3. **Showing play state**: it MUST be visible in a sidebar in the console and be queryable (Bruce, 2026-11-23). The layout and the query commands are console work for `design/CONSOLE_REQUIREMENTS.md`.
 4. **What's in `world/`**: its file layout, and what stays in `world.toml`.
