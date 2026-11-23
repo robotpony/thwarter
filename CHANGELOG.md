@@ -26,6 +26,22 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.6.0 (2026-11-23)
+
+### Added
+
+- Edit-mode commands that change one thing at a time (REQ-CON-5), from 656e143. Each saves through the writer, reloads, and reports any problems the change adds:
+  - `/new room <direction> <id> [title]` creates a room through a new exit from the current one and moves there. Compass and up/down exits get a return exit; free-text ones like `behind` don't (`PLAN.md` › Open question 3, as proposed). Outside a room, `/new room <id> [title]` creates a room with no exits. An id without a `/` goes in the current folder.
+  - `/new character <id> [title]` and `/new object <id> <type> [title]` create a card. In a room, they place it there and set a character's `default_location`. An object the room already names as scenery gets its card this way (REQ-CF-8).
+  - `/set <key> <value>` sets one field of the current room, character or object. `/set attributes.health 80` sets one map entry, `/set inventory a, b` a list, and `/set body ...` the description. Numbers and booleans are typed.
+  - `/link <direction> <room>` adds or changes an exit, and `/unlink <direction>` removes one.
+- Transcripts can run on a throwaway copy of their world (`# copy: yes`), so authoring transcripts never change the fixture. New: `tests/transcripts/authoring.txt`.
+
+### Changed
+
+- The file watcher ignores files the console saved itself in the last 3 seconds, so a `/set` isn't announced twice.
+- Characters and objects with no description show `(no description yet)`.
+
 ## 0.5.1 (2026-11-23)
 
 ### Added
