@@ -13,7 +13,21 @@ The author is a player of sorts, like a game master running a table (Bruce, 2026
 - REQ-CON-1: `thwart edit <world>` MUST open the console in edit mode and `thwart play <world>` in play mode. Both are subcommands of the one `thwart` binary.
 - REQ-CON-2: Commands to the console itself MUST start with `/`; anything else is input to the current mode. `/edit` and `/play` MUST switch modes inside a running console (`/edit` followed by a kind, such as `/edit room`, opens full editing instead, REQ-CON-6; from play mode it switches to edit mode and opens the current room), and `/help` and `/quit` MUST work in both.
 - REQ-CON-3: Edit mode MUST be able to see everything in the world, including hidden state, and change content. Play mode MUST NOT change content files; it MAY write game saves. (Play mode's limits beyond that are proposed, not decided: Open question 2 below.)
-- REQ-CON-4: Edit mode MUST navigate the world by area and room, as a terminal navigates folders (an area such as `castle/` holds rooms such as `castle/courtyard`), and MUST be able to navigate to an object or character to edit it. Navigation stays in the terminal, as plain input to edit mode (no `/`), in shell-like words: `ls`, `cd <area or room>`, `cd <direction>` (follows that exit), `cd ..`, `pwd` and `look`. Characters and objects are reached with `cd <id>` from a room that holds them, or through the folders they live in on disk (`npcs/`, `objects/`). Commands that change content keep the `/` prefix.
+- REQ-CON-4: Edit mode MUST navigate the world with play mode's words, not shell words, since the author moves through the world like a game master (Bruce, 2026-11-23; this replaced `cd`, `ls` and `pwd`). Bare directions and `go <direction>` follow exits. `go <name>` goes to any room, area, folder, character, object or door, by its name or by a link in the prose. `go back` returns to the place before. `look` shows where edit mode is: a room, a thing, or what a folder holds. `examine <thing>` shows a thing here without going to it. A name that fits several things gets a question, never a guess. *Proposed*: `go /` goes to the world root. Commands that change content keep the `/` prefix.
+
+  ```
+  edit village/square> go north
+  The Well (room)
+  edit village/well> go elder
+  The Elder (character), npcs/elder.md
+  edit npcs/elder> go back
+  edit village/well> go objects
+  objects/  2 things: lantern, rope
+  edit objects/> look
+  lantern  Brass Lantern (object)
+  rope     Rope (object)
+  ```
+
 - REQ-CON-5: Edit mode MUST offer commands that create or change one thing at a time, for example `/new room north <id>` (a new room, linked north of the current one), `/new object`, `/new character`, `/set` (one field), `/link` (add or change one exit) and `/unlink` (remove one exit). Each MUST save the change to the file (REQ-ENG-7) and report any problems it causes (REQ-ENG-8). The author always names a new entity's `id`; the console MUST NOT make one up, since an `id` can't be renamed yet. In a room, the first word after `/new room` is a direction; outside a room, it's the new room's `id`.
 - REQ-CON-6: Edit mode MUST offer full editing of a whole entity, frontmatter and body, inside the console: `/edit room`, `/edit object`, `/edit character`. It MUST NOT hand off to an external `$EDITOR`. Editing an object without a card creates its card (REQ-CF-8). Full editing happens in the terminal, inside the console, and MAY take the whole terminal; it opens the file as it is (Bruce, 2026-11-23). A thing stored as several files (a bundle, `design/STATES.md`) opens as one document with a section per file; saving writes every file only if every section parses.
 - REQ-CON-7: `/reload` MUST reload the world from disk, keeping the current location, inventory and flags. If a file fails to parse, or the current room no longer exists, the console MUST keep the previous world and show the problems. Broken references (exits to unwritten rooms, objects without cards) are normal while a world is being written: they MUST be shown as warnings and MUST NOT block the reload. The console SHOULD also reload when a world file changes on disk (after `/reload` works).
@@ -41,7 +55,7 @@ Edit-mode tools that use a large language model (an AI) on the author's prose. B
 
 Decided by Bruce, 2026-11-23, except where marked as proposed.
 
-- REQ-CON-22: On a terminal, the console MUST be one full-screen view: a status bar across the top, scrolling output on the left, a sidebar on the right that is always visible, and the input line across the bottom (Bruce chose this layout, 2026-11-23). The status bar names the world and mode, counts warnings, and shows the running build. Watcher notices go into the output. The full-screen editor (REQ-CON-6) opens inside this view. Scripts and transcripts stay line-based, with the same output and no sidebar (REQ-CON-9).
+- REQ-CON-22: On a terminal, the console MUST be one full-screen view: a status bar across the top, scrolling output on the left, a sidebar on the right that is always visible, and the input line across the bottom (Bruce chose this layout, 2026-11-23). The status bar names the world and mode, counts warnings, and shows the running build. Watcher notices go into the output. The full-screen editor (REQ-CON-6) opens over the output and keeps the sidebar, where HERE shows the file's problems as they change and which responses the thing has, needs or could have (`design/STATES.md` › Responses). Scripts and transcripts stay line-based, with the same output and no sidebar (REQ-CON-9).
 
   ```
    Tiny World · edit · 2 warnings              thwart 0.12.0
@@ -140,7 +154,18 @@ The console restarts itself onto a new build in place, so it can be changed and 
   ```
 
 - REQ-CON-32: *Proposed*: when a newer `thwart` has been built while the console runs, the status bar says so (`newer build: /restart`).
-- REQ-CON-33: Console commands MUST follow Claude Code's conventions for slash commands, such as `/restart` to restart (Bruce, 2026-11-23). *Proposed*, to confirm with Bruce: typing `/` opens a list of commands with one-line descriptions that narrows as you type, Tab completes, Esc closes it, and `/help` lists everything.
+- REQ-CON-33: Console commands MUST follow Claude Code's conventions for slash commands, such as `/restart` to restart (Bruce, 2026-11-23). Typing `/` opens a list of the commands that work right now, each with a one-line description, which narrows as you type. Tab or Enter picks one, Esc closes the list, and `/help` lists everything. Arguments complete from the world too: after `go ` or `/edit object `, the list offers the exits, rooms and things that fit.
+
+  ```
+   edit village/square [global]> /re_
+     /reload    reload the world from disk, staying where you are
+     /restart   restart the console on the newest build
+
+   edit village/square> /edit object _
+     lantern   brass lantern, global
+     bench     scenery, no card yet
+     rope      not here: objects/rope.md
+  ```
 
 ## Open questions
 
