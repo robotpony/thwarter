@@ -30,6 +30,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.24.0 (2026-11-23)
+
+### Added
+
+- `reply ambiguous` (`design/STATES.md` › Ambiguity, Responses): when a noun matches several things, the reply is the `<!-- thwarter:reply ambiguous -->` block of the nearest template the candidates all share, with its variables filled.
+
+### Changed
+
+- The built-in ambiguity replies are in the story's voice and vary by turn: "Which sword do you want to take: the rusty sword or the old sword?" and "You look at the rusty sword and the old sword, not sure which to take." `GameEngine::ask_which` now takes the verb, the noun as typed, the candidates and the turn.
+
 ## 0.23.0 (2026-11-23)
 
 ### Added

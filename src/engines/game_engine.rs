@@ -17,12 +17,24 @@ pub struct GameEngine {
     /// (`take`, `examine`, `pull`) and the candidates, already phrased
     /// ("the rusty sword"). Replaceable, since such replies are part of a
     /// story's voice ("Which door do you want to open?").
-    pub ask_which: fn(verb: &str, candidates: &[String]) -> String,
+    /// `noun` is what the player typed, without "the"; `turn` lets a
+    /// reply vary. Used when the candidates share no template with a
+    /// `<!-- thwarter:reply ambiguous -->` block.
+    pub ask_which: fn(verb: &str, noun: &str, candidates: &[String], turn: u64) -> String,
 }
 
-/// "Which do you mean: the rusty sword or the old sword?"
-pub fn default_ask_which(_verb: &str, candidates: &[String]) -> String {
-    format!("Which do you mean: {}?", join_or(candidates))
+/// The built-in replies, in the story's voice rather than the system's
+/// (`design/STATES.md` › Ambiguity), varied by turn.
+pub fn default_ask_which(verb: &str, noun: &str, candidates: &[String], turn: u64) -> String {
+    let forms = [
+        "Which {noun} do you want to {verb}: {or}?",
+        "You look at {and}, not sure which to {verb}.",
+    ];
+    forms[(turn as usize) % forms.len()]
+        .replace("{noun}", noun)
+        .replace("{verb}", verb)
+        .replace("{or}", &join_or(candidates))
+        .replace("{and}", &join_and(candidates))
 }
 
 impl Default for GameEngine {
@@ -82,6 +94,33 @@ impl GameEngine {
         view.objects
             .retain(|o| !state.was_taken(&state.location, &o.id) && !state.inventory.contains(&o.id));
         Some(view)
+    }
+
+    /// The reply when `noun` matches several things: the
+    /// `reply ambiguous` block of the nearest template they all share,
+    /// else `ask_which`.
+    #[allow(clippy::too_many_arguments)]
+    fn which(&self, world: &WorldEngine, state: &PlayState, verb: &str, noun: &str, kind: EntityKind, candidates: &[EntityRef]) -> String {
+        let chains: Vec<Vec<&crate::engines::layers::Layer>> = candidates
+            .iter()
+            .map(|c| world.thing(kind, &c.id).map(|t| t.templates.iter().rev().collect()).unwrap_or_default())
+            .collect();
+        if let Some(first) = chains.first() {
+            for template in first {
+                let shared = chains[1..].iter().all(|chain| chain.iter().any(|t| t.path == template.path));
+                let block = crate::parsers::Body::parse(&template.body);
+                if let (true, Some(text)) = (shared, block.block("reply ambiguous")) {
+                    if !text.trim().is_empty() {
+                        return world.fill(text.trim(), &Scope { at: At::play(state), this: None, here: None });
+                    }
+                }
+            }
+        }
+        let phrase: fn(&EntityRef) -> String = if kind == EntityKind::Character { person } else { the_object };
+        let names: Vec<String> = candidates.iter().map(phrase).collect();
+        let noun = noun.trim().to_lowercase();
+        let noun = noun.strip_prefix("the ").unwrap_or(&noun).trim().to_string();
+        (self.ask_which)(verb, &noun, &names, state.turn)
     }
 
     /// Find the faint things here not yet found, and say what was found.
@@ -168,7 +207,7 @@ impl GameEngine {
                 }
                 return ActionResult::say(format!("There's no {} here.", noun.trim()));
             }
-            Err(which) => return ActionResult::say((self.ask_which)("take", &which)),
+            Err(which) => return ActionResult::say(self.which(world, state, "take", noun, EntityKind::Object, &which)),
         };
         let name = object_name(&object);
         let Some(card) = world.object_at(&object.id, At::play(state)) else {
@@ -221,7 +260,7 @@ impl GameEngine {
                     _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
                 }
             }
-            Err(which) => return ActionResult::say((self.ask_which)("examine", &which)),
+            Err(which) => return ActionResult::say(self.which(world, state, "examine", noun, EntityKind::Object, &which)),
             Ok(None) => {}
         }
         match resolve(noun, &view.characters, person) {
@@ -232,7 +271,7 @@ impl GameEngine {
                 }
                 _ => ActionResult::say(format!("You see nothing special about {}.", person.display_name())),
             },
-            Err(which) => ActionResult::say((self.ask_which)("examine", &which)),
+            Err(which) => ActionResult::say(self.which(world, state, "examine", noun, EntityKind::Character, &which)),
             Ok(None) => ActionResult::say(format!("There's no {} here.", noun.trim())),
         }
     }
@@ -263,12 +302,12 @@ impl GameEngine {
         };
         let object = match resolve(noun, &things, the_object) {
             Ok(Some(o)) => o,
-            Err(which) => return ActionResult::say((self.ask_which)(&verb, &which)),
+            Err(which) => return ActionResult::say(self.which(world, state, &verb, noun, EntityKind::Object, &which)),
             Ok(None) if hidden().is_some() => hidden().unwrap(),
             Ok(None) => {
                 return match resolve(noun, &view.characters, person) {
                     Ok(Some(p)) => ActionResult::say(format!("You can't {} {}.", verb, person(&p))),
-                    Err(which) => ActionResult::say((self.ask_which)(&verb, &which)),
+                    Err(which) => ActionResult::say(self.which(world, state, &verb, noun, EntityKind::Character, &which)),
                     Ok(None) => ActionResult::say(format!("There's no {} here.", noun.trim())),
                 }
             }
@@ -489,7 +528,7 @@ pub fn load_game(path: &Path, world: &WorldEngine) -> Result<(PlayState, Vec<Str
 /// The thing `noun` names among `things`: an exact id, the id with spaces
 /// for hyphens, the name ignoring case, then a unique whole word of
 /// either. `Err` holds the candidates, phrased, when more than one matches.
-fn resolve(noun: &str, things: &[EntityRef], phrase: fn(&EntityRef) -> String) -> std::result::Result<Option<EntityRef>, Vec<String>> {
+fn resolve(noun: &str, things: &[EntityRef], _phrase: fn(&EntityRef) -> String) -> std::result::Result<Option<EntityRef>, Vec<EntityRef>> {
     let noun = noun.trim().to_lowercase();
     let noun = noun.strip_prefix("the ").unwrap_or(&noun).trim().to_string();
     if noun.is_empty() {
@@ -520,7 +559,7 @@ fn resolve(noun: &str, things: &[EntityRef], phrase: fn(&EntityRef) -> String) -
     match unique.len() {
         0 => Ok(None),
         1 => Ok(Some(unique[0].clone())),
-        _ => Err(unique.iter().map(|t| phrase(t)).collect()),
+        _ => Err(unique.into_iter().cloned().collect()),
     }
 }
 
@@ -672,7 +711,7 @@ mod tests {
             ("bench", "You can't take the stone bench."),
             ("well", "The well won't budge."),
             ("king", "You can't take people."),
-            ("sword", "Which do you mean: the rusty sword or the old sword?"),
+            ("sword", "Which sword do you want to take: the rusty sword or the old sword?"),
             ("lamp", "There's no lamp here."),
             ("", "Take what?"),
         ];
@@ -718,7 +757,7 @@ mod tests {
         assert_eq!(game.act(&world, &mut state, &PlayAction::Take("Brass Lantern".into())).text, "You already have the brass lantern.");
         assert_eq!(
             game.act(&world, &mut state, &PlayAction::Examine("aldric".into())).text,
-            "Which do you mean: King Aldric or Queen Aldric?"
+            "You look at King Aldric and Queen Aldric, not sure which to examine."
         );
     }
 
@@ -965,7 +1004,7 @@ mod tests {
     fn the_which_reply_can_be_replaced() {
         let (_d, world) = world();
         let mut game = GameEngine::new();
-        game.ask_which = |verb, c| format!("Which one do you want to {}? {}", verb, c.join(" or "));
+        game.ask_which = |verb, _noun, c, _turn| format!("Which one do you want to {}? {}", verb, c.join(" or "));
         let mut state = game.start(&world, "castle/yard").unwrap();
         let r = game.act(&world, &mut state, &PlayAction::Take("sword".into()));
         assert_eq!(r.text, "Which one do you want to take? the rusty sword or the old sword");
@@ -1033,5 +1072,23 @@ mod tests {
         let (dir, mut world) = world();
         world.set_file(&dir.path().join("objects/well.md"), "---\nid: well\ntitle: Well\ntype: object\nobject_type: x\nvisibility: invisible\n---\n");
         assert!(world.current_problems(false).iter().any(|p| p.contains("`visibility: invisible` must be one of visible, faint, hidden, absent")));
+    }
+
+    #[test]
+    fn a_shared_template_can_say_its_own_ambiguity_reply() {
+        let (dir, mut world) = world();
+        let d = dir.path();
+        world.set_file(&d.join("objects/templates/sword.md"), "---\ntype: object\nobject_type: weapon\n---\n<!-- thwarter:reply ambiguous -->\nTwo blades glint. You'll have to say which.\n");
+        world.set_file(&d.join("objects/rusty-sword.md"), "---\nid: rusty-sword\ntitle: Rusty sword\ntype: object\ninherits: sword\n---\n");
+        world.set_file(&d.join("objects/old-sword.md"), "---\nid: old-sword\ntitle: Old sword\ntype: object\ninherits: sword\n---\n");
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Take("sword".into())).text, "Two blades glint. You'll have to say which.");
+        // Without a shared template, the built-in replies vary by turn.
+        world.set_file(&d.join("objects/old-sword.md"), "---\nid: old-sword\ntitle: Old sword\ntype: object\nobject_type: weapon\n---\n");
+        let first = game.act(&world, &mut state, &PlayAction::Take("sword".into())).text;
+        let second = game.act(&world, &mut state, &PlayAction::Take("sword".into())).text;
+        assert_ne!(first, second);
+        assert!(first.contains("the rusty sword") && second.contains("the old sword"), "{} / {}", first, second);
     }
 }
