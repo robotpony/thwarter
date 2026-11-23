@@ -10,7 +10,7 @@ This replaces the earlier idea of conditional text blocks (`{{< when >}}` shortc
 
 ## Principles
 
-Agreed by Bruce, 2026-11-23. Every decision in this document should follow from at least one.
+Agreed by Bruce, 2026-11-23 (principle 8 added the same day). Every decision in this document should follow from at least one.
 
 1. **Lineage only.** A thing takes values from global definitions, the folders above it, and templates it names; never from a sibling beside it.
 2. **Explicit, never hidden.** Inheritance is written down, and the console shows where every value came from.
@@ -19,6 +19,7 @@ Agreed by Bruce, 2026-11-23. Every decision in this document should follow from 
 5. **Files are the truth; the console is how you edit them.** Structure changes go through commands, and the files stay plain Markdown.
 6. **Play never changes content.** Everything that happens in a game lives in the game state.
 7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
+8. **Content lives in prose, not frontmatter.** Frontmatter holds state, ids and mechanics; everything a player reads is in the Markdown body (Bruce, 2026-11-23).
 
 Review status: reviewed with Bruce group by group, all six groups done. Files and bundles: reviewed and kept. Inheritance: reviewed, with two changes (list replacement and placement-based overlays now warn). Chapters: reviewed, with two items reopened (below). Changing state: reviewed, with doors and templates designed in outline. Variables: reviewed; undeclared variables and shared ids warn rather than fail. Console: reviewed; full editing may take the whole terminal, headers defined, conflicts handled by git and safe reloads. All 2026-11-23.
 
