@@ -28,6 +28,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.11.1 (2026-11-23)
+
+### Changed
+
+- The full-screen editor watches its file while open. A change on disk (a `git pull`, another editor) is taken in by itself when nothing in the editor is unsaved, with "Reloaded: changed on disk." on the status line. With unsaved edits, it warns once, and the next Ctrl-S saves over the change. This follows Bruce's rule in `design/STATES.md` › Engine rules: authors use git, so conflicts are rare and shouldn't need a second confirmation. A change that lands between that check and the write is still caught by the writer, and a second Ctrl-S overwrites it.
+
 ## 0.11.0 (2026-11-23)
 
 ### Added

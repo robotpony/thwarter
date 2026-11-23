@@ -11,13 +11,15 @@
 //! (REQ-CF-8).
 
 use super::author::{bare_id_problem, entity_kind, title_or_default};
-use super::editor::{Closed, Document, Saved};
+use super::editor::{Closed, Document, Files, Saved};
 use super::session::{Console, Place};
 use super::world::Kind;
 use super::Mode;
 use crate::engines::EntityKind;
 use crate::writer::{ContentFile, Edit, NewEntity};
 use std::fs;
+use std::path::PathBuf;
+use std::sync::Mutex;
 
 /// The file a `/edit` opened, held while the editor is open.
 #[derive(Debug, Clone)]
@@ -29,6 +31,38 @@ pub struct EditTarget {
     /// The file's text when the editor opened it, or as last saved. `None`
     /// for scenery whose card isn't written yet.
     opened: Option<String>,
+    /// The file on disk.
+    file: PathBuf,
+}
+
+impl EditTarget {
+    /// The file's text if it changed on disk since it was opened, saved or
+    /// last reported, which then counts as what the editor opened.
+    fn changed_on_disk(&mut self) -> Option<String> {
+        let opened = self.opened.as_ref()?;
+        let now = fs::read_to_string(&self.file).ok()?;
+        if now == *opened {
+            return None;
+        }
+        self.opened = Some(now.clone());
+        Some(now)
+    }
+}
+
+/// The editor's view of a `/edit` target's files: saves lock the console
+/// just while they write, and checks for changes on disk don't lock it.
+pub struct EditFiles<'a> {
+    pub console: &'a Mutex<Console>,
+    pub target: &'a mut EditTarget,
+}
+
+impl Files for EditFiles<'_> {
+    fn save(&mut self, sections: &[String], force: bool) -> Saved {
+        super::lock(self.console).save_full_edit(self.target, &sections[0], force)
+    }
+    fn changed_on_disk(&mut self) -> Option<Vec<String>> {
+        self.target.changed_on_disk().map(|text| vec![text])
+    }
 }
 
 impl Console {
@@ -89,7 +123,7 @@ impl Console {
     /// parse as the same thing, and a file changed on disk since it was
     /// opened unless `force`.
     pub(super) fn save_full_edit(&mut self, target: &mut EditTarget, text: &str, force: bool) -> Saved {
-        let file = self.world.root.join(format!("{}.md", target.path));
+        let file = target.file.clone();
         let written = match &target.opened {
             Some(opened) => {
                 match fs::read_to_string(&file) {
@@ -188,7 +222,8 @@ impl Console {
         if kind == Kind::Object && self.is_scenery_here(typed) {
             let relative = crate::writer::new_entity_relative_path(EntityKind::Object, typed);
             let path = relative.to_string_lossy().trim_end_matches(".md").replace('\\', "/");
-            return Ok(EditTarget { kind, id: typed.to_string(), path, opened: None });
+            let file = self.world.root.join(&relative);
+            return Ok(EditTarget { kind, id: typed.to_string(), path, opened: None, file });
         }
         Err(match kind {
             Kind::Character => format!("No character `{}`. /new character {} makes one.", typed, typed),
@@ -200,7 +235,7 @@ impl Console {
     fn open_target(&self, kind: Kind, id: String, path: String) -> Result<EditTarget, String> {
         let file = self.world.root.join(format!("{}.md", path));
         let text = fs::read_to_string(&file).map_err(|e| format!("Can't open {}.md: {}", path, e))?;
-        Ok(EditTarget { kind, id, path, opened: Some(text) })
+        Ok(EditTarget { kind, id, path, opened: Some(text), file })
     }
 }
 
@@ -362,6 +397,22 @@ mod tests {
         let saved = console.save_full_edit(&mut target, &renamed, false);
         assert!(matches!(&saved, Saved::No(why) if why.contains("can't be changed here yet")), "{:?}", saved);
         assert_eq!(fs::read_to_string(root.join("village/square.md")).unwrap(), original);
+    }
+
+    #[test]
+    fn a_change_on_disk_is_reported_once_and_then_saves_over_it() {
+        let (_dir, root) = tiny_copy();
+        let mut console = console_at(&root, "village/well");
+        let mut target = open(&mut console, "/edit room");
+        assert_eq!(target.changed_on_disk(), None);
+        let file = root.join("village/well.md");
+        let pulled = format!("{}Pulled from git.\n", fs::read_to_string(&file).unwrap());
+        fs::write(&file, &pulled).unwrap();
+        assert_eq!(target.changed_on_disk().as_deref(), Some(pulled.as_str()));
+        assert_eq!(target.changed_on_disk(), None, "reported once");
+        // Having seen it, a save is no longer a conflict.
+        let mine = format!("{}Mine.\n", pulled);
+        assert!(matches!(console.save_full_edit(&mut target, &mine, false), Saved::Yes(_)));
     }
 
     #[test]

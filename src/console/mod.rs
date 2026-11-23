@@ -101,10 +101,11 @@ fn drive_terminal(mut console: Console, world_path: &Path) -> Result<()> {
 
 /// Runs the full-screen editor for a `/edit <kind>` (REQ-CON-6). The
 /// console is locked only while a save is written, so the file watcher
-/// keeps working; its notices wait until the prompt is back.
+/// keeps working; its notices wait until the prompt is back. The editor
+/// itself looks for changes to its file, and takes them when it's safe.
 fn edit_full_screen(console: &Mutex<Console>, mut target: full_edit::EditTarget) -> String {
     let document = lock(console).edit_document(&target);
-    let closed = editor::run_in_terminal(document, |sections, force| lock(console).save_full_edit(&mut target, &sections[0], force));
+    let closed = editor::run_in_terminal(document, full_edit::EditFiles { console, target: &mut target });
     match closed {
         Ok(closed) => lock(console).edit_closed(&target, closed),
         Err(e) => format!("The editor failed: {}. Nothing more was saved.", e),

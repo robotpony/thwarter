@@ -16,7 +16,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use ratatui::{backend::Backend, Terminal};
-use ratatui_textarea::{Input, Key, TextArea};
+use ratatui_textarea::{CursorMove, Input, Key, TextArea};
 use std::io;
 
 /// What the editor shows: a heading, and one section per file.
@@ -71,6 +71,15 @@ pub enum Saved {
     Conflict(String),
 }
 
+/// Where a document's files live, as the editor sees them.
+pub trait Files {
+    /// Writes each section's text; `force` overwrites a change on disk.
+    fn save(&mut self, sections: &[String], force: bool) -> Saved;
+    /// Each section's text on disk, if it changed since the editor last
+    /// opened, saved or reloaded it. Reports each change once.
+    fn changed_on_disk(&mut self) -> Option<Vec<String>>;
+}
+
 /// What the editor returns when it closes: each save's report, in order.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Closed {
@@ -122,8 +131,32 @@ impl<'a> Editor<'a> {
         normalize(&self.text()) != normalize(&self.saved_text)
     }
 
+    /// After the files changed on disk: takes the new text if nothing here
+    /// is unsaved, else warns once, and the next save overwrites the change
+    /// (`design/STATES.md` › Engine rules: authors use git, so this is rare).
+    fn disk_changed(&mut self, sections: Vec<String>) {
+        if self.dirty() {
+            self.force_armed = true;
+            self.status = "Changed on disk too. Ctrl-s overwrites that change with yours; esc keeps it.".to_string();
+            return;
+        }
+        for (section, text) in self.document.sections.iter_mut().zip(&sections) {
+            section.text = text.clone();
+        }
+        let text = self.document.combined();
+        let cursor = self.area.cursor();
+        let (row, col) = (cursor.0, cursor.1);
+        let mut area = TextArea::new(text.lines().map(str::to_string).collect());
+        area.set_line_number_style(Style::default().add_modifier(Modifier::DIM));
+        area.set_cursor_line_style(Style::default());
+        area.move_cursor(CursorMove::Jump(row.min(u16::MAX as usize) as u16, col.min(u16::MAX as usize) as u16));
+        self.area = area;
+        self.saved_text = text;
+        self.status = "Reloaded: changed on disk.".to_string();
+    }
+
     /// Handles one key. Returns false when the editor should close.
-    fn key(&mut self, input: Input, save: &mut impl FnMut(&[String], bool) -> Saved) -> bool {
+    fn key(&mut self, input: Input, files: &mut impl Files) -> bool {
         match input {
             Input { key: Key::Esc, .. } => {
                 if !self.dirty() || self.discard_armed {
@@ -136,7 +169,7 @@ impl<'a> Editor<'a> {
                 self.discard_armed = false;
                 let text = self.text();
                 let sections = self.document.split(text.clone());
-                match save(&sections, self.force_armed) {
+                match files.save(&sections, self.force_armed) {
                     Saved::Yes(report) => {
                         self.saved_text = text;
                         self.force_armed = false;
@@ -175,14 +208,13 @@ impl<'a> Editor<'a> {
 }
 
 /// Runs the editor on `terminal` until the author closes it. `next_key`
-/// waits for the next key (`None` for anything that only needs a redraw,
-/// such as a resize). `save` gets each section's text and whether to
-/// overwrite a conflict.
+/// waits a short while for the next key, and returns `None` when none
+/// came (or for a resize); the editor then checks the files on disk.
 pub fn run<B: Backend>(
     terminal: &mut Terminal<B>,
     document: Document,
     mut next_key: impl FnMut() -> io::Result<Option<Input>>,
-    mut save: impl FnMut(&[String], bool) -> Saved,
+    mut files: impl Files,
 ) -> io::Result<Closed>
 where
     B::Error: std::error::Error + Send + Sync + 'static,
@@ -190,25 +222,36 @@ where
     let mut editor = Editor::new(document);
     loop {
         terminal.draw(|frame| editor.draw(frame)).map_err(io::Error::other)?;
-        let Some(input) = next_key()? else { continue };
-        if !editor.key(input, &mut save) {
+        let Some(input) = next_key()? else {
+            if let Some(sections) = files.changed_on_disk() {
+                editor.disk_changed(sections);
+            }
+            continue;
+        };
+        if !editor.key(input, &mut files) {
             return Ok(Closed { reports: editor.reports });
         }
     }
 }
 
+/// How often the editor looks at its files on disk while no key comes.
+const DISK_CHECK: std::time::Duration = std::time::Duration::from_millis(500);
+
 /// Opens the editor full-screen on the real terminal, and puts the
 /// terminal back as it was when it closes, even after an error.
-pub fn run_in_terminal(document: Document, save: impl FnMut(&[String], bool) -> Saved) -> io::Result<Closed> {
+pub fn run_in_terminal(document: Document, files: impl Files) -> io::Result<Closed> {
     use ratatui::crossterm::event::{self, Event, KeyEventKind};
     let mut terminal = ratatui::try_init()?;
     let next_key = || -> io::Result<Option<Input>> {
+        if !event::poll(DISK_CHECK)? {
+            return Ok(None);
+        }
         Ok(match event::read()? {
             Event::Key(key) if key.kind != KeyEventKind::Release => Some(Input::from(key)),
             _ => None,
         })
     };
-    let result = run(&mut terminal, document, next_key, save);
+    let result = run(&mut terminal, document, next_key, files);
     ratatui::restore();
     result
 }
@@ -240,20 +283,52 @@ mod tests {
         Input { key: Key::Esc, ..Input::default() }
     }
 
+    /// Files for tests: answers saves with `answer`, and reports a change
+    /// on disk at each `tick()` that has one queued.
+    struct TestFiles<'a, F: FnMut(&str, bool) -> Saved> {
+        answer: F,
+        saves: &'a mut Vec<(String, bool)>,
+        disk: VecDeque<Option<String>>,
+    }
+
+    impl<F: FnMut(&str, bool) -> Saved> Files for TestFiles<'_, F> {
+        fn save(&mut self, sections: &[String], force: bool) -> Saved {
+            self.saves.push((sections[0].clone(), force));
+            (self.answer)(&sections[0], force)
+        }
+        fn changed_on_disk(&mut self) -> Option<Vec<String>> {
+            self.disk.pop_front().flatten().map(|text| vec![text])
+        }
+    }
+
+    /// No key this time round, so the editor checks the disk.
+    fn tick() -> Option<Input> {
+        None
+    }
+
     /// Runs the editor over `keys` on a small test screen, returning what
     /// it closed with, each save's texts, and the last screen drawn.
-    fn drive(text: &str, keys: Vec<Input>, mut answer: impl FnMut(&str, bool) -> Saved) -> (Closed, Vec<(String, bool)>, String) {
+    fn drive(text: &str, keys: Vec<Input>, answer: impl FnMut(&str, bool) -> Saved) -> (Closed, Vec<(String, bool)>, String) {
+        drive_with_disk(text, keys.into_iter().map(Some).collect(), Vec::new(), answer)
+    }
+
+    /// `drive`, with ticks among the keys and a change on disk queued for
+    /// each tick (`None` for no change).
+    fn drive_with_disk(
+        text: &str,
+        keys: Vec<Option<Input>>,
+        disk: Vec<Option<String>>,
+        answer: impl FnMut(&str, bool) -> Saved,
+    ) -> (Closed, Vec<(String, bool)>, String) {
         let mut terminal = Terminal::new(TestBackend::new(60, 8)).unwrap();
-        let mut keys: VecDeque<Input> = keys.into();
+        let mut keys: VecDeque<Option<Input>> = keys.into();
         let mut saves = Vec::new();
+        let files = TestFiles { answer, saves: &mut saves, disk: disk.into() };
         let closed = run(
             &mut terminal,
             Document::single("/edit room  village/square", text),
-            || Ok(Some(keys.pop_front().expect("the editor wanted more keys than the test gave"))),
-            |sections, force| {
-                saves.push((sections[0].clone(), force));
-                answer(&sections[0], force)
-            },
+            || Ok(keys.pop_front().expect("the editor wanted more keys than the test gave")),
+            files,
         )
         .unwrap();
         let screen = terminal.backend().buffer().content().iter().map(|c| c.symbol()).collect::<String>();
@@ -307,6 +382,51 @@ mod tests {
         });
         assert_eq!(saves.iter().map(|(_, force)| *force).collect::<Vec<_>>(), vec![false, true]);
         assert_eq!(closed.reports.len(), 1);
+    }
+
+    #[test]
+    fn a_reload_says_so_on_the_status_line() {
+        let (_, _, screen) = drive_with_disk("old\n", vec![tick(), Some(esc())], vec![Some("new\n".into())], |_, _| unreachable!());
+        assert!(screen.contains("Reloaded: changed on disk."), "{}", screen);
+    }
+
+    #[test]
+    fn a_change_on_disk_reloads_when_nothing_is_unsaved() {
+        let (closed, saves, screen) = drive_with_disk(
+            "old\n",
+            vec![tick(), Some(ch('X')), Some(ctrl('s')), Some(esc())],
+            vec![Some("new from git\n".into())],
+            |_, _| Saved::Yes("Saved.".into()),
+        );
+        assert_eq!(saves, vec![("Xnew from git\n".to_string(), false)]);
+        assert_eq!(closed.reports.len(), 1);
+        assert!(!screen.contains("Changed on disk too"), "{}", screen);
+    }
+
+    #[test]
+    fn a_change_on_disk_with_unsaved_edits_warns_once_then_saving_overwrites() {
+        let (_, saves, _) = drive_with_disk(
+            "old\n",
+            vec![Some(ch('X')), tick(), tick(), Some(ctrl('s')), Some(esc())],
+            vec![Some("new from git\n".into()), None],
+            |_, _| Saved::Yes("Saved.".into()),
+        );
+        // The author's text wins, and the save is told to overwrite.
+        assert_eq!(saves, vec![("Xold\n".to_string(), true)]);
+    }
+
+    #[test]
+    fn the_disk_warning_shows_on_the_status_line() {
+        let mut editor = Editor::new(Document::single("h", "old\n"));
+        editor.area.input(ch('X'));
+        editor.disk_changed(vec!["new\n".into()]);
+        assert!(editor.status.starts_with("Changed on disk too."), "{}", editor.status);
+        assert_eq!(editor.text(), "Xold\n");
+
+        let mut clean = Editor::new(Document::single("h", "old\n"));
+        clean.disk_changed(vec!["new\n".into()]);
+        assert_eq!((clean.text().as_str(), clean.status.as_str()), ("new\n", "Reloaded: changed on disk."));
+        assert!(!clean.dirty());
     }
 
     #[test]
