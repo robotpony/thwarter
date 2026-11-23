@@ -46,6 +46,9 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 - [x] Links in prose, Markdown rendered in play, and tags [coder] (REQ-CF-28 to 30)
 - [x] `design/STATES.md` › Engine rules written as REQ-ENG items [coder] (`design/ENGINE_REQUIREMENTS.md`)
 
+- [ ] `thwart show` for any thing (objects, characters, templates and built-ins), not only locations [coder] (`design/CLI_REQUIREMENTS.md`)
+- [ ] `thwart show` for the `world/` definition and the chapters [coder] (`design/CLI_REQUIREMENTS.md`)
+
 ## Phase 5 · Authoring the model
 
 The console side (Bruce with the console coder). Done when an author can build a bundle with states and a chapter, and run the world, without touching a file by hand.
@@ -60,7 +63,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
 - [ ] Renaming an id with every reference updated, and proposed renames for shared ids [coder, console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
-- [ ] Showing a template or built-in: `/template` in the console, and a `thwart show` option [console, coder] (REQ-CF-21)
+- [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
 
 ## Phase 6 · Doors and play
 
