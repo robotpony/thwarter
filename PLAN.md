@@ -54,4 +54,4 @@ Built when authoring or play asks for them, most likely as console commands. Unt
 
 1. What does full editing (`/edit room`) look like on screen: a full-screen editor inside the terminal, or the room's whole file shown inline for editing? It's inside the console either way, not `$EDITOR` (Bruce, 2026-11-23). This decides whether Phase 3 needs a terminal UI library. The console coder recommends full-screen (ratatui with a text-area widget): inline editing of an existing room means typing or pasting the whole file again. Its fallback is inline editing of the body only, with `/set` for frontmatter.
 2. What can play mode do and not do? Assumed until Bruce says otherwise: in-game verbs only, no changes to content, game saves only (REQ-CON-3).
-3. Should `/new room north` also add the return exit (`south`) to the new room? Proposed: yes for compass directions and `up`/`down`, no for free-text directions.
+3. Should `/new room north` also add the return exit (`south`) to the new room? Proposed: yes for compass directions and `up`/`down`, no for free-text directions. Implemented as proposed in 0.6.1, pending Bruce.
