@@ -128,10 +128,12 @@ impl Console {
 
     fn new_object(&mut self, args: &[&str]) -> String {
         // Scenery this room names, given only its id, gets the default card
-        // (`object_type: scenery`, REQ-CF-8).
+        // (REQ-CF-8): one that inherits the built-in `scenery` template
+        // (REQ-CF-21).
         let scenery_args;
+        let scenery = matches!(args, [id] if self.is_scenery_here(id));
         let args = match args {
-            [id] if self.is_scenery_here(id) => {
+            [id] if scenery => {
                 scenery_args = [*id, "scenery"];
                 &scenery_args[..]
             }
@@ -151,7 +153,8 @@ impl Console {
             title: title.clone(),
             object_type: Some(object_type.to_string()),
         };
-        self.create_and_place(&new, &[], "objects", here, format!("Created object {}, {}", id, title))
+        let edits = if scenery { vec![Edit::ReplaceAll(super::full_edit::scenery_card(id))] } else { Vec::new() };
+        self.create_and_place(&new, &edits, "objects", here, format!("Created object {}, {}", id, title))
     }
 
     /// Creates a character or object card and, in a room, adds it to the

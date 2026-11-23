@@ -7,7 +7,7 @@
 //! for a file that parsed before, still hold the same thing, and is then reported like any other change
 //! (REQ-CON-5). A file that doesn't parse opens too, since editing is how
 //! an author fixes it. Scenery, an object a room names with no card, opens as a
-//! new card with `object_type: scenery`, written on the first save
+//! new card that inherits the built-in `scenery` template, written on the first save
 //! (REQ-CF-8).
 
 use super::author::{bare_id_problem, entity_kind, title_or_default};
@@ -266,9 +266,10 @@ fn same_thing(target: &EditTarget, text: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The card scenery starts with (REQ-CF-8), as `/new object <id>` writes it.
-fn scenery_card(id: &str) -> String {
-    format!("---\nid: {}\ntitle: {}\ntype: object\nobject_type: scenery\n---\n", id, title_or_default(&[], id))
+/// The card scenery starts with (REQ-CF-8): one that inherits the built-in
+/// `scenery` template (REQ-CF-21), as `/new object <id>` writes it.
+pub(super) fn scenery_card(id: &str) -> String {
+    format!("---\nid: {}\ntitle: {}\ntype: object\ninherits: scenery\n---\n", id, title_or_default(&[], id))
 }
 
 #[cfg(test)]
@@ -356,7 +357,7 @@ mod tests {
         let mut target = open(&mut console, "/edit object bench");
         let document = console.edit_document(&target);
         assert_eq!(document.heading, "/edit object  objects/bench.md (new card)");
-        assert!(document.sections[0].text.contains("object_type: scenery"));
+        assert!(document.sections[0].text.contains("inherits: scenery"));
         assert!(!root.join("objects/bench.md").exists());
 
         let text = format!("{}A worn bench.\n", document.sections[0].text);

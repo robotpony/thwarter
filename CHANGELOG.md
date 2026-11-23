@@ -30,6 +30,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.22.1 (2026-11-23)
+
+### Changed
+
+- A scenery object's new card, from `/new object <id>` or `/edit object <id>`, inherits the built-in `scenery` template (`inherits: scenery`, REQ-CF-21) instead of repeating `object_type: scenery`, so it picks up whatever the template says scenery is.
+
 ## 0.22.0 (2026-11-23)
 
 ### Added
