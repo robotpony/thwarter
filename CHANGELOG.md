@@ -26,6 +26,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.5.1 (2026-11-23)
+
+### Added
+
+- `validate`, `show` and the console warn when two kinds share an id (a location and an object, say), because the console's `cd <id>` can't tell them apart. It's a warning, not a problem: ids stay scoped by kind. It appears in `WorldLoadReport::warnings` and `WorldEngine::current_warnings()`, and `WorldEngine::shared_ids()` lists the ids.
+
 ## 0.5.0 (2026-11-23)
 
 ### Added

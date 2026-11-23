@@ -92,8 +92,9 @@ pub struct WorldLoadReport {
     /// `design/ARCHITECTURE.md`.
     pub characters: Vec<Character>,
     pub errors: Vec<String>,
-    /// Problems that don't fail validation, such as a key that differs
-    /// only in case from a known one. Each is prefixed with its file.
+    /// Problems that don't fail validation: a key that differs only in
+    /// case from a known one (prefixed with its file), or an id shared
+    /// between kinds.
     pub warnings: Vec<String>,
 }
 
@@ -144,7 +145,36 @@ impl WorldEngine {
         }
 
         self.loaded_locations = self.world_graph.locations.clone();
+        report.warnings.extend(self.shared_id_warnings());
         Ok(report)
+    }
+
+    /// Every id used by more than one kind, with those kinds, sorted. Ids
+    /// are scoped by kind, so this isn't an error, but the console's
+    /// `cd <id>` can't tell such entities apart.
+    pub fn shared_ids(&self) -> Vec<(String, Vec<EntityKind>)> {
+        let mut by_id: std::collections::BTreeMap<&str, Vec<EntityKind>> = std::collections::BTreeMap::new();
+        for (kind, id) in self.sources.keys() {
+            by_id.entry(id.as_str()).or_default().push(*kind);
+        }
+        by_id
+            .into_iter()
+            .filter(|(_, kinds)| kinds.len() > 1)
+            .map(|(id, mut kinds)| {
+                kinds.sort();
+                (id.to_string(), kinds)
+            })
+            .collect()
+    }
+
+    fn shared_id_warnings(&self) -> Vec<String> {
+        self.shared_ids()
+            .into_iter()
+            .map(|(id, kinds)| {
+                let names: Vec<&str> = kinds.iter().map(|k| k.type_name()).collect();
+                format!("id `{}` is used by more than one kind ({}); give each a different id", id, names.join(", "))
+            })
+            .collect()
     }
 
     fn add_parsed(&mut self, entity: ParsedEntity, report: &mut WorldLoadReport) {
@@ -245,12 +275,16 @@ impl WorldEngine {
         self.problems_from(errors, strict)
     }
 
-    /// The file-prefixed warnings for the world as it is now.
+    /// The warnings for the world as it is now: each file's (prefixed with
+    /// its path), then ids shared between kinds.
     pub fn current_warnings(&self) -> Vec<String> {
-        self.files
+        let mut warnings: Vec<String> = self
+            .files
             .iter()
             .flat_map(|r| r.warnings.iter().map(move |w| format!("{}: {}", r.path.display(), w)))
-            .collect()
+            .collect();
+        warnings.extend(self.shared_id_warnings());
+        warnings
     }
 
     /// The one file `(kind, id)` was loaded from. An error if it wasn't
@@ -607,6 +641,26 @@ mod tests {
         engine.set_file(&dir.path().join("castle/hall.md"), "---\nid: castle/great-hall\ntitle: Great Hall\ntype: location\n---\n");
         assert!(engine.get_location("castle/hall").is_none());
         assert_eq!(engine.get_location("castle/great-hall").unwrap().name, "Great Hall");
+    }
+
+    #[test]
+    fn ids_shared_between_kinds_are_warnings_not_problems() {
+        let (dir, mut engine, report) = small_world();
+        assert!(engine.shared_ids().is_empty());
+        assert!(report.warnings.is_empty());
+        engine.set_file(&dir.path().join("objects/hall.md"), "---\nid: castle/hall\ntitle: Hall Bell\ntype: object\nobject_type: x\n---\n");
+        assert_eq!(engine.shared_ids(), vec![("castle/hall".to_string(), vec![EntityKind::Location, EntityKind::Object])]);
+        let warnings = engine.current_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].starts_with("id `castle/hall` is used by more than one kind (location, object)"), "{}", warnings[0]);
+        assert_eq!(engine.current_problems(false).len(), 1); // still only broken.md
+
+        // On a load, it's in the report's warnings too.
+        let mut fresh = WorldEngine::new();
+        write(dir.path(), "objects/hall.md", "---\nid: castle/hall\ntitle: Hall Bell\ntype: object\nobject_type: x\n---\n");
+        let report = fresh.load_world(dir.path()).unwrap();
+        assert_eq!(report.warnings, fresh.current_warnings());
+        assert_eq!(report.warnings.len(), 1);
     }
 
     #[test]
