@@ -33,10 +33,11 @@ pub fn watch(root: &Path, console: Arc<Mutex<Console>>, notices: SyncSender<Stri
                 return;
             }
         };
+        let Ok(mut console) = console.lock() else { return };
+        let changed = console.not_own_writes(changed);
         if changed.is_empty() {
             return;
         }
-        let Ok(mut console) = console.lock() else { return };
         let report = console.reload();
         let _ = notices.send(format!("Changed on disk: {}.\n{}", changed.join(", "), report));
     })?;

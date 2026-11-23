@@ -1,0 +1,98 @@
+# world: worlds/tiny
+# mode: edit
+# copy: yes
+Editing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
+> cd village/well
+The Well (room)
+> /new room north tower The Old Tower
+Created village/tower, The Old Tower, through the north exit of village/well, with a south exit back.
+Now at village/tower.
+> look
+The Old Tower (village/tower)
+
+
+
+Exits:
+  south  village/well
+
+Characters: none
+
+Objects: none
+> cd s
+The Well (room)
+> /new room n gatehouse
+village/well already has a north exit, to village/tower. Use /link north <room> to change it.
+> /new room behind cellar
+Created village/cellar, Cellar, through the behind exit of village/well.
+Now at village/cellar.
+> cd behind
+No folder, room, exit, character or object called `behind` here.
+> pwd
+village/cellar
+> /link up village/attic
+Linked village/cellar up to village/attic.
+This adds 1 problem(s):
+  village/cellar: connection `up` points at unknown location `village/attic`
+> /unlink up
+Removed the up exit from village/cellar.
+> /unlink up
+Not saved: `connections` has no entry `up`
+> cd /village/square
+Village Square (room)
+> /new object bench furniture Stone Bench
+Created object bench, Stone Bench; village/square already lists it, and now it has a card.
+> /new object rope tool
+Created object rope, Rope, placed in village/square.
+> /new character smith The Smith
+Created character smith, The Smith, placed in village/square.
+> look
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  village/well
+  east   village/inn  (missing)
+
+Characters:
+  The Elder (elder)
+  The Smith (smith)
+
+Objects:
+  Brass Lantern (lantern)
+  Stone Bench (bench)
+  Rope (rope)
+> cd smith
+The Smith (character)
+> /set attributes.strength 12
+Set attributes.strength on smith.
+> /set inventory rope, lantern
+Set inventory on smith.
+> /set id blacksmith
+Not saved: changing `id` isn't supported yet: renaming means moving the file and fixing references
+> look
+The Smith (smith)
+npcs/smith.md, npc
+
+(no description yet)
+
+Starts in: village/square
+Carries: rope, lantern
+> /new character npcs/bad
+Character and object ids are bare names, without folders: `bad`.
+> cd /
+/
+> /set title Nope
+/set changes the room, character or object you're in; cd to one first.
+> /new room village/garden
+Created village/garden, Garden.
+Now at village/garden.
+> cd /
+/
+> /new room village/garden
+Not created: village/garden.md already exists
+> /reload
+Reloaded: 5 room(s), 2 character(s), 3 object(s).
+1 warning(s):
+  village/square: connection `east` points at unknown location `village/inn`

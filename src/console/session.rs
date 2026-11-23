@@ -8,6 +8,7 @@ use super::Mode;
 use crate::render::render_location;
 use anyhow::Result;
 use std::path::Path;
+use std::time::Instant;
 
 /// Whether the loop should keep reading input.
 #[derive(Debug, PartialEq, Eq)]
@@ -20,21 +21,24 @@ pub enum Flow {
 /// (`""` is the root, `castle` is an area) or a content file
 /// (`castle/courtyard`, `npcs/king`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Place {
+pub(super) enum Place {
     Dir(String),
     File(String),
 }
 
 pub struct Console {
-    world: World,
-    mode: Mode,
-    place: Place,
+    pub(super) world: World,
+    pub(super) mode: Mode,
+    pub(super) place: Place,
     /// The room the player is in, shared by both modes, so switching mode
     /// or reloading keeps it (REQ-CON-7).
-    room: Option<String>,
+    pub(super) room: Option<String>,
+    /// Files the console saved itself, relative to the world root, with
+    /// when, so the file watcher doesn't announce them a second time.
+    pub(super) own_writes: Vec<(String, Instant)>,
 }
 
-const COMPASS_ALIASES: &[(&str, &str)] = &[
+pub(super) const COMPASS_ALIASES: &[(&str, &str)] = &[
     ("n", "north"),
     ("ne", "northeast"),
     ("e", "east"),
@@ -51,7 +55,7 @@ impl Console {
     pub fn open(world_path: &Path, mode: Mode) -> Result<Console> {
         let world = World::load(world_path)?;
         let room = world.default_room();
-        let mut console = Console { world, mode, place: Place::Dir(String::new()), room };
+        let mut console = Console { world, mode, place: Place::Dir(String::new()), room, own_writes: Vec::new() };
         if mode == Mode::Play {
             console.place_at_room();
         }
@@ -116,10 +120,11 @@ impl Console {
             ("edit", [kind, ..]) => self.full_edit(kind),
             ("play", _) => self.switch(Mode::Play),
             ("reload", _) => self.reload(),
-            ("new" | "set" | "link", _) if self.mode == Mode::Edit => {
-                format!("/{} isn't built yet (PLAN.md › Phase 3).", name)
-            }
-            ("new" | "set" | "link", _) => {
+            ("new", args) if self.mode == Mode::Edit => self.new_entity(args),
+            ("set", args) if self.mode == Mode::Edit => self.set(args),
+            ("link", args) if self.mode == Mode::Edit => self.link(args),
+            ("unlink", args) if self.mode == Mode::Edit => self.unlink(args),
+            ("new" | "set" | "link" | "unlink", _) => {
                 format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", name)
             }
             ("", _) => "Type /help for commands.".to_string(),
@@ -148,7 +153,15 @@ impl Console {
                 "  pwd             where you are".to_string(),
                 "  look            show the room, character or object you're in".to_string(),
                 String::new(),
-                "Not built yet: /new, /set, /link, /edit room (PLAN.md › Phase 3).".to_string(),
+                "Changing content (each saves the file, then reloads):".to_string(),
+                "  /new room <direction> <id> [title]   a room through a new exit from this one".to_string(),
+                "  /new room <id> [title]               a room with no exits, outside a room".to_string(),
+                "  /new character <id> [title]          a character, placed here if in a room".to_string(),
+                "  /new object <id> <type> [title]      an object, placed here if in a room".to_string(),
+                "  /set <key> <value>                   one field; attributes.health 80 sets one entry".to_string(),
+                "  /link <direction> <room>             add or change one exit from this room".to_string(),
+                "  /unlink <direction>                  remove one exit from this room".to_string(),
+                "Not built yet: /edit room, /edit object, /edit character (PLAN.md › Phase 3).".to_string(),
             ]),
             Mode::Play => lines.extend([
                 String::new(),
@@ -276,7 +289,7 @@ impl Console {
         }
     }
 
-    fn pwd(&self) -> String {
+    pub(super) fn pwd(&self) -> String {
         match &self.place {
             Place::Dir(dir) if dir.is_empty() => "/".to_string(),
             Place::Dir(dir) => format!("{}/", dir),
@@ -441,7 +454,7 @@ impl Console {
     }
 
     /// The folder this place is in: itself for a folder, its parent for a file.
-    fn current_dir(&self) -> String {
+    pub(super) fn current_dir(&self) -> String {
         match &self.place {
             Place::Dir(dir) => dir.clone(),
             Place::File(path) => parent_of(path),
@@ -463,7 +476,7 @@ impl Console {
     }
 
     /// Moves edit mode's place to the current room's file, if there is one.
-    fn place_at_room(&mut self) {
+    pub(super) fn place_at_room(&mut self) {
         if let Some(path) = self.room.as_ref().and_then(|r| self.world.path_of(Kind::Room, r)) {
             self.place = Place::File(path);
         }

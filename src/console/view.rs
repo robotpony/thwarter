@@ -10,7 +10,7 @@ pub fn character(c: &Character, path: &str) -> String {
     let kind = format!("{:?}", c.character_type).to_lowercase();
     let mut out = vec![format!("{} ({})", c.name, c.id), format!("{}.md, {}", path, kind)];
     out.push(String::new());
-    out.push(c.description.trim().to_string());
+    out.push(description(&c.description));
     out.push(String::new());
     out.push(format!("Starts in: {}", c.default_location.as_deref().unwrap_or("nowhere")));
     out.push(list("Carries", &c.inventory));
@@ -24,12 +24,19 @@ pub fn object(o: &GameObject, path: &str) -> String {
     }
     let mut out = vec![format!("{} ({})", o.title, o.id), format!("{}.md, {}", path, kind)];
     out.push(String::new());
-    out.push(o.description.trim().to_string());
+    out.push(description(&o.description));
     let mut actions: Vec<&String> = o.actions.keys().collect();
     actions.sort();
     out.push(String::new());
     out.push(list("Actions", &actions.into_iter().cloned().collect::<Vec<_>>()));
     out.join("\n")
+}
+
+fn description(text: &str) -> String {
+    match text.trim() {
+        "" => "(no description yet)".to_string(),
+        text => text.to_string(),
+    }
 }
 
 fn list(heading: &str, items: &[String]) -> String {

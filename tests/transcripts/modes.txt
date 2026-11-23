@@ -43,7 +43,7 @@ Objects: none
 > /edit
 Edit mode, at village/well.
 > /new room north
-/new isn't built yet (PLAN.md › Phase 3).
+Name the new room: /new room north <id> [title]
 > /play
 Play mode.
 
@@ -78,7 +78,15 @@ Edit mode moves through the world's folders:
   pwd             where you are
   look            show the room, character or object you're in
 
-Not built yet: /new, /set, /link, /edit room (PLAN.md › Phase 3).
+Changing content (each saves the file, then reloads):
+  /new room <direction> <id> [title]   a room through a new exit from this one
+  /new room <id> [title]               a room with no exits, outside a room
+  /new character <id> [title]          a character, placed here if in a room
+  /new object <id> <type> [title]      an object, placed here if in a room
+  /set <key> <value>                   one field; attributes.health 80 sets one entry
+  /link <direction> <room>             add or change one exit from this room
+  /unlink <direction>                  remove one exit from this room
+Not built yet: /edit room, /edit object, /edit character (PLAN.md › Phase 3).
 > /bogus
 Unknown command `/bogus`. Type /help for commands.
 > /

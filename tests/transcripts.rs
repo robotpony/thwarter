@@ -7,7 +7,13 @@
 //! ```text
 //! # world: worlds/tiny     (relative to tests/transcripts/)
 //! # mode: edit             (or play)
+//! # copy: yes              (optional: run on a throwaway copy of the world)
 //! ```
+//!
+//! A transcript that changes files (`/new`, `/set`, ...) MUST use
+//! `# copy: yes`, so the fixture world never changes. The copy's path is
+//! shown as the world's own path in the output, so the transcript is the
+//! same on every machine.
 //!
 //! Everything after the header is the expected output. The runner feeds
 //! the `> ` lines to the console as input and compares what it prints with
@@ -24,6 +30,7 @@ struct Transcript {
     header: String,
     world: PathBuf,
     mode: Mode,
+    copy: bool,
     expected: String,
 }
 
@@ -32,6 +39,7 @@ fn parse(path: &Path) -> Result<Transcript, String> {
     let mut header = String::new();
     let mut world = None;
     let mut mode = Mode::Edit;
+    let mut copy = false;
     let mut lines = text.split_inclusive('\n').peekable();
     while let Some(line) = lines.peek() {
         let Some(directive) = line.strip_prefix("# ") else { break };
@@ -40,13 +48,15 @@ fn parse(path: &Path) -> Result<Transcript, String> {
             ("world", value) => world = Some(Path::new(DIR).join(value)),
             ("mode", "edit") => mode = Mode::Edit,
             ("mode", "play") => mode = Mode::Play,
+            ("copy", "yes") => copy = true,
+            ("copy", "no") => copy = false,
             (key, value) => return Err(format!("unknown header `{}: {}`", key, value)),
         }
         header.push_str(line);
         lines.next();
     }
     let world = world.ok_or("missing `# world:` header")?;
-    Ok(Transcript { header, world, mode, expected: lines.collect() })
+    Ok(Transcript { header, world, mode, copy, expected: lines.collect() })
 }
 
 fn input_of(expected: &str) -> String {
@@ -70,6 +80,19 @@ fn first_difference(expected: &str, actual: &str) -> String {
     "trailing newline differs".to_string()
 }
 
+fn copy_world(from: &Path) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("temp dir");
+    for entry in walkdir::WalkDir::new(from).into_iter().filter_map(|e| e.ok()) {
+        let to = dir.path().join(entry.path().strip_prefix(from).unwrap());
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(&to).unwrap();
+        } else {
+            fs::copy(entry.path(), &to).unwrap();
+        }
+    }
+    dir
+}
+
 #[test]
 fn transcripts() {
     let bless = std::env::var_os("THWART_BLESS").is_some();
@@ -91,8 +114,10 @@ fn transcripts() {
                 continue;
             }
         };
-        let actual = match run_script(&t.world, t.mode, &input_of(&t.expected)) {
-            Ok(out) => out,
+        let scratch = t.copy.then(|| copy_world(&t.world));
+        let world = scratch.as_ref().map(|d| d.path().to_path_buf()).unwrap_or_else(|| t.world.clone());
+        let actual = match run_script(&world, t.mode, &input_of(&t.expected)) {
+            Ok(out) => out.replace(&world.display().to_string(), &t.world.display().to_string()),
             Err(e) => {
                 failures.push(format!("{}: console failed: {:#}", name, e));
                 continue;
