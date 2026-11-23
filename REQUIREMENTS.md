@@ -36,6 +36,7 @@ Agreed by Bruce, 2026-11-23. Every requirement in every component's document ans
 6. **Play never changes content.** Everything that happens in a game lives in the game state.
 7. **Keep the condition language small.** Only `requires: { has: ... }`, until a real case needs more.
 8. **Content lives in prose, not frontmatter.** Frontmatter holds state, ids and mechanics; everything a player reads is in the Markdown body. `title` is the one exception (Bruce, 2026-11-23).
+9. **A world is a folder any Markdown tool can read.** Worlds MUST stay readable in editors like VS Code and Obsidian, and SHOULD support their features where it's convenient, so that Hugo or a similar tool could sit on top of a world as a site (Bruce, 2026-11-23).
 
 ## 5. Components
 

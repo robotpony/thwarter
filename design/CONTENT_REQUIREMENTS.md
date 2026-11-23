@@ -40,9 +40,20 @@ Written from `design/STATES.md` as agreed with Bruce on 2026-11-23. Where this l
 - REQ-CF-21: The engine MUST supply built-in templates that any world can name without defining them, and a world template of the same name MUST override one. Phase 4 ships `scenery`; the door templates ship with doors.
 - REQ-CF-22: An object, character or door `id` MUST be unique across the whole world, whatever scope its file lives in, so a room's `torch` always means one file. Moving a thing between scopes (`/move`) keeps its `id`. Templates and chapters are named per scope instead, and are looked up along the lineage (REQ-CF-11, REQ-CF-14). Decided by the commander, 2026-11-23, at the console coder's proposal.
 
+## Working with other tools
+
+Principle 9 (Bruce, 2026-11-23). Much of the format already follows Hugo's conventions: leaf bundles with `index.md`, sections with `_index.md`, `title` in frontmatter, and plain Markdown bodies. Items marked *proposed* are the commander's reading of what "where convenient" covers; to confirm with Bruce.
+
+- REQ-CF-23: World files MUST be plain Markdown with YAML frontmatter that VS Code, Obsidian and Hugo can open without errors. The format MUST NOT add syntax that breaks their preview. Response markers and section headers are HTML comments, which all three hide.
+- REQ-CF-24: The loader MUST ignore folders and files that belong to other tools: any name starting with `.` (`.obsidian/`, `.vscode/`, `.git/`), and Hugo's own (`layouts/`, `static/`, `assets/`, `public/`, `hugo.toml`). A world MAY list more in `world.toml`. *Proposed.*
+- REQ-CF-25: Wherever the format takes an `id` (exits, `objects:`, `inherits:`, `becomes:` and the rest), it SHOULD also accept an Obsidian link to the same file (`"[[castle/courtyard]]"`), so Obsidian's graph shows the world's map and links. *Proposed.*
+- REQ-CF-26: Thing ids SHOULD match their file names, as REQ-CF-22 and the default layout already make them, because Obsidian identifies a note by its file name. *Proposed.*
+- REQ-CF-27: `{{ variables }}` are written so Hugo leaves them alone: Hugo only runs templates in layouts, and runs shortcodes only in the `{{< >}}` and `{{% %}}` forms. A Hugo site MAY render them through a small plugin of its own. *Proposed.*
+
 ## Open questions
 
 The world model's open questions are in `design/STATES.md` › Open questions. Format questions:
 
 1. Dialogue tree format is unspecified. REQ-CF-5 loads `dialogue_tree` as an opaque reference.
 2. Should `validate` check a location's `id` against its path as a MUST once the check exists?
+3. Tags and links in prose: should `#tag` and `[[link]]` inside a description mean anything to Thwarter (a tag the console can search, a link the console can follow), or only to the other tools?
