@@ -329,7 +329,7 @@ Where a bundle has to be one piece of plain text (copying it out, or a transcrip
 <!-- thwarter:section state open starting -->
 ```
 
-A header is never a Markdown heading (`#`), since prose uses those, and never `---`, which fences frontmatter. *Proposed*; to confirm with the console coder. So no body line ever needs escaping, and a header can't be renamed or deleted by editing. New states and overlays come only from commands (`/state new`, `/chapter overlay`), never by typing a header. Sections appear in this order: `index`, the starting state, the other states A to Z, then chapter overlays in chapter order. (Settled by the commander with the console coder, 2026-11-23.)
+The comment is positional: kind, then name, then tags. Names are file names, so they never contain spaces, and the path is derived from them, so it isn't written. A header is never a Markdown heading (`#`), since prose uses those, and never `---`, which fences frontmatter. (Confirmed with the console coder, 2026-11-23.) So no body line ever needs escaping, and a header can't be renamed or deleted by editing. New states and overlays come only from commands (`/state new`, `/chapter overlay`), never by typing a header. Sections appear in this order: `index`, the starting state, the other states A to Z, then chapter overlays in chapter order. (Settled by the commander with the console coder, 2026-11-23.)
 
 Saving splits the document back into its files. Every section must parse before any file is written; if one fails, nothing is saved. A file that doesn't parse still opens, since editing is how an author fixes it. A one-file thing opens as a document with one section.
 
