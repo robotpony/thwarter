@@ -32,6 +32,20 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.27.0 (2026-11-23)
+
+### Added
+
+- `thwart show <name>` shows any thing, not only locations (REQ-CLI-9): an object with its fields and actions, a character with where it starts and what it carries, by id or link, in any state and chapter. A thing with states, chapter versions or templates lists them, marking the starting and shown state. `--kind location|object|character` chooses when an id names more than one kind, which is otherwise an error that says so.
+- `thwart show --template <name>` shows a template or built-in exactly as written, and where it was found (REQ-CLI-10). An unknown name lists the templates there are.
+- `thwart show` with no name summarizes the world (REQ-CLI-11): its `world/` definition, story values, player, chapters, and every location, object and character id, sorted. It used to print only the location ids, unsorted and unlabelled.
+- `render_object`, `render_character` and `render_thing_sources`, the author's text views, and `WorldEngine::find_template` and `template_names`.
+- `tests/cli_show.rs` runs `thwart show` itself against a small world.
+
+### Changed
+
+- `design/CLI_REQUIREMENTS.md`: REQ-CLI-5 now covers any thing and the summary, with REQ-CLI-9 to 11 new.
+
 ## 0.26.1 (2026-11-23)
 
 ### Changed

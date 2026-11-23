@@ -241,6 +241,9 @@ pub(crate) struct Built {
     /// chapters and area overlays. Things, states and overlays come from
     /// `things`.
     pub roles: Vec<(PathBuf, FileRole)>,
+    /// Every file a template name can find, by path from the root without
+    /// `.md` (a bundle also by its folder).
+    pub library: BTreeMap<String, Layer>,
     pub problems: Vec<String>,
     pub warnings: Vec<String>,
 }
@@ -550,6 +553,7 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
         }
     }
 
+    built.library = library;
     dedup(&mut built.problems);
     dedup(&mut built.warnings);
     built
@@ -676,7 +680,7 @@ fn build_chapters(
 /// The template `name` means, seen from the folder `scope`: a path from
 /// the world root, or a bare name looked up in `templates/` folders from
 /// `scope` outward to the root, then among the built-ins.
-fn find_template(name: &str, scope: &Path, library: &BTreeMap<String, Layer>) -> Option<Layer> {
+pub(crate) fn find_template(name: &str, scope: &Path, library: &BTreeMap<String, Layer>) -> Option<Layer> {
     if name.contains('/') {
         return library.get(name).cloned();
     }

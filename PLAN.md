@@ -46,8 +46,8 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 - [x] Links in prose, Markdown rendered in play, and tags [coder] (REQ-CF-28 to 30)
 - [x] `design/STATES.md` › Engine rules written as REQ-ENG items [coder] (`design/ENGINE_REQUIREMENTS.md`)
 
-- [ ] `thwart show` for any thing (objects, characters, templates and built-ins), not only locations [coder] (`design/CLI_REQUIREMENTS.md`)
-- [ ] `thwart show` for the `world/` definition and the chapters [coder] (`design/CLI_REQUIREMENTS.md`)
+- [x] `thwart show` for any thing (objects, characters, templates and built-ins), not only locations [coder] (`design/CLI_REQUIREMENTS.md`)
+- [x] `thwart show` for the `world/` definition and the chapters [coder] (`design/CLI_REQUIREMENTS.md`)
 
 ## Phase 5 · Authoring the model
 

@@ -239,6 +239,118 @@ fn author_blocks(view: &LocationView) -> Rendered {
     Rendered { blocks }
 }
 
+/// An object as an author checks it (`thwart show <object>`): title and
+/// id, its type, its description as written, then its fields, actions
+/// and responses.
+pub fn render_object(o: &crate::models::world::GameObject) -> String {
+    let mut out = vec![format!("{} ({})", o.title, o.id)];
+    let mut kind = format!("object, {}", o.object_type);
+    if let Some(category) = &o.category {
+        kind.push_str(&format!(", {}", category));
+    }
+    out.push(kind);
+    out.push(String::new());
+    let body = o.description.trim();
+    out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
+    let mut fields = Vec::new();
+    if let Some(w) = &o.weight {
+        fields.push(format!("Weight: {}", w));
+    }
+    if let Some(v) = &o.value {
+        fields.push(format!("Value: {}", v));
+    }
+    if !fields.is_empty() {
+        out.push(String::new());
+        out.extend(fields);
+    }
+    out.push(String::new());
+    let mut names: Vec<&String> = o.actions.keys().collect();
+    names.sort();
+    if names.is_empty() {
+        out.push("Actions: none".to_string());
+    } else {
+        out.push("Actions:".to_string());
+        for name in names {
+            let a = &o.actions[name];
+            let mut what = Vec::new();
+            for (id, state) in &a.becomes {
+                what.push(format!("{} becomes {}", id, state));
+            }
+            for (var, value) in &a.sets {
+                what.push(format!("sets {} = {}", var, value));
+            }
+            if let Some(c) = &a.chapter {
+                what.push(format!("moves to chapter {}", c));
+            }
+            if !a.requires_has.is_empty() {
+                what.push(format!("needs {}", a.requires_has.join(", ")));
+            }
+            let reply = if o.responses.contains_key(name) { "" } else { "  (no response)" };
+            let detail = if what.is_empty() { String::new() } else { format!(": {}", what.join("; ")) };
+            out.push(format!("  {}{}{}", name, detail, reply));
+        }
+    }
+    out.join("\n")
+}
+
+/// A character as an author checks it (`thwart show <character>`).
+pub fn render_character(c: &crate::models::character::Character) -> String {
+    let mut out = vec![format!("{} ({})", c.name, c.id), format!("character, {:?}", c.character_type).to_lowercase()];
+    out.push(String::new());
+    let body = c.description.trim();
+    out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
+    out.push(String::new());
+    out.push(format!("Starts in: {}", c.default_location.as_deref().unwrap_or("nowhere")));
+    out.push(if c.inventory.is_empty() { "Carries: nothing".to_string() } else { format!("Carries: {}", c.inventory.join(", ")) });
+    if !c.attributes.is_empty() {
+        let mut attrs: Vec<String> = c.attributes.iter().map(|(k, v)| format!("{} {}", k, v)).collect();
+        attrs.sort();
+        out.push(format!("Attributes: {}", attrs.join(", ")));
+    }
+    if !c.relationships.is_empty() {
+        let mut rels: Vec<String> = c.relationships.iter().map(|(k, v)| format!("{} ({})", k, v)).collect();
+        rels.sort();
+        out.push(format!("Relationships: {}", rels.join(", ")));
+    }
+    out.join("\n")
+}
+
+/// Where a thing's version comes from, for `thwart show`: its states,
+/// chapter versions and templates. Empty for a one-file thing with none.
+pub fn render_thing_sources(thing: &crate::engines::bundles::Thing, shown_state: Option<&str>, shown_chapter: Option<&str>) -> String {
+    let mut out = Vec::new();
+    if !thing.states.is_empty() {
+        let states: Vec<String> = thing
+            .states
+            .keys()
+            .map(|s| {
+                let mut tags = Vec::new();
+                if thing.starting_state.as_deref() == Some(s.as_str()) {
+                    tags.push("starting");
+                }
+                if shown_state == Some(s.as_str()) {
+                    tags.push("shown");
+                }
+                if tags.is_empty() { s.clone() } else { format!("{} ({})", s, tags.join(", ")) }
+            })
+            .collect();
+        out.push(format!("States: {}", states.join(", ")));
+    }
+    if !thing.overlays.is_empty() || !thing.area_overlays.is_empty() {
+        let mut names: Vec<String> = thing.overlays.keys().map(|k| k.path.join("/")).collect();
+        names.extend(thing.area_overlays.iter().map(|o| format!("{} (from {}/)", o.chapter.path.join("/"), o.area.display())));
+        out.push(format!("Chapter versions: {}", names.join(", ")));
+    }
+    if let Some(c) = shown_chapter {
+        out.push(format!("Shown in chapter: {}", c));
+    }
+    if !thing.templates.is_empty() {
+        let names: Vec<String> = thing.templates.iter().rev().map(|t| t.path.display().to_string()).collect();
+        out.push(format!("Templates: {}", names.join(", then ")));
+    }
+    out.join("\n")
+}
+
 /// `author_blocks` as text: what `thwart show` prints.
 pub fn render_location(view: &LocationView) -> String {
     author_blocks(view).to_plain()

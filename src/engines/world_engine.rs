@@ -83,6 +83,8 @@ pub struct WorldEngine {
     links: HashMap<String, Vec<(EntityKind, String)>>,
     /// Every file read, by its path in the engine's form, and what it is.
     roles: std::collections::BTreeMap<PathBuf, FileRole>,
+    /// Every file a template name can find (`bundles::Built::library`).
+    library: std::collections::BTreeMap<String, Layer>,
 }
 
 /// How plainly a thing is there, from its current version's
@@ -178,7 +180,33 @@ impl WorldEngine {
             world_toml_warning: None,
             links: HashMap::new(),
             roles: std::collections::BTreeMap::new(),
+            library: std::collections::BTreeMap::new(),
         }
+    }
+
+    /// The template `name` means, seen from `scope` (a folder relative to
+    /// the world root; empty for the root): a path from the root, or a
+    /// bare name in `templates/` folders from `scope` outward, then a
+    /// built-in. Its layer's path is `<built-in>/<name>.md` for a built-in.
+    pub fn find_template(&self, name: &str, scope: &Path) -> Option<Layer> {
+        bundles::find_template(&crate::parsers::link_target(name), scope, &self.library)
+    }
+
+    /// Every template the world defines, by path from the root, then the
+    /// built-ins by name.
+    pub fn template_names(&self) -> Vec<String> {
+        let root = self.world_root.clone().unwrap_or_default();
+        let mut names: Vec<String> = self
+            .roles
+            .iter()
+            .filter(|(_, role)| **role == FileRole::Template)
+            .filter_map(|(path, _)| {
+                let rel = path.strip_prefix(&root).ok()?.with_extension("");
+                Some(rel.to_string_lossy().replace('\\', "/"))
+            })
+            .collect();
+        names.extend(crate::engines::builtins::BUILTINS.iter().map(|(n, _)| n.to_string()));
+        names
     }
 
     /// What one file is, by its path relative to the world root: a thing,
@@ -259,7 +287,7 @@ impl WorldEngine {
     /// whose starting version typed, in load order.
     fn rebuild(&mut self) -> Vec<(Thing, ParsedEntity)> {
         let root = self.world_root.clone().unwrap_or_default();
-        let built = bundles::build(&root, &self.files, &self.ignore);
+        let mut built = bundles::build(&root, &self.files, &self.ignore);
         self.world_graph.locations.clear();
         self.objects.clear();
         self.characters.clear();
@@ -345,6 +373,7 @@ impl WorldEngine {
                 .unwrap_or_else(|| "isn't part of the world as loaded".to_string());
             self.roles.insert(file.path.clone(), FileRole::Problem(why));
         }
+        self.library = std::mem::take(&mut built.library);
         self.file_problems = built.problems;
         self.file_warnings = built.warnings;
         if let Some(w) = &self.world_toml_warning {
