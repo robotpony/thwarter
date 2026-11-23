@@ -13,7 +13,7 @@ The author is a player of sorts, like a game master running a table (Bruce, 2026
 - REQ-CON-1: `thwart edit <world>` MUST open the console in edit mode and `thwart play <world>` in play mode. Both are subcommands of the one `thwart` binary.
 - REQ-CON-2: Commands to the console itself MUST start with `/`; anything else is input to the current mode. `/edit` and `/play` MUST switch modes inside a running console (`/edit` followed by a kind, such as `/edit room`, opens full editing instead, REQ-CON-6; from play mode it switches to edit mode and opens the current room), and `/help` and `/quit` MUST work in both.
 - REQ-CON-3: Edit mode MUST be able to see everything in the world, including hidden state, and change content. Play mode MUST NOT change content files; it MAY write game saves. (Play mode's limits beyond that are proposed, not decided: Open question 2 below.)
-- REQ-CON-4: Edit mode MUST navigate the world with play mode's words, not shell words, since the author moves through the world like a game master (Bruce, 2026-11-23; this replaced `cd`, `ls` and `pwd`). Bare directions and `go <direction>` follow exits. `go <name>` goes to any room, area, folder, character, object or door, by its name or by a link in the prose. `go back` returns to the place before. `look` shows where edit mode is: a room, a thing, or what a folder holds. `examine <thing>` shows a thing here without going to it. A name that fits several things gets a question, never a guess. *Proposed*: `go /` goes to the world root. Commands that change content keep the `/` prefix.
+- REQ-CON-4: Edit mode MUST navigate the world with play mode's words, not shell words, since the author moves through the world like a game master (Bruce, 2026-11-23; this replaced `cd`, `ls` and `pwd`). Bare directions and `go <direction>` follow exits. `go <name>` goes to any room, area, folder, character, object or door, by its name or by a link in the prose. `go back` returns to the place before. `look` shows where edit mode is: a room, a thing, or what a folder holds. `examine <thing>` shows a thing here without going to it. A name that fits several things gets a question, never a guess. `go /` goes to the world root (built in 0.17.0). Commands that change content keep the `/` prefix.
 
   ```
   edit village/square> go north
@@ -80,18 +80,18 @@ Decided by Bruce, 2026-11-23, except where marked as proposed.
    edit village/square [global]> _
   ```
 
-- REQ-CON-23: The sidebar MUST show the play state under GAME: where the player is, the current chapter, what they carry, every thing that has left its starting state, and the values in play. It shows the game in both modes, so an author writing in edit mode can see the playtest they are running. In edit mode it MUST also show a HERE panel for where edit mode is, like a game master's notes for the room: its exits and which aren't written, the people and things in it with their scope, and its warnings. In play mode HERE is hidden and GAME gets the space. *Proposed*: on a terminal too narrow for both (under 100 columns), the sidebar folds into one line above the input, and `cd /game` still shows everything.
+- REQ-CON-23: The sidebar MUST show the play state under GAME: where the player is, the current chapter, what they carry, every thing that has left its starting state, and the values in play. It shows the game in both modes, so an author writing in edit mode can see the playtest they are running. In edit mode it MUST also show a HERE panel for where edit mode is, like a game master's notes for the room: its exits and which aren't written, the people and things in it with their scope, and its warnings. In play mode HERE is hidden and GAME gets the space. *Proposed*: on a terminal too narrow for both (under 100 columns), the sidebar folds into one line above the input, and `go /game` still shows everything.
 - REQ-CON-24: The running game MUST appear as a virtual `game/` folder at the world root. It isn't on disk, and it is navigated like any other folder. A real `game/` folder on disk only sets the starting state (`design/STATES.md`).
 
   ```
-  edit /> cd /game
+  edit /> go /game
   edit game/> ls
   location     village/square
   chapter      arrival
   carrying/    1 thing
   things/      2 changed from their starting state
   values/      1 value
-  edit game/> cd things/bread
+  edit game/> go things/bread
   edit game/things/bread> look
   bread: fresh (its starting state)
   ```
