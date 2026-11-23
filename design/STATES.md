@@ -252,7 +252,7 @@ sides:
 
 ## Hidden things
 
-Hidden means several things in stories (Bruce, 2026-11-23), and they apply to any thing, not only doors. *Proposed*: a state's `visibility:` says which:
+Hidden means several things in stories (Bruce, 2026-11-23), and they apply to any thing, not only doors. A state's `visibility:` says which (agreed by Bruce, 2026-11-23):
 
 | `visibility:` | In the story | In play |
 |---|---|---|
