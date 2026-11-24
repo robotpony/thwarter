@@ -192,7 +192,7 @@ impl Console {
     fn help(&self) -> String {
         let mut lines = vec![
             "Console commands, in either mode:".to_string(),
-            "  /edit           edit where you are (from play: the player's room)".to_string(),
+            "  /edit [name]    edit where you are, or the room or thing named".to_string(),
             "  /play           switch to play mode, resuming the game".to_string(),
             "  /play here      play from the room edit mode is in".to_string(),
             "  /save [name]    save the game (quicksave if no name)".to_string(),
@@ -518,7 +518,7 @@ impl Console {
     /// or thing here (`resolve_here`); a path from this folder or the world
     /// root; then a character, object, room, area or folder anywhere, by id
     /// or name. A name that fits several places is a question.
-    fn resolve(&self, target: &str) -> Result<Place, String> {
+    pub(super) fn resolve(&self, target: &str) -> Result<Place, String> {
         let target = target.trim();
         if target == "/" {
             return Ok(Place::Dir(String::new()));

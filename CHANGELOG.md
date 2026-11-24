@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.41.3 (2026-11-23)
+
+### Changed
+
+- `/edit` takes a name as well as a kind (Bruce, 2026-11-23): `/edit bedroom`, `/edit lantern`, `/edit "old shirt"` or `/edit north` open whatever the name means, found as `go <name>` finds it (an exit, a person or thing here, a path, an id or a title anywhere; several matches ask which). Edit mode stays where it was. Scenery the room lists opens as a new card. The `/` menu offers the kinds first, then what's here and the rooms.
+
 ## 0.41.2 (2026-11-23)
 
 ### Fixed

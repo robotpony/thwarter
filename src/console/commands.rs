@@ -25,7 +25,7 @@ const fn command(name: &'static str, args: &'static str, about: &'static str, ed
 
 /// Every console command, in the order the menu shows them.
 pub const COMMANDS: &[Command] = &[
-    command("edit", "[room|object|character] [id]", "edit where you are, or the one named", false),
+    command("edit", "[room|object|character] [id] or <name>", "edit where you are, or what you name", false),
     command("play", "[here]", "play, resuming the game, or from the room edit mode is in", false),
     command("new", "room|character|object ...", "make a room, character or object", true),
     command("set", "<key> <value>", "change one field of where you are", true),
@@ -125,7 +125,12 @@ impl Console {
                 .collect()
         };
         match (name, args) {
-            ("edit", []) => kinds(),
+            ("edit", []) => {
+                let mut options: Vec<Suggestion> = kinds();
+                options.iter_mut().for_each(|s| s.more = true);
+                options.extend(self.places_to_go().into_iter().filter(|s| s.text != "back" && !s.text.ends_with('/')));
+                options
+            }
             ("edit", ["room"]) => self.rooms(),
             ("edit", ["object"]) => self.things_of(Kind::Object),
             ("edit", ["character"]) => self.things_of(Kind::Character),
@@ -318,7 +323,7 @@ mod tests {
         console.handle("go /village/square");
         let c = console.complete("/edit object ");
         assert_eq!(texts(&c), vec!["lantern"]);
-        assert_eq!(c.hint.as_deref(), Some("/edit [room|object|character] [id]"));
+        assert_eq!(c.hint.as_deref(), Some("/edit [room|object|character] [id] or <name>"));
         assert_eq!(texts(&console.complete("/unlink ")), vec!["east", "north"]);
         assert_eq!(texts(&console.complete("/link north ")), vec!["village/square", "village/well"]);
         let c = console.complete("/move l");

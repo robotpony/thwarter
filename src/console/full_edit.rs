@@ -103,7 +103,8 @@ impl Console {
                 "room" => (Some(Kind::Room), rest),
                 "object" => (Some(Kind::Object), rest),
                 "character" => (Some(Kind::Character), rest),
-                other => return format!("`/edit {}`: the kinds are room, object and character.", other),
+                // Anything else names what to open (Bruce, 2026-11-23).
+                _ => (None, args),
             },
         };
         let mut out = Vec::new();
@@ -116,7 +117,7 @@ impl Console {
             (_, []) => self.edit_target_here(kind),
             (Some(kind), [id]) => self.edit_target_named(kind, &super::author::id_from(id).0),
             (Some(kind), _) => Err(format!("Usage: /edit {} [id]", kind.label())),
-            (None, _) => unreachable!("a kind word comes before an id"),
+            (None, words) => self.edit_target_any(&words.join(" ")),
         };
         match target {
             Err(why) => out.push(why),
@@ -232,6 +233,24 @@ impl Console {
                 ),
             });
         };
+        self.target_for_file(path, kind)
+    }
+
+    /// `/edit <name>`: whatever the name means, as `go <name>` finds it,
+    /// without moving edit mode there. Scenery here opens as a new card.
+    fn edit_target_any(&self, typed: &str) -> Result<EditTarget, String> {
+        let (id, _) = super::author::id_from(typed);
+        if self.is_scenery_here(&id) {
+            return self.edit_target_named(Kind::Object, &id);
+        }
+        match self.resolve(&id)? {
+            Place::File(path) => self.target_for_file(&path, None),
+            Place::Dir(dir) => Err(format!("{}/ is a folder, with nothing to edit. /edit a room or thing in it.", dir)),
+        }
+    }
+
+    /// The file at `path`, if it fits `kind` (any kind for `None`).
+    fn target_for_file(&self, path: &String, kind: Option<Kind>) -> Result<EditTarget, String> {
         let entry = self.world.files.get(path).ok_or_else(|| format!("{} is not in the world.", path))?;
         match entry.kind {
             // Any kind opens a file that doesn't parse: what it holds is
@@ -498,6 +517,20 @@ mod tests {
         // A room standing for its own area: beside the square again.
         let (out, _) = console.handle("/move house/well village/square");
         assert!(out.starts_with("Moved house/well → village/well"), "{}", out);
+    }
+
+    #[test]
+    fn edit_takes_a_name_as_well_as_a_kind() {
+        let (_dir, root) = tiny_copy();
+        let mut console = console_at(&root, "/village/square");
+        assert_eq!(open(&mut console, "/edit lantern").path, "objects/lantern");
+        assert_eq!(open(&mut console, "/edit elder").path, "npcs/elder");
+        assert_eq!(open(&mut console, "/edit village/well").path, "village/well");
+        assert_eq!(open(&mut console, "/edit north").path, "village/well", "an exit names its room");
+        assert_eq!(open(&mut console, "/edit bench").path, "objects/bench", "scenery here gets its card");
+        assert_eq!(console.pwd(), "village/square", "edit mode stays where it was");
+        assert!(console.handle("/edit nothing-at-all").0.starts_with("Nothing called"));
+        assert!(console.handle("/edit village").0.contains("is a folder"));
     }
 
     #[test]

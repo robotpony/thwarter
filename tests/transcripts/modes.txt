@@ -70,10 +70,10 @@ Here: The Elder.
 Edit mode, at village/square.
 /edit opens village/square.md in a full-screen editor, which needs a terminal.
 > /edit spaceship
-`/edit spaceship`: the kinds are room, object and character.
+Nothing called `spaceship` here or anywhere in the world.
 > /help
 Console commands, in either mode:
-  /edit           edit where you are (from play: the player's room)
+  /edit [name]    edit where you are, or the room or thing named
   /play           switch to play mode, resuming the game
   /play here      play from the room edit mode is in
   /save [name]    save the game (quicksave if no name)
