@@ -17,6 +17,9 @@ pub enum Row {
     /// Something not written yet: an exit's room, a thing's card.
     Missing(String),
     Warning(String),
+    /// A row of the map, drawn as it is: cut at the sidebar's edge, never
+    /// wrapped.
+    Map(String),
     Blank,
 }
 
@@ -95,14 +98,54 @@ impl Console {
         out.join("\n")
     }
 
-    /// GAME, then HERE in edit mode.
+    /// GAME, then MAP, then HERE in edit mode.
     pub(super) fn sidebar(&self) -> Sidebar {
         let (fixed, mut rest) = self.game_panel();
+        let map = self.map_panel();
+        if !map.is_empty() {
+            rest.push(Row::Blank);
+            rest.extend(map);
+        }
         if self.mode == Mode::Edit {
             rest.push(Row::Blank);
             rest.extend(self.here_panel());
         }
         Sidebar { fixed, rest }
+    }
+
+    /// The room the map is drawn around: edit mode's room, or the player's.
+    fn map_room(&self) -> Option<String> {
+        let edit_room = match (&self.mode, &self.place) {
+            (Mode::Edit, Place::File(path)) => self.world.files.get(path).filter(|e| e.kind == Kind::Room).map(|e| e.id.clone()),
+            _ => None,
+        };
+        edit_room.or_else(|| self.game.as_ref().map(|g| g.location.clone()))
+    }
+
+    /// MAP: the rooms one exit out from `map_room`, small enough for the
+    /// sidebar. It follows you; `/map` shows the whole map in the output.
+    fn map_panel(&self) -> Vec<Row> {
+        let Some(room) = self.map_room() else { return Vec::new() };
+        let map = self.world.engine.map_layout(&room, Some(1), None);
+        if map.cells.is_empty() {
+            return Vec::new();
+        }
+        let mut rows = vec![Row::Heading(format!("MAP  around {}", room))];
+        rows.extend(mini_map(&map).into_iter().map(Row::Map));
+        for b in &map.beside {
+            let missing = if b.written { "" } else { " ?" };
+            let short = |id: &str| id.rsplit('/').next().unwrap_or(id).to_string();
+            rows.push(Row::Map(format!("  {}: {} → {}{}", short(&b.room), b.direction, short(&b.target), missing)));
+        }
+        rows
+    }
+
+    /// `/map`: the whole map around you, as `thwart map` draws it.
+    pub(super) fn map_command(&self) -> String {
+        match self.map_room() {
+            Some(room) => format!("Map around {}:\n\n{}", room, crate::render::render_map(&self.world.engine.map_layout(&room, None, None))),
+            None => "There's no room to map from: go to a room, or /play to start a game.".to_string(),
+        }
     }
 
     /// GAME's fixed rows (where, chapter, carrying), and the rest.
@@ -148,9 +191,33 @@ impl Console {
             Place::Dir(_) => None,
         };
         let Some(room) = room else {
-            if let Place::File(path) = &self.place {
-                if let Some(entry) = self.world.files.get(path) {
-                    rows.push(Row::Text(format!("{} ({})", entry.title, entry.kind.label())));
+            match &self.place {
+                Place::File(path) => {
+                    if let Some(entry) = self.world.files.get(path) {
+                        rows.push(Row::Text(format!("{} ({})", entry.title, entry.kind.label())));
+                    }
+                }
+                // A folder: what it holds, folders first.
+                Place::Dir(dir) => {
+                    let prefix = if dir.is_empty() { String::new() } else { format!("{}/", dir) };
+                    let child = |path: &str| -> Option<String> {
+                        let rest = path.strip_prefix(&prefix)?;
+                        (!rest.is_empty() && !rest.contains('/')).then(|| rest.to_string())
+                    };
+                    for sub in self.world.dirs.iter().filter_map(|d| child(d)) {
+                        rows.push(Row::Text(format!("  {}/", sub)));
+                    }
+                    for (path, entry) in &self.world.files {
+                        if let Some(name) = child(path) {
+                            rows.push(match entry.kind {
+                                Kind::Broken => Row::Warning(format!("  {}  doesn't load", name)),
+                                kind => Row::Text(format!("  {}  {}", name, kind.label())),
+                            });
+                        }
+                    }
+                    if rows.len() == 1 {
+                        rows.push(Row::Dim("  nothing here yet".to_string()));
+                    }
                 }
             }
             return rows;
@@ -231,13 +298,61 @@ impl Console {
     }
 }
 
+/// The map drawn small: each room a short label in brackets (`@` where
+/// you are, `?` not written yet), joined by `-`, `|`, `/` and `\\`, with a
+/// door as `+` (passable) or `#` (not).
+fn mini_map(map: &crate::engines::map::Map) -> Vec<String> {
+    const LABEL: usize = 7;
+    let label = |c: &crate::engines::map::MapCell| -> String {
+        let name = c.room.rsplit('/').next().unwrap_or(&c.room);
+        let mark = if c.here { "@" } else if !c.written { "?" } else { "" };
+        let mut text: String = format!("{}{}", mark, name);
+        if text.chars().count() > LABEL {
+            text = text.chars().take(LABEL - 1).collect::<String>() + "…";
+        }
+        text
+    };
+    let width = LABEL + 2;
+    let pitch = width + 2;
+    let (min_x, max_x) = (map.cells.iter().map(|c| c.x).min().unwrap_or(0), map.cells.iter().map(|c| c.x).max().unwrap_or(0));
+    let (min_y, max_y) = (map.cells.iter().map(|c| c.y).min().unwrap_or(0), map.cells.iter().map(|c| c.y).max().unwrap_or(0));
+    let cols = (max_x - min_x) as usize * pitch + width;
+    let mut canvas = vec![vec![' '; cols]; (max_y - min_y) as usize * 2 + 1];
+    let at = |x: i32, y: i32| ((x - min_x) as usize * pitch, (y - min_y) as usize * 2);
+    let mut put = |col: usize, row: usize, text: &str| {
+        for (i, ch) in text.chars().enumerate() {
+            if let Some(cell) = canvas.get_mut(row).and_then(|r| r.get_mut(col + i)) {
+                *cell = ch;
+            }
+        }
+    };
+    for c in &map.cells {
+        let (col, row) = at(c.x, c.y);
+        let text = label(c);
+        put(col, row, &format!("[{:^w$}]", text, w = LABEL));
+    }
+    for link in &map.links {
+        let (a, b) = if (link.from.1, link.from.0) <= (link.to.1, link.to.0) { (link.from, link.to) } else { (link.to, link.from) };
+        let door = link.door.as_ref().map(|d| if d.passable { '+' } else { '#' });
+        let (col, row) = at(a.0, a.1);
+        match (b.0 - a.0, b.1 - a.1) {
+            (1, 0) => put(col + width, row, &door.map(|d| format!("{}-", d)).unwrap_or_else(|| "--".to_string())),
+            (0, 1) => put(col + width / 2, row + 1, &door.unwrap_or('|').to_string()),
+            (1, 1) => put(col + width, row + 1, &door.unwrap_or('\\').to_string()),
+            (-1, 1) if col >= 1 => put(col - 1, row + 1, &door.unwrap_or('/').to_string()),
+            _ => {}
+        }
+    }
+    canvas.into_iter().map(|r| r.into_iter().collect::<String>().trim_end().to_string()).collect()
+}
+
 /// The sidebar folded into one line, for a terminal too narrow for it.
 pub fn folded(sidebar: &Sidebar) -> String {
     let texts: Vec<&str> = sidebar
         .fixed
         .iter()
         .filter_map(|r| match r {
-            Row::Text(t) | Row::Dim(t) | Row::Missing(t) | Row::Warning(t) => Some(t.as_str()),
+            Row::Text(t) | Row::Dim(t) | Row::Missing(t) | Row::Warning(t) | Row::Map(t) => Some(t.as_str()),
             _ => None,
         })
         .collect();
@@ -259,6 +374,7 @@ mod tests {
                 Row::Heading(t) => format!("# {}", t),
                 Row::Text(t) => t.clone(),
                 Row::Dim(t) | Row::Missing(t) | Row::Warning(t) => format!("~ {}", t),
+                Row::Map(t) => format!("| {}", t),
                 Row::Blank => String::new(),
             })
             .collect()
@@ -325,6 +441,33 @@ mod tests {
         assert!(rest.contains(&"  down  vault  through vault-door".to_string()), "{:?}", rest);
         assert_eq!(console.handle("down").0, "Vault (room)");
         assert_eq!(console.world.files["doors/vault-door"].kind, Kind::Door);
+    }
+
+    #[test]
+    fn here_in_a_folder_lists_what_it_holds() {
+        let mut console = tiny();
+        let here: Vec<String> = texts(&console.sidebar().rest).into_iter().skip_while(|r| !r.starts_with("# HERE")).collect();
+        assert_eq!(here, vec!["# HERE  /", "  npcs/", "  objects/", "  village/"]);
+        console.handle("go village");
+        let here: Vec<String> = texts(&console.sidebar().rest).into_iter().skip_while(|r| !r.starts_with("# HERE")).collect();
+        assert_eq!(here, vec!["# HERE  village/", "  square  room", "  well  room"]);
+    }
+
+    #[test]
+    fn the_map_follows_you_and_marks_where_you_are() {
+        let mut console = tiny();
+        assert!(!texts(&console.sidebar().rest).iter().any(|r| r.starts_with("# MAP")), "no room, no map");
+        console.handle("go /village/square");
+        let map: Vec<String> = texts(&console.sidebar().rest)
+            .into_iter()
+            .skip_while(|r| !r.starts_with("# MAP"))
+            .take_while(|r| !r.is_empty())
+            .collect();
+        assert_eq!(map[0], "# MAP  around village/square");
+        let drawn = map[1..].join("\n");
+        assert!(drawn.contains("[ well  ]"), "{}", drawn);
+        assert!(drawn.contains("[@square]--[ ?inn  ]"), "{}", drawn);
+        assert!(console.handle("/map").0.starts_with("Map around village/square:"));
     }
 
     #[test]

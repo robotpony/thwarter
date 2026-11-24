@@ -34,6 +34,21 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.40.0 (2026-11-23)
+
+### Added
+
+- A MAP panel in the sidebar (Bruce, 2026-11-23): the rooms one exit out from edit mode's room, or the player's, drawn small from the coder's map layout (851a7f2). `@` marks where you are, `?` a room not written yet, `+` and `#` a door that's passable or not, and exits off the grid (up, down, the rest) follow as `pantry: north → courtyard`. It follows you as you move and after every reload.
+- `/map` prints the whole map around you in the output, as `thwart map` draws it.
+
+### Changed
+
+- The edit-mode prompt is `in <place> > `, such as `in / > ` (Bruce, 2026-11-23). Play mode's stays `play <room>> `.
+
+### Fixed
+
+- HERE showed only its heading in a folder, so rooms at the world root, such as a new `bedroom`, didn't appear in the sidebar. In a folder, it now lists the folders and files there, with what each is.
+
 ## 0.39.2 (2026-11-23)
 
 ### Added

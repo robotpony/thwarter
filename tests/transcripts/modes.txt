@@ -80,6 +80,7 @@ Console commands, in either mode:
   /load [name]    load a saved game
   /reload         reload the world from disk, staying where you are
   /status         the world, where you are, the game, saves and the build
+  /map            the map around you (the sidebar shows the nearest rooms)
   /clear          empty the output (the session carries on)
   /restart        restart the console on the newest build, keeping your place
   /help           this list

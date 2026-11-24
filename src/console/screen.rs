@@ -486,6 +486,8 @@ fn wrap_row(row: &Row, width: usize) -> Vec<Row> {
         Row::Dim(t) => (t, Row::Dim),
         Row::Missing(t) => (t, Row::Missing),
         Row::Warning(t) => (t, Row::Warning),
+        // A map row keeps its shape: cut at the edge, never wrapped.
+        Row::Map(t) => return vec![Row::Map(t.chars().take(width).collect())],
         Row::Blank => return vec![Row::Blank],
     };
     let indent = text.chars().take_while(|c| *c == ' ').count();
@@ -504,6 +506,7 @@ fn row_line(row: &Row) -> Line<'static> {
         Row::Dim(text) => styled(text, Role::Note),
         Row::Missing(text) => styled(text, Role::Missing),
         Row::Warning(text) => styled(text, Role::Warning),
+        Row::Map(text) => styled(text, Role::Link),
         Row::Blank => Line::from(""),
     }
 }
@@ -623,7 +626,7 @@ mod tests {
         assert!(text.contains("> go /village/square"), "{}", text);
         assert!(text.contains("│ GAME"), "{}", text);
         assert!(text.contains("HERE  village/square"), "{}", text);
-        assert!(lines[23].contains("edit village/square>"), "{}", text);
+        assert!(lines[23].contains("in village/square >"), "{}", text);
     }
 
     #[test]

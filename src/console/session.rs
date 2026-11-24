@@ -101,12 +101,16 @@ impl Console {
         Ok(console)
     }
 
+    /// `in village/square > ` in edit mode (Bruce, 2026-11-23); play mode
+    /// keeps `play village/square> `. The status bar names the mode.
     pub fn prompt(&self) -> String {
-        let at = match self.mode {
-            Mode::Edit => self.pwd(),
-            Mode::Play => self.game.as_ref().map(|g| g.location.clone()).unwrap_or_else(|| "nowhere".to_string()),
-        };
-        format!("{} {}> ", self.mode.name(), at)
+        match self.mode {
+            Mode::Edit => format!("in {} > ", self.pwd()),
+            Mode::Play => format!(
+                "play {}> ",
+                self.game.as_ref().map(|g| g.location.clone()).unwrap_or_else(|| "nowhere".to_string())
+            ),
+        }
     }
 
     /// What the console says when it opens.
@@ -155,7 +159,8 @@ impl Console {
             ("clear", []) if self.interactive => return (String::new(), Flow::Clear),
             ("clear", []) => "/clear empties the screen's output, which needs a terminal.".to_string(),
             ("status", []) => self.status_report(),
-            ("clear" | "status", _) => format!("Usage: /{}", name),
+            ("map", []) => self.map_command(),
+            ("clear" | "status" | "map", _) => format!("Usage: /{}", name),
             ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
             ("restart", []) => "/restart restarts the console on the newest build, which needs a terminal.".to_string(),
             ("restart", _) => "Usage: /restart".to_string(),
@@ -193,6 +198,7 @@ impl Console {
             "  /load [name]    load a saved game".to_string(),
             "  /reload         reload the world from disk, staying where you are".to_string(),
             "  /status         the world, where you are, the game, saves and the build".to_string(),
+            "  /map            the map around you (the sidebar shows the nearest rooms)".to_string(),
             "  /clear          empty the output (the session carries on)".to_string(),
             "  /restart        restart the console on the newest build, keeping your place".to_string(),
             "  /help           this list".to_string(),
