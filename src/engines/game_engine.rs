@@ -196,6 +196,19 @@ impl GameEngine {
         let Some(here) = world.location_at(&state.location, At::play(state)) else {
             return ActionResult::say("You're nowhere.");
         };
+        // `go to the river`: the whole phrase as an exit first, then
+        // without the `to` and an article (REQ-PC-20).
+        let direction = match here.connections.contains_key(&direction) {
+            true => direction,
+            false => {
+                let words: Vec<&str> = direction.split_whitespace().collect();
+                let rest = match words.as_slice() {
+                    ["to", "the" | "a" | "an", rest @ ..] | ["to", rest @ ..] if !rest.is_empty() => expand_direction(&rest.join(" ")),
+                    _ => direction.clone(),
+                };
+                if here.connections.contains_key(&rest) { rest } else { direction }
+            }
+        };
         let Some(named) = here.connections.get(&direction) else {
             return ActionResult::say(format!("You can't go {} from here.", direction));
         };

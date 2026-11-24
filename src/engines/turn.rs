@@ -242,4 +242,19 @@ mod tests {
         let mut state = game.start(&world, "bedroom").unwrap();
         assert_eq!(say(&game, &world, &mut state, "x stick"), "Captain Marcus dropped it near Hall. nobody knows why.");
     }
+
+    #[test]
+    fn go_to_tries_the_whole_phrase_then_without_to() {
+        let (dir, mut world) = world();
+        let d = dir.path();
+        world.set_file(&d.join("yard.md"), "---\nid: yard\ntitle: Yard\ntype: location\nconnections: { river: bedroom, to the well: hall, north: hall }\n---\nGrass.\n");
+        let game = GameEngine::new();
+        for (line, to) in [("go to the river", "bedroom"), ("go to the well", "hall"), ("go river", "bedroom"), ("go to north", "hall"), ("go to n", "hall")] {
+            let mut state = game.start(&world, "yard").unwrap();
+            say(&game, &world, &mut state, line);
+            assert_eq!(state.location, to, "{}", line);
+        }
+        let mut state = game.start(&world, "yard").unwrap();
+        assert_eq!(say(&game, &world, &mut state, "go to the sea"), "You can't go to the sea from here.");
+    }
 }

@@ -37,6 +37,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.47.1 (2026-11-23)
+
+### Changed
+
+- `go to <exit>` tries the whole phrase as an exit first, then without the `to` and an article (REQ-PC-20), so `go to the river` works whether the exit is `river` or `to the river`.
+
 ## 0.47.0 (2026-11-23)
 
 ### Added
