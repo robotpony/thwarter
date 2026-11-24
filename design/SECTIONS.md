@@ -82,6 +82,16 @@ Until Bruce confirms this, mechanics stay in frontmatter `actions:` (settled wit
 
 A description section's block MAY hold data that applies while it matches, such as a door's `passable:`, merging over frontmatter the way layers merge today (REQ-CF-13). *Proposed*: one block per section, first in it.
 
+### Scripts
+
+Decided by Bruce, 2026-11-23. When YAML and sections aren't enough, as for a door with a key, a bundle MAY hold a script file.
+- Scripts are written in [Rhai](https://rhai.rs), a scripting language made for embedding in Rust. It's sandboxed by default (no files or network), and the engine caps how long a script can run, so a world from a stranger is safe to play.
+- Each function is an action, named by the verb (`fn unlock(door, game)`). It gets the thing and the game state, read-only, and returns what changes. The engine applies the changes, so a script never writes a file (principle 6).
+- What the player reads still comes from sections. A script changes state, and the sections that match the new state are the reply. A script MAY return text, when no state change can say it.
+- Scripts sit beside the YAML mechanics, for hard cases; a lever that `becomes: pulled` needs no script.
+- *Proposed*: one script per bundle, `actions.rhai`. A template's script passes down, and a thing's function replaces the template's function of the same name.
+- *Proposed*, following from "the new state's sections are the reply": a reply matches the game state after the action, not before (a change to REQ-ENG-36).
+
 ### States
 
 States come from bundles (Bruce: "bundles are simpler"). A state exists because its file does (`objects/window/broken.md`), or because frontmatter's `state:` or a `becomes:` names it. A heading only reads states; `## When: #broken` is shown while the window is broken, and never makes `broken` exist. `validate` warns about a heading tag that can never be true: no state, action, thing or chapter has that name, so `## When: #lockd` is a warning.
