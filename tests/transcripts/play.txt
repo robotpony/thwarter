@@ -5,16 +5,18 @@ Playing Tiny World (tests/worlds/tiny). Type /help for commands.
 1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
 
 A small square of packed earth. An old well stands to the north.
-You see a brass lantern and a bench.
-
-You can go north and east.
 The Elder is here.
+
+You see a brass lantern.
+
+You can go north or east.
 > l
 A small square of packed earth. An old well stands to the north.
-You see a brass lantern and a bench.
-
-You can go north and east.
 The Elder is here.
+
+You see a brass lantern.
+
+You can go north or east.
 > take the lantern
 You take the brass lantern.
 > take lantern
@@ -35,9 +37,9 @@ A stooped woman who remembers when the well still had water.
 > i
 You have a brass lantern.
 > dance wildly
-I don't understand `dance wildly`.
+I don't understand "dance wildly".
 > n please
-I don't understand `n please`.
+I don't understand "n please".
 > e
 You can't go east from here.
 Author note: the east exit leads to `village/inn`, which doesn't exist yet
@@ -55,10 +57,9 @@ You can go south.
 Saved the game as `quicksave`.
 > s
 A small square of packed earth. An old well stands to the north.
-You see a bench.
-
-You can go north and east.
 The Elder is here.
+
+You can go north or east.
 > /load
 Loaded `quicksave`.
 
@@ -93,6 +94,7 @@ Created object rope, Rope, placed in village/well.
 Play mode.
 
 A mossy stone well. The rope is long gone.
+
 You see a rope.
 
 You can go south.
@@ -102,6 +104,7 @@ You can't go north from here.
 Play mode.
 
 A mossy stone well. The rope is long gone.
+
 You see a rope.
 
 You can go south.
@@ -115,6 +118,7 @@ Saved the game as `after-rope`.
 Loaded `quicksave`.
 
 A mossy stone well. The rope is long gone.
+
 You see a rope.
 
 You can go south.
@@ -129,6 +133,6 @@ You light the brass lantern.
 > search
 You search carefully, but find nothing new.
 > dance wildly
-I don't understand `dance wildly`.
+I don't understand "dance wildly".
 > /quit
 Bye.
