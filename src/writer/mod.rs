@@ -6,8 +6,10 @@
 //! gives its kind, refusing anything that would land outside the world.
 
 pub mod content_file;
+pub mod rename;
 
 pub use content_file::{ContentFile, Edit};
+pub use rename::RenameReport;
 
 use crate::engines::{EntityKind, WorldEngine};
 use anyhow::{anyhow, bail, Context, Result};

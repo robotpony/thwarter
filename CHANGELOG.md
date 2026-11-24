@@ -32,6 +32,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.30.0 (2026-11-23)
+
+### Added
+
+- `WorldWriter::rename_loaded(engine, kind, old, new, strict)` renames a thing (REQ-ENG-30), for the console's `/move` (a room's id is its path, so `/move hallway house` is a rename to `house/hallway`) and for renaming. It rewrites the thing's `id`, moves its file, or its bundle folder with every state and chapter file, to the path the new id gives, and rewrites every reference: exits, `characters:`, `objects:`, `inventory`, `default_location`, `world/index.md`'s `start:`, and `[[links]]`, `[text](file.md)` links and `{{ id.value }}` variables in prose. A link stays a link, and comments beside a value stay. Every edit is checked in memory first. The rename is refused, with nothing written, if the new path or id is taken or the id is reserved. References inside an action's `becomes:` or `requires:` are listed for the author to fix. `RenameReport` lists every file moved and written, and the engine takes the same change.
+- The writer can edit files that aren't whole things (states, overlays, chapters, `world/` files), checking only that their frontmatter still parses (`ContentFile::load_layer`).
+
 ## 0.29.1 (2026-11-23)
 
 ### Changed

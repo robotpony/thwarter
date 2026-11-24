@@ -442,7 +442,7 @@ impl Body {
         let mut out = Body::default();
         let mut current: Option<String> = None;
         let mut text: Vec<&str> = Vec::new();
-        let mut flush = |current: &Option<String>, text: &mut Vec<&str>, out: &mut Body| {
+        let flush = |current: &Option<String>, text: &mut Vec<&str>, out: &mut Body| {
             let joined = text.join("\n").trim().to_string();
             match current {
                 None => out.description = joined,

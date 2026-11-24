@@ -69,6 +69,51 @@ impl ContentFile {
         let path = path.as_ref().to_path_buf();
         let (type_name, id) =
             identity(text, &path).with_context(|| format!("{} doesn't parse, so it can't be edited", path.display()))?;
+        Self::split(path, text, type_name, id)
+    }
+
+    /// Read a file that is a layer rather than a whole thing (a state, an
+    /// overlay, a chapter, `world/index.md`): it has no `id` or `type` of
+    /// its own, so edits are checked only for frontmatter that parses.
+    pub fn load_layer(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let text = fs::read_to_string(path).with_context(|| format!("can't read {}", path.display()))?;
+        MarkdownParser::new()
+            .split_document(&text)
+            .with_context(|| format!("{} doesn't parse, so it can't be edited", path.display()))?;
+        Self::split(path.to_path_buf(), &text, String::new(), String::new())
+    }
+
+    /// The same file, to be saved at `path` instead (a rename's move).
+    pub(crate) fn at(mut self, path: PathBuf) -> Self {
+        self.path = path;
+        self
+    }
+
+    /// Whether this file is a whole thing, with its own `id` and `type`.
+    pub fn is_thing(&self) -> bool {
+        !self.type_name.is_empty()
+    }
+
+    /// Give the thing a new `id` (renaming, `WorldWriter::rename_loaded`).
+    /// Checked like any edit: the frontmatter must read back with only
+    /// `id` changed.
+    pub(crate) fn set_id(&mut self, new_id: &str) -> Result<()> {
+        let before = self.frontmatter_value()?;
+        let mut draft = self.clone();
+        draft.set_scalar("id", &Value::String(new_id.to_string()))?;
+        let mut expected = before;
+        expected.insert(Value::from("id"), Value::String(new_id.to_string()));
+        if draft.frontmatter_value()? != expected {
+            bail!("the new `id` didn't read back as written");
+        }
+        draft.id = new_id.to_string();
+        draft.verify_entity()?;
+        *self = draft;
+        Ok(())
+    }
+
+    fn split(path: PathBuf, text: &str, type_name: String, id: String) -> Result<Self> {
 
         let mut parts = text.split_inclusive('\n');
         let opening = parts.next().unwrap_or_default().to_string();
@@ -263,6 +308,10 @@ impl ContentFile {
     }
 
     fn verify_entity(&self) -> Result<()> {
+        if !self.is_thing() {
+            self.frontmatter_value().context("the edited file wouldn't parse, so the edit was not made")?;
+            return Ok(());
+        }
         let (type_name, id) =
             identity(&self.text(), &self.path).context("the edited file wouldn't parse, so the edit was not made")?;
         if type_name != self.type_name || id != self.id {

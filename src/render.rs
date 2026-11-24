@@ -394,7 +394,7 @@ pub fn prose_blocks(text: &str, links: Resolver) -> Rendered {
     let mut in_quote = false;
     let mut item_open = false;
 
-    let mut open = |blocks: &mut Vec<Block>, current: &mut Option<Block>, kind: BlockKind, space: bool| {
+    let open = |blocks: &mut Vec<Block>, current: &mut Option<Block>, kind: BlockKind, space: bool| {
         if let Some(done) = current.take() {
             if !done.spans.is_empty() {
                 blocks.push(done);
