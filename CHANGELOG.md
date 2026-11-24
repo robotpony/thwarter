@@ -39,6 +39,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.51.3 (2026-11-23)
+
+### Changed
+
+- A door with only one side is a `validate` warning, not a problem: it's half-built, as `/add door bedroom` will leave it until its other room is added, and going through it leads nowhere with an author note. A door with no sides, and a plain door with more than two, are still problems (REQ-ENG-31).
+
 ## 0.51.2 (2026-11-23)
 
 ### Changed

@@ -1598,12 +1598,17 @@ mod tests {
         world.set_file(&d.join("doors/bad.md"), "---\nid: bad\ntitle: Bad\ntype: door\nsides:\n  castle/hall: { direction: north }\n---\n");
         world.set_file(&d.join("doors/ring.md"), "---\nid: ring\ntitle: Ring\ntype: door\nportal: yes\nsides:\n  castle/tower: { direction: in }\n  castle/cell: { direction: in }\n  castle/nowhere: { direction: in }\n---\n");
         world.set_file(&d.join("castle/vault.md"), "---\nid: castle/vault\ntitle: Vault\ntype: location\nconnections: { up: vault-door, east: grate }\n---\n");
+        world.set_file(&d.join("doors/none.md"), "---\nid: none\ntitle: None\ntype: door\n---\n");
         let problems = world.current_problems(false);
+        // A door in one room so far is half-built: a warning, and going
+        // through it leads nowhere.
+        assert!(!problems.iter().any(|p| p.contains("door `bad`")), "{:?}", problems);
+        assert!(world.current_warnings().iter().any(|w| w.starts_with("door `bad`: it's only in `castle/hall` so far")), "{:?}", world.current_warnings());
         for expected in [
-            "door `bad`: a door joins exactly two rooms, and this one has 1 sides",
             "door `ring`: the side in `castle/tower` needs `to:`",
             "door `ring`: side `castle/nowhere` is not a known location",
             "castle/vault: connection `east` goes through door `grate`, which doesn't join this room",
+            "door `none`: a door needs a side in at least one room",
         ] {
             assert!(problems.iter().any(|p| p.starts_with(expected)), "{}: {:?}", expected, problems);
         }

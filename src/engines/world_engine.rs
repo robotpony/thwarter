@@ -948,15 +948,18 @@ impl WorldEngine {
         for id in ids {
             let door = &self.doors[id];
             let at = format!("door `{}`", id);
-            if door.portal {
-                if door.sides.len() < 2 {
-                    problems.push(format!("{}: a portal joins at least two rooms", at));
-                } else if door.sides.len() > 2 {
+            // A door with one side is half-built (`/add door bedroom`, before
+            // its other room is linked): a warning, not a problem.
+            if door.sides.is_empty() {
+                problems.push(format!("{}: a door needs a side in at least one room", at));
+            } else if door.sides.len() == 1 {
+            } else if door.portal {
+                if door.sides.len() > 2 {
                     for side in door.sides.iter().filter(|s| s.to.is_none()) {
                         problems.push(format!("{}: the side in `{}` needs `to:`, since a portal with more than two sides can't tell where it leads", at, side.room));
                     }
                 }
-            } else if door.sides.len() != 2 {
+            } else if door.sides.len() > 2 {
                 problems.push(format!("{}: a door joins exactly two rooms, and this one has {} sides; a portal can join more", at, door.sides.len()));
             }
             for side in &door.sides {
@@ -988,6 +991,11 @@ impl WorldEngine {
         let mut warnings = Vec::new();
         let mut ids: Vec<&String> = self.doors.keys().collect();
         ids.sort();
+        for id in &ids {
+            if let [side] = self.doors[*id].sides.as_slice() {
+                warnings.push(format!("door `{}`: it's only in `{}` so far, so it leads nowhere; give it a side in the room it opens onto", id, side.room));
+            }
+        }
         for id in ids {
             for side in &self.doors[id].sides {
                 let Some(room) = self.get_location(&side.room) else { continue };
