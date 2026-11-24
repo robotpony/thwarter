@@ -10,7 +10,7 @@ The console is the interactive terminal client for writing and playing a world. 
 
 The author is a player of sorts, like a game master running a table (Bruce, 2026-11-23). Editing SHOULD feel like being in the world and running it: standing in a room, adding things to it, checking how it plays, and nudging the game's state. It should not feel like filling in forms. New commands are judged against that, and each requirement below gives an example of how it reads at the prompt.
 
-Output reads with air around it (Bruce, 2026-11-24): a blank line follows what was typed, and a reply that suggests a command puts each command on its own indented line after a blank line, with parameters named as in the `/` menu (`{id}`, `[{title}]`), never inside the sentence.
+Output reads with air around it (Bruce, 2026-11-24): every block of output has one blank line before it and one after, never two, so a blank line follows what was typed and another comes before the next prompt. A reply that suggests a command puts each command on its own indented line after a blank line, with parameters named as in the `/` menu (`{id}`, `[{title}]`), never inside the sentence. `code` shows in the code style, without its backticks. The examples in this document are written compactly; transcripts record replies without the screen's blank lines, which the screen's own tests check.
 
 ```
 in bedroom > /new room west hallway
@@ -26,14 +26,14 @@ bedroom already has a west exit, to door-bedroom-west. To change it:
 - REQ-CON-4: Edit mode MUST navigate the world with play mode's words, not shell words, since the author moves through the world like a game master (Bruce, 2026-11-23; this replaced `cd`, `ls` and `pwd`). Bare directions and `go <direction>` follow exits. `go <name>` goes to any room, area, folder, character, object or door, by its name or by a link in the prose. `go back` returns to the place before. `look` shows where edit mode is: a room, a thing, or what a folder holds. `examine <thing>` shows a thing here without going to it. A name that fits several things gets a question, never a guess. `go /` goes to the world root (built in 0.17.0). Commands that change content keep the `/` prefix.
 
   ```
-  edit village/square> go north
+  in village/square > go north
   The Well (room)
-  edit village/well> go elder
+  in village/well > go elder
   The Elder (character), npcs/elder.md
-  edit npcs/elder> go back
-  edit village/well> go objects
+  in npcs/elder > go back
+  in village/well > go objects
   objects/  2 things: lantern, rope
-  edit objects/> look
+  in objects/ > look
   lantern  Brass Lantern (object)
   rope     Rope (object)
   ```
@@ -69,11 +69,11 @@ bedroom already has a west exit, to door-bedroom-west. To change it:
 - REQ-CON-40: `/move <thing> <room or character>` MUST put a person or thing somewhere else (Bruce, 2026-11-23): a character into another room, with its `default_location` following, or an object into a room, a character's inventory or another object (REQ-CF-31), scenery included, which gets its card first if it has none. It takes the thing out of every room list and inventory that held it, and the thing's own file stays where it is. `/move <id> global|area|local` changes scope instead (REQ-CON-29). A room moves into an area folder: `/move hallway house` makes it `house/hallway`, with its file moved and every exit to it updated, and a room as the target stands for its own area, so `/move hallway bedroom` puts hallway beside bedroom (Bruce, 2026-11-23). The writer's rename does the move, and the report lists every file it updated and any reference left to fix by hand.
 
   ```
-  edit village/square> /move lantern village/well
+  in village/square > /move lantern village/well
   Moved lantern: village/square → village/well.
-  edit village/square> /move lantern elder
+  in village/square > /move lantern elder
   Moved lantern: village/well → carried by elder.
-  edit village/square> /move elder village/well
+  in village/square > /move elder village/well
   Moved elder: village/square → village/well (and its default_location).
   ```
 
@@ -109,13 +109,13 @@ Decided by Bruce, 2026-11-23, except where marked as proposed.
    Tiny World · edit · 2 warnings              thwart 0.12.0
   ─────────────────────────────────────┬──────────────────
    > look                              │ GAME
-   Village Square                      │ at  village/square
-   A small square of packed earth.     │ chapter  arrival
-   An old well stands to the north.    │ carrying  lantern
-   Exits: north (village/well),        │
-     east (village/inn, not written)   │ HERE  village/square
-   Here: The Elder.                    │ exits
-   You see: brass lantern, bench.      │   north  village/well
+                                       │ at  village/square
+   Village Square (village/square)     │ chapter  arrival
+   A small square of packed earth.     │ carrying  lantern
+   An old well stands to the north.    │
+   The Elder is here.                  │ HERE  village/square
+   You see a brass lantern.            │ exits
+   You can go north or east.           │   north  village/well
                                        │   east   village/inn  (not written)
                                        │ people
                                        │   elder    global
@@ -132,24 +132,24 @@ Decided by Bruce, 2026-11-23, except where marked as proposed.
 - REQ-CON-24: The running game MUST appear as a virtual `game/` folder at the world root. It isn't on disk, and it is navigated like any other folder. A real `game/` folder on disk only sets the starting state (`design/STATES.md`).
 
   ```
-  edit /> go /game
-  edit game/> ls
+  in / > go /game
+  in game/ > look
   location     village/square
   chapter      arrival
   carrying/    1 thing
   things/      2 changed from their starting state
   values/      1 value
-  edit game/> go things/bread
-  edit game/things/bread> look
+  in game/ > go things/bread
+  in game/things/bread > look
   bread: fresh (its starting state)
   ```
 
 - REQ-CON-25: Inside `game/`, `/set` MUST change only the running game, never a file, and say so. It can set a thing's state, the chapter, the player's location, what they carry and values, so an author can set a scene up the way a game master would, then play it.
 
   ```
-  edit game/things/bread> /set state stale
+  in game/things/bread > /set state stale
   Game: bread is now stale. No file changed.
-  edit game/> /set chapter after-the-king
+  in game/ > /set chapter after-the-king
   Game: now in chapter after-the-king. No file changed.
   ```
 
@@ -160,7 +160,7 @@ Where a thing's file lives is its scope: global, area or local (`design/STATES.m
 - REQ-CON-26: `/scope global|area|local` MUST set the scope that the following `/new` commands use, and the prompt MUST show it. The default is global, since most objects and doors are expected to be global.
 
   ```
-  edit castle/hall> /scope global
+  in castle/hall > /scope global
   edit castle/hall [global]> /new object lantern, rope, key tool
   Created 3 objects in objects/, placed in castle/hall.
   ```
@@ -189,17 +189,17 @@ The console restarts itself onto a new build in place, so it can be changed and 
 
   ```
   (another pane: cargo build finishes)
-  edit village/square> /restart
+  in village/square > /restart
   Restarted on thwart 0.12.1 (built 14:02). You're where you were.
-  edit village/square> _
+  in village/square > _
   ```
 
 - REQ-CON-31: If the new build can't take part of the session as it was, such as a game saved in a shape that changed or a place that no longer exists, that part MUST start fresh with a notice saying what was reset. Everything else carries over, and the restart goes ahead.
 
   ```
-  edit village/square> /restart
+  in village/square > /restart
   Restarted on thwart 0.12.1. The game was reset: its saved shape changed in this build.
-  edit village/square> _
+  in village/square > _
   ```
 
 - REQ-CON-32: *Proposed*: when a newer `thwart` has been built while the console runs, the status bar says so (`newer build: /restart`).
@@ -210,7 +210,7 @@ The console restarts itself onto a new build in place, so it can be changed and 
      /reload    reload the world from disk, staying where you are
      /restart   restart the console on the newest build
 
-   edit village/square> /edit object _
+   in village/square > /edit object _
      lantern   brass lantern, global
      bench     scenery, no card yet
      rope      not here: objects/rope.md
@@ -220,7 +220,7 @@ The console restarts itself onto a new build in place, so it can be changed and 
 
 Who is writing, as a persona (`REQUIREMENTS.md` › 5.2, REQ-WS-4 to 6). Decided by Bruce, 2026-11-23; built after the lines above (`PLAN.md`).
 
-- REQ-CON-34: On first run, the console MUST ask who's writing. It lists the personas in `authors/` or offers to create one, writes `authors/<name>/index.md` for a new one, and records the choice in `~/.config/thwarter/config.toml`.
+- REQ-CON-34: On first run, the console MUST ask who's writing. It lists the personas in `authors/` or offers to create one, writes `authors/<name>/index.md` for a new one, and records the choice in `$XDG_CONFIG_HOME/thwarter/config.toml` (`~/.config/thwarter/config.toml` by default).
 
   ```
   Who's writing?
@@ -276,7 +276,7 @@ Bruce, 2026-11-24: console commands should solve common problems easily, through
     /action pull hanging --> loose
   ```
 
-- REQ-CON-46: When `/add` or `/new` makes something new and there's a question file for it, they MUST ask its questions (placing a thing that exists asks nothing) in a picker like the `/` menu's, then run the answers and print the commands they stood for. Esc takes the defaults for the rest. The file is `questions/<template or kind>.md`, found the way templates are, from the new thing's folder out to the root and then the built-ins compiled in from `src/builtins/questions/`; the nearest whole file wins, a template's set before its kind's (`design/CONTENT_FORMAT.md` › `type: questions`, REQ-CF-32). An answer uses one of four constructs: `set <key>`, `recipe …`, `ask thing`, or `ask value <name> <default>`.
+- REQ-CON-46: When `/add` or `/new` makes something new and there's a question file for it, they MUST ask its questions (placing a thing that exists asks nothing) in a picker like the `/` menu's, then run the answers and print the commands they stood for. Esc takes the defaults for the rest. The file is `questions/<id, template or kind>.md`, tried in that order (d2665a8) and found the way templates are, from the new thing's folder out to the root and then the built-ins compiled in from `src/builtins/questions/`; the nearest whole file wins, a template's set before its kind's (`design/CONTENT_FORMAT.md` › `type: questions`, REQ-CF-32). An answer uses one of four constructs: `set <key> [<value>]` (a written-in value asks nothing, dc66a64), `recipe …`, `ask thing`, or `ask value <name> <default>`.
 
   ```
    A lantern, from the built-in lantern questions                  2 of 4
@@ -293,6 +293,6 @@ Bruce, 2026-11-24: console commands should solve common problems easily, through
 2. What can play mode do and not do? Assumed until Bruce says otherwise: in-game verbs only, no changes to content, game saves only (REQ-CON-3).
 3. Should `/new room north` also add the return exit (`south`) to the new room? Proposed: yes for compass directions and `up`/`down`, no for free-text directions. Implemented as proposed in 0.6.1, pending Bruce.
 4. Writing helpers: which model services to support (one, several, or a local model), and can "flesh out" also propose new things, such as rooms from an outline, or only prose?
-5. Writing helpers: where styles live, until `world/`'s layout is settled (`design/STATES.md` › Open questions).
+5. ~~Writing helpers: where styles live~~ Settled: in `world/styles/` (`design/STATES.md` › world/ layout, REQ-CON-18).
 6. Scope: what does `local` mean in a room? Making an object local to a room turns the room into a bundle (`castle/hall.md` becomes `castle/hall/index.md`, with `torch.md` beside it). Proposed: `/new ... in here` asks first, or works only in a room that is already a bundle.
 7. ~~Scope: must object, character and door ids be unique across the whole world?~~ Decided 2026-11-23: yes, whatever their scope, and `/move` keeps the id (`design/CONTENT_REQUIREMENTS.md` › REQ-CF-22). Templates and chapters are the exception: named per scope and looked up along the lineage.

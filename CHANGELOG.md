@@ -51,6 +51,19 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.63.2 (2026-11-24)
+
+### Fixed
+
+- The sidebar lost characters where a long row wrapped ("play shows it i" for "in"): its wrapped rows were indented two more after wrapping and ran past the edge. They're wrapped two narrower now.
+
+### Changed
+
+- Air around every block of output (Bruce, 2026-11-24): a blank line after each reply as well as after what was typed, in every mode, and never two together.
+- `code` in the output and the sidebar shows in the code style without its backticks.
+- `design/CONSOLE_REQUIREMENTS.md`: the examples use the `in <place> > ` prompt, the output principle covers blank lines before and after every block and backticks, REQ-CON-24 says `look` not `ls`, REQ-CON-46 has the id-template-kind lookup and `set <key> [<value>]`, REQ-CON-34 names `$XDG_CONFIG_HOME`, and open question 5 is closed.
+
 ## 0.63.1 (2026-11-24)
 
 ### Changed

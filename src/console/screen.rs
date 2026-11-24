@@ -244,15 +244,16 @@ impl<'a> Screen<'a> {
             }
             self.remember(&line);
         }
-        // A blank line after what was typed, in every mode (Bruce,
-        // 2026-11-24), and play adds one after each reply, reading as a story.
-        let playing = lock(console).mode == super::Mode::Play && !line.trim_start().starts_with('/');
+        // A blank line after what was typed, in every mode (Bruce, 2026-11-24).
         self.output.push(String::new());
         let (text, flow) = lock(console).handle(&line);
         if !text.is_empty() {
             self.push(&text);
         }
-        if playing {
+        // A blank line after every reply too, so each block of output has
+        // air before and after it, and never two blank lines together
+        // (Bruce, 2026-11-24).
+        if self.output.last().is_some_and(|l| !l.is_empty()) {
             self.output.push(String::new());
         }
         match flow {
@@ -800,19 +801,27 @@ fn wrap_row(row: &Row, width: usize) -> Vec<Row> {
         Row::Map(t) => return vec![Row::Map(t.chars().take(width).collect())],
         Row::Blank => return vec![Row::Blank],
     };
+    // The first row as it is; the rest indented two more, so they're
+    // wrapped two narrower, or the edge would cut their last characters.
     let indent = text.chars().take_while(|c| *c == ' ').count();
-    wrap(text, width)
-        .into_iter()
-        .enumerate()
-        .map(|(i, line)| make(if i == 0 { line } else { format!("{}  {}", " ".repeat(indent), line.trim_start()) }))
-        .collect()
+    let rows = wrap(text, width);
+    let Some(first) = rows.first().cloned() else { return vec![Row::Blank] };
+    let rest: String = rows[1..].iter().map(|r| r.trim()).collect::<Vec<_>>().join(" ");
+    let mut out = vec![make(first)];
+    if !rest.is_empty() {
+        let pad = " ".repeat(indent + 2);
+        for line in wrap(&rest, width.saturating_sub(indent + 2).max(1)) {
+            out.push(make(format!("{}{}", pad, line)));
+        }
+    }
+    out
 }
 
 fn row_line(row: &Row) -> Line<'static> {
-    let styled = |text: &str, role: Role| Line::from(Span::styled(format!(" {}", text), style(role)));
+    let styled = |text: &str, role: Role| Line::from(code_spans(&format!(" {}", text), style(role)));
     match row {
         Row::Heading(text) => styled(text, Role::Heading),
-        Row::Text(text) => Line::from(format!(" {}", text)),
+        Row::Text(text) => Line::from(code_spans(&format!(" {}", text), Style::default())),
         Row::Dim(text) => styled(text, Role::Note),
         Row::Missing(text) => styled(text, Role::Missing),
         Row::Warning(text) => styled(text, Role::Warning),
@@ -834,7 +843,25 @@ fn output_line(text: &str, row_style: Style) -> Line<'static> {
             Span::styled(command[name_end..].to_string(), Style::default()),
         ]);
     }
-    Line::styled(format!(" {}", text), row_style)
+    Line::from(code_spans(&format!(" {}", text), row_style))
+}
+
+/// `text` as spans, with each `code` part in the code style and its
+/// backticks dropped, as a terminal shows them (Bruce, 2026-11-24).
+fn code_spans(text: &str, base: Style) -> Vec<Span<'static>> {
+    let mut spans = Vec::new();
+    for (i, part) in text.split('`').enumerate() {
+        if part.is_empty() {
+            continue;
+        }
+        let style = if i % 2 == 1 { base.patch(style(Role::Code)) } else { base };
+        spans.push(Span::styled(part.to_string(), style));
+    }
+    // An odd number of backticks: show the text as it was.
+    if text.matches('`').count() % 2 == 1 {
+        return vec![Span::styled(text.to_string(), base)];
+    }
+    spans
 }
 
 /// Colours a console command being typed: its `/` and its name.
@@ -1015,7 +1042,7 @@ mod tests {
         for c in "/move lantern".chars() {
             screen.key(Input { key: Key::Char(c), ..Input::default() }, &console);
         }
-        let mut terminal = Terminal::new(TestBackend::new(110, 12)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(110, 30)).unwrap();
         draw(&mut terminal, &screen, &console).unwrap();
         let buffer = terminal.backend().buffer();
         let row = |y: u16| (0..110).map(|x| buffer[(x, y)].symbol().to_string()).collect::<String>();
@@ -1023,13 +1050,13 @@ mod tests {
         let border = row(1).chars().position(|c| c == '│').unwrap() as u16;
         assert_eq!(buffer[(border, 1)].fg, Color::Blue, "the sidebar's border");
         // The echoed command and the one being typed.
-        let echo = (0..12).find(|&y| row(y).contains("> /status")).unwrap();
+        let echo = (0..30).find(|&y| row(y).contains("> /status")).unwrap();
         let slash = row(echo).find('/').unwrap() as u16;
         assert_eq!(buffer[(slash, echo)].fg, Color::Yellow);
-        let input = row(11).find("/move").unwrap() as u16;
-        assert_eq!(buffer[(input, 11)].fg, Color::Yellow);
-        assert!(buffer[(input + 1, 11)].modifier.contains(ratatui::style::Modifier::BOLD));
-        assert_ne!(buffer[(input + 7, 11)].fg, Color::Yellow, "arguments stay plain");
+        let input = row(29).find("/move").unwrap() as u16;
+        assert_eq!(buffer[(input, 29)].fg, Color::Yellow);
+        assert!(buffer[(input + 1, 29)].modifier.contains(ratatui::style::Modifier::BOLD));
+        assert_ne!(buffer[(input + 7, 29)].fg, Color::Yellow, "arguments stay plain");
     }
 
     fn keys(screen: &mut Screen, console: &Mutex<Console>, text: &str) {
@@ -1139,6 +1166,45 @@ mod tests {
         assert!(screen.picker.is_none());
         assert!(screen.output.iter().any(|l| l.trim() == "/new object rock thing"), "{:?}", screen.output);
         assert!(screen.editing.is_some(), "then the editor opens on it");
+    }
+
+    #[test]
+    fn every_reply_has_air_before_and_after_and_never_two_blanks() {
+        let console = tiny();
+        let mut screen = Screen::new("Hello.", None);
+        typed(&mut screen, &console, "go /village/square");
+        typed(&mut screen, &console, "look");
+        let at = screen.output.iter().position(|l| l == "> look").unwrap();
+        assert_eq!(screen.output[at - 1], "", "a blank line before the echo");
+        assert_eq!(screen.output[at + 1], "", "and after it");
+        assert_eq!(screen.output.last().unwrap(), "", "and after the reply, before the prompt");
+        assert!(!screen.output.windows(2).any(|w| w[0].is_empty() && w[1].is_empty()), "{:?}", screen.output);
+    }
+
+    #[test]
+    fn backticked_code_drops_its_backticks_and_takes_the_code_style() {
+        let spans = code_spans("leads to `village/inn`, see", Style::default());
+        let text: String = spans.iter().map(|s| s.content.to_string()).collect();
+        assert_eq!(text, "leads to village/inn, see");
+        assert_eq!(spans[1].style, style(Role::Code));
+    }
+
+    #[test]
+    fn wrapped_sidebar_rows_keep_every_character() {
+        let row = Row::Warning("  `tshirt` starts in more than one place: room `hallway`; play shows it in each".into());
+        for width in [20, 28, 33, 40] {
+            let rows = wrap_row(&row, width);
+            let text: String = rows
+                .iter()
+                .map(|r| match r {
+                    Row::Warning(t) => t.trim().to_string(),
+                    _ => String::new(),
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            assert!(text.ends_with("play shows it in each"), "width {}: {:?}", width, rows);
+            assert!(rows.iter().all(|r| matches!(r, Row::Warning(t) if t.chars().count() <= width)), "width {}: {:?}", width, rows);
+        }
     }
 
     #[test]
