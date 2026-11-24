@@ -105,6 +105,8 @@ fn commands_for(id: &str, answer: &Answer) -> Vec<String> {
     let given = answer.given.as_deref().map(str::trim).filter(|g| !g.is_empty());
     match (&answer.choice.action, given) {
         (None, _) => Vec::new(),
+        // A value written into the option needs nothing typed.
+        (Some(Construct::Set { key, value: Some(preset) }), _) => vec![format!("/set {} {}", key, quote(preset))],
         (Some(Construct::Set { key, .. }), Some(value)) => vec![format!("/set {} {}", key, quote(value))],
         (Some(Construct::Set { .. }), None) => Vec::new(),
         (Some(Construct::Recipe { name, args }), _) => {
@@ -140,6 +142,7 @@ fn quote(value: &str) -> String {
 /// Whether an answer to this option needs something typed or picked.
 pub fn needs(choice: &Choice) -> Option<Needs> {
     match &choice.action {
+        Some(Construct::Set { value: Some(_), .. }) => None,
         Some(Construct::Set { key, .. }) => Some(Needs::Text { prompt: format!("{}:", key), default: None }),
         Some(Construct::AskValue { name, default }) => Some(Needs::Text { prompt: format!("{}:", name), default: default.clone() }),
         Some(Construct::AskThing { .. }) => Some(Needs::Thing),
@@ -168,6 +171,9 @@ mod tests {
         let a = |c, g: Option<&str>| Answer { choice: choice(c), given: g.map(str::to_string) };
         assert_eq!(commands_for("lantern", &a(set("title"), Some("Old lamp"))), vec!["/set title \"Old lamp\""]);
         assert!(commands_for("lantern", &a(set("title"), None)).is_empty());
+        let preset = Some(Construct::Set { key: "title".into(), value: Some("Brass lantern".into()) });
+        assert_eq!(commands_for("lantern", &a(preset.clone(), None)), vec!["/set title \"Brass lantern\""]);
+        assert!(needs(&choice(preset)).is_none(), "nothing to type");
         let recipe = Some(Construct::Recipe { name: "fixed-until".into(), args: vec!["pull".into()] });
         assert_eq!(commands_for("lantern", &a(recipe, None)), vec!["/recipe fixed-until pull"]);
         let thing = Some(Construct::AskThing { then: Some("then move into it".into()) });

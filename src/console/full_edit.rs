@@ -107,6 +107,20 @@ impl Console {
                 "room" => (Some(Kind::Room), rest),
                 "object" => (Some(Kind::Object), rest),
                 "character" => (Some(Kind::Character), rest),
+                // `/edit world`: the world's own settings (Bruce, 2026-11-24).
+                "world" if rest.is_empty() => {
+                    return match self.world.files.get("world/index") {
+                        Some(_) => match self.open_target(Kind::World, "world/index".to_string(), "world/index".to_string()) {
+                            Ok(target) if self.interactive => {
+                                self.pending_edit = Some(target);
+                                String::new()
+                            }
+                            Ok(target) => format!("/edit opens {}.md in a full-screen editor, which needs a terminal.", target.path),
+                            Err(e) => e,
+                        },
+                        None => "This world has no world/index.md yet; its settings are in world.toml.".to_string(),
+                    }
+                }
                 // Anything else names what to open (Bruce, 2026-11-23).
                 _ => (None, args),
             },

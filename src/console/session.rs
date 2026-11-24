@@ -511,7 +511,13 @@ impl Console {
         };
 
         let mut rows: Vec<(String, String)> = Vec::new();
-        for sub in self.world.dirs.iter().filter_map(|d| child(d)) {
+        let folders: Vec<String> = self.world.dirs.iter().filter_map(|d| child(d)).collect();
+        // At the root, the rooms come first, then areas, then the world's
+        // own folders, labelled for what they hold (Bruce, 2026-11-24).
+        if dir.is_empty() {
+            return self.list_root(&folders);
+        }
+        for sub in &folders {
             let full = format!("{}{}", prefix, sub);
             let count = self.world.files.keys().filter(|p| p.starts_with(&format!("{}/", full))).count();
             rows.push((format!("{}/", sub), format!("{} file(s)", count)));
@@ -542,6 +548,45 @@ impl Console {
             (Mode::Edit, Place::Dir(dir)) => self.list_dir(dir),
             (Mode::Edit, Place::File(path)) => self.view_of(path),
         }
+    }
+
+    /// The world's root: its rooms, then its areas, then its own folders
+    /// with what they hold: "World settings", "Global objects: 4".
+    fn list_root(&self, folders: &[String]) -> String {
+        let in_folder = |folder: &str, kind: Option<Kind>| {
+            self.world
+                .files
+                .iter()
+                .filter(|(p, e)| p.starts_with(&format!("{}/", folder)) && kind.is_none_or(|k| e.kind == k))
+                .count()
+        };
+        let mut rows: Vec<(String, String)> = Vec::new();
+        for (path, entry) in self.world.files.iter().filter(|(p, _)| !p.contains('/')) {
+            let note = if entry.kind == Kind::Broken { "(doesn't parse)".to_string() } else { format!("{}  ({})", entry.title, entry.kind.label()) };
+            rows.push((path.clone(), note));
+        }
+        const OWN: &[&str] = &["objects", "npcs", "doors", "world", "questions", "templates", "chapters", "game"];
+        for folder in folders.iter().filter(|f| !OWN.contains(&f.as_str())) {
+            rows.push((format!("{}/", folder), format!("area: {} room(s)", in_folder(folder, Some(Kind::Room)))));
+        }
+        for folder in folders.iter().filter(|f| OWN.contains(&f.as_str())) {
+            let label = match folder.as_str() {
+                "objects" => format!("Global objects: {}", in_folder(folder, Some(Kind::Object))),
+                "npcs" => format!("Global characters: {}", in_folder(folder, Some(Kind::Character))),
+                "doors" => format!("Global doors: {}", in_folder(folder, Some(Kind::Door))),
+                "world" => "World settings".to_string(),
+                "questions" => format!("Question sets: {}", in_folder(folder, None)),
+                "templates" => format!("Templates: {}", in_folder(folder, None)),
+                "chapters" => format!("Chapters: {}", in_folder(folder, None)),
+                _ => format!("{} file(s)", in_folder(folder, None)),
+            };
+            rows.push((format!("{}/", folder), label));
+        }
+        if rows.is_empty() {
+            return "Nothing here.".to_string();
+        }
+        let width = rows.iter().map(|(n, _)| n.chars().count()).max().unwrap_or(0);
+        rows.iter().map(|(name, note)| format!("{:<width$}  {}", name, note, width = width)).collect::<Vec<_>>().join("\n")
     }
 
     /// The edit-mode view of the content file at `path`.

@@ -72,7 +72,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [x] Question sets: the loader reads `questions/` folders and built-ins, and `validate` checks them [coder] (REQ-CF-32, `design/CONTENT_FORMAT.md` › `type: questions`)
 - [x] `/new` and `/add` ask a set's questions, run the answers and print the commands they stood for, with the four recipes (0.60.0, 0.61.0) [console] (REQ-CF-32)
 - [x] Question sets chosen by id, then template, then kind, with no warning for a set whose name matches nothing yet (d2665a8) [coder] (REQ-CF-32)
-- [ ] Question sets: `set <key> <value>` with the value written in, sequenced with the console's `Construct::Set` [coder, console] (REQ-CF-32)
+- [x] Question sets: `set <key> <value>` with the value written in, sequenced with the console's `Construct::Set` (dc66a64, 0.62.1) [coder, console] (REQ-CF-32)
 - [ ] Review the built-in question content with Bruce, once the mechanics work [commander, Bruce]
 
 ## Phase 6 · Doors and play
@@ -118,7 +118,7 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [ ] `/map` from the world's root draws the whole world, instead of asking for a room [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] A bare console command name in edit mode (`edit`) runs it or asks "Did you mean /edit?" [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] An unknown slash command suggests the nearest one [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [ ] At the world's root, edit mode lists `objects/` and `world/` below the rooms with labels ("World settings", "Global objects: 4"), and `/edit world` opens `world/index.md` (Bruce, 2026-11-24) [console] (`design/CONSOLE_REQUIREMENTS.md`)
+- [x] At the world's root, edit mode lists `objects/` and `world/` below the rooms with labels ("World settings", "Global objects: 4"), and `/edit world` opens `world/index.md` (Bruce, 2026-11-24; 0.62.1) [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [x] Play reads rooms and replies as the story: people right after the prose, held things on a plain look, doors named in the ways out (95ed0c9, REQ-ENG-43, 45, 46)
 - [ ] New verbs `drop`, `talk`, `ask` and `give` [coder] (`design/PLAYER_COMMANDS.md` › Open question 1; Bruce to choose)
 

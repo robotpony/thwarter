@@ -3,9 +3,9 @@
 Editing Tiny World (tests/worlds/tiny). Type /help for commands.
 1 warning(s), such as exits to rooms not written yet. /validate lists them.
 > look
-npcs/     1 file(s)
-objects/  1 file(s)
-village/  2 file(s)
+village/  area: 2 room(s)
+npcs/     Global characters: 1
+objects/  Global objects: 1
 > go village
 village/  2 rooms: square, well
 > look

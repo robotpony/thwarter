@@ -50,6 +50,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.62.1 (2026-11-24)
+
+### Added
+
+- At the world's root, `look` lists the rooms first, then the areas ("area: 16 room(s)"), then the world's own folders labelled for what they hold: "Global objects: 4", "Global characters: 18", "Global doors: 1", "World settings", "Question sets: 2", "Templates", "Chapters" (REQ-CON-47, Bruce, 2026-11-24). `/edit world` opens `world/index.md`, or says the settings are in `world.toml` when there's none.
+- A question's option with its value written in (`-> set title Brass lantern`, the coder's dc66a64) asks nothing and sets it.
+
 ## 0.62.0 (2026-11-24)
 
 ### Added
