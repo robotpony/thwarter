@@ -56,7 +56,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [x] `/restart` onto a new build, keeping the session (0.15.0, 3818dfe) [console] (REQ-CON-30, REQ-CON-31)
 - [x] Edit mode moves with play words (go, go back, look, examine), replacing cd, ls and pwd (0.17.0) [console] (REQ-CON-4)
 - [x] Full-screen console: status bar, output, a sidebar with GAME and HERE, the editor inside it (0.25.0) [console] (REQ-CON-22, REQ-CON-23)
-- [ ] The `/` command menu with argument completion [console] (REQ-CON-33)
+- [x] The `/` command menu with argument completion (0.38.0) [console] (REQ-CON-33)
 - [ ] The `game/` folder, and `/set` in it changing only the running game [console] (REQ-CON-24, REQ-CON-25)
 - [ ] Scope: a sticky default, per-command overrides, `/move` [console] (REQ-CON-26 to 29)
 - [x] Turning a one-file thing into a bundle, and saving a bundle's sections together [coder] (REQ-ENG-28, REQ-ENG-29)

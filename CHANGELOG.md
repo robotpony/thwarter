@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.38.0 (2026-11-23)
+
+### Added
+
+- The `/` command menu (REQ-CON-33), as in Claude Code: typing `/` opens a list of the commands that work in this mode, each with a line about it, narrowing as you type. After a command it shows the command's arguments as a hint and offers what fits from the world: `/edit` the kinds and then the rooms, objects or characters; `/move` the people and things here first, then the rooms and characters to put them in; `/link` directions and rooms; `/unlink` this room's exits; `/load` and `/save` the saves. Plain input completes too: `go` offers the exits first (marking a room not written yet), then `back`, what's here, the rooms nearest first by the map's distances (851a7f2), and the folders; `examine` and `take` offer what's in the room. ↑ and ↓ choose, Tab completes, Esc closes it until the line changes. Enter picks the command being named, or a suggestion chosen with ↑ or ↓, and otherwise runs the line as typed.
+
 ## 0.37.1 (2026-11-23)
 
 ### Added

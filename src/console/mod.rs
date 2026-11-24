@@ -7,6 +7,7 @@
 //! transcript (REQ-CON-9).
 
 mod author;
+mod commands;
 mod editor;
 mod full_edit;
 mod panels;

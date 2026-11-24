@@ -7,6 +7,7 @@
 //! status bar); this module only lays it out and handles keys. Scripts and
 //! transcripts don't come here: they stay line-based (REQ-CON-9).
 
+use super::commands::Completion;
 use super::editor::Editor;
 use super::full_edit::{EditFiles, EditTarget};
 use super::panels::{folded, Row};
@@ -48,6 +49,10 @@ pub struct Screen<'a> {
     /// Where Up has got to in `history`, and the line being typed before.
     browsing: Option<(usize, String)>,
     editing: Option<(Editor<'a>, EditTarget)>,
+    /// The `/` menu, while it's open (REQ-CON-33).
+    menu: Option<Menu>,
+    /// The line Esc closed the menu on; it stays closed until the line changes.
+    menu_dismissed: Option<String>,
     sidebar_scroll: usize,
     /// The output pane's height at the last draw, for Page Up and Down.
     page: Cell<usize>,
@@ -68,6 +73,8 @@ impl<'a> Screen<'a> {
             history: Vec::new(),
             browsing: None,
             editing: None,
+            menu: None,
+            menu_dismissed: None,
             sidebar_scroll: 0,
             page: Cell::new(20),
             built: binary_built(),
@@ -108,7 +115,11 @@ impl<'a> Screen<'a> {
             }
             return;
         }
+        if self.menu.is_some() && self.menu_key(&input, console) {
+            return;
+        }
         match input {
+            Input { key: Key::Tab, .. } => self.refresh_menu(console, true),
             Input { key: Key::Enter, .. } => self.submit(console),
             Input { key: Key::Up, alt: false, .. } => self.browse(-1),
             Input { key: Key::Down, alt: false, .. } => self.browse(1),
@@ -116,13 +127,76 @@ impl<'a> Screen<'a> {
             Input { key: Key::Down, alt: true, .. } => self.sidebar_scroll += 1,
             Input { key: Key::PageUp, .. } => self.scroll += self.page.get().saturating_sub(2).max(1),
             Input { key: Key::PageDown, .. } => self.scroll = self.scroll.saturating_sub(self.page.get().saturating_sub(2).max(1)),
-            Input { key: Key::Char('c'), ctrl: true, .. } => self.set_input(""),
+            Input { key: Key::Char('c'), ctrl: true, .. } => {
+                self.set_input("");
+                self.menu = None;
+            }
             Input { key: Key::Char('d'), ctrl: true, .. } if self.input_text().is_empty() => self.quit = true,
             input => {
                 self.browsing = None;
                 self.input.input(input);
+                self.refresh_menu(console, false);
             }
         }
+    }
+
+    /// A key while the menu is open. Returns whether the menu took it.
+    fn menu_key(&mut self, input: &Input, console: &Mutex<Console>) -> bool {
+        let naming_a_command = !self.input_text().contains(' ');
+        let Some(menu) = self.menu.as_mut() else { return false };
+        let count = menu.completion.suggestions.len();
+        match input.key {
+            Key::Up if count > 0 => {
+                menu.selected = (menu.selected + count - 1) % count;
+                menu.chosen = true;
+            }
+            Key::Down if count > 0 => {
+                menu.selected = (menu.selected + 1) % count;
+                menu.chosen = true;
+            }
+            Key::Esc => {
+                self.menu = None;
+                self.menu_dismissed = Some(self.input_text());
+            }
+            Key::Tab if count > 0 => {
+                let (completion, selected) = (menu.completion.clone(), menu.selected);
+                let line = completion.apply(&self.input_text(), selected);
+                self.set_input(&line);
+                self.refresh_menu(console, true);
+            }
+            // Enter picks the command being typed, or an argument chosen with
+            // Up or Down, then runs the line unless more has to be typed.
+            // Otherwise it runs the line as typed.
+            Key::Enter if count > 0 && (menu.chosen || naming_a_command) => {
+                let (completion, selected) = (menu.completion.clone(), menu.selected);
+                let more = completion.suggestions[selected].more;
+                let line = completion.apply(&self.input_text(), selected);
+                self.set_input(&line);
+                self.menu = None;
+                if more {
+                    self.refresh_menu(console, true);
+                } else {
+                    self.submit(console);
+                }
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    /// Opens, updates or closes the menu for the line as it is now. It opens
+    /// by itself for a `/` command or once a word is followed by a space;
+    /// Tab (`asked`) opens it for anything.
+    fn refresh_menu(&mut self, console: &Mutex<Console>, asked: bool) {
+        let line = self.input_text();
+        if !asked && self.menu_dismissed.as_deref() == Some(line.as_str()) {
+            return;
+        }
+        self.menu_dismissed = None;
+        let wanted = asked || line.starts_with('/') || line.contains(' ');
+        let completion = if wanted && !line.is_empty() { lock(console).complete(&line) } else { Completion::default() };
+        self.menu = (!completion.suggestions.is_empty() || completion.hint.is_some())
+            .then(|| Menu { completion, selected: 0, chosen: false });
     }
 
     /// Between keys: watcher notices, the open editor's file, a newer build.
@@ -142,6 +216,8 @@ impl<'a> Screen<'a> {
     }
 
     fn submit(&mut self, console: &Mutex<Console>) {
+        self.menu = None;
+        self.menu_dismissed = None;
         let line = self.input_text();
         self.set_input("");
         self.browsing = None;
@@ -234,7 +310,12 @@ impl<'a> Screen<'a> {
         };
         match &self.editing {
             Some((editor, target)) => editor.draw(frame, output_area, &console.lookup_for(target)),
-            None => self.draw_output(frame, output_area),
+            None => {
+                self.draw_output(frame, output_area);
+                if let Some(menu) = &self.menu {
+                    draw_menu(frame, output_area, menu);
+                }
+            }
         }
 
         let prompt = console.prompt();
@@ -281,6 +362,59 @@ impl<'a> Screen<'a> {
         }
         frame.render_widget(Paragraph::new(lines), bottom);
     }
+}
+
+/// The `/` menu: what it offers, and which one is chosen.
+struct Menu {
+    completion: Completion,
+    selected: usize,
+    /// Whether the author chose with Up or Down, so Enter takes the choice.
+    chosen: bool,
+}
+
+/// How many suggestions the menu shows at once.
+const MENU_ROWS: usize = 8;
+
+/// The menu, drawn over the bottom of the output, just above the input.
+fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu) {
+    let items = &menu.completion.suggestions;
+    let shown = items.len().min(MENU_ROWS);
+    let start = menu.selected.saturating_sub(MENU_ROWS - 1).min(items.len().saturating_sub(shown));
+    let label_width = items.iter().map(|s| s.label.chars().count()).max().unwrap_or(0).min(32);
+    let mut lines: Vec<Line> = Vec::new();
+    if let Some(hint) = &menu.completion.hint {
+        lines.push(Line::styled(format!(" {}", hint), style(Role::Chrome)));
+    }
+    for (i, s) in items.iter().enumerate().skip(start).take(shown) {
+        let chosen = i == menu.selected;
+        let mut spans = vec![Span::raw(" ")];
+        match s.label.strip_prefix('/') {
+            Some(name) => {
+                spans.push(Span::styled("/", style(Role::Slash)));
+                spans.push(Span::styled(format!("{:<w$}", name, w = label_width.saturating_sub(1)), style(Role::Command)));
+            }
+            None => spans.push(Span::raw(format!("{:<w$}", s.label, w = label_width))),
+        }
+        spans.push(Span::styled(format!("  {}", s.detail), style(Role::Note)));
+        let mut line = Line::from(spans);
+        if chosen {
+            line = line.style(Style::default().add_modifier(ratatui::style::Modifier::REVERSED));
+        }
+        lines.push(line);
+    }
+    if items.len() > start + shown {
+        lines.push(Line::styled(format!(" ↓ {} more", items.len() - start - shown), style(Role::Note)));
+    }
+    let keys = if items.is_empty() { " esc close" } else { " ↑↓ choose · tab or enter pick · esc close" };
+    lines.push(Line::styled(keys, style(Role::Chrome)));
+    let height = (lines.len() as u16).min(area.height);
+    let width = area.width.min(90);
+    let popup = Rect { x: area.x, y: area.bottom().saturating_sub(height), width, height };
+    frame.render_widget(ratatui::widgets::Clear, popup);
+    frame.render_widget(
+        Paragraph::new(lines).block(Block::default().borders(Borders::TOP).border_style(style(Role::Chrome))),
+        Rect { y: popup.y.saturating_sub(1), height: popup.height + 1, ..popup },
+    );
 }
 
 /// Runs the full-screen console until `/quit` or Ctrl-D.
@@ -582,6 +716,60 @@ mod tests {
         assert_eq!(buffer[(input, 11)].fg, Color::Yellow);
         assert!(buffer[(input + 1, 11)].modifier.contains(ratatui::style::Modifier::BOLD));
         assert_ne!(buffer[(input + 7, 11)].fg, Color::Yellow, "arguments stay plain");
+    }
+
+    fn keys(screen: &mut Screen, console: &Mutex<Console>, text: &str) {
+        for c in text.chars() {
+            screen.key(Input { key: Key::Char(c), ..Input::default() }, console);
+        }
+    }
+
+    fn press(screen: &mut Screen, console: &Mutex<Console>, key: Key) {
+        screen.key(Input { key, ..Input::default() }, console);
+    }
+
+    #[test]
+    fn a_slash_opens_the_menu_and_typing_narrows_it() {
+        let console = tiny();
+        let mut screen = Screen::new("", None);
+        keys(&mut screen, &console, "/");
+        assert!(screen.menu.as_ref().unwrap().completion.suggestions.len() > 10);
+        keys(&mut screen, &console, "re");
+        let text = screen_text(&screen, &console, 110, 24);
+        assert!(text.contains("/reload") && text.contains("/restart"), "{}", text);
+        assert!(text.contains("tab or enter pick"), "{}", text);
+        press(&mut screen, &console, Key::Down);
+        press(&mut screen, &console, Key::Tab);
+        assert_eq!(screen.input_text(), "/restart");
+    }
+
+    #[test]
+    fn enter_picks_and_runs_unless_more_is_needed() {
+        let console = tiny();
+        let mut screen = Screen::new("", None);
+        keys(&mut screen, &console, "/stat");
+        press(&mut screen, &console, Key::Enter);
+        assert!(screen.output.iter().any(|l| l.starts_with("Tiny World, at")), "/status ran: {:?}", screen.output);
+        keys(&mut screen, &console, "/lin");
+        press(&mut screen, &console, Key::Enter);
+        assert_eq!(screen.input_text(), "/link ", "it needs a direction next, so it waits");
+        assert!(screen.menu.is_some(), "and offers the directions");
+    }
+
+    #[test]
+    fn go_offers_exits_and_esc_closes_the_menu_until_the_line_changes() {
+        let console = tiny();
+        let mut screen = Screen::new("", None);
+        typed(&mut screen, &console, "go /village/square");
+        keys(&mut screen, &console, "go n");
+        assert_eq!(screen.menu.as_ref().unwrap().completion.suggestions[0].text, "north");
+        press(&mut screen, &console, Key::Esc);
+        assert!(screen.menu.is_none());
+        press(&mut screen, &console, Key::Enter);
+        assert!(screen.output.iter().any(|l| l == "The Well (room)"), "go n ran as typed: {:?}", screen.output);
+        // With the menu closed, Up is history again.
+        press(&mut screen, &console, Key::Up);
+        assert_eq!(screen.input_text(), "go n");
     }
 
     #[test]
