@@ -1,40 +1,58 @@
-# Engine text as data
+# Text as data
 
-Every sentence the engine writes for a player MUST come from data a world can change, not from a string in the Rust source (Bruce, 2026-11-24). The engine ships that data as defaults: `world.toml`'s `[play]` table and the built-in bundles in `src/builtins/`. A world overrides a default the same way it overrides a built-in template.
+Every sentence thwarter writes, in play or in the console, MUST come from a text table, not from a string in the Rust source (Bruce, 2026-11-24). The defaults are compiled in, and the same shape of table is used everywhere, so the engine, play and the console each override their text the same way (Bruce: "console messages should be configurable too, even if text is compiled in. the same shape of config should be used everywhere, if possible").
 
-Owner: commander (design); the coder builds it. Status: *proposed*, planned as `PLAN.md` › Phase 8.
+Owner: commander (design). The coder builds the shared type and the engine's tables; the console coder moves the console's text. Status: *proposed* (the console coder's shape, agreed by the commander), planned as `PLAN.md` › Phase 8.
 
-## What counts
+## The shape
 
-Engine text is anything a player reads that the world's own files didn't write:
-- Room and inventory wording ("You see {list}.", "You aren't carrying anything."). Already data: `[play]` (`design/CONTENT_FORMAT.md` › How play words a room).
-- Built-in verb replies: taking, refusals ("You can't go west from here."), the locked-exit line, missing nouns ("Take what?"), "There's no {noun} here.".
-- Defaults when nothing answers: "Nothing happens." and its variants (`design/SECTIONS.md` › Default replies).
-- Ambiguity questions ("Which key do you want to take, the brass key or the iron key?"). The template-section override exists; the built-in wording is still code (`GameEngine::ask_which`).
-- Parser replies: ``I don't understand "<line>".``, and later typo suggestions (REQ-PC-24).
-- The built-in templates' replies (`src/builtins/door`, `locked-door`, `portal`). Already data.
+One mechanism for all text: a TOML table of `key = "template with {placeholders}"`, the shape `[play]` already has (`design/CONTENT_FORMAT.md` › How play words a room).
 
-Not engine text: author notes (`ActionResult::note`), validation warnings, CLI output, and the console's own replies to `/` commands. Those are tools talking to an author, not the story talking to a player.
+```toml
+[engine]
+no_exit = "You can't go {direction} from here."
+no_noun = "{Verb} what?"
+not_here = "There's no {noun} here."
+not_understood = "I don't understand \"{line}\"."
+nothing = ["Nothing happens.", "Nothing seems to happen.", "That does nothing."]
+```
 
-## Where each kind lives
+- A key's value is a string, or a list of strings that play picks from by turn, so a reply doesn't repeat word for word.
+- `{or}` and `{list}` join lists as they do in `[play]`. A placeholder the call doesn't supply, or a key the defaults don't have, is a warning.
+- One type, `Texts`, holds every table and answers `text(key, &args)`. It's the coder's, built from `engines::play_text`.
 
-| Kind | Home | Why |
-|---|---|---|
-| Fixed sentence shapes with slots (room, inventory, exits) | `[play]` in `world.toml` | Already there; one line each, easy to tune |
-| Replies to verbs, refusals, defaults, ambiguity | A built-in bundle, `src/builtins/replies/`, with one `## When:` section per reply (`## When: #take #no-noun`, `## When: #go #no-exit`) | The same matching as every other reply, so a world, chapter or thing overrides one by writing the same section nearer the action |
-| Variants of one reply | Several sections with the same heading; play picks one by turn | Matches `design/STATES.md` › Randomness in prose |
+## Where tables live
 
-A world overrides a built-in reply by putting the same section in `world/replies.md` (or nearer: the chapter, the area, the thing). The usual lineage decides which wins, nearest first.
+| Table | Defaults (compiled in) | Overridden in | Covers |
+|---|---|---|---|
+| `[play]` | `src/builtins/text/play.toml` | `world.toml` | Rooms, people, held things, exits, the inventory |
+| `[engine]` | `src/builtins/text/engine.toml` | `world.toml` | Built-in verb replies, refusals, missing nouns, defaults when nothing answers, ambiguity questions, parser replies |
+| `[console]` | `src/builtins/text/console.toml` | `$XDG_CONFIG_HOME/thwarter/config.toml` | The console's replies to `/` commands, usage lines, the sidebar, the problems pane |
+
+Defaults are read with `include_str!`, so nothing has to be on disk. The console's text is the author's choice, not the world's, so it lives in the personal config and doesn't change with the open world.
+
+A world's story still answers first: a `## When:` reply section in a thing, its room or its template wins over `[engine]`, as it does today. `[engine]` replaces only the built-in fallback. Default-reply lists by chapter or area (`design/SECTIONS.md` › Default replies) are `## When: #nothing` sections, since they're story; the world-wide list is `[engine]`'s `nothing`.
+
+### Story overrides of built-in replies
+
+Rules for a `## When:` section that replaces an `[engine]` reply (from the coder, 2026-11-24):
+- **Exact match.** Each built-in reply has one outcome tag, such as `#take #immovable` or `#go #no-exit`. A section replaces it only when its tags are exactly that set, most specific winning, so a thing's `## When: #take` doesn't also swallow every take refusal. The outcome tag is the reply's stable name, which the guard test and the unused-key warning use.
+- **Each reply has a chain.** A reply about a thing ("The chest won't budge.", "You can't kick the cook.") can be replaced by the thing, its room, the chapter, or the world. A reply with no thing (``I don't understand "<line>".``, "Take what?", "There's no lamp here.", "You can't go west from here.") can be replaced only by the chapter or the world's `[engine]`. The step 2 list gives each key its chain.
+- **Outcome names are reserved.** `#no-noun`, `#no-exit`, `#immovable`, `#not-here` and the rest join `#ambiguous` and `#searched` as reserved tags (`engines::layers::RESERVED_TAGS`), and `validate` warns about a state named like one.
+- **Slots.** In a TOML table a slot is `{noun}`. In a section's prose it's the prose form, `{{ turn.noun }}`, `{{ turn.direction }}`, `{{ turn.door }}`, so an author learns one slot syntax per file type.
+- **Whole replies only.** A reply built from parts, such as search's "{opening}, but find nothing new.", becomes one whole reply per case, so each can be reworded on its own.
+
+Not covered: author notes (`ActionResult::note`), validation warnings and `thwart` command-line output. Those are tooling messages and may follow later if Bruce wants.
 
 ## Order of work
 
-1. **Inventory.** The coder lists every player-facing string literal in `src/engines/` and `src/render.rs` in a table here (text, where, which kind above). Strings in tests don't count. About 100 candidates today, many of them built-in replies in `game_engine.rs` and `turn.rs`.
-2. **Move.** Each string moves to its home, with its slots named (`{noun}`, `{direction}`, `{door}`). The default text doesn't change, so transcripts stay the same.
-3. **Guard.** A test fails when a new player-facing literal appears in the engine outside the defaults, so the inventory doesn't drift.
-4. **Override.** A world's `world/replies.md` replaces a built-in reply; `validate` warns about a section there that matches no built-in reply.
+1. **The shared type.** `Texts` with the three tables and their compiled-in defaults; `[play]` moves into it unchanged. [coder]
+2. **Engine strings.** Every player-facing literal in `src/engines/` and `src/render.rs` becomes an `[engine]` key with its outcome tag and override chain, the default text unchanged so transcripts stay the same. The defaults file is the list of every use, which covers Bruce's "track all uses" route. [coder]
+3. **Console strings.** About 200 literals in `src/console/` become `[console]` keys, likewise unchanged. [console]
+4. **Guard.** A test fails on a new user-facing string literal outside the defaults files. [coder, console]
+5. **Overrides.** `world.toml`'s `[engine]` and the personal config's `[console]` replace defaults, and `validate` warns about a key nothing uses. [coder, console]
 
 ## Open questions
 
-1. Does the console's own UI text (replies to `/` commands, usage lines, the sidebar) need the same treatment? Proposed: no, it's tooling; the console coder gathers it into one table in `src/console` so it's easy to find, not configurable.
-2. Should `[play]`'s sentence templates also move into the replies bundle, so there's one home instead of two? Proposed: not now; `[play]` works and is simpler to edit.
-3. Do default-reply lists (`design/SECTIONS.md` › Open question 4) take this form, several `## When: #nothing` sections? Proposed: yes, which settles that question too.
+1. Should validation warnings and `thwart` CLI output move to tables too? Proposed: not in Phase 8; they're for authors and change with the code.
+2. A world's `[engine]` wording applies everywhere in that world. Should a chapter be able to override one key outside a `## When:` section? Proposed: no; sections already do that.

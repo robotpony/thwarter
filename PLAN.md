@@ -116,14 +116,15 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [x] Play reads rooms and replies as the story: people right after the prose, held things on a plain look, doors named in the ways out (95ed0c9, REQ-ENG-43, 45, 46)
 - [ ] New verbs `drop`, `talk`, `ask` and `give` [coder] (`design/PLAYER_COMMANDS.md` › Open question 1; Bruce to choose)
 
-## Phase 8 · Engine text as data
+## Phase 8 · Text as data
 
-Every sentence the engine writes for a player comes from defaults a world can change, not from code (Bruce, 2026-11-24). Done when no player-facing string is left in the engine's source and a test keeps it that way.
+Every sentence the engine, play and the console write comes from a text table with compiled-in defaults, the same shape everywhere (Bruce, 2026-11-24). Done when no user-facing string is left in the source outside the defaults files and a test keeps it that way.
 
-- [ ] Inventory every player-facing string in the engine, in `design/ENGINE_TEXT.md` [coder] (`design/ENGINE_TEXT.md` › Order of work)
-- [ ] Move them to `[play]` and a built-in `replies` bundle, the default text unchanged [coder]
-- [ ] A test that fails on a new player-facing string in engine code [coder]
-- [ ] A world's `world/replies.md` overrides a built-in reply, and `validate` warns about one that matches nothing [coder]
+- [ ] One `Texts` type for `[play]`, `[engine]` and `[console]` tables, defaults from `src/builtins/text/` [coder] (`design/ENGINE_TEXT.md` › The shape)
+- [ ] Engine and play strings become `[engine]` keys, the default text unchanged [coder]
+- [ ] Console strings become `[console]` keys, the default text unchanged [console]
+- [ ] A test that fails on a new user-facing string outside the defaults [coder, console]
+- [ ] Overrides: `world.toml`'s `[engine]`, the personal config's `[console]`, and a warning for an unused key [coder, console]
 
 ## Phase 9 · Writing helpers
 
