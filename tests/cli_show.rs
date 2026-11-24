@@ -123,3 +123,24 @@ fn map_draws_from_the_start_and_unbuilt_options_say_so() {
         assert!(!ok && err.contains(why), "{:?}: {}", args, err);
     }
 }
+
+#[test]
+fn search_finds_text_and_broken_exits() {
+    let dir = world();
+    let run = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_thwart")).arg("search").args(args).arg("--world").arg(dir.path()).output().unwrap();
+        (out.status.success(), String::from_utf8_lossy(&out.stdout).into_owned(), String::from_utf8_lossy(&out.stderr).into_owned())
+    };
+    let (ok, out, err) = run(&["stern"]);
+    assert!(ok && out.contains("character guard  Guard\n    Stern.") && err.contains("1 match"), "{} {}", out, err);
+    let (ok, out, _) = run(&["VAULT", "--type", "object"]);
+    assert!(ok && out.trim() == "object vault  Vault key", "{}", out);
+    let (ok, out, _) = run(&["nothing-like-this"]);
+    assert!(ok && out.trim() == "No matches.", "{}", out);
+    let (ok, out, _) = run(&["--missing-connections"]);
+    assert!(ok && out.trim() == "No broken exits.", "{}", out);
+    let (ok, _, err) = run(&["(", "--regex"]);
+    assert!(!ok && err.contains("isn't a regular expression"), "{}", err);
+    let (ok, _, err) = run(&[]);
+    assert!(!ok && err.contains("needs a query"), "{}", err);
+}

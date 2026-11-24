@@ -343,7 +343,7 @@ pub fn render_map(map: &crate::engines::map::Map) -> String {
     let rows = (max_y - min_y) as usize * 2 + 1;
     let mut canvas = vec![vec![' '; cols]; rows];
     let at = |x: i32, y: i32| ((x - min_x) as usize * pitch, (y - min_y) as usize * 2);
-    let mut put = |canvas: &mut Vec<Vec<char>>, col: usize, row: usize, text: &str| {
+    let put = |canvas: &mut Vec<Vec<char>>, col: usize, row: usize, text: &str| {
         for (i, ch) in text.chars().enumerate() {
             if let Some(cell) = canvas.get_mut(row).and_then(|r| r.get_mut(col + i)) {
                 *cell = ch;

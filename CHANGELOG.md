@@ -34,6 +34,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.39.0 (2026-11-23)
+
+### Added
+
+- `thwart search <query> [location]` (REQ-CLI-18): finds every location, object, character and door whose id, title or prose (an object's responses included) contains the query, ignoring case unless `--case-sensitive`, or matches it as a pattern with `--regex`. `--type location|object|character|door` narrows the kinds, and `--type text` searches prose only. A location (`castle/`) limits it to rooms in that folder and the things they hold or where characters start. Each match says the thing's kind, id and title, and for prose the line it's in. `--missing-connections` lists every exit to a room not written yet. `WorldEngine::search` gives the same results as data. Tags wait on the console's tag-search design (REQ-CF-30).
+- The `regex` crate is a new dependency, since its matching runs in linear time, so no pattern in someone's search can hang it.
+
+### Changed
+
+- `EntityKind` serializes as its lowercase type name.
+
 ## 0.38.0 (2026-11-23)
 
 ### Added

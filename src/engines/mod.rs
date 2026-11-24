@@ -6,6 +6,7 @@ pub mod variables;
 pub mod builtins;
 pub mod persona;
 pub mod map;
+pub mod search;
 pub mod location_view;
 pub mod character_engine;
 pub mod narrative_engine;

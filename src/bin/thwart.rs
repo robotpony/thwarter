@@ -108,11 +108,11 @@ enum Commands {
     },
     /// Find content
     Search {
-        /// Search query
-        query: String,
+        /// Search query: text, or a pattern with --regex
+        query: Option<String>,
         /// Location to search in (optional)
         location: Option<String>,
-        #[arg(long, help = "Limit search scope")]
+        #[arg(long, help = "location, object, character, door, or text (prose only)")]
         r#type: Option<String>,
         #[arg(long, help = "Enable case-sensitive matching")]
         case_sensitive: bool,
@@ -181,7 +181,7 @@ fn main() -> ExitCode {
             thwarter::cli::commands::map_command(world_path, location, player, depth, style, output, connections)
         },
         Commands::Search { query, location, r#type, case_sensitive, regex, missing_connections } => {
-            thwarter::cli::commands::search_command(query, location, r#type, case_sensitive, regex, missing_connections)
+            thwarter::cli::commands::search_command(world_path, query, location, r#type, case_sensitive, regex, missing_connections)
         },
         Commands::Debug { location, check_references, memory_usage, trace_action, profile } => {
             thwarter::cli::commands::debug_command(location, check_references, memory_usage, trace_action, profile)

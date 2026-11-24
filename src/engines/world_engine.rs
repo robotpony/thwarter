@@ -15,7 +15,8 @@ use walkdir::WalkDir;
 
 /// The three kinds of content file. An `id` is unique within a kind; a
 /// location and an object may share one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum EntityKind {
     Location,
     Character,
