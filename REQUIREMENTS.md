@@ -48,6 +48,7 @@ Each component's requirements live in their own document, with one owner. A chan
 | Content and world model | `design/CONTENT_REQUIREMENTS.md` | REQ-CF, REQ-WS | commander |
 | Engine | `design/ENGINE_REQUIREMENTS.md` | REQ-ENG | thwarter coder |
 | CLI tools | `design/CLI_REQUIREMENTS.md` | REQ-CLI | thwarter coder |
+| Player commands, shared by every client | `design/PLAYER_COMMANDS.md` | REQ-PC | commander |
 | Console | `design/CONSOLE_REQUIREMENTS.md` | REQ-CON | thwarter console coder |
 
 ### 5.1 Configuration

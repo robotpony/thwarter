@@ -8,6 +8,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Added
 
+- `design/PLAYER_COMMANDS.md`: the player command language every client shares, REQ-PC-1 to 19, drafted from the console's play mode as built, at Bruce's request.
 - `.github/workflows/ci.yml`: GitHub Actions builds every target and runs every test, with the lock file as committed, on each push and pull request.
 - `design/CLI_REQUIREMENTS.md` › Packaging and installing worlds: REQ-CLI-12 to 16, for `thwart package`, `thwart install`, `thwart installed` and playing an installed world, agreed with the commander.
 - `PLAN.md`, the phased work queue, and `BUGS.md`, the defect log, both in Space Command's task format.
