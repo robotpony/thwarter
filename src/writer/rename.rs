@@ -114,7 +114,7 @@ impl WorldWriter {
             let text = fs::read_to_string(&disk)?;
             let doc = MarkdownParser::new().split_document(&text)?;
             let mut edits = reference_edits(&doc.metadata, kind, &old_names, new, engine, &role);
-            by_hand.extend(nested_references(&doc.metadata, kind, &old_names, engine).into_iter().map(|w| format!("{}: {}", relative.display(), w)));
+            let nested = nested_references(&doc.metadata, kind, &old_names, engine);
             let body = rewrite_prose(&doc.body, &old_names, new);
             if body != doc.body {
                 edits.push(Edit::SetBody(body));
@@ -122,7 +122,27 @@ impl WorldWriter {
             if is_own_index {
                 file.set_id(new).with_context(|| format!("can't rewrite the id in {}", relative.display()))?;
             }
-            if edits.is_empty() && !is_own_index && moves(&relative).is_none() {
+            // References inside actions: rewritten in place and checked
+            // against what the frontmatter should read as; reported for
+            // the author if that can't be done safely.
+            let mut rewrote_nested = false;
+            if !nested.is_empty() {
+                let mut expected = file_frontmatter(&file)?;
+                rename_in_actions(&mut expected, kind, &old_names, new);
+                let mut attempt = file.clone();
+                let ok = old_names.iter().all(|name| {
+                    let mut wanted = file_frontmatter(&attempt).unwrap_or_default();
+                    rename_in_actions(&mut wanted, kind, std::slice::from_ref(name), new);
+                    attempt.replace_in_key("actions", name, new, &wanted).is_ok()
+                });
+                if ok && file_frontmatter(&attempt)? == expected {
+                    file = attempt;
+                    rewrote_nested = true;
+                } else {
+                    by_hand.extend(nested.iter().map(|w| format!("{}: {}", relative.display(), w)));
+                }
+            }
+            if edits.is_empty() && !is_own_index && !rewrote_nested && moves(&relative).is_none() {
                 continue;
             }
             file.apply_all(&edits).with_context(|| format!("can't update the references in {}", relative.display()))?;
@@ -254,6 +274,62 @@ fn reference_edits(meta: &Value, kind: EntityKind, old: &[String], new: &str, en
     }
     let _ = engine;
     edits
+}
+
+/// A file's frontmatter as a map, as it reads now.
+fn file_frontmatter(file: &ContentFile) -> Result<serde_yaml::Mapping> {
+    let doc = MarkdownParser::new().split_document(&file.text())?;
+    Ok(match doc.metadata {
+        Value::Mapping(m) => m,
+        _ => serde_yaml::Mapping::new(),
+    })
+}
+
+/// `meta` with the renamed thing's references inside `actions` renamed:
+/// `becomes:` keys (any kind) and, for an object, `requires: { has: }`,
+/// each in the style it was written.
+fn rename_in_actions(meta: &mut serde_yaml::Mapping, kind: EntityKind, old: &[String], new: &str) {
+    let Some(Value::Mapping(actions)) = meta.get_mut("actions") else { return };
+    for (_, action) in actions.iter_mut() {
+        let Value::Mapping(action) = action else { continue };
+        if let Some(Value::Mapping(becomes)) = action.get_mut("becomes") {
+            let renamed_map: serde_yaml::Mapping = std::mem::take(becomes)
+                .into_iter()
+                .map(|(k, v)| match k.as_str() {
+                    Some(name) if names_old(name, old) => (Value::String(swap(name, old, new)), v),
+                    _ => (k, v),
+                })
+                .collect();
+            *becomes = renamed_map;
+        }
+        if kind != EntityKind::Object {
+            continue;
+        }
+        if let Some(Value::Mapping(req)) = action.get_mut("requires") {
+            match req.get_mut("has") {
+                Some(Value::String(s)) if names_old(s, old) => *s = swap(s, old, new),
+                Some(Value::Sequence(items)) => {
+                    for item in items.iter_mut() {
+                        if let Value::String(s) = item {
+                            if names_old(s, old) {
+                                *s = swap(s, old, new);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// `value` with the old name in it replaced, keeping any link brackets.
+fn swap(value: &str, old: &[String], new: &str) -> String {
+    let name = link_target(value);
+    match old.iter().find(|n| **n == name) {
+        Some(n) => value.replacen(n.as_str(), new, 1),
+        None => value.to_string(),
+    }
 }
 
 /// References too deep for the writer to rewrite: an action's
@@ -389,10 +465,10 @@ mod tests {
         let thing = engine.thing(EntityKind::Location, "castle/strongroom").unwrap();
         assert_eq!(thing.starting_state.as_deref(), Some("shut"));
         assert_eq!(thing.overlays.len(), 1);
-        // The lever's becomes: is too deep to rewrite, so it's reported.
-        assert_eq!(report.by_hand.len(), 1, "{:?}", report.by_hand);
-        assert!(report.by_hand[0].starts_with("objects/lever.md: action `pull`'s `becomes:` names `castle/vault`"), "{:?}", report.by_hand);
-        assert!(report.change.added.iter().any(|p| p.contains("castle/vault")), "{:?}", report.change);
+        // The lever's becomes: is rewritten in place too.
+        assert!(report.by_hand.is_empty(), "{:?}", report.by_hand);
+        assert!(fs::read_to_string(d.join("objects/lever.md")).unwrap().contains("becomes: { castle/strongroom: shut }"));
+        assert!(report.change.problems.is_empty(), "{:?}", report.change);
     }
 
     #[test]
@@ -403,7 +479,9 @@ mod tests {
         assert!(d.join("objects/lantern.md").exists() && !d.join("objects/lamp.md").exists());
         assert_eq!(engine.get_location("hallway").unwrap().objects, vec!["lantern"]);
         assert_eq!(engine.characters["cook"].inventory, vec!["lantern"]);
-        assert!(report.by_hand.iter().any(|w| w.contains("`requires: { has: }` names `lamp`")), "{:?}", report.by_hand);
+        assert!(report.by_hand.is_empty(), "{:?}", report.by_hand);
+        assert!(fs::read_to_string(d.join("objects/lever.md")).unwrap().contains("requires: { has: lantern }"));
+        assert!(report.change.problems.is_empty(), "{:?}", report.change);
     }
 
     #[test]
@@ -428,5 +506,18 @@ mod tests {
         }
         assert_eq!(fs::read_to_string(d.join("kitchen.md")).unwrap(), before);
         assert!(d.join("hallway.md").exists());
+    }
+
+    #[test]
+    fn an_action_that_mentions_the_old_id_elsewhere_is_left_for_the_author() {
+        let (dir, mut engine, writer) = world();
+        let d = dir.path();
+        // `lamp` is also a value nobody should rename: the read-back check refuses.
+        engine.set_file(&d.join("objects/lever.md"), "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull: { requires: { has: lamp }, sets: { story.clue: lamp } }\n---\n<!-- thwarter:action pull -->\nClunk.\n<!-- thwarter:action pull refused -->\nDark.\n");
+        fs::write(d.join("objects/lever.md"), "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull: { requires: { has: lamp }, sets: { story.clue: lamp } }\n---\n<!-- thwarter:action pull -->\nClunk.\n<!-- thwarter:action pull refused -->\nDark.\n").unwrap();
+        let before = fs::read_to_string(d.join("objects/lever.md")).unwrap();
+        let report = writer.rename_loaded(&mut engine, EntityKind::Object, "lamp", "lantern", false).unwrap();
+        assert_eq!(fs::read_to_string(d.join("objects/lever.md")).unwrap(), before);
+        assert!(report.by_hand.iter().any(|w| w.starts_with("objects/lever.md: action `pull`'s `requires: { has: }` names `lamp`")), "{:?}", report.by_hand);
     }
 }

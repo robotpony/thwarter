@@ -84,6 +84,26 @@ impl ContentFile {
         Self::split(path.to_path_buf(), &text, String::new(), String::new())
     }
 
+    /// Replace every whole-word `old` with `new` in the value of the
+    /// top-level `key` (its lines only, comments included), for
+    /// references nested too deep for the other edits (an action's
+    /// `becomes:` and `requires:`). The safety net is the result: the
+    /// frontmatter must then read back exactly as `expected`, or nothing
+    /// changes. A word is bounded by characters an id can't hold.
+    pub(crate) fn replace_in_key(&mut self, key: &str, old: &str, new: &str, expected: &Mapping) -> Result<()> {
+        let entry = self.find(key)?.ok_or_else(|| anyhow!("there's no `{}` here", key))?;
+        let mut draft = self.clone();
+        for line in &mut draft.lines[entry.start..entry.end] {
+            *line = replace_word(line, old, new);
+        }
+        if draft.frontmatter_value()? != *expected {
+            bail!("rewriting `{}` in `{}` didn't read back as expected, so it was left alone", old, key);
+        }
+        draft.verify_entity()?;
+        *self = draft;
+        Ok(())
+    }
+
     /// The same file, to be saved at `path` instead (a rename's move).
     pub(crate) fn at(mut self, path: PathBuf) -> Self {
         self.path = path;
@@ -697,6 +717,27 @@ fn identity(text: &str, path: &Path) -> Result<(String, String)> {
         return Ok((type_name, id));
     }
     Ok(entity_key(&parser.parse_content(text, path)?))
+}
+
+/// `text` with each whole-word `old` replaced: not preceded or followed
+/// by a character an id can hold (letters, digits, `-`, `_`, `/`).
+fn replace_word(text: &str, old: &str, new: &str) -> String {
+    let is_id = |c: char| c.is_alphanumeric() || matches!(c, '-' | '_' | '/');
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(i) = rest.find(old) {
+        let before = rest[..i].chars().next_back();
+        let after = rest[i + old.len()..].chars().next();
+        out.push_str(&rest[..i]);
+        if before.map_or(true, |c| !is_id(c)) && after.map_or(true, |c| !is_id(c)) {
+            out.push_str(new);
+        } else {
+            out.push_str(old);
+        }
+        rest = &rest[i + old.len()..];
+    }
+    out.push_str(rest);
+    out
 }
 
 fn entity_key(entity: &ParsedEntity) -> (String, String) {

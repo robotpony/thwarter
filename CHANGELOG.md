@@ -38,6 +38,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 - `/move <room> <area or room>` moves a room into an area folder (REQ-CON-40, Bruce, 2026-11-23): `/move hallway house` makes it `house/hallway`, moving its file (or its bundle folder) and updating every exit, room list, inventory, `default_location`, the world's `start:` and every link to it, through the writer's `rename_loaded` (318144e). A room as the target stands for its own area. The report names the files it updated and lists any reference left to fix by hand (inside an action's `becomes:` or `requires:`). Edit mode's place, `go back` and the game in progress follow the room to its new id, and the watcher doesn't announce the files the move touched.
 
+## 0.30.1 (2026-11-23)
+
+### Changed
+
+- Renaming rewrites references inside actions too: `becomes:` keys and `requires: { has: }`, in the style each was written. The writer replaces the old id as a whole word within the `actions:` block, then checks the frontmatter reads back as exactly what was expected. When the same word appears where it means something else (a `sets:` value, say), it changes nothing there and reports the reference for the author, as before.
+
 ## 0.30.0 (2026-11-23)
 
 ### Added

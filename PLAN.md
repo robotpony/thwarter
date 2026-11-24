@@ -62,7 +62,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
 - [x] Renaming an id with every reference updated: file or bundle moved, exits, lists, `default_location`, `start:`, prose links and variables (0.30.0, 318144e) [coder] (REQ-ENG-30)
-- [ ] Renaming also rewrites references inside actions (`becomes:`, `requires:`), which are reported for now [coder] (REQ-ENG-30)
+- [x] Renaming also rewrites references inside actions (`becomes:`, `requires:`), which are reported for now [coder] (REQ-ENG-30)
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 - [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
