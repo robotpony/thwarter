@@ -76,8 +76,6 @@ Not saved: save names use letters, digits, `-` and `_`: `../escape` doesn't.
 Edit mode, at village/well.
 /edit opens village/well.md in a full-screen editor, which needs a terminal.
 > look
-The Well (village/well)
-
 A mossy stone well. The rope is long gone.
 
 You can go south.

@@ -127,7 +127,8 @@ impl Console {
             // Play's text is the player's; the detail an author needs goes
             // here instead (Bruce, 2026-11-23).
             rest.push(Row::Blank);
-            rest.push(Row::Heading(format!("ROOM  {}", game.location)));
+            let title = self.world.engine.get_location(&game.location).map(|l| l.name.clone()).unwrap_or_default();
+            rest.push(Row::Heading(format!("ROOM  {} ({})", title, game.location)));
             rest.extend(self.room_rows(&game.location));
             if !self.notes.is_empty() {
                 rest.push(Row::Heading("author notes".to_string()));
@@ -218,7 +219,16 @@ impl Console {
 
     /// HERE: a game master's notes for where edit mode is.
     fn here_panel(&self) -> Vec<Row> {
-        let mut rows = vec![Row::Heading(format!("HERE  {}", self.pwd()))];
+        // A room's title leads its notes, since the room view shows only
+        // what the player reads (Bruce, 2026-11-24).
+        let heading = match &self.place {
+            Place::File(path) => match self.world.files.get(path) {
+                Some(entry) if entry.kind == Kind::Room => format!("HERE  {} ({})", entry.title, entry.id),
+                _ => format!("HERE  {}", self.pwd()),
+            },
+            Place::Dir(_) => format!("HERE  {}", self.pwd()),
+        };
+        let mut rows = vec![Row::Heading(heading)];
         let room = match &self.place {
             Place::File(path) => self.world.files.get(path).filter(|e| e.kind == Kind::Room).map(|e| e.id.clone()),
             Place::Dir(_) => None,
@@ -295,10 +305,15 @@ impl Console {
         // People, things, then scenery: the things built from the built-in
         // `scenery` template, or listed with no card yet (dimmed). Scope
         // shows only when it isn't global, the default (Bruce, 2026-11-23).
+        // Each with its state, the game's if one is running (the
+        // engine's state_at, 627f899), and its scope when not global.
+        let at = self.game.as_ref().map(crate::engines::At::play).unwrap_or_default();
         let named = |id: &String, path: Option<String>| -> Row {
+            let kind = if self.world.engine.characters.contains_key(id) { crate::engines::EntityKind::Character } else { crate::engines::EntityKind::Object };
+            let state = self.world.engine.state_at(kind, id, at).map(|s| format!("  {}", s)).unwrap_or_default();
             match path.map(|p| self.scope_of(&p)) {
-                Some(scope) if scope == "global" => Row::Text(format!("  {}", id)),
-                Some(scope) => Row::Text(format!("  {}  {}", id, scope)),
+                Some(scope) if scope == "global" => Row::Text(format!("  {}{}", id, state)),
+                Some(scope) => Row::Text(format!("  {}{}  {}", id, state, scope)),
                 None => Row::Dim(format!("  {}", id)),
             }
         };
@@ -503,7 +518,7 @@ mod tests {
         assert_eq!(
             here,
             vec![
-                "# HERE  village/square",
+                "# HERE  Village Square (village/square)",
                 "# exits",
                 "~   east  village/inn  (not written)",
                 "  north  village/well",
@@ -591,12 +606,26 @@ mod tests {
     }
 
     #[test]
+    fn here_shows_each_things_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("objects/lantern")).unwrap();
+        std::fs::write(root.join("hall.md"), "---\nid: hall\ntitle: Hall\ntype: location\nobjects: [lantern]\n---\n").unwrap();
+        std::fs::write(root.join("objects/lantern/index.md"), "---\nid: lantern\ntitle: Lantern\ntype: object\nobject_type: tool\nstate: hanging\n---\n").unwrap();
+        std::fs::write(root.join("objects/lantern/hanging.md"), "---\ninherits: index\n---\n").unwrap();
+        let mut console = Console::open(root, Mode::Edit).unwrap();
+        console.handle("go hall");
+        let rest = texts(&console.sidebar().rest);
+        assert!(rest.contains(&"  lantern  hanging".to_string()), "{:?}", rest);
+    }
+
+    #[test]
     fn play_mode_has_no_here() {
         let mut console = tiny();
         console.handle("/play");
         assert!(!texts(&console.sidebar().rest).iter().any(|r| r.starts_with("# HERE")));
         let rest = texts(&console.sidebar().rest);
-        assert!(rest.contains(&"# ROOM  village/square".to_string()), "play's detail is in the sidebar: {:?}", rest);
+        assert!(rest.contains(&"# ROOM  Village Square (village/square)".to_string()), "play's detail is in the sidebar: {:?}", rest);
         assert!(rest.contains(&"  north  village/well".to_string()), "{:?}", rest);
     }
 }

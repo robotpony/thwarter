@@ -935,7 +935,7 @@ mod tests {
         let (out, _) = console.handle("/reload");
         assert!(out.starts_with("Reloaded:"), "{}", out);
         assert_eq!(console.pwd(), "village/well");
-        assert!(console.handle("look").0.starts_with("The Old Well (village/well)"));
+        assert_eq!(console.world.files["village/well"].title, "The Old Well", "the new title is loaded");
     }
 
     #[test]

@@ -21,8 +21,6 @@ You can go north or east.
 Edit mode, at village/square.
 /edit opens village/square.md in a full-screen editor, which needs a terminal.
 > look
-Village Square (village/square)
-
 A small square of packed earth. An old well stands to the north.
 The Elder is here.
 
@@ -124,8 +122,6 @@ Reloaded: 2 room(s), 1 character(s), 1 object(s).
 1 warning(s):
   village/square: connection `east` points at unknown location `village/inn`
 > look
-Village Square (village/square)
-
 A small square of packed earth. An old well stands to the north.
 The Elder is here.
 

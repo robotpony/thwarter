@@ -14,8 +14,6 @@ well    The Well  (room)
 > go square
 Village Square (room)
 > look
-Village Square (village/square)
-
 A small square of packed earth. An old well stands to the north.
 The Elder is here.
 

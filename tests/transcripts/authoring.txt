@@ -9,8 +9,6 @@ The Well (room)
 Created village/tower, The Old Tower, through the north exit of village/well, with a south exit back.
 Now at village/tower.
 > look
-The Old Tower (village/tower)
-
 (no description yet)
 
 You can go south.
@@ -26,8 +24,6 @@ Now at village/cellar.
 > go behind
 Nothing called `behind` here or anywhere in the world.
 > look
-Cellar (village/cellar)
-
 (no description yet)
 
 There's no way out.
@@ -64,8 +60,6 @@ Created object rope, Rope, placed in village/square.
 > /new character smith The Smith
 Created character smith, The Smith, placed in village/square.
 > look
-Village Square (village/square)
-
 A small square of packed earth. An old well stands to the north.
 The Elder and The Smith are here.
 
@@ -118,8 +112,6 @@ lantern is already in village/well.
 > /move lantern elder
 Moved lantern: village/well → carried by elder.
 > look
-Village Square (village/square)
-
 A small square of packed earth. An old well stands to the north.
 The Elder and The Smith are here.
 
@@ -142,8 +134,6 @@ Usage, for example:
 > go /village/well
 The Well (room)
 > look
-The Well (village/well)
-
 A mossy stone well. The rope is long gone.
 The Elder is here.
 
@@ -153,8 +143,6 @@ Moved village/well → house/well: moved village/well.md → house/well.md, upda
 > go back
 Village Square (room)
 > look
-Village Square (village/square)
-
 A small square of packed earth. An old well stands to the north.
 The Smith is here.
 
@@ -211,8 +199,6 @@ Moved lantern: carried by elder → bench.
 > /move bench bench
 bench can't hold itself.
 > look
-Village Square (village/square)
-
 A small square of packed earth. An old well stands to the north.
 The Smith and Old Tom are here.
 

@@ -28,8 +28,6 @@ This adds 1 problem(s):
 > go west
 Hallway (room)
 > look
-Hallway (village/hallway)
-
 (no description yet)
 
 You can go east through a door.

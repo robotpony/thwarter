@@ -963,7 +963,7 @@ mod tests {
         assert!(lines[0].contains("thwart "), "{}", text);
         assert!(text.contains("> go /village/square"), "{}", text);
         assert!(text.contains("│ GAME"), "{}", text);
-        assert!(text.contains("HERE  village/square"), "{}", text);
+        assert!(text.contains("HERE  Village Square"), "{}", text);
         assert!(lines[23].contains("in village/square >"), "{}", text);
     }
 
@@ -1000,7 +1000,7 @@ mod tests {
         let text = screen_text(&screen, &console, 110, 24);
         assert!(text.contains("/edit room  village/square.md"), "{}", text);
         assert!(text.contains("id: village/square"), "{}", text);
-        assert!(text.contains("HERE  village/square"), "{}", text);
+        assert!(text.contains("HERE  Village Square"), "{}", text);
         screen.key(Input { key: Key::Esc, ..Input::default() }, &console);
         assert!(screen.editing.is_none());
         assert!(screen.output.last().unwrap().starts_with("Closed village/square.md"));

@@ -54,6 +54,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.66.2 (2026-11-24)
+
+### Changed
+
+- The room's title and id lead the sidebar's HERE ("HERE  Village Square (village/square)") and play's ROOM, since the room view now shows only what the player reads (Bruce, 2026-11-24; the coder's f17588d drops its title line). HERE also gives each person's and thing's state, the game's when one is running (`state_at`, 627f899): "lantern  hanging". Transcripts reblessed.
+
 ## 0.66.1 (2026-11-24)
 
 ### Changed
