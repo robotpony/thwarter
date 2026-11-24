@@ -350,7 +350,7 @@ impl Console {
     }
 
     /// A target for an existing file, with its text as it is now.
-    fn open_target(&self, kind: Kind, id: String, path: String) -> Result<EditTarget, String> {
+    pub(super) fn open_target(&self, kind: Kind, id: String, path: String) -> Result<EditTarget, String> {
         let file = self.world.root.join(format!("{}.md", path));
         let text = fs::read_to_string(&file).map_err(|e| format!("Can't open {}.md: {}", path, e))?;
         Ok(EditTarget { kind, id, path, opened: Some(text), file })

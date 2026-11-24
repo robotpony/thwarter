@@ -1,0 +1,91 @@
+# world: tests/worlds/tiny
+# mode: edit
+# copy: yes
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
+> go /village/square
+Village Square (room)
+> go lantern
+Brass Lantern (object)
+> /recipe fixed-until pull hanging loose
+Made the hanging state; it's where the thing starts.
+Set weight to immovable while lantern is hanging.
+pull: hanging → loose. The reply is under `## When: #pull #loose`.
+
+That was:
+
+  /state hanging start
+  /set weight immovable in hanging
+  /action pull hanging --> loose
+> go /village/square
+Village Square (room)
+> /new object torch tool
+Created object torch, Torch, placed in village/square.
+> go torch
+Torch (object)
+> /recipe switch light/put-out unlit/lit
+Made the unlit state; it's where the thing starts.
+light: unlit → lit. The reply is under `## When: #light #lit`.
+put-out: lit → unlit. The reply is under `## When: #put-out #unlit`.
+
+That was:
+
+  /state unlit start
+  /action light unlit --> lit
+  /action put-out lit --> unlit
+> go /village/square
+Village Square (room)
+> /new object chest furniture "Old chest"
+Created object chest, Old chest, placed in village/square.
+> go chest
+Old chest (object)
+> /recipe container in
+Set holds on chest.
+Made the closed state; it's where the thing starts.
+open: closed → open. The reply is under `## When: #open #open`.
+close: open → closed. The reply is under `## When: #close #closed`.
+
+That was:
+
+  /set holds in
+  /state closed start
+  /action open closed --> open
+  /action close open --> closed
+> /action pull
+Usage:
+
+  /action {verb} {from} --> {to} [with {thing}]
+> /recipe teleport
+The recipes:
+
+  /recipe fixed-until {verb} [{fixed} {free}]
+  /recipe locked-with {key}
+  /recipe switch {verb}/{verb} {state}/{state}
+  /recipe container in|on
+> go /village/square
+Village Square (room)
+> /play here
+Play mode.
+
+A small square of packed earth. An old well stands to the north.
+The Elder is here.
+
+You see a brass lantern, a torch, and an old chest.
+
+You can go north or east.
+> take lantern
+The brass lantern won't budge.
+> pull lantern
+You pull the brass lantern.
+> take lantern
+You take the brass lantern.
+> take torch
+You take the torch.
+> light torch
+You light the torch. Something changes.
+> put-out torch
+You put-out the torch.
+> open chest
+You open the old chest. Something changes.
+> close chest
+You close the old chest.

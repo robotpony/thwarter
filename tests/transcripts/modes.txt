@@ -102,6 +102,10 @@ Changing content (each saves the file):
   /unlink <direction>                  remove one exit from this room
   /add <thing> [room, character, thing] put a person or thing here too (scenery if no card)
   /move <thing> <room, character, thing> put a person or thing somewhere else
+  /state <name> [start]                a state of the thing you're at (makes it a bundle)
+  /set <key> <value> in <state>        one field, only while in that state
+  /action <verb> <from> --> <to>       an action between states (with <thing>: needs it held)
+  /recipe <name> ...                   a common shape: fixed-until, locked-with, switch, container
 
 Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):
   /edit room [id]                      the room you're in, or the one named

@@ -791,7 +791,7 @@ pub(super) fn bare_id_problem(id: &str) -> Option<String> {
 
 /// A typed value as YAML would read it, so `80` is a number and `true` a
 /// bool, but anything that isn't a plain number or bool stays text.
-fn scalar(typed: &str) -> Value {
+pub(super) fn scalar(typed: &str) -> Value {
     match serde_yaml::from_str::<Value>(typed) {
         Ok(v @ (Value::Number(_) | Value::Bool(_))) => v,
         _ => Value::String(typed.to_string()),

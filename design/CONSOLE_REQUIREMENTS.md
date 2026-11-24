@@ -251,7 +251,7 @@ Decided by Bruce, 2026-11-23.
 
 ## Making things well
 
-Bruce, 2026-11-24: console commands should solve common problems easily, through small verbs, recipes built from them, and questions that `/add` and `/new` can ask. The question file's format is in `design/CONTENT_FORMAT.md` (REQ-CF-32); the console's side below is *proposed* until built.
+Bruce, 2026-11-24: console commands should solve common problems easily, through small verbs, recipes built from them, and questions that `/add` and `/new` can ask. The question file's format is in `design/CONTENT_FORMAT.md` (REQ-CF-32). REQ-CON-44 and 45 are built (0.60.0); REQ-CON-46 is *proposed* until built.
 
 - REQ-CON-44: Small verbs MUST cover states and actions: `/state <name> [start]` makes a state (turning a one-file thing into a bundle first), `/set <key> <value> in <state>` changes one state's file, and `/action <verb> <from> --> <to>` writes the action and opens its reply section in the editor, making the `to` state if it doesn't exist.
 - REQ-CON-45: Recipes MUST be shorthand for those verbs, and MUST print the commands they ran so an author learns them. First four, as Bruce picked: `fixed-until <verb>` (an immovable starting state and a free one), `locked-with <key>`, `switch <verbs> <states>` (two states with an action each way), and `container in|on`.

@@ -48,6 +48,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.60.0 (2026-11-24)
+
+### Added
+
+- States and actions from the console (REQ-CON-44, Bruce, 2026-11-24). `/state <name> [start]` makes a state of the thing edit mode is at, turning a one-file thing into a bundle first, and `start` makes it the starting state. `/set <key> <value> in <state>` sets one key in one state's file. `/action <verb> <from> --> <to> [with <thing>]` puts the action in the `from` state's file, so it works only from there, makes the `to` state if needed, adds a `## When: #<verb> #<to>` reply section to the thing and opens the editor on it; `with` means the player must hold that thing.
+- Recipes (REQ-CON-45), each shorthand for those verbs and printing the commands it ran: `/recipe fixed-until <verb> [<fixed> <free>]` (an immovable starting state until the verb), `/recipe locked-with <key>`, `/recipe switch <verb>/<verb> <state>/<state>`, and `/recipe container in|on`. New transcript: `making.txt`.
+
+### Fixed
+
+- Going to a bundled thing's folder (`go /village/square` once the square is a bundle) landed in the folder rather than on the thing; it now lands on its `index`.
+
 ## 0.59.0 (2026-11-24)
 
 ### Added

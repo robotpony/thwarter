@@ -197,12 +197,16 @@ impl Console {
             ("load", args) => self.load_game_named(args),
             ("reload", _) => self.reload(),
             ("new", args) if self.mode == Mode::Edit => self.new_and_edit(args),
+            ("set", args) if self.mode == Mode::Edit && args.len() >= 4 && args[args.len() - 2] == "in" => self.set_in_state(args),
             ("set", args) if self.mode == Mode::Edit => self.set(args),
+            ("state", args) if self.mode == Mode::Edit => self.state_command(args),
+            ("action", args) if self.mode == Mode::Edit => self.action_command(args),
+            ("recipe", args) if self.mode == Mode::Edit => self.recipe_command(args),
             ("link", args) if self.mode == Mode::Edit => self.link(args),
             ("unlink", args) if self.mode == Mode::Edit => self.unlink(args),
             ("move", args) if self.mode == Mode::Edit => self.move_thing(args),
             ("add", args) if self.mode == Mode::Edit => self.add_and_edit(args),
-            ("new" | "set" | "link" | "unlink" | "move" | "add", _) => {
+            ("new" | "set" | "link" | "unlink" | "move" | "add" | "state" | "action" | "recipe", _) => {
                 format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", name)
             }
             ("", _) => "Type /help for commands.".to_string(),
@@ -251,6 +255,10 @@ impl Console {
                 "  /unlink <direction>                  remove one exit from this room".to_string(),
                 "  /add <thing> [room, character, thing] put a person or thing here too (scenery if no card)".to_string(),
                 "  /move <thing> <room, character, thing> put a person or thing somewhere else".to_string(),
+                "  /state <name> [start]                a state of the thing you're at (makes it a bundle)".to_string(),
+                "  /set <key> <value> in <state>        one field, only while in that state".to_string(),
+                "  /action <verb> <from> --> <to>       an action between states (with <thing>: needs it held)".to_string(),
+                "  /recipe <name> ...                   a common shape: fixed-until, locked-with, switch, container".to_string(),
                 String::new(),
                 "Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):".to_string(),
                 "  /edit room [id]                      the room you're in, or the one named".to_string(),
@@ -589,6 +597,11 @@ impl Console {
         for candidate in [relative, absolute] {
             if self.world.files.contains_key(&candidate) {
                 return Ok(Place::File(candidate));
+            }
+            // A bundle's folder is the thing: going there lands on its index.
+            let index = format!("{}/index", candidate);
+            if self.world.files.get(&index).is_some_and(|e| e.kind.is_thing()) {
+                return Ok(Place::File(index));
             }
             if self.world.dirs.contains(&candidate) {
                 return Ok(Place::Dir(candidate));

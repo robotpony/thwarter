@@ -33,6 +33,9 @@ pub const COMMANDS: &[Command] = &[
     command("unlink", "{direction}", "remove an exit from this room", true),
     command("add", "{thing} [{room|character|thing}]", "put a person or thing here too; scenery if it has no card", true),
     command("move", "{thing} {room|character|thing}", "put something somewhere else, or a room in an area", true),
+    command("state", "{name} [start]", "a state of the thing you're at; makes it a bundle", true),
+    command("action", "{verb} {from} --> {to} [with {thing}]", "an action from one state to another", true),
+    command("recipe", "fixed-until|locked-with|switch|container ...", "a common shape, as the commands it stands for", true),
     command("save", "[{name}]", "save the game", false),
     command("load", "[{name}]", "load a saved game", false),
     command("reload", "", "reload the world from disk, staying where you are", false),
@@ -307,7 +310,7 @@ mod tests {
         let mut console = tiny();
         let all = console.complete("/");
         assert_eq!(all.suggestions.len(), COMMANDS.len());
-        assert_eq!(texts(&console.complete("/re")), vec!["/reload", "/restart"]);
+        assert_eq!(texts(&console.complete("/re")), vec!["/recipe", "/reload", "/restart"]);
         console.handle("/play");
         assert!(!texts(&console.complete("/")).contains(&"/set"), "edit-only commands leave play mode's list");
     }
@@ -317,8 +320,8 @@ mod tests {
         let console = tiny();
         let c = console.complete("/li");
         assert_eq!(c.apply("/li", 0), "/link ");
-        let c = console.complete("/sta");
-        assert_eq!(c.apply("/sta", 0), "/status");
+        let c = console.complete("/statu");
+        assert_eq!(c.apply("/statu", 0), "/status");
     }
 
     #[test]

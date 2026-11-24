@@ -16,6 +16,7 @@ mod play;
 mod restart;
 mod screen;
 mod session;
+mod states;
 mod theme;
 mod view;
 mod watch;

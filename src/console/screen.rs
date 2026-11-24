@@ -842,11 +842,10 @@ mod tests {
         let mut screen = Screen::new("", None);
         keys(&mut screen, &console, "/");
         assert!(screen.menu.as_ref().unwrap().completion.suggestions.len() > 10);
-        keys(&mut screen, &console, "re");
+        keys(&mut screen, &console, "res");
         let text = screen_text(&screen, &console, 110, 24);
-        assert!(text.contains("/reload") && text.contains("/restart"), "{}", text);
+        assert!(text.contains("/restart"), "{}", text);
         assert!(text.contains("tab or enter pick"), "{}", text);
-        press(&mut screen, &console, Key::Down);
         press(&mut screen, &console, Key::Tab);
         assert_eq!(screen.input_text(), "/restart");
     }
@@ -855,7 +854,7 @@ mod tests {
     fn enter_picks_and_runs_unless_more_is_needed() {
         let console = tiny();
         let mut screen = Screen::new("", None);
-        keys(&mut screen, &console, "/stat");
+        keys(&mut screen, &console, "/statu");
         press(&mut screen, &console, Key::Enter);
         assert!(screen.output.iter().any(|l| l.starts_with("Tiny World, at")), "/status ran: {:?}", screen.output);
         keys(&mut screen, &console, "/lin");

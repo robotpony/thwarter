@@ -32,7 +32,7 @@ const DIR: &str = "tests/transcripts";
 /// run on a copy, or it would change the fixture world.
 /// (`/edit` alone only switches mode; `/edit room` and the like will
 /// write once full editing exists.)
-const CHANGES_CONTENT: &[&str] = &["/new", "/set", "/link", "/unlink", "/move", "/add"];
+const CHANGES_CONTENT: &[&str] = &["/new", "/set", "/link", "/unlink", "/move", "/add", "/state", "/action", "/recipe"];
 
 struct Transcript {
     header: String,
