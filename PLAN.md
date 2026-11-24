@@ -103,7 +103,7 @@ Done when a persona can package a world, and someone else can install it and pla
 - [x] Persona files, and `author:` in `world/index.md` naming one [coder] (REQ-WS-4, REQ-WS-5)
 - [x] Personal settings in `~/.config/thwarter/config.toml` [coder] (REQ-CFG-4)
 - [ ] First run asks who's writing; `/author` switches persona; the status bar shows it; packaging says which contact details ship [console] (REQ-CON-34 to 37, REQ-WS-4)
-- [ ] Packaging a world with its persona, and installing one to play [coder] (REQ-CFG-5, REQ-CFG-7)
+- [x] Packaging a world with its persona, and installing one to play [coder] (REQ-CFG-5, REQ-CFG-7)
 - [ ] Play data for installed worlds kept apart from them [coder, console] (REQ-CFG-6)
 
 ## Phase 10 · Tooling, as needed

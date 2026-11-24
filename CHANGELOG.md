@@ -33,6 +33,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.35.0 (2026-11-23)
+
+### Added
+
+- `thwart package [WORLD]` (REQ-CLI-12 to 14): writes the world and its persona into one `<persona>-<world>-<version>.thwarter` file, a zip anyone can rename and open, holding `thwarter-package.toml` (format, persona, world, title, version, the packaging `thwart` version and the date), `<persona>/index.md` and `<persona>/<world>/`. It leaves out what the loader skips and `world/styles/`, keeps `world.toml`, and refuses a world that fails `validate`. Before writing, it says which of the persona's details ship and how many author comments, then asks; `--yes` skips the question, and without a terminal it refuses rather than publish. `--strip-comments` leaves author comments out of the packaged copies, keeping response markers. `--output` picks the file.
+- `thwart install <file>` (REQ-CLI-15, REQ-CFG-5, 8): checks the whole archive before writing anything (no absolute paths, `..`, links or files outside the layout; at most 200 MB, checked as it unpacks, and 10,000 files), then unpacks into `$XDG_DATA_HOME/thwarter/worlds/<persona>/<world>/`, beside the target first, so a failed install leaves an older copy as it was. An installed world is refused without `--replace`. The persona file is written beside the world, or updated, with a note.
+- `thwart installed` lists installed worlds, and `thwart play <persona>/<world>` plays one when there's no such folder where it's run (REQ-CLI-16).
+- The `zip` crate (deflate only) is a new dependency.
+- `tests/cli_package.rs` runs packaging and installing end to end, and hostile archives.
+
 ## 0.34.1 (2026-11-23)
 
 ### Fixed

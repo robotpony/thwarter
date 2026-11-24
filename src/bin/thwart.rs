@@ -34,10 +34,32 @@ enum Commands {
     },
     /// Open the console in play mode, to read (play) a world
     Play {
-        /// World directory (defaults to --world, then the built-in default)
+        /// World directory, or an installed world as persona/world
+        /// (defaults to --world, then the built-in default)
         #[arg(value_name = "WORLD")]
         world_dir: Option<String>,
     },
+    /// Package a world and its persona into one .thwarter file to share
+    Package {
+        /// World directory (defaults to --world, then the built-in default)
+        #[arg(value_name = "WORLD")]
+        world_dir: Option<String>,
+        #[arg(long, help = "Where to write the package (default: <persona>-<world>-<version>.thwarter here)")]
+        output: Option<String>,
+        #[arg(long, help = "Leave the author comments (<!-- -->) out of the packaged files")]
+        strip_comments: bool,
+        #[arg(long, help = "Don't ask before publishing the persona's contact details")]
+        yes: bool,
+    },
+    /// Install a packaged world to play
+    Install {
+        /// A .thwarter file
+        package: String,
+        #[arg(long, help = "Replace an installed copy of the same world")]
+        replace: bool,
+    },
+    /// List the installed worlds
+    Installed,
     /// Validate world files
     Validate {
         /// Location to validate (optional)
@@ -125,8 +147,20 @@ fn main() -> ExitCode {
         },
         Commands::Play { world_dir } => {
             let path = world_dir.unwrap_or(world_path);
-            thwarter::console::run(std::path::Path::new(&path), thwarter::console::Mode::Play)
+            // An installed world by name, when there's no such folder here.
+            let path = match thwarter::settings::data_dir() {
+                Some(data) if !std::path::Path::new(&path).exists() => {
+                    thwarter::packaging::find_installed(&data, &path).unwrap_or_else(|| std::path::PathBuf::from(&path))
+                }
+                _ => std::path::PathBuf::from(&path),
+            };
+            thwarter::console::run(&path, thwarter::console::Mode::Play)
         },
+        Commands::Package { world_dir, output, strip_comments, yes } => {
+            thwarter::cli::commands::package_command(world_dir.unwrap_or(world_path), output, strip_comments, yes)
+        },
+        Commands::Install { package, replace } => thwarter::cli::commands::install_command(package, replace),
+        Commands::Installed => thwarter::cli::commands::installed_command(),
         Commands::Validate { location, strict, output, format, fix } => {
             thwarter::cli::commands::validate_command(world_path, location, strict, output, format, fix)
         },
