@@ -98,7 +98,7 @@ Done when a locked-door puzzle plays from both sides.
 Bruce authors it with the console coder, starting now, using what exists and growing as features land. Done when it plays start to finish and has a transcript test.
 
 - [ ] Write the world: a short story that uses states, chapters, templates and a door [Bruce, console]
-- [ ] Fix or remove the test world's five broken exits along the way [Bruce] (`BUGS.md`)
+- [x] The old test content removed, and the test world restarted from Bruce's rooms (0.50.2, 37a5c49) [Bruce, coder]
 - [ ] A transcript that plays it through [console] (REQ-CON-9)
 
 ## Phase 8 · Writing helpers

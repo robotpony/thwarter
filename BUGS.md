@@ -6,11 +6,11 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 
 ## Open
 
-- [ ] **Five connections in the test world point at rooms that don't exist**: `forest/abandoned-camp`, `forest/rocky-outcrop` (twice), `forest/cave-entrance`, `forest/cave-behind-falls`. An authoring decision for Bruce: write the rooms or cut the exits. Blocks using `validate` as a CI gate (2026-08-23)
 - [ ] **One compiler warning left**, `narrative_engine`'s unused `conditions` in a stub; it goes when narrative state uses that code. The two in `world_graph::find_path` went with the map in 0.37.0. Down from 11 in 0.7.0 (2026-08-23)
 
 ## Fixed
 
+- 2026-11-23 (0.50.2, 37a5c49): the test world's five connections to rooms that didn't exist went with the old content; the new test world validates clean.
 - 2026-11-23 (0.27.1): `thwart show` no longer prints the world's warnings on standard output; it writes one count to standard error ("2 problems and 27 warnings; run `thwart validate` to list them"), so its result stands alone and `--format json` is one document.
 - 2026-11-23 (0.1.1): `--world`, `--config`, `-q` and `-v` are global, so they work after the subcommand as the docs write them.
 - 2026-11-23 (0.1.1): `validate` prints its failure once and still exits non-zero.

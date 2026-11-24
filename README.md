@@ -53,10 +53,10 @@ thwart validate --world authors/mx/test-world
 
 # Show the whole world state, or one location
 thwart show --world authors/mx/test-world
-thwart show --world authors/mx/test-world castle/courtyard
+thwart show --world authors/mx/test-world bedroom
 ```
 
-`map`, `search`, and `debug` are specified in `design/CLI_DESIGN.md` but not implemented yet; running them reports that honestly rather than printing placeholder output. See `design/ARCHITECTURE.md` for current status.
+`map` draws the world as ASCII and `search` finds things by id, title or prose. `debug` is specified in `design/CLI_DESIGN.md` but not implemented yet; running it reports that honestly rather than printing placeholder output. See `design/ARCHITECTURE.md` for current status.
 
 ### World Structure
 
@@ -66,15 +66,15 @@ Each author's content lives under their own name, so a single repo can hold more
 authors/
 └── mx/
     └── test-world/
-        ├── world.toml          # World configuration
-        ├── castle/
-        │   ├── courtyard.md    # Location file
-        │   └── throne-room.md
-        ├── forest/
-        │   └── path.md
-        └── npcs/
-            ├── king.md         # Character file
-            └── guard-captain.md
+        ├── world.toml          # Tool settings
+        ├── world/
+        │   └── index.md        # The world: title, author, starting room
+        ├── bedroom.md          # Location files
+        ├── closet.md
+        ├── hallway.md
+        └── objects/
+            ├── walls.md        # Object files
+            └── photo-1.md
 thwart.toml                     # CLI preferences, including the default world path
 ```
 
@@ -84,18 +84,15 @@ See `design/CONTENT_FORMAT.md` for the full field-by-field spec across locations
 
 ```markdown
 ---
-id: castle/courtyard
-title: Castle Courtyard
+id: bedroom
+title: Bedroom
 type: location
 connections:
-  north: castle/throne-room
-  south: forest/path
-objects: [sword, shield]
-characters: [guard-captain]
+  north: closet
+objects: [chair, bed, old-shirt]
 ---
 
-The morning sun illuminates the ancient stones of the courtyard.
-A fountain bubbles peacefully in the center.
+You are in a small bedroom. It's not all that interesting, yet here you are.
 ```
 
 #### Future components that are out of scope

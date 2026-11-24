@@ -41,13 +41,13 @@ thwart validate --world authors/mx/test-world --strict
 thwart show --world authors/mx/test-world
 
 # Show one location's full parsed data
-thwart show --world authors/mx/test-world castle/courtyard
+thwart show --world authors/mx/test-world bedroom
 
 # Same, as JSON
-thwart show --world authors/mx/test-world castle/courtyard --format json
+thwart show --world authors/mx/test-world bedroom --format json
 ```
 
-Expected result against the shipped sample world: `validate` exits non-zero and reports five broken connections (see `BUGS.md`); `show` lists 28 locations.
+Expected result against the shipped sample world: `validate --strict` passes with no problems and no warnings; `show` names the world, "Test world", and its starting room, the bedroom. The world is small on purpose: Bruce is writing it afresh (2026-11-23), and tests that need more use the fixture in `tests/worlds/sample/`.
 
 ### What a broken world looks like
 
@@ -62,12 +62,12 @@ thwart validate --world /tmp/empty-world
 
 ## Not implemented yet
 
-`map`, `search`, and `debug` exist as CLI subcommands (`thwart map`, `thwart search <query>`, `thwart debug`) but each one now reports "not implemented" and exits non-zero rather than producing output. Running them is a valid way to confirm that behavior, but there's nothing further to test until they're built. See `design/ARCHITECTURE.md`'s implementation status table for what's planned and in what order, and `design/CLI_DESIGN.md` for the target interface (including flags that don't exist yet, like fog-of-war maps or regex search).
+`debug` exists as a CLI subcommand but reports "not implemented" and exits non-zero rather than producing output; `map` and `search` are built. Running it is a valid way to confirm that behaviour, but there's nothing further to test until it's built. See `design/ARCHITECTURE.md`'s implementation status table for what's planned and in what order, and `design/CLI_DESIGN.md` for the target interface (including flags that don't exist yet, like fog-of-war maps or regex search).
 
 ## CI
 
 `.github/workflows/ci.yml` builds and tests on every push and pull request (added in bca9973): `cargo build --locked --all-targets`, then `cargo test --locked`, on Ubuntu with the stable Rust toolchain and read-only repository permissions. It runs once `main` is pushed to GitHub.
 
-It doesn't run `thwart validate` against the test world, since the world still has five broken exits (`BUGS.md`). Add that step, with `--strict`, once they're fixed.
+It doesn't yet run `thwart validate --strict` against the test world as its own step; the test suite's `the_shipped_test_world_validates` covers it for problems.
 
 The workflow's actions are pinned by version tag (`actions/checkout@v5` and the rest), not by commit; pinning by commit is the stricter choice if supply-chain risk ever matters more.

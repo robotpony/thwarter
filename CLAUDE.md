@@ -22,8 +22,9 @@ For anything beyond this orientation, prefer these over re-deriving from source:
 - `design/` - Design documents and technical specifications
 - `PLAN.md` - Phased work queue; `BUGS.md` - defect log; `CHANGELOG.md` - changes, plus a record of removed and replaced files
 - `authors/<author>/<world-name>/` - World content, one directory per author. The shipped example is `authors/mx/test-world/`.
-  - Example locations: `castle/courtyard.md`, `forest/path.md`
-  - Character files: `npcs/king.md`, `npcs/guard-captain.md`
+  - Example locations: `bedroom.md`, `hallway.md`
+  - Object files: `objects/walls.md`, `objects/photo-1.md`
+  - Tests use their own fixture worlds under `tests/`, never this one, since Bruce rewrites it
   - World configuration: `world.toml`
 
 ## Architecture Principles
@@ -89,6 +90,6 @@ A coder who fixes a bug or finishes a task ticks it in `PLAN.md` or moves it to 
 
 Do not mark a `PLAN.md` item done without also updating `design/ARCHITECTURE.md`'s implementation status table to match; docs drifting from the code is the problem the August 2026 audit fixed (`CHANGELOG.md` › 0.1.0). Treat `design/ARCHITECTURE.md` as authoritative on what works; this section is a summary of it, not an independent claim.
 
-**Current state** (0.4.0): builds, 58 tests plus console transcripts, `validate` and `show` do real work against real content, `thwart edit` and `thwart play` open a working console (navigation, reload, file watching), and the round-trip writer is built but not yet called by the console. `map`/`search`/`debug` report themselves as not implemented.
+**Current state** (0.50.2): builds, over 250 tests plus console transcripts. `validate`, `show`, `map` and `search` do real work; `thwart edit` and `thwart play` open the console for writing and playing. Play matches `## When:` sections against the game state, runs Rhai scripts, and has doors, keys and objects that hold objects. `debug` reports itself as not implemented.
 
-**Next**: `PLAN.md` › Phase 2, the console shell.
+**Next**: `PLAN.md` › Phase 6's remaining lines, then Phase 7's sample world, which Bruce is writing from the new test world.
