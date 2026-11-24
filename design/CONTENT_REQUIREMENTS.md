@@ -26,6 +26,9 @@ Split out of `REQUIREMENTS.md` on 2026-11-23. The REQ-CF and REQ-WS ids are stab
 - REQ-WS-4: A persona is `authors/<persona>/index.md`, Markdown with frontmatter (Bruce, 2026-11-23): `type: author`, `title` (the pen name readers see), and contact details (`email`, `website` and similar), with the bio as its prose. It MAY also name a default writing style and a default world. A persona folder without `index.md` still works, with its folder name as the pen name. A TOML form may follow later if it's needed.
 - REQ-WS-5: A world's `world/index.md` MUST name its author by persona id (`author: bob`), so the pen name and contact details come from the persona file and changing them there changes every world.
 - REQ-WS-6: A persona's contact details are published with every archive of its worlds (REQ-CFG-7). The console MUST say so before packaging.
+- REQ-WS-7: *Proposed* (commander, 2026-11-24, for Bruce): a person is an author of a world when both are true: the world is one they write (in an `authors/` workspace, not installed under REQ-CFG-5's folder), and their current persona (REQ-CON-34, REQ-CON-35) is the persona the world's `author:` names. A world that names no author has none, so features for authors stay off and the console says why ("this world names no author; /set author <persona> turns on its commands").
+- REQ-WS-8: *Proposed*: an installed world has no authors on the machine it's installed on, even when the installer's persona matches, since installed worlds are only played (REQ-CFG-5, principle 6). To change one, its author works on their own copy.
+- REQ-WS-9: *Proposed*: being an author makes things convenient, but it isn't security. A persona is a name anyone can pick, so anything a world offers its authors (such as world console commands) MUST do no more than an author could by typing commands themselves.
 
 ## World model
 
