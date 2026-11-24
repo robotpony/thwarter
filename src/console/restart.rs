@@ -123,7 +123,7 @@ impl Console {
             notes.push(format!("{} is gone; now at {}.", gone, self.pwd()));
         }
 
-        let mut greeting = vec![format!("{} You're where you were.", restarted_on())];
+        let mut greeting = vec![restarted_on(), "You are precisely where you were when you left.".to_string()];
         greeting.extend(notes);
         Resumed { history: snapshot.history, scrollback: snapshot.scrollback, greeting: greeting.join("\n") }
     }
@@ -229,7 +229,7 @@ mod tests {
 
         let mut after = Console::open(&root, Mode::Edit).unwrap();
         let resumed = after.resume(&snapshot);
-        assert!(resumed.greeting.contains("You're where you were."), "{}", resumed.greeting);
+        assert!(resumed.greeting.contains("\nYou are precisely where you were when you left."), "{}", resumed.greeting);
         assert_eq!(resumed.history, history);
         assert_eq!(resumed.scrollback, vec!["before".to_string()]);
         assert_eq!(after.mode, Mode::Edit);

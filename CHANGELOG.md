@@ -47,6 +47,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.58.3 (2026-11-24)
+
+### Changed
+
+- `/restart` greets in two lines (Bruce, 2026-11-24): "Restarted on thwart 0.58.3 (built 14:11)." then "You are precisely where you were when you left."
+
 ## 0.58.2 (2026-11-24)
 
 ### Changed
