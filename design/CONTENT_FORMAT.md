@@ -115,6 +115,32 @@ type: questions
 - **Recipes** are shorthand for console commands (`/state`, `/set … in <state>`, `/action`), and the console prints the commands an answer stood for. The four built-ins are `fixed-until`, `locked-with`, `switch` and `container`. Their exact forms are the console's (`design/CONSOLE_REQUIREMENTS.md`).
 - `validate` warns about an option with an unknown construct and more than one `(default)` under a question. A set whose name matches nothing yet isn't a warning, since it may be waiting for its thing.
 
+## `type: command`
+
+*Proposed (Bruce, 2026-11-24).* A command file describes one console command: its name, how it's called and its help. The `/` menu, `/help` and usage replies all read it, and what the command does at run time is the console's (`design/CONSOLE_REQUIREMENTS.md` › Command registry, REQ-CON-50 to 56). A world can add its own commands, as lists of existing ones:
+
+```markdown
+---
+type: command
+name: furnish
+aliases: [fu]
+args: "{thing} [{room}]"
+modes: [edit]
+changes: true
+run:
+  - /add {thing} {room}
+  - /set {thing} object_type fixture
+---
+Puts a piece of furniture in a room, fixed in place.
+
+    /furnish desk bedroom
+```
+
+- **Fields.** `name` is what follows the `/`, and the file is named after it (`world/commands/furnish.md`). `aliases` are other names for it. `args` names its parameters the way the `/` menu shows them, `{required}` and `[{optional}]`. `modes` lists `edit`, `play` or both. `changes` says whether it writes to the world. A built-in has `handler` (its Rust handler's name), and a world command has `run`. The body is the help that `/help <name>` shows.
+- **Where commands live.** Built-ins are compiled in from `src/builtins/commands/`. A world's are in `world/commands/`, which is reserved like `questions/`, so its files are never read as things. The person's `config.toml` can add aliases to a command or hide one, but it can't add a command.
+- **World commands.** `run` is a list of console commands with the `{param}` slots from `args`, run in order as if the author typed them. A world command works only in edit mode, for the world's authors (`design/CONTENT_REQUIREMENTS.md` › REQ-WS-7 to 9), and it can't do more than they could by typing. The console's REQ-CON-54 lists the commands it may not run. A world command named like a built-in is a load warning, and the built-in wins.
+- `validate` warns about a world command whose `run` names an unknown command, uses a slot `args` doesn't have, or has a `handler`.
+
 ## How play words a room: `[play]` in `world.toml`
 
 Play writes rooms and the inventory as plain sentences, each from a template in `world.toml`'s `[play]` table (REQ-ENG-43). A world MAY change any of them; the test world's `world.toml` lists every key at its default, as the reference.

@@ -99,6 +99,7 @@ world/
   story.md      # story. values, declared with their starting values
   player.md     # the player: a character, with player. values
   styles/       # writing styles for the writing helpers
+  commands/     # the world's own console commands, for its authors in edit mode (proposed; CONTENT_FORMAT.md › type: command)
 ```
 
 ```yaml
