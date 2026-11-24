@@ -551,7 +551,7 @@ In play:
 | `unlock door` | `no-key` | It's locked. Unlock it with what? |
 | `unlock door with spoon` | `wrong-key` | That doesn't fit the lock. |
 | `unlock door with key` | `closed`; the key stays in the lock | The padlock snaps open with a rusty clunk. The key stays in it. |
-| `open door` | `open` | It swings open. Cold air rises from the dark below. |
+| `open door` | `open` | Cold air rises from the dark below. |
 | `take key` | the key comes back to the player | You take the brass key. |
 | `down` | engine: `passable: yes` | The vault's description |
 
