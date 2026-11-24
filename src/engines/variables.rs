@@ -173,8 +173,23 @@ impl WorldEngine {
     }
 
     /// `text` with its variables filled in, unknown ones blank (REQ-CF-16).
+    /// Play's text: each `{{ variable }}` filled, and each `@id` shown as
+    /// that thing's name in the version play sees (`@guard-captain` →
+    /// Captain Marcus). An `@` that names nothing stays as the bare word.
     pub fn fill(&self, text: &str, scope: &Scope) -> String {
-        substitute(text, |name| self.variable(name, scope))
+        let filled = substitute(text, |name| self.variable(name, scope));
+        let mut out = String::with_capacity(filled.len());
+        let mut last = 0;
+        for (range, id) in mentions(&filled) {
+            out.push_str(&filled[last..range.start]);
+            match self.thing_by_id(&id).ok().and_then(|t| self.current(t.kind, &t.id, scope.at)) {
+                Some(entity) => out.push_str(entity.title()),
+                None => out.push_str(&id),
+            }
+            last = range.end;
+        }
+        out.push_str(&filled[last..]);
+        out
     }
 
     /// Why `name` isn't declared where it's used, or `None` if it is.
@@ -266,6 +281,40 @@ impl WorldEngine {
         }
         warnings
     }
+}
+
+/// Each `@id` in prose (`design/SECTIONS.md` › Prefixes): an `@` at the
+/// start or after a character that can't be part of a word (so an email
+/// address isn't one), outside inline code, followed by an id. Gives the
+/// span of `@id` and the id.
+pub fn mentions(text: &str) -> Vec<(std::ops::Range<usize>, String)> {
+    let mut out = Vec::new();
+    let bytes = text.as_bytes();
+    let mut in_code = false;
+    let id_char = |c: u8| c.is_ascii_alphanumeric() || c == b'-' || c == b'_' || c == b'/';
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'`' => in_code = !in_code,
+            b'@' if !in_code && (i == 0 || !(id_char(bytes[i - 1]) || bytes[i - 1] == b'.' || bytes[i - 1] == b'@')) => {
+                let mut end = i + 1;
+                while end < bytes.len() && id_char(bytes[end]) {
+                    end += 1;
+                }
+                while end > i + 1 && matches!(bytes[end - 1], b'-' | b'/' | b'_') {
+                    end -= 1;
+                }
+                if end > i + 1 {
+                    out.push((i..end, text[i + 1..end].to_string()));
+                    i = end;
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    out
 }
 
 #[cfg(test)]

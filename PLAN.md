@@ -75,7 +75,7 @@ Done when a locked-door puzzle plays from both sides.
 - [x] Doors as their own type, with sides, `passable:` and `transparent:` [coder] (REQ-CF-19, `design/STATES.md` › Doors)
 - [x] Door built-ins: `door` and `portal` [coder] (REQ-CF-21)
 - [x] The engine matches `## When:` sections against each turn's game state, and stops reading markers (0.46.0) [coder] (`design/SECTIONS.md` › The model)
-- [ ] `@name` in prose shows the thing's name in play [coder] (`design/SECTIONS.md` › Prefixes, links and names)
+- [x] `@name` in prose shows the thing's name in play [coder] (`design/SECTIONS.md` › Prefixes, links and names)
 - [x] Rewrite the `door` and `portal` built-ins and the test world's marker files as sections [coder] (`design/SECTIONS.md` › What changes)
 - [x] The editor draws keyword headings and colours `@`, `#` and `thwarter` blocks (0.44.0) [console] (`design/SECTIONS.md`)
 - [ ] Try sections on real content with Bruce, then fold `design/SECTIONS.md` into the content requirements [commander, Bruce]

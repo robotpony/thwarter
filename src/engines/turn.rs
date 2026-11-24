@@ -224,4 +224,22 @@ mod tests {
         // An `examine` reply is part of the description now.
         assert!(say(&game, &world, &mut state, "x chest").ends_with("The craftsmanship rivals the finest furniture."));
     }
+
+    #[test]
+    fn an_at_name_shows_the_things_name_in_play() {
+        use crate::engines::variables::mentions;
+        let found: Vec<String> = mentions("Ask @guard-captain, or @castle/hall. Mail b@example.com. `@code` @-").into_iter().map(|(_, id)| id).collect();
+        assert_eq!(found, ["guard-captain", "castle/hall"]);
+
+        let (dir, mut world) = world();
+        let d = dir.path();
+        world.set_file(&d.join("npcs/captain.md"), "---\nid: guard-captain\ntitle: Captain Marcus\ntype: character\n---\nStern.\n");
+        world.set_file(&d.join("objects/stick.md"), "---\nid: stick\ntitle: Stick\ntype: object\nobject_type: x\n---\n@guard-captain dropped it near @hall. @nobody knows why.\n");
+        let warnings = world.current_warnings();
+        assert!(warnings.iter().any(|w| w.contains("`@nobody` names nothing in the world")), "{:?}", warnings);
+        assert!(!warnings.iter().any(|w| w.contains("@guard-captain") || w.contains("@hall")), "{:?}", warnings);
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "bedroom").unwrap();
+        assert_eq!(say(&game, &world, &mut state, "x stick"), "Captain Marcus dropped it near Hall. nobody knows why.");
+    }
 }

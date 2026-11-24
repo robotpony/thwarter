@@ -106,7 +106,8 @@ impl GameEngine {
         let body = self.describe(world, state, EntityKind::Location, &state.location, &view.body);
         view.body = world.fill(&body, &Scope { at: At::play(state), this: Some((EntityKind::Location, &state.location)), here: None });
         for door in view.exits.iter_mut().filter_map(|e| e.door.as_mut()) {
-            door.description = self.describe(world, state, EntityKind::Door, &door.id, &door.description);
+            let text = self.describe(world, state, EntityKind::Door, &door.id, &door.description);
+            door.description = world.fill(&text, &Scope { at: At::play(state), this: Some((EntityKind::Door, &door.id)), here: None });
         }
         view.objects
             .retain(|o| !state.was_taken(&state.location, &o.id) && !state.inventory.contains(&o.id));

@@ -102,6 +102,11 @@ fn parse_words(line: &str) -> Words {
         "inventory" | "i" | "inv" => done(unknown(line)),
         _ if direction(verb).is_some() => done(unknown(line)),
         _ => {
+            // `listen to the chest`, `talk to the captain` (REQ-PC-20).
+            let rest = match rest {
+                ["to" | "at", more @ ..] => more,
+                _ => rest,
+            };
             // `hit window with stick`: what the action uses follows `with`.
             let (noun, with) = match rest.iter().position(|w| *w == "with") {
                 Some(at) => (&rest[..at], Some(strip_article(&rest[at + 1..]))),
@@ -177,6 +182,13 @@ mod tests {
         assert_eq!(parse("pull the lever"), act(Use { verb: "pull".into(), noun: "lever".into(), with: None }));
         assert_eq!(parse("hit the window with a stick"), act(Use { verb: "hit".into(), noun: "window".into(), with: Some("stick".into()) }));
         assert_eq!(parse("hit window with"), act(Use { verb: "hit".into(), noun: "window".into(), with: None }));
+        assert_eq!(parse("listen to the chest"), act(Use { verb: "listen".into(), noun: "chest".into(), with: None }));
+        assert_eq!(parse("talk to captain"), act(Use { verb: "talk".into(), noun: "captain".into(), with: None }));
+        assert_eq!(parse("stare at a wall"), act(Use { verb: "stare".into(), noun: "wall".into(), with: None }));
+        // Other prepositions change the meaning and stay.
+        assert_eq!(parse("peer into the well"), act(Use { verb: "peer".into(), noun: "into the well".into(), with: None }));
+        // `go to` is left alone: an exit's name is free text.
+        assert_eq!(parse("go to the river"), act(Go("to the river".into())));
     }
 
     #[test]

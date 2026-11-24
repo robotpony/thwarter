@@ -498,8 +498,14 @@ impl WorldEngine {
         let mut things: Vec<&Thing> = self.things.values().collect();
         things.sort_by(|a, b| a.index.path.cmp(&b.index.path));
         for thing in things {
-            let layers = std::iter::once(&thing.index).chain(thing.states.values()).chain(thing.overlays.values());
+            let files = std::iter::once(&thing.index).chain(thing.states.values()).chain(thing.overlays.values());
+            let layers = files.flat_map(|l| std::iter::once(l).chain(l.sections.iter().map(|s| &s.layer)));
             for layer in layers {
+                for (_, id) in super::variables::mentions(&layer.body) {
+                    if self.thing_by_id(&id).is_err() {
+                        warnings.push(format!("{}: `@{}` names nothing in the world, so play shows `{}`", layer.path.display(), id, id));
+                    }
+                }
                 for name in crate::render::prose_links(&layer.body) {
                     if self.link_for(&name).is_some() {
                         continue;

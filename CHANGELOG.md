@@ -37,6 +37,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.47.0 (2026-11-23)
+
+### Added
+
+- In play, `@id` in prose shows as that thing's name in its current version (`@guard-captain` → Captain Marcus), in rooms, doors, objects, characters and replies. An `@` after a letter or a dot (an email address) or inside inline code isn't one. An `@` that names nothing shows as the bare word, and `validate` warns about it, in a file's prose and its sections. Edit mode shows `@` as written.
+- The parser drops a `to` or `at` straight after a verb, then any article (REQ-PC-20): `listen to the chest`, `talk to the captain`. `in`, `into`, `on` and `under` stay, since they change the meaning, and `go to` is left alone, since an exit's name is free text (`go to the river`).
+
 ## 0.46.1 (2026-11-23)
 
 ### Changed
