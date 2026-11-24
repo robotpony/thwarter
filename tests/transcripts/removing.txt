@@ -1,0 +1,25 @@
+# world: tests/worlds/tiny
+# mode: edit
+# copy: yes
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
+> /remove lantern
+Remove lantern (object)?
+  deletes  objects/lantern.md
+  changes  village/square.md  objects: drops lantern
+
+There's no undo. Remove it? (y/n)
+> n
+Kept lantern.
+> /remove lantern
+Remove lantern (object)?
+  deletes  objects/lantern.md
+  changes  village/square.md  objects: drops lantern
+
+There's no undo. Remove it? (y/n)
+> y
+Removed lantern: 1 deleted, 1 changed.
+> /remove village/square
+Not removed: village/square still holds `elder`, `bench`; move or remove them first
+> /remove nothing-at-all
+Nothing called `nothing-at-all` here or anywhere in the world.

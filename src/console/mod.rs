@@ -13,6 +13,7 @@ mod doors;
 mod editor;
 mod full_edit;
 mod inspect;
+mod removing;
 mod panels;
 mod play;
 mod restart;

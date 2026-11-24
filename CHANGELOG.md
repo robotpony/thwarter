@@ -56,6 +56,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.68.0 (2026-11-24)
+
+### Added
+
+- `/remove <thing>` (REQ-CON-49, Bruce, 2026-11-24): deletes an object, room, character or door and the references to it, on the coder's `plan_remove` and `remove_loaded` (904a93f). It shows the plan and asks y/n first, since there's no undo; any other line keeps the thing. A room that still holds things, or the start room, is refused with what to do first. New transcript `removing.txt`.
+
 ## 0.67.0 (2026-11-24)
 
 ### Added

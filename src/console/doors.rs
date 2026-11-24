@@ -29,6 +29,8 @@ pub enum Asked {
     DoorDirection { template: String, to: Option<String> },
     /// Whether to move a thing that's already somewhere, for `/add`.
     MoveHere { thing: String, to: String },
+    /// Whether to go ahead with `/remove`, after its plan.
+    Remove { kind: Kind, id: String },
 }
 
 impl Console {
@@ -91,6 +93,7 @@ impl Console {
                     self.t("left_in_place", &[("thing", &thing)])
                 }
             }
+            Asked::Remove { kind, id } => self.confirm_remove(kind, &id, line),
         }
     }
 
