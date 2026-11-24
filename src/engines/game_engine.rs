@@ -6,7 +6,7 @@ use crate::engines::variables::Scope;
 use crate::engines::{At, EntityKind, Visibility, WorldEngine};
 use crate::models::game::{ActionResult, Change, PlayAction, PlayState};
 use crate::engines::turn::Outcome;
-use crate::render::{location_blocks, prose_plain, RenderStyle};
+use crate::render::prose_plain;
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -202,7 +202,7 @@ impl GameEngine {
 
     fn look(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
         match self.view(world, state) {
-            Some(view) => ActionResult::say(location_blocks(&view, RenderStyle::Player, &|n| world.link_for(n)).to_plain()),
+            Some(view) => ActionResult::say(crate::render::play_blocks(&view, &|n| world.link_for(n), world.play_text()).to_plain()),
             None => ActionResult::say("You're nowhere."),
         }
     }
@@ -328,7 +328,7 @@ impl GameEngine {
         let wanted = noun.trim().to_lowercase();
         let wanted = wanted.strip_prefix("the ").unwrap_or(&wanted);
         if ["room", "here", "around"].contains(&wanted) || wanted == view.title.to_lowercase() || wanted == view.id.to_lowercase() {
-            let look = location_blocks(&view, RenderStyle::Player, &|n| world.link_for(n)).to_plain();
+            let look = crate::render::play_blocks(&view, &|n| world.link_for(n), world.play_text()).to_plain();
             let mut found = self.search(world, state, "You look closely");
             found.text = format!("{}\n\n{}", look, found.text);
             return found;
@@ -633,12 +633,13 @@ impl GameEngine {
     }
 
     fn inventory(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
+        let text = world.play_text();
         let carried = self.carried(world, state);
         if carried.is_empty() {
-            return ActionResult::say("You aren't carrying anything.");
+            return ActionResult::say(text.empty_inventory.clone());
         }
-        let names: Vec<String> = carried.iter().map(|o| o.display_name()).collect();
-        ActionResult::say(format!("You're carrying: {}.", names.join(", ")))
+        let names: Vec<String> = carried.iter().map(|o| crate::engines::play_text::with_article(&o.display_name())).collect();
+        ActionResult::say(text.fill(&text.inventory, &names))
     }
 
     /// Whether `noun` names anything the player can see or carries,
@@ -686,12 +687,15 @@ impl GameEngine {
         let names: Vec<String> = self
             .contents(world, state, holder)
             .iter()
-            .map(|id| world.object_at(id, At::play(state)).map(|o| o.title).unwrap_or_else(|| id.clone()))
+            .map(|id| crate::engines::play_text::with_article(&world.object_at(id, At::play(state)).map(|o| o.title).unwrap_or_else(|| crate::engines::title_from_id(id))))
             .collect();
-        match (names.is_empty(), text.trim().is_empty()) {
-            (true, _) => text.to_string(),
-            (false, true) => format!("You see: {}.", names.join(", ")),
-            (false, false) => format!("{}\n\nYou see: {}.", text.trim(), names.join(", ")),
+        if names.is_empty() {
+            return text.to_string();
+        }
+        let line = world.play_text().fill(&world.play_text().objects, &names);
+        match text.trim().is_empty() {
+            true => line,
+            false => format!("{}\n{}", text.trim(), line),
         }
     }
 
@@ -1063,9 +1067,12 @@ mod tests {
         let (_d, world) = world();
         let (game, mut state) = play(&world);
         let r = game.act(&world, &mut state, &PlayAction::Look);
-        assert!(r.text.starts_with("Yard\n\nGrass.\n\nExits: north, west.\n"), "{}", r.text);
-        assert!(r.text.contains("You see: Rusty sword, Old sword, Stone bench, Well."), "{}", r.text);
-        assert!(r.text.ends_with("Here: King Aldric."), "{}", r.text);
+        // No room name by default; what's here follows the prose, then
+        // after a blank line the ways out and who's here (world.toml [play]).
+        assert_eq!(
+            r.text,
+            "Grass.\nYou see a rusty sword, an old sword, a stone bench, and a well.\n\nYou can go north and west.\nKing Aldric is here."
+        );
         assert!(r.changes.is_empty());
     }
 
@@ -1076,7 +1083,7 @@ mod tests {
         let r = game.act(&world, &mut state, &PlayAction::Go("n".into()));
         assert_eq!(state.location, "castle/hall");
         assert_eq!(r.changes, vec![Change::Moved { from: "castle/yard".into(), to: "castle/hall".into() }]);
-        assert!(r.text.starts_with("Hall\n"));
+        assert!(r.text.starts_with("Stone."), "{}", r.text);
 
         let r = game.act(&world, &mut state, &PlayAction::Go("east".into()));
         assert_eq!(r.text, "You can't go east from here.");
@@ -1100,7 +1107,7 @@ mod tests {
         assert_eq!(r.changes, vec![Change::Took { object: "rusty-sword".into(), from: "castle/yard".into() }]);
         assert_eq!(state.inventory, vec!["rusty-sword"]);
         assert!(!game.act(&world, &mut state, &PlayAction::Look).text.contains("Rusty sword"));
-        assert_eq!(game.act(&world, &mut state, &PlayAction::Inventory).text, "You're carrying: Rusty sword.");
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Inventory).text, "You have a rusty sword.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Take("rusty-sword".into())).text, "You already have the rusty sword.");
 
         // Playing never writes the world (REQ-CON-3).
@@ -1273,7 +1280,7 @@ mod tests {
         state.enter_chapter(&world, Path::new("castle/yard"), "after").unwrap();
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(look.contains("Ashes."), "{}", look);
-        assert!(look.contains("You see: Well.") && !look.contains("Lamp"), "{}", look);
+        assert!(look.contains("You see a well.") && !look.contains("lamp"), "{}", look);
 
         // Chapters can go back; only the new one applies.
         state.enter_chapter(&world, Path::new(""), "before").unwrap();
@@ -1432,14 +1439,14 @@ mod tests {
         let act = |state: &mut PlayState, a: PlayAction| game.act(&world, state, &a).text;
 
         let look = act(&mut state, PlayAction::Look);
-        assert!(look.contains("You see: Crate.") && look.contains("There's no way out."), "{}", look);
+        assert!(look.contains("You see a crate.") && look.contains("There's no way out."), "{}", look);
         assert_eq!(act(&mut state, PlayAction::Take("key".into())), "There's no key here.");
         assert_eq!(act(&mut state, PlayAction::Go("north".into())), "You can't go north from here.");
 
         assert_eq!(act(&mut state, PlayAction::Search), "You search carefully and find the brass key and a way north.");
         assert_eq!(act(&mut state, PlayAction::Search), "You search carefully, but find nothing new.");
         let look = act(&mut state, PlayAction::Look);
-        assert!(look.contains("You see: Brass key, Crate.") && look.contains("Exits: north."), "{}", look);
+        assert!(look.contains("You see a brass key and a crate.") && look.contains("You can go north."), "{}", look);
         assert_eq!(act(&mut state, PlayAction::Take("key".into())), "You take the brass key.");
 
         // Hidden: never listed or found, but an action can name it exactly.
@@ -1460,7 +1467,7 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/yard").unwrap();
         let r = game.act(&world, &mut state, &PlayAction::Examine("room".into()));
-        assert!(r.text.starts_with("Yard\n\nGrass."), "{}", r.text);
+        assert!(r.text.starts_with("Grass."), "{}", r.text);
         assert!(r.text.ends_with("You look closely and find the old sword."), "{}", r.text);
         assert!(state.has_noticed("object", "old-sword"));
     }
@@ -1546,7 +1553,7 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/hall").unwrap();
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
-        assert!(look.contains("Exits: east, down.\nThrough the iron grate you can see the Cell.\nAn iron door is set in the floor, shut."), "{}", look);
+        assert!(look.contains("You can go east and down.\nThrough the iron grate you can see the Cell.\nAn iron door is set in the floor, shut."), "{}", look);
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text, "The iron door is closed.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("east".into())).text, "The iron grate is closed.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("iron door".into())).text, "An iron door is set in the floor, shut.");
@@ -1556,7 +1563,7 @@ mod tests {
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(!look.contains("shut"), "{}", look); // the open state has no prose, and the index none either
         let r = game.act(&world, &mut state, &PlayAction::Go("down".into()));
-        assert!(r.text.starts_with("Vault\n\nGold."), "{}", r.text);
+        assert!(r.text.starts_with("Gold."), "{}", r.text);
         game.act(&world, &mut state, &PlayAction::Go("up".into()));
         assert_eq!(state.location, "castle/hall");
     }
@@ -1568,7 +1575,8 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/hall").unwrap();
         assert!(game.act(&world, &mut state, &PlayAction::Use { verb: "open".into(), noun: "door".into(), with: None }).text.starts_with("You open the iron door."), "`this` is the door");
-        assert!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text.starts_with("Vault"));
+        game.act(&world, &mut state, &PlayAction::Go("down".into()));
+        assert_eq!(state.location, "castle/vault");
     }
 
     #[test]

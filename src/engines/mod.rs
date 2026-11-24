@@ -14,6 +14,7 @@ pub mod game_engine;
 pub mod player_commands;
 pub mod saves;
 pub mod turn;
+pub mod play_text;
 pub mod scripts;
 
 pub use world_engine::*;

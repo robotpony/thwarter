@@ -76,6 +76,9 @@ pub struct WorldEngine {
     /// Every `actions.rhai`, by its full path (`design/SECTIONS.md` ›
     /// Scripts).
     scripts: std::collections::BTreeMap<PathBuf, String>,
+    /// How play words rooms and the inventory (`world.toml`'s `[play]`).
+    play_text: super::play_text::PlayText,
+    play_text_warnings: Vec<String>,
     /// Problems and warnings from the last rebuild, each prefixed with its file.
     file_problems: Vec<String>,
     file_warnings: Vec<String>,
@@ -211,6 +214,8 @@ impl WorldEngine {
             chapters: Vec::new(),
             files: Vec::new(),
             scripts: Default::default(),
+            play_text: Default::default(),
+            play_text_warnings: Vec::new(),
             file_problems: Vec::new(),
             file_warnings: Vec::new(),
             world: WorldDef::default(),
@@ -775,6 +780,8 @@ impl WorldEngine {
     /// its old `[metadata]` and `[settings] starting_location`.
     fn read_world_toml(&mut self, root: &Path) {
         self.ignore.clear();
+        self.play_text = Default::default();
+        self.play_text_warnings.clear();
         self.world_toml = WorldDef::default();
         self.world_toml_warning = None;
         let path = root.join("world.toml");
@@ -790,6 +797,13 @@ impl WorldEngine {
             self.ignore = list.iter().filter_map(|v| v.as_str()).map(PathBuf::from).collect();
         }
         self.world_toml = WorldDef::from_world_toml(root, &value);
+        self.play_text = super::play_text::PlayText::from_toml(value.get("play"), &mut self.play_text_warnings);
+    }
+
+    /// How play words rooms and the inventory, from `world.toml`'s
+    /// `[play]` over the defaults.
+    pub fn play_text(&self) -> &super::play_text::PlayText {
+        &self.play_text
     }
 
     /// Every id used by more than one kind, with those kinds, sorted. Ids
@@ -1093,6 +1107,7 @@ impl WorldEngine {
         warnings.extend(self.script_warnings());
         warnings.extend(self.placement_warnings());
         warnings.extend(self.holds_warnings());
+        warnings.extend(self.play_text_warnings.iter().cloned());
         warnings.extend(self.door_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings

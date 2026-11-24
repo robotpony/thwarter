@@ -38,6 +38,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.51.0 (2026-11-23)
+
+### Changed
+
+- Play reads as plain sentences (Bruce, 2026-11-23; REQ-ENG-43). Looking shows no room name by default, then the description, then what's here on the next line ("You see a chair, a bed, and an old shirt."), then after a blank line the ways out ("You can go north and west."), each door's text, and who's here ("Captain Marcus is here."). Inventory is "You have a key and a lamp." Examining a holder adds "You see an old photo and a shelf." Every line is a template in `world.toml`'s `[play]` table (`engines::play_text::PlayText`, `WorldEngine::play_text()`), and the test world's `world.toml` lists each one at its default as the reference. `render::play_blocks` renders a room with a world's settings; `render_location_as(view, Player)` uses the defaults.
+
+### Fixed
+
+- Play's room text is cleaned of terminal control sequences when rendered directly, not only through `location_blocks`.
+
 ## 0.50.2 (2026-11-23)
 
 ### Changed

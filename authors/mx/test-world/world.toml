@@ -1,5 +1,20 @@
-# Tool settings only. The world's title, author, version and starting room
-# are in world/index.md (design/STATES.md).
+# Tool and play settings. The world's title, author, version and starting
+# room are in world/index.md (design/STATES.md).
 
 [settings]
 default_map_style = "ascii"
+
+# How play words rooms and the inventory. Every setting is shown here with
+# its default, as a reference; change any line to reword this world. In
+# the text settings, {list} is the things, people or directions, joined
+# with commas and "and" ("a chair, a bed, and an old shirt").
+[play]
+show_room_names = false                 # show the room's name above its description
+objects = "You see {list}."             # what's in the room, right after the description
+character = "{list} is here."           # one person here
+characters = "{list} are here."         # more than one
+exits = "You can go {list}."            # the ways out
+no_exits = "There's no way out."
+inventory = "You have {list}."
+empty_inventory = "You aren't carrying anything."
+serial_comma = true                     # "a, b, and c" rather than "a, b and c"

@@ -209,67 +209,71 @@ pub fn render_location_as(view: &LocationView, style: RenderStyle) -> String {
 pub fn location_blocks(view: &LocationView, style: RenderStyle, links: Resolver) -> Rendered {
     match style {
         RenderStyle::Author => author_blocks(view),
-        RenderStyle::Player => player_blocks(view, links),
+        RenderStyle::Player => play_blocks(view, links, &crate::engines::play_text::PlayText::default()),
     }
     .cleaned()
 }
 
-/// A room as the player sees it: title, description, the ways out, then
-/// what and who is here, by name. No ids, coordinates or missing marks.
-fn player_blocks(view: &LocationView, links: Resolver) -> Rendered {
-    let mut blocks = vec![Block::line(BlockKind::Title, view.title.clone(), false)];
+/// A room as the player sees it, worded by `text` (a world's `[play]`
+/// settings): its name if the world shows names, its description, then
+/// what's here in one sentence right after it, then the ways out and who's
+/// here, in plain sentences. No ids, coordinates or missing marks; those
+/// are for an author's sidebar.
+pub fn play_blocks(view: &LocationView, links: Resolver, text: &crate::engines::play_text::PlayText) -> Rendered {
+    let mut blocks = Vec::new();
+    if text.show_room_names {
+        blocks.push(Block::line(BlockKind::Title, view.title.clone(), false));
+    }
     let body = view.body.trim();
     if body.is_empty() {
-        blocks.push(Block::line(BlockKind::Notice, "(no description yet)", true));
+        blocks.push(Block::line(BlockKind::Notice, "(no description yet)", !blocks.is_empty()));
     } else {
         let mut prose = prose_blocks(body, links).blocks;
         if let Some(first) = prose.first_mut() {
-            first.space_before = true;
+            first.space_before = !blocks.is_empty();
         }
         blocks.extend(prose);
     }
+    // What's here, straight after the description.
+    blocks.extend(seen(view, text));
+    // Then, after a blank line, the ways out, each door's own text, and
+    // who's here.
+    let mut after: Vec<Block> = Vec::new();
     if view.exits.is_empty() {
-        blocks.push(Block::line(BlockKind::Notice, "There's no way out.", true));
+        after.push(Block::line(BlockKind::Notice, text.no_exits.clone(), false));
     } else {
-        let dirs: Vec<&str> = view.exits.iter().map(|e| e.direction.as_str()).collect();
-        blocks.push(Block::line(BlockKind::Exits, format!("Exits: {}.", dirs.join(", ")), true));
+        let dirs: Vec<String> = view.exits.iter().map(|e| e.direction.clone()).collect();
+        after.push(Block::line(BlockKind::Exits, text.fill(&text.exits, &dirs), false));
     }
     // Each door's own text by the exits; the room's prose never changes
     // for a door (`design/STATES.md` › Doors).
     for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
         if !door.description.trim().is_empty() {
             for block in prose_blocks(door.description.trim(), links).blocks {
-                blocks.push(Block { kind: BlockKind::Exits, space_before: false, ..block });
+                after.push(Block { kind: BlockKind::Exits, space_before: false, ..block });
             }
         }
         if let Some(beyond) = &door.beyond {
-            blocks.push(Block::line(BlockKind::Exits, format!("Through the {} you can see the {}.", door.title.to_lowercase(), beyond), false));
+            after.push(Block::line(BlockKind::Exits, format!("Through the {} you can see the {}.", door.title.to_lowercase(), beyond), false));
         }
     }
-    let names = |refs: &[crate::engines::EntityRef], kind: EntityKind, label: &str| -> Option<Block> {
-        if refs.is_empty() {
-            return None;
-        }
-        let mut spans = vec![Span::plain(format!("{}: ", label))];
-        for (i, r) in refs.iter().enumerate() {
-            if i > 0 {
-                spans.push(Span::plain(", "));
-            }
-            let link = Link { name: r.id.clone(), target: r.name.as_ref().map(|_| (kind, r.id.clone())) };
-            spans.push(Span { text: r.display_name(), style: Style { link: Some(link), ..Default::default() } });
-        }
-        spans.push(Span::plain("."));
-        Some(Block::new(BlockKind::Here, spans, false))
-    };
-    blocks.extend(seen(view));
-    blocks.extend(names(&view.characters, EntityKind::Character, "Here"));
-    Rendered { blocks }
+    if !view.characters.is_empty() {
+        let names: Vec<String> = view.characters.iter().map(|c| c.display_name()).collect();
+        let template = if names.len() == 1 { &text.character } else { &text.characters };
+        after.push(Block::line(BlockKind::Here, text.fill(template, &names), false));
+    }
+    if let Some(first) = after.first_mut() {
+        first.space_before = !blocks.is_empty();
+    }
+    blocks.extend(after);
+    // Cleaned here, since play calls this directly (REQ-CFG-9).
+    Rendered { blocks }.cleaned()
 }
 
-/// "You see:" in play: every visible thing by title, each held thing
-/// right after what holds it, "Old photo (on the walls)" (REQ-CF-31), and
-/// what the doors hold last.
-fn seen(view: &LocationView) -> Option<Block> {
+/// "You see a chair, a bed, and an old shirt." in play: every visible
+/// thing, each held thing right after what holds it, "an old photo on the
+/// walls" (REQ-CF-31), and what the doors hold last.
+fn seen(view: &LocationView, text: &crate::engines::play_text::PlayText) -> Option<Block> {
     let mut entries: Vec<(&crate::engines::EntityRef, Option<&crate::engines::Held>)> = Vec::new();
     fn add<'a>(view: &'a LocationView, holder: &str, entries: &mut Vec<(&'a crate::engines::EntityRef, Option<&'a crate::engines::Held>)>) {
         for held in view.held.iter().filter(|h| h.holder == holder) {
@@ -290,19 +294,17 @@ fn seen(view: &LocationView) -> Option<Block> {
     if entries.is_empty() {
         return None;
     }
-    let mut spans = vec![Span::plain("You see: ")];
-    for (i, (r, holder)) in entries.iter().enumerate() {
-        if i > 0 {
-            spans.push(Span::plain(", "));
-        }
-        let link = Link { name: r.id.clone(), target: r.name.as_ref().map(|_| (EntityKind::Object, r.id.clone())) };
-        spans.push(Span { text: r.display_name(), style: Style { link: Some(link), ..Default::default() } });
-        if let Some(held) = holder {
-            spans.push(Span::plain(format!(" ({} the {})", held.word, held.holder_name.to_lowercase())));
-        }
-    }
-    spans.push(Span::plain("."));
-    Some(Block::new(BlockKind::Here, spans, false))
+    let names: Vec<String> = entries
+        .iter()
+        .map(|(r, held)| {
+            let name = crate::engines::play_text::with_article(&r.display_name());
+            match held {
+                Some(h) => format!("{} {} the {}", name, h.word, h.holder_name.to_lowercase()),
+                None => name,
+            }
+        })
+        .collect();
+    Some(Block::line(BlockKind::Here, text.fill(&text.objects, &names), false))
 }
 
 /// A location as an author checks it: title and id, coordinates,
@@ -939,14 +941,15 @@ Objects:
     #[test]
     fn renders_for_the_player_by_name_only() {
         let expected = "\
-Castle Courtyard
-
 A dry fountain.
+You see a fountain.
 
-Exits: north, down.
-You see: Fountain.
-Here: Captain Marcus, Ghost.";
+You can go north and down.
+Captain Marcus and Ghost are here.";
         assert_eq!(render_location_as(&view(), RenderStyle::Player), expected);
+        // A world may show room names (`world.toml` [play]).
+        let named = crate::engines::play_text::PlayText { show_room_names: true, ..Default::default() };
+        assert!(play_blocks(&view(), &no_links, &named).to_plain().starts_with("Castle Courtyard\n\nA dry fountain.\nYou see a fountain."));
         let mut empty = view();
         empty.exits.clear();
         empty.objects.clear();
@@ -967,23 +970,25 @@ Here: Captain Marcus, Ghost.";
     /// The player view as it was before blocks, kept to prove `to_plain`
     /// prints the same bytes for prose with no Markdown in it.
     fn legacy_player(view: &LocationView) -> String {
-        let mut out = vec![view.title.clone(), String::new()];
+        use crate::engines::play_text::{with_article, PlayText};
+        let t = PlayText::default();
+        let mut out = Vec::new();
         let body = view.body.trim();
         out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
+        if !view.objects.is_empty() {
+            let names: Vec<String> = view.objects.iter().map(|o| with_article(&o.display_name())).collect();
+            out.push(t.fill(&t.objects, &names));
+        }
         out.push(String::new());
         if view.exits.is_empty() {
-            out.push("There's no way out.".to_string());
+            out.push(t.no_exits.clone());
         } else {
-            let dirs: Vec<&str> = view.exits.iter().map(|e| e.direction.as_str()).collect();
-            out.push(format!("Exits: {}.", dirs.join(", ")));
-        }
-        if !view.objects.is_empty() {
-            let names: Vec<String> = view.objects.iter().map(|o| o.display_name()).collect();
-            out.push(format!("You see: {}.", names.join(", ")));
+            let dirs: Vec<String> = view.exits.iter().map(|e| e.direction.clone()).collect();
+            out.push(t.fill(&t.exits, &dirs));
         }
         if !view.characters.is_empty() {
             let names: Vec<String> = view.characters.iter().map(|c| c.display_name()).collect();
-            out.push(format!("Here: {}.", names.join(", ")));
+            out.push(t.fill(if names.len() == 1 { &t.character } else { &t.characters }, &names));
         }
         out.join("\n")
     }
@@ -1039,7 +1044,8 @@ Here: Captain Marcus, Ghost.";
         v.title = "Court\u{1b}[1;1Hyard".into();
         v.body = "A \u{1b}]0;pwned\u{7}fountain.".into();
         v.objects = vec![EntityRef { id: "x\u{1b}[5m".into(), name: Some("Bell\u{7}".into()) }];
-        for text in [render_location(&v), render_location_as(&v, RenderStyle::Player)] {
+        let named = crate::engines::play_text::PlayText { show_room_names: true, ..Default::default() };
+        for text in [render_location(&v), play_blocks(&v, &no_links, &named).to_plain()] {
             assert!(!text.chars().any(|c| c.is_control() && c != '\n'), "{:?}", text);
             assert!(text.contains("Courtyard") && text.contains("A fountain."), "{}", text);
         }
