@@ -44,7 +44,7 @@ impl Console {
             Place::File(path) => Path::new(path).parent().map(Path::to_path_buf).unwrap_or_default(),
             Place::Dir(dir) => Path::new(dir).to_path_buf(),
         };
-        let set = self.world.engine.questions_for(&folder, Some(id), kind_word)?;
+        let set = self.world.engine.questions_for_thing(&folder, id, None, kind_word)?;
         let root = self.world.engine.world_root.clone().unwrap_or_default();
         let shown_path = set.path.strip_prefix(&root).unwrap_or(&set.path).display().to_string();
         (!set.questions.is_empty()).then(|| Asking { set, kind, id: id.to_string(), shown_path })
@@ -105,7 +105,7 @@ fn commands_for(id: &str, answer: &Answer) -> Vec<String> {
     let given = answer.given.as_deref().map(str::trim).filter(|g| !g.is_empty());
     match (&answer.choice.action, given) {
         (None, _) => Vec::new(),
-        (Some(Construct::Set { key }), Some(value)) => vec![format!("/set {} {}", key, quote(value))],
+        (Some(Construct::Set { key, .. }), Some(value)) => vec![format!("/set {} {}", key, quote(value))],
         (Some(Construct::Set { .. }), None) => Vec::new(),
         (Some(Construct::Recipe { name, args }), _) => {
             vec![format!("/recipe {} {}", name, args.join(" ")).trim_end().to_string()]
@@ -140,7 +140,7 @@ fn quote(value: &str) -> String {
 /// Whether an answer to this option needs something typed or picked.
 pub fn needs(choice: &Choice) -> Option<Needs> {
     match &choice.action {
-        Some(Construct::Set { key }) => Some(Needs::Text { prompt: format!("{}:", key), default: None }),
+        Some(Construct::Set { key, .. }) => Some(Needs::Text { prompt: format!("{}:", key), default: None }),
         Some(Construct::AskValue { name, default }) => Some(Needs::Text { prompt: format!("{}:", name), default: default.clone() }),
         Some(Construct::AskThing { .. }) => Some(Needs::Thing),
         _ => None,

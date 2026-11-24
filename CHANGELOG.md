@@ -49,6 +49,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.61.2 (2026-11-24)
+
+### Changed
+
+- The question picker chooses a set through the engine's `questions_for_thing` (d2665a8): the new thing's id, then its template's, then its kind's.
+
 ## 0.61.1 (2026-11-24)
 
 ### Changed
