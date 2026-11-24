@@ -32,6 +32,9 @@ pub enum Kind {
     Template,
     /// A file in `game/`, which sets the starting state.
     Game,
+    /// A door joining two rooms (`design/STATES.md` › Doors). Shown, not
+    /// yet editable from the console.
+    Door,
 }
 
 impl Kind {
@@ -48,6 +51,7 @@ impl Kind {
             Kind::Area => "area",
             Kind::Template => "template",
             Kind::Game => "game start",
+            Kind::Door => "door",
         }
     }
 
@@ -195,6 +199,9 @@ fn entry_for_role(engine: &WorldEngine, role: Option<&FileRole>, key: &str) -> F
         Some(FileRole::Thing { kind: EntityKind::Object, id }) => {
             entry_for(Kind::Object, id, engine.objects.get(id).map(|o| &o.title))
         }
+        // Any other kind of thing: doors, which the engine is adding.
+        #[allow(unreachable_patterns)]
+        Some(FileRole::Thing { id, .. }) => part(Kind::Door, id, id.clone()),
         Some(FileRole::State { id, name, .. }) => part(Kind::State, id, format!("State `{}` of {}", name, id)),
         Some(FileRole::Overlay { id, chapter, .. }) => {
             part(Kind::Overlay, id, format!("{} in chapter {}", id, chapter.name()))
