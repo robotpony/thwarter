@@ -430,16 +430,15 @@ fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu) {
     if items.len() > start + shown {
         lines.push(Line::styled(format!(" ↓ {} more", items.len() - start - shown), style(Role::Note)));
     }
-    let keys = if items.is_empty() { " esc close" } else { " ↑↓ choose · tab or enter pick · esc close" };
-    lines.push(Line::styled(keys, style(Role::Chrome)));
-    let height = (lines.len() as u16).min(area.height);
-    let width = area.width.min(90);
-    let popup = Rect { x: area.x, y: area.bottom().saturating_sub(height), width, height };
+    // The menu sits on the output's last rows, between two rules; the keys
+    // ride on the lower rule at the right, just above the prompt.
+    let height = (lines.len() as u16 + 2).min(area.height);
+    let popup = Rect { x: area.x, y: area.bottom().saturating_sub(height), width: area.width, height };
     frame.render_widget(ratatui::widgets::Clear, popup);
-    frame.render_widget(
-        Paragraph::new(lines).block(Block::default().borders(Borders::TOP).border_style(style(Role::Chrome))),
-        Rect { y: popup.y.saturating_sub(1), height: popup.height + 1, ..popup },
-    );
+    let block = Block::default().borders(Borders::TOP | Borders::BOTTOM).border_style(style(Role::Chrome));
+    let keys = if items.is_empty() { " esc close " } else { " ↑↓ choose · tab or enter pick · esc close " };
+    let block = block.title_bottom(Line::styled(keys, style(Role::Chrome)).right_aligned());
+    frame.render_widget(Paragraph::new(lines).block(block), popup);
 }
 
 /// Runs the full-screen console until `/quit` or Ctrl-D.

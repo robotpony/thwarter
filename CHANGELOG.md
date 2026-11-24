@@ -40,6 +40,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.57.2 (2026-11-24)
+
+### Changed
+
+- The `/` menu's keys (`↑↓ choose · tab or enter pick · esc close`) sit on its lower rule at the right, just above the prompt, rather than on a line of their own (Bruce, 2026-11-24).
+- Command hints name their parameters, required ones in braces and optional ones in brackets: `/new room|character|object {id} [{title}]`, `/link {direction} {room}`, `/move {thing} {room|character|thing}`.
+
 ## 0.57.1 (2026-11-24)
 
 ### Changed

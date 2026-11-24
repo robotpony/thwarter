@@ -25,16 +25,16 @@ const fn command(name: &'static str, args: &'static str, about: &'static str, ed
 
 /// Every console command, in the order the menu shows them.
 pub const COMMANDS: &[Command] = &[
-    command("edit", "[room|object|character] [id] or <name>", "edit where you are, or what you name", false),
+    command("edit", "[room|object|character] [{id}]", "edit where you are, or what you name", false),
     command("play", "[here]", "play, resuming the game, or from the room edit mode is in", false),
-    command("new", "room|character|object ...", "make a room, character or object", true),
-    command("set", "<key> <value>", "change one field of where you are", true),
-    command("link", "<direction> <room>", "add or change an exit from this room", true),
-    command("unlink", "<direction>", "remove an exit from this room", true),
-    command("add", "<thing> [room or character]", "put a person or thing here too; scenery if it has no card", true),
-    command("move", "<thing> <room or character>", "put something somewhere else, or a room in an area", true),
-    command("save", "[name]", "save the game", false),
-    command("load", "[name]", "load a saved game", false),
+    command("new", "room|character|object {id} [{title}]", "make a room, character or object", true),
+    command("set", "{key} {value}", "change one field of where you are", true),
+    command("link", "{direction} {room}", "add or change an exit from this room", true),
+    command("unlink", "{direction}", "remove an exit from this room", true),
+    command("add", "{thing} [{room|character|thing}]", "put a person or thing here too; scenery if it has no card", true),
+    command("move", "{thing} {room|character|thing}", "put something somewhere else, or a room in an area", true),
+    command("save", "[{name}]", "save the game", false),
+    command("load", "[{name}]", "load a saved game", false),
     command("reload", "", "reload the world from disk, staying where you are", false),
     command("restart", "", "restart the console on the newest build", false),
     command("status", "", "the world, where you are, the game, saves and the build", false),
@@ -327,7 +327,7 @@ mod tests {
         console.handle("go /village/square");
         let c = console.complete("/edit object ");
         assert_eq!(texts(&c), vec!["lantern"]);
-        assert_eq!(c.hint.as_deref(), Some("/edit [room|object|character] [id] or <name>"));
+        assert_eq!(c.hint.as_deref(), Some("/edit [room|object|character] [{id}]"));
         assert_eq!(texts(&console.complete("/unlink ")), vec!["east", "north"]);
         assert_eq!(texts(&console.complete("/link north ")), vec!["village/square", "village/well"]);
         let c = console.complete("/move l");
