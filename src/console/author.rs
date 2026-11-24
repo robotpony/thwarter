@@ -292,10 +292,7 @@ impl Console {
                 return format!("{} is already in {}, as {} is.", room, shown, target);
             }
             let to = if area.is_empty() { name.to_string() } else { format!("{}/{}", area, name) };
-            return format!(
-                "{} is a room. Moving it to {} needs the writer to move its file and update the exits to it, which comes with renaming.",
-                room, to
-            );
+            return self.move_room(&room, &to);
         }
         if let Some(problem) = bare_id_problem(thing) {
             return problem;
@@ -426,6 +423,96 @@ impl Console {
             followed
         );
         self.after_writes(&written, summary)
+    }
+
+    /// Moves room `old` to the id `new`: its file (or bundle folder) moves to
+    /// match, and every exit, list, start and link to it follows, through
+    /// the writer's rename. Edit mode, `go back` and the game follow too.
+    fn move_room(&mut self, old: &str, new: &str) -> String {
+        let writer = match self.writer() {
+            Ok(writer) => writer,
+            Err(e) => return e,
+        };
+        self.note_warnings_before();
+        let report = match writer.rename_loaded(&mut self.world.engine, EntityKind::Location, old, new, false) {
+            Ok(report) => report,
+            Err(e) => return format!("Not moved: {}", within(&writer, &e)),
+        };
+        self.follow_rename(old, new);
+
+        // Every path touched, so the watcher doesn't announce them again.
+        let mut touched: Vec<PathBuf> = report.written.clone();
+        for (from, to) in &report.moved {
+            touched.push(from.clone());
+            touched.push(to.clone());
+        }
+        let moved_to: Vec<&PathBuf> = report.moved.iter().map(|(_, to)| to).collect();
+        let mut updated: Vec<String> = report
+            .written
+            .iter()
+            .filter(|p| !moved_to.contains(p))
+            .map(|p| p.with_extension("").to_string_lossy().replace('\\', "/"))
+            .collect();
+        updated.sort();
+        let file = report
+            .moved
+            .first()
+            .map(|(from, to)| format!("moved {} → {}", from.display(), to.display()))
+            .unwrap_or_else(|| "nothing to move".to_string());
+        let mut summary = format!("Moved {} → {}: {}", old, new, file);
+        if report.moved.len() > 1 {
+            summary.push_str(&format!(" and {} more file(s) of its bundle", report.moved.len() - 1));
+        }
+        if !updated.is_empty() {
+            summary.push_str(&format!(", updated {} ({})", plural(updated.len(), "file"), updated.join(", ")));
+        }
+        summary.push('.');
+        if !report.by_hand.is_empty() {
+            summary.push_str(&format!("\nStill naming {}, to fix by hand:", old));
+            for place in &report.by_hand {
+                summary.push_str(&format!("\n  {}", place));
+            }
+        }
+        self.after_writes(&touched, summary)
+    }
+
+    /// After room `old` became `new`: where edit mode is, the places `go
+    /// back` remembers, and the game in progress follow it.
+    fn follow_rename(&mut self, old: &str, new: &str) {
+        let swap = |path: &str| -> Option<String> {
+            if path == old {
+                Some(new.to_string())
+            } else {
+                path.strip_prefix(&format!("{}/", old)).map(|rest| format!("{}/{}", new, rest))
+            }
+        };
+        let follow = |place: &mut Place| match place {
+            Place::File(path) | Place::Dir(path) => {
+                if let Some(moved) = swap(path) {
+                    *path = moved;
+                }
+            }
+        };
+        follow(&mut self.place);
+        for place in &mut self.trail {
+            follow(place);
+        }
+        if let Some(game) = self.game.as_mut() {
+            if game.location == old {
+                game.location = new.to_string();
+            }
+            if let Some(taken) = game.taken.remove(old) {
+                game.taken.insert(new.to_string(), taken);
+            }
+            if let Some(visits) = game.visits.remove(old) {
+                game.visits.insert(new.to_string(), visits);
+            }
+            if let Some(states) = game.states.get_mut("location") {
+                if let Some(state) = states.remove(old) {
+                    states.insert(new.to_string(), state);
+                }
+            }
+        }
     }
 
     // Shared steps.
@@ -608,6 +695,11 @@ fn split_list(typed: &str) -> Vec<String> {
     parts.into_iter().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).collect()
 }
 
+
+/// "1 file" or "3 files".
+fn plural(n: usize, noun: &str) -> String {
+    format!("{} {}{}", n, noun, if n == 1 { "" } else { "s" })
+}
 
 /// "in village/well" or "carried by elder".
 fn where_to(destination: &str, carried: bool) -> String {

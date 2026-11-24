@@ -32,6 +32,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.31.0 (2026-11-23)
+
+### Added
+
+- `/move <room> <area or room>` moves a room into an area folder (REQ-CON-40, Bruce, 2026-11-23): `/move hallway house` makes it `house/hallway`, moving its file (or its bundle folder) and updating every exit, room list, inventory, `default_location`, the world's `start:` and every link to it, through the writer's `rename_loaded` (318144e). A room as the target stands for its own area. The report names the files it updated and lists any reference left to fix by hand (inside an action's `becomes:` or `requires:`). Edit mode's place, `go back` and the game in progress follow the room to its new id, and the watcher doesn't announce the files the move touched.
+
 ## 0.30.0 (2026-11-23)
 
 ### Added

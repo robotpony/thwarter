@@ -480,6 +480,25 @@ mod tests {
     }
 
     #[test]
+    fn moving_a_room_takes_edit_mode_and_the_game_with_it() {
+        let (_dir, root) = tiny_copy();
+        let mut console = console_at(&root, "/village/well");
+        console.handle("/play here");
+        console.handle("/edit");
+        console.take_pending_edit();
+        let (out, _) = console.handle("/move village/well house");
+        assert!(out.starts_with("Moved village/well → house/well: moved village/well.md → house/well.md"), "{}", out);
+        assert!(root.join("house/well.md").exists() && !root.join("village/well.md").exists());
+        assert_eq!(console.pwd(), "house/well");
+        assert_eq!(console.game.as_ref().unwrap().location, "house/well");
+        let square = fs::read_to_string(root.join("village/square.md")).unwrap();
+        assert!(square.contains("north: house/well"), "{}", square);
+        // A room standing for its own area: beside the square again.
+        let (out, _) = console.handle("/move house/well village/square");
+        assert!(out.starts_with("Moved house/well → village/well"), "{}", out);
+    }
+
+    #[test]
     fn named_things_open_from_anywhere() {
         let (_dir, root) = tiny_copy();
         let mut console = console_at(&root, "/");

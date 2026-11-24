@@ -172,4 +172,25 @@ Characters:
 
 Objects: none
 > /move village/well house
-village/well is a room. Moving it to house/well needs the writer to move its file and update the exits to it, which comes with renaming.
+Moved village/well → house/well: moved village/well.md → house/well.md, updated 3 files (npcs/elder, village/square, village/tower).
+> go back
+Village Square (room)
+> look
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  house/well
+  east   village/inn  (missing)
+
+Characters:
+  The Smith (smith)
+
+Objects:
+  Bench (bench)
+  Rope (rope)
+> /move house/well village/square
+Moved house/well → village/well: moved house/well.md → village/well.md, updated 3 files (npcs/elder, village/square, village/tower).
+> go /village/well
+The Well (room)
