@@ -43,6 +43,7 @@ pub const COMMANDS: &[Command] = &[
     command("status", "", "the world, where you are, the game, saves and the build", false),
     command("map", "", "the map around you; the sidebar shows the nearest rooms", false),
     command("validate", "[strict]", "check the world as thwart validate does", false),
+    command("inspect", "[{thing}]", "a thing in full: its file, where it starts, states, sections, warnings", false),
     command("clear", "", "empty the output", false),
     command("help", "", "every command", false),
     command("quit", "", "leave the console", false),

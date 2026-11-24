@@ -48,6 +48,17 @@ bedroom already has a west exit, to door-bedroom-west. To change it:
   world/    World settings
   ```
 
+- REQ-CON-48: The room view in edit mode MUST read as play's prose, under its title line; the author's detail goes to the sidebar and `/inspect` instead (Bruce, 2026-11-24). HERE shows the room's exits with where they lead, each door's title, id and state, and the people, things and scenery by id. `/inspect [<thing>]` MUST show one thing or door in full: its file, scope, where it starts, its templates, states, actions and sections, its sides for a door, its state in the game, and every problem or warning that names it.
+
+  ```
+  in village/square > /inspect lantern
+  Brass Lantern (lantern), object
+    file       objects/lantern.md
+    scope      global
+    starts in  room `village/square`
+    actions    light
+  ```
+
 - REQ-CON-5: Edit mode MUST offer commands that create or change one thing at a time, for example `/new room north <id>` (a new room, linked north of the current one), `/new object`, `/new character`, `/set` (one field), `/link` (add or change one exit) and `/unlink` (remove one exit). Each MUST save the change to the file (REQ-ENG-7) and report any problems it causes (REQ-ENG-8). On a terminal, `/new` and `/add` then open the full-screen editor on what they made or added (Bruce, 2026-11-24); a setting to turn that off MAY follow. The author always names a new entity's `id`; the console MUST NOT make one up, since an `id` can't be renamed yet. In a room, the first word after `/new room` is a direction; outside a room, it's the new room's `id`.
 - REQ-CON-41: `/add <thing> [room or character]` MUST put a person or thing into a room, the current one if none is named, or an object into a character's inventory, without taking it from anywhere else (Bruce, 2026-11-23). A name with no card goes in as scenery (REQ-CF-8).
 

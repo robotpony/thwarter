@@ -54,6 +54,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.65.0 (2026-11-24)
+
+### Added
+
+- `/inspect [<thing>]` (REQ-CON-48, Bruce, 2026-11-24): one thing or door in full, for chasing a warning like "tshirt starts in more than one place". It shows the file, scope, where it starts (from `placement()`), its templates, states (the starting one marked), actions by state, `## When:` and `## Unless:` sections, a door's sides, its state in a running game, and every problem or warning that names it. With no name, the thing edit mode is at.
+
+### Changed
+
+- The sidebar's exits name a door by title, id and state (in the game, else its starting state): "down  vault  through Iron door (vault-door), closed". With the coder's da8728b, edit mode's room view is play's prose under its title, and the sidebar and `/inspect` hold the author's detail. Transcripts reblessed.
+
 ## 0.64.3 (2026-11-24)
 
 ### Changed

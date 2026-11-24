@@ -272,8 +272,18 @@ impl Console {
         exits.sort();
         for (direction, to) in exits {
             // Through a door: the room beyond, and the door by name.
+            // Through a door: its title, its id, and the state it's in, in
+            // the game if one is running, else where it starts.
             let (room, through) = match self.world.engine.doors.get(to) {
-                Some(door) => (door.leads_to(&location.id).unwrap_or("?").to_string(), format!("  through {}", to)),
+                Some(door) => {
+                    let state = self
+                        .game
+                        .as_ref()
+                        .and_then(|g| g.states.values().find_map(|m| m.get(to)).cloned())
+                        .or_else(|| self.world.engine.thing(crate::engines::EntityKind::Door, to).and_then(|t| t.starting_state.clone()));
+                    let state = state.map(|s| format!(", {}", s)).unwrap_or_default();
+                    (door.leads_to(&location.id).unwrap_or("?").to_string(), format!("  through {} (`{}`){}", door.title, to, state))
+                }
                 None => (to.clone(), String::new()),
             };
             if self.world.engine.get_location(&room).is_some() {
@@ -525,7 +535,7 @@ mod tests {
         let mut console = Console::open(root, Mode::Edit).unwrap();
         console.handle("go hall");
         let rest = texts(&console.sidebar().rest);
-        assert!(rest.contains(&"  down  vault  through vault-door".to_string()), "{:?}", rest);
+        assert!(rest.contains(&"  down  vault  through Iron door (`vault-door`), closed".to_string()), "{:?}", rest);
         assert_eq!(console.handle("down").0, "Vault (room)");
         assert_eq!(console.world.files["doors/vault-door"].kind, Kind::Door);
     }

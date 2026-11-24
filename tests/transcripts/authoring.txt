@@ -14,7 +14,6 @@ The Old Tower (village/tower)
 (no description yet)
 
 You can go south.
-  south  village/well
 > go s
 The Well (room)
 > /new room n gatehouse
@@ -68,19 +67,11 @@ Created character smith, The Smith, placed in village/square.
 Village Square (village/square)
 
 A small square of packed earth. An old well stands to the north.
-
 The Elder and The Smith are here.
-  The Elder (elder)
-  The Smith (smith)
 
-You see a brass lantern, a bench, and a rope.
-  Brass Lantern (lantern)
-  Bench (bench)
-  Rope (rope)
+You see a brass lantern and a rope.
 
 You can go north or east.
-  north  village/well
-  east   village/inn  (not written yet)
 > go smith
 The Smith (character)
 > /set attributes.strength 12
@@ -130,18 +121,11 @@ Moved lantern: village/well → carried by elder.
 Village Square (village/square)
 
 A small square of packed earth. An old well stands to the north.
-
 The Elder and The Smith are here.
-  The Elder (elder)
-  The Smith (smith)
 
-You see a bench and a rope.
-  Bench (bench)
-  Rope (rope)
+You see a rope.
 
 You can go north or east.
-  north  village/well
-  east   village/inn  (not written yet)
 > /move elder village/well
 Moved elder: village/square → village/well (and its default_location).
 > /move elder lantern
@@ -161,14 +145,9 @@ The Well (room)
 The Well (village/well)
 
 A mossy stone well. The rope is long gone.
-
 The Elder is here.
-  The Elder (elder)
 
 You can go north, south, or behind.
-  north   village/tower
-  south   village/square
-  behind  village/cellar
 > /move village/well house
 Moved village/well → house/well: moved village/well.md → house/well.md, updated 3 files (npcs/elder, village/square, village/tower).
 > go back
@@ -177,17 +156,11 @@ Village Square (room)
 Village Square (village/square)
 
 A small square of packed earth. An old well stands to the north.
-
 The Smith is here.
-  The Smith (smith)
 
-You see a bench and a rope.
-  Bench (bench)
-  Rope (rope)
+You see a rope.
 
 You can go north or east.
-  north  house/well
-  east   village/inn  (not written yet)
 > /move house/well village/square
 Moved house/well → village/well: moved house/well.md → village/well.md, updated 3 files (npcs/elder, village/square, village/tower).
 > go /village/well
@@ -241,18 +214,9 @@ bench can't hold itself.
 Village Square (village/square)
 
 A small square of packed earth. An old well stands to the north.
-
 The Smith and Old Tom are here.
-  The Smith (smith)
-  Old Tom (old-tom)
 
-You see a bench, a chair, and an iron key.
-  Bench (bench)
-    Brass Lantern (lantern)
-  Chair (chair)
-    Rope (rope)
-  Iron Key (iron-key)
+You see an iron key.
+There's a brass lantern on the bench and a rope on the chair.
 
 You can go north or east.
-  north  village/well
-  east   village/inn  (not written yet)

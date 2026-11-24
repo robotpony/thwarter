@@ -44,3 +44,6 @@ room_person_missing = "{id}  (not written yet)"
 room_thing = "{name} ({id})"
 room_thing_no_card = "{id}  (no card)"
 room_held_by_door = "{Word} the {door}:"
+
+# /inspect (inspect.rs).
+inspect_warnings = "Named in {count} problem(s) or warning(s):"

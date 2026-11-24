@@ -138,7 +138,7 @@ Every sentence the engine, play and the console write comes from a text table wi
 - [ ] Overrides: the personal config's `[console]` over the defaults, with a warning for an unknown key [console]
 - [ ] Story overrides: a `## When:` section replaces an `[engine]` reply by exact outcome tag, reserved outcome names, `{{ turn.x }}` slots [coder] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies)
 - [x] Edit mode's room view reads as play's plus its title line; ids, targets and door states go to the console as a `LocationView` [coder] (`design/ENGINE_TEXT.md` › Where tables live)
-- [ ] The sidebar shows the current room's ids, exits and doors, and `/inspect <thing>` shows one in full [console] (`design/CONSOLE_REQUIREMENTS.md`)
+- [x] The sidebar shows the current room's ids, exits and doors, and `/inspect <thing>` shows one in full (0.65.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)
 
 ## Phase 9 · Writing helpers
 

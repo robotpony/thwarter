@@ -33,7 +33,6 @@ Hallway (village/hallway)
 (no description yet)
 
 You can go east through a door.
-  east  village/square through Door (door-village-square-village-hallway-west), closed
 > /validate
 Problems (1):
   village/square: connection `east` points at unknown location `village/inn`

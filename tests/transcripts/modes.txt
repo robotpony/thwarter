@@ -24,17 +24,11 @@ Edit mode, at village/square.
 Village Square (village/square)
 
 A small square of packed earth. An old well stands to the north.
-
 The Elder is here.
-  The Elder (elder)
 
-You see a brass lantern and a bench.
-  Brass Lantern (lantern)
-  bench  (no card)
+You see a brass lantern.
 
 You can go north or east.
-  north  village/well
-  east   village/inn  (not written yet)
 > go n
 The Well (room)
 > /play
@@ -80,6 +74,7 @@ Console commands, in either mode:
   /status         the world, where you are, the game, saves and the build
   /map            the map around you (the sidebar shows the nearest rooms)
   /validate       check the world as thwart validate does, edits included
+  /inspect [name] a thing in full: its file, where it starts, states, sections, warnings
   /clear          empty the output (the session carries on)
   /restart        restart the console on the newest build, keeping your place
   /help           this list
@@ -132,14 +127,8 @@ Reloaded: 2 room(s), 1 character(s), 1 object(s).
 Village Square (village/square)
 
 A small square of packed earth. An old well stands to the north.
-
 The Elder is here.
-  The Elder (elder)
 
-You see a brass lantern and a bench.
-  Brass Lantern (lantern)
-  bench  (no card)
+You see a brass lantern.
 
 You can go north or east.
-  north  village/well
-  east   village/inn  (not written yet)
