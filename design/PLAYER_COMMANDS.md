@@ -4,7 +4,7 @@ The command language every client shares (Bruce, 2026-11-23): what a player can 
 
 The console's play mode is one such client. Its own commands (`/edit`, `/play here` and the rest) are in `design/CONSOLE_REQUIREMENTS.md`, not here.
 
-Owner: commander. Ids: REQ-PC. Each requirement says whether it's built, as of 0.43.2.
+Owner: commander. Ids: REQ-PC. Each requirement says whether it's built, as of 0.46.0.
 
 ## Summary
 
@@ -12,7 +12,7 @@ A line is a verb and maybe a noun. The engine turns it into an action (look, go,
 
 ## How a line is read
 
-- REQ-PC-1: The engine MUST parse a typed line into an action, a reply, or an unknown line, through one call any client can use: `GameEngine::parse_command(&WorldEngine, line, &PlayState) -> Parsed`. `Parsed` is `Action`, `Reply` (a verb missing its noun) or `Unknown` (REQ-PC-5's reply, kept apart so a client can log what players tried). Only an `Action` goes on to `act`, so only it can count as a turn. A client MAY also build actions directly (a button for "north"), skipping the parser. *Built* (0fe9754, REQ-ENG-32), and the console's play mode parses through it (a1e8f1b).
+- REQ-PC-1: The engine MUST parse a typed line into an action, a reply, or an unknown line, through one call any client can use: `GameEngine::parse_command(&WorldEngine, line, &PlayState) -> Parsed`. `Parsed` is `Action`, `Reply` (a verb missing its noun) or `Unknown` (REQ-PC-5's reply, kept apart so a client can log what players tried). Only an `Action` goes on to `act`, so only it can count as a turn. An object action is `PlayAction::Use { verb, noun, with }`, where `with` is what it's done with (`hit window with stick`), articles dropped from both. A client MAY also build actions directly (a button for "north"), skipping the parser. *Built* (0fe9754, REQ-ENG-32), and the console's play mode parses through it (a1e8f1b).
 - REQ-PC-2: Parsing MUST ignore case and surrounding space, and split the line into words. *Built.*
 - REQ-PC-3: An article (`the`, `a`, `an`) MUST be dropped before a noun: `take the lantern`, `look at a well`. *Built.*
 - REQ-PC-4: A known verb with no noun MUST get a reply asking for one, and change nothing: `Take what?`, `Go where?`, `Look at what?`. A verb that some object has as an action counts as known: a bare `pull` gets `What do you want to pull?`. *Built.*
@@ -45,8 +45,8 @@ A line is a verb and maybe a noun. The engine turns it into an action (look, go,
 
 ## Object actions
 
-- REQ-PC-13: A verb that isn't in the table, followed by a noun, MUST be tried as that object's named action (`light lantern`, `pull lever`; `design/STATES.md` › Changing state). The engine checks `requires:`, applies the action and replies with its response block (REQ-ENG-24). *Built* (`PlayAction::Use`, REQ-ENG-32).
-- REQ-PC-14: When the noun matches a thing that doesn't have the action, the reply MUST be ``You can't <verb> the <thing>.`` When no thing in the world has that verb as an action, the reply MUST be REQ-PC-5's ``I don't understand `<line>`.``, so `dance wildly` doesn't answer "There's no wildly here." "In the world" means any state or chapter of any object or door, not only the current ones, so a verb a gong gains later (`hush`) is understood now, and `hush wind` gets ``There's no wind here.`` *Built* (REQ-ENG-33).
+- REQ-PC-13: A verb that isn't in the table, followed by a noun, MUST be tried as that object's named action (`light lantern`, `pull lever`; `design/STATES.md` › Changing state). A verb counts as an action when a thing has it in `actions:` or names it in a section heading (`## When: #hit @stick`). The engine checks `requires:`, applies the action, and replies with the matching reply sections in the target, then what it's done with, then the room (`design/SECTIONS.md` › The model). A `with` thing that matches nothing gets REQ-PC-12's reply. *Built* (`PlayAction::Use`, REQ-ENG-32, REQ-ENG-36).
+- REQ-PC-14: When the noun matches a thing but no section answers the action, the reply MUST be ``Nothing happens.``, and the turn changes nothing (Bruce; `design/SECTIONS.md` › Default replies). When no thing in the world has that verb as an action, the reply MUST be REQ-PC-5's ``I don't understand `<line>`.``, so `dance wildly` doesn't answer "There's no wildly here." "In the world" means any state or chapter of any object or door, not only the current ones, so a verb a gong gains later (`hush`) is understood now, and `hush wind` gets ``There's no wind here.`` *Built* (REQ-ENG-33, REQ-ENG-36).
 - REQ-PC-15: Object actions MUST NOT shadow the built-in verbs: an object with a `take` action is still taken by `take`. `search` is the exception, since a bare `search` is the built-in and `search <thing>` is the object's action. *Built* (REQ-ENG-32); whether a world may override a built-in verb for one object is Open question 3.
 
 ## Replies

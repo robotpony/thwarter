@@ -1,6 +1,6 @@
 # Sections: content shown by game state
 
-Status: Agreed in outline by Bruce, 2026-11-23, to be tested on real content. Bruce set the principles and the model, and answered the open points through the console coder's session and directly; the commander wrote it up and filled the gaps, marked *proposed*. Reading sections is built (2dad20b, 0.45.0), and the editor draws them (f959c28); matching them against the game state isn't built yet. Once the trial confirms it, this folds into `design/CONTENT_REQUIREMENTS.md` and `design/STATES.md`, and this file goes in `CHANGELOG.md` › Removed.
+Status: Agreed in outline by Bruce, 2026-11-23, to be tested on real content. Bruce set the principles and the model, and answered the open points through the console coder's session and directly; the commander wrote it up and filled the gaps, marked *proposed*. Reading sections and matching them against each turn's game state are built (2dad20b and ce4c62e, 0.46.0, REQ-ENG-35 and 36), and the editor draws them (f959c28). Not built: tags on other things' states and values, mechanics in `thwarter` blocks, default-reply lists, and `@name` shown as a name in prose. Once the trial confirms it, this folds into `design/CONTENT_REQUIREMENTS.md` and `design/STATES.md`, and this file goes in `CHANGELOG.md` › Removed.
 
 ## Summary
 
