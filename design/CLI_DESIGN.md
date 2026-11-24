@@ -122,6 +122,8 @@ thwart search <query> [location] [options]
 **Examples:**
 ```bash
 thwart search "golden key"                     # Search for objects/text
+thwart search --type=character castle/         # List the characters under castle/
+thwart search castle/                          # List everything under castle/
 thwart search --type=character guard castle/   # Characters under castle/ matching "guard"
 thwart search --type=character "wizard"        # Search for specific character
 thwart search --type=door gate                 # Doors matching "gate"
@@ -134,7 +136,7 @@ thwart search --missing-connections            # Find broken location links
 - `--regex` - Use regular expression matching (linear-time, so no pattern can hang it)
 - `--missing-connections` - Find broken location references
 
-The query matches ids, titles and prose, including object responses. A location limits the search to rooms in that folder, what they hold, and characters who start there. No matches isn't an error (REQ-CLI-18).
+The query matches ids, titles and prose, including object responses. A location limits the search to rooms in that folder, what they hold, and characters who start there. With no query, or an empty one, search lists everything in scope; `--type text` is the exception and needs a query. A single bare word is a location only when the world has a folder with exactly that name (case included) and nothing has it as an id; otherwise it's the query. No matches isn't an error (REQ-CLI-18).
 
 ### Interactive Actions
 
