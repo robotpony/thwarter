@@ -54,6 +54,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.64.3 (2026-11-24)
+
+### Changed
+
+- Edit mode's room view and `thwart show <room>` read exactly as play does, under the room's title and id (Bruce, 2026-11-24). The indented detail lines from 0.64.1 and the coordinates line are gone: ids, exit targets, doors and their state, and what isn't written are the console's to show from the `LocationView`, in its sidebar and `/inspect`. The `[console]` `room_*` keys now belong to the console for that.
+
 ## 0.64.2 (2026-11-24)
 
 ### Changed

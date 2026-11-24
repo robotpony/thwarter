@@ -119,7 +119,7 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [ ] A bare console command name in edit mode (`edit`) runs it or asks "Did you mean /edit?" [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] An unknown slash command suggests the nearest one [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [x] At the world's root, edit mode lists `objects/` and `world/` below the rooms with labels ("World settings", "Global objects: 4"), and `/edit world` opens `world/index.md` (Bruce, 2026-11-24; 0.62.1) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [ ] Edit mode's room view introduces exits, people and things with prose from `[play]` and `[console]`, not headings (Bruce, 2026-11-24) [coder] (shared renderer; `design/ENGINE_TEXT.md` › Where tables live)
+- [x] Edit mode's room view introduces exits, people and things with prose from `[play]` and `[console]`, not headings (Bruce, 2026-11-24) [coder] (shared renderer; `design/ENGINE_TEXT.md` › Where tables live)
 - [x] One blank line before and after every block of output, the prompt included; the screen's tests check it, since transcripts are compact (881fe90, Bruce, 2026-11-24) [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [x] Sidebar fixes from Bruce's playtest: the problems pane's wrap and literal backticks (881fe90) [console]
 - [ ] A door's exit shows its state ("closed", "locked"), not "not passable", and its name before its id [coder] (shared renderer)
@@ -137,7 +137,7 @@ Every sentence the engine, play and the console write comes from a text table wi
 - [x] Overrides: `world.toml`'s `[play]` and `[engine]` over the defaults, with validate's warning for an unknown key [coder]
 - [ ] Overrides: the personal config's `[console]` over the defaults, with a warning for an unknown key [console]
 - [ ] Story overrides: a `## When:` section replaces an `[engine]` reply by exact outcome tag, reserved outcome names, `{{ turn.x }}` slots [coder] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies)
-- [ ] Edit mode's room view reads as play's plus its title line; ids, targets and door states go to the console as a `LocationView` [coder] (`design/ENGINE_TEXT.md` › Where tables live)
+- [x] Edit mode's room view reads as play's plus its title line; ids, targets and door states go to the console as a `LocationView` [coder] (`design/ENGINE_TEXT.md` › Where tables live)
 - [ ] The sidebar shows the current room's ids, exits and doors, and `/inspect <thing>` shows one in full [console] (`design/CONSOLE_REQUIREMENTS.md`)
 
 ## Phase 9 · Writing helpers

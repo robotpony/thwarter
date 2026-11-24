@@ -527,14 +527,20 @@ mod tests {
     }
 
     #[test]
-    fn edit_modes_room_view_lists_held_things_under_their_holder() {
+    fn edit_modes_room_view_reads_as_play_and_keeps_the_detail_as_data() {
         use crate::engines::At;
         use crate::render::{render_location_as, RenderStyle};
         let (_d, world) = hallway();
         let view = world.describe_location_at("hallway", At::default()).unwrap();
         assert_eq!(view.held.len(), 3);
         let text = render_location_as(&view, RenderStyle::Author);
-        assert!(text.contains("You see some walls.\n  Walls (walls)\n    Old photo (photo-1)\n    Shelf (shelf)\n      Vase (vase)"), "{}", text);
+        // The text is play's; who holds what is the view's data, for the
+        // console's sidebar (Bruce, 2026-11-24).
+        assert!(text.starts_with("Hallway (hallway)\n\n"), "{}", text);
+        assert!(text.contains("There's an old photo and a shelf on the walls and a vase on the shelf."), "{}", text);
+        assert!(!text.contains("(photo-1)") && !text.contains("\n  "), "no detail lines: {}", text);
+        let held: Vec<(&str, &str)> = view.held.iter().map(|h| (h.thing.id.as_str(), h.holder.as_str())).collect();
+        assert_eq!(held, [("photo-1", "walls"), ("shelf", "walls"), ("vase", "shelf")]);
     }
 
     #[test]
