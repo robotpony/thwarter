@@ -1,6 +1,6 @@
 [package]
 name = "thwarter"
-version = "0.63.2"
+version = "0.64.0"
 edition = "2021"
 description = "A Hugo-style engine for interactive fiction"
 authors = ["Thwarter Project"]

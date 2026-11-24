@@ -37,6 +37,11 @@ pub struct PlayText {
     pub door_exit: String,
     /// No way out.
     pub no_exits: String,
+    /// A door that can be seen through: "Through the grate you can see
+    /// the Cell." `{door}` and `{room}`.
+    pub see_through: String,
+    /// A room with no prose yet.
+    pub no_description: String,
     /// What the player carries: "You have a key."
     pub inventory: String,
     /// Carrying nothing.
@@ -54,7 +59,7 @@ impl Default for PlayText {
 
 /// The settings by name, as `world.toml` writes them, for the reference
 /// copy and for checking keys.
-pub const KEYS: &[&str] = &["show_room_names", "objects", "character", "characters", "held", "exits", "door_exit", "no_exits", "inventory", "empty_inventory", "serial_comma"];
+pub const KEYS: &[&str] = &["show_room_names", "objects", "character", "characters", "held", "exits", "door_exit", "no_exits", "see_through", "no_description", "inventory", "empty_inventory", "serial_comma"];
 
 impl PlayText {
     /// The `[play]` table of `texts`, as typed settings. A key given as a
@@ -70,6 +75,8 @@ impl PlayText {
             exits: t("exits"),
             door_exit: t("door_exit"),
             no_exits: t("no_exits"),
+            see_through: t("see_through"),
+            no_description: t("no_description"),
             inventory: t("inventory"),
             empty_inventory: t("empty_inventory"),
             serial_comma: texts.flag("play", "serial_comma"),

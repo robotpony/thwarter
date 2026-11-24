@@ -3,6 +3,7 @@
 //! `GameEngine::act`, or a reply that changes nothing (REQ-PC-1 to 15).
 
 use crate::engines::location_view::expand_direction;
+use crate::engines::texts::Texts;
 use crate::engines::{GameEngine, WorldEngine};
 use crate::models::game::{PlayAction, PlayState};
 
@@ -43,13 +44,14 @@ impl GameEngine {
                 return Parsed::Action(PlayAction::Examine(typed.to_string()));
             }
         }
-        match parse_words(line) {
+        let texts = world.texts();
+        match parse_words(line, texts, state.turn) {
             Words::Other { verb, noun, with } => {
                 let known = world.has_action(&verb);
                 match noun {
-                    None if known => Parsed::Reply(format!("What do you want to {}?", verb)),
+                    None if known => Parsed::Reply(texts.text_at("engine", "no_noun", &[("verb", &verb)], state.turn)),
                     Some(noun) if known || self.names_anything(world, state, &noun) => Parsed::Action(PlayAction::Use { verb, noun, with }),
-                    _ => unknown(line),
+                    _ => unknown(line, texts, state.turn),
                 }
             }
             Words::Parsed(parsed) => parsed,
@@ -64,17 +66,18 @@ enum Words {
     Other { verb: String, noun: Option<String>, with: Option<String> },
 }
 
-fn unknown(line: &str) -> Parsed {
-    Parsed::Unknown(format!("I don't understand \"{}\".", line.trim()))
+fn unknown(line: &str, texts: &Texts, turn: u64) -> Parsed {
+    Parsed::Unknown(texts.text_at("engine", "not_understood", &[("line", line.trim())], turn))
 }
 
 /// The syntax alone: no world, no state (REQ-PC-2 to 8).
-fn parse_words(line: &str) -> Words {
+fn parse_words(line: &str, texts: &Texts, state_turn: u64) -> Words {
     use PlayAction::*;
+    let ask = |key: &str| texts.text_at("engine", key, &[], state_turn);
     let lower = line.trim().to_lowercase();
     let words: Vec<&str> = lower.split_whitespace().collect();
     let Some((&verb, rest)) = words.split_first() else {
-        return Words::Parsed(unknown(line));
+        return Words::Parsed(unknown(line, texts, state_turn));
     };
     let done = |p: Parsed| Words::Parsed(p);
 
@@ -86,29 +89,29 @@ fn parse_words(line: &str) -> Words {
     match verb {
         "look" | "l" => match rest {
             [] => done(Parsed::Action(Look)),
-            ["at", noun @ ..] => done(with_noun(noun, Examine, "Look at what?")),
-            noun => done(with_noun(noun, Examine, "Look at what?")),
+            ["at", noun @ ..] => done(with_noun(noun, Examine, ask("look_at_what"))),
+            noun => done(with_noun(noun, Examine, ask("look_at_what"))),
         },
         "go" | "walk" | "move" => match rest {
-            [] => done(Parsed::Reply("Go where?".to_string())),
+            [] => done(Parsed::Reply(ask("go_where"))),
             [one] => done(Parsed::Action(Go(direction(one).unwrap_or_else(|| one.to_string())))),
             more => done(Parsed::Action(Go(more.join(" ")))),
         },
         "take" | "get" => match rest {
-            ["up", noun @ ..] if !noun.is_empty() => done(with_noun(noun, Take, "Take what?")),
-            noun => done(with_noun(noun, Take, "Take what?")),
+            ["up", noun @ ..] if !noun.is_empty() => done(with_noun(noun, Take, ask("take_what"))),
+            noun => done(with_noun(noun, Take, ask("take_what"))),
         },
         "pick" => match rest {
-            ["up", noun @ ..] => done(with_noun(noun, Take, "Pick up what?")),
-            _ => done(unknown(line)),
+            ["up", noun @ ..] => done(with_noun(noun, Take, ask("pick_up_what"))),
+            _ => done(unknown(line, texts, state_turn)),
         },
-        "examine" | "x" | "inspect" => done(with_noun(rest, Examine, "Examine what?")),
+        "examine" | "x" | "inspect" => done(with_noun(rest, Examine, ask("examine_what"))),
         "inventory" | "i" | "inv" if rest.is_empty() => done(Parsed::Action(Inventory)),
         "search" if rest.is_empty() => done(Parsed::Action(Search)),
         // Built-in verbs used another way (`inventory lamp`, `n please`)
         // aren't read.
-        "inventory" | "i" | "inv" => done(unknown(line)),
-        _ if direction(verb).is_some() => done(unknown(line)),
+        "inventory" | "i" | "inv" => done(unknown(line, texts, state_turn)),
+        _ if direction(verb).is_some() => done(unknown(line, texts, state_turn)),
         _ => {
             // `listen to the chest`, `talk to the captain` (REQ-PC-20).
             let rest = match rest {
@@ -140,10 +143,10 @@ fn strip_article<'a>(words: &[&'a str]) -> Vec<&'a str> {
     }
 }
 
-fn with_noun(words: &[&str], make: fn(String) -> PlayAction, ask: &str) -> Parsed {
+fn with_noun(words: &[&str], make: fn(String) -> PlayAction, ask: String) -> Parsed {
     let words = strip_article(words);
     if words.is_empty() {
-        Parsed::Reply(ask.to_string())
+        Parsed::Reply(ask)
     } else {
         Parsed::Action(make(words.join(" ")))
     }
@@ -156,11 +159,11 @@ mod tests {
 
     /// The syntax alone, as verbs.rs had it.
     fn parse(line: &str) -> Parsed {
-        match parse_words(line) {
+        match parse_words(line, &Texts::defaults(), 0) {
             Words::Parsed(p) => p,
             Words::Other { verb, noun, with } => match noun {
                 Some(noun) => Parsed::Action(Use { verb, noun, with }),
-                None => unknown(line),
+                None => unknown(line, &Texts::defaults(), 0),
             },
         }
     }

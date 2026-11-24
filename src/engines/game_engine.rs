@@ -21,23 +21,13 @@ pub struct GameEngine {
     /// `noun` is what the player typed, without "the"; `turn` lets a
     /// reply vary. Used when the candidates share no template with a
     /// `## When: #ambiguous` section.
-    pub ask_which: fn(verb: &str, noun: &str, candidates: &[String], turn: u64) -> String,
-}
-
-/// The built-in reply, in the story's voice rather than the system's
-/// (`design/STATES.md` › Ambiguity): one plain question, so the player
-/// always knows what to type next.
-pub fn default_ask_which(verb: &str, noun: &str, candidates: &[String], turn: u64) -> String {
-    let _ = turn;
-    "Which {noun} do you want to {verb}, {or}?"
-        .replace("{noun}", noun)
-        .replace("{verb}", verb)
-        .replace("{or}", &join_or(candidates))
+    /// `None` uses the world's `[engine] which` (`design/ENGINE_TEXT.md`).
+    pub ask_which: Option<fn(verb: &str, noun: &str, candidates: &[String], turn: u64) -> String>,
 }
 
 impl Default for GameEngine {
     fn default() -> Self {
-        Self { ask_which: default_ask_which }
+        Self { ask_which: None }
     }
 }
 
@@ -68,7 +58,7 @@ impl GameEngine {
     fn act_raw(&self, world: &WorldEngine, state: &mut PlayState, action: &PlayAction) -> ActionResult {
         state.turn += 1;
         if world.get_location(&state.location).is_none() {
-            return ActionResult::say("You're nowhere: this place no longer exists.")
+            return ActionResult::say(say(world, state.turn, "nowhere_gone", &[]))
                 .with_note(format!("location `{}` isn't in the world any more; use /play here to move", state.location));
         }
         match action {
@@ -77,7 +67,7 @@ impl GameEngine {
             PlayAction::Take(noun) => self.take(world, state, noun),
             PlayAction::Examine(noun) => self.examine(world, state, noun),
             PlayAction::Inventory => self.inventory(world, state),
-            PlayAction::Search => self.search(world, state, "You search carefully"),
+            PlayAction::Search => self.search(world, state, false),
             PlayAction::Use { verb, noun, with } => self.use_object(world, state, verb, noun, with.as_deref()),
         }
     }
@@ -152,17 +142,21 @@ impl GameEngine {
         }
         if kind == EntityKind::Character {
             let names: Vec<String> = candidates.iter().map(person).collect();
-            return format!("Who do you want to {}, {}?", verb, join_or(&names));
+            return say(world, state.turn, "who", &[("verb", verb), ("or", &join_or(&names))]);
         }
         let names: Vec<String> = candidates.iter().map(the_object).collect();
         let noun = noun.trim().to_lowercase();
         let noun = noun.strip_prefix("the ").unwrap_or(&noun).trim().to_string();
-        (self.ask_which)(verb, &noun, &names, state.turn)
+        match self.ask_which {
+            Some(ask) => ask(verb, &noun, &names, state.turn),
+            None => say(world, state.turn, "which", &[("noun", &noun), ("verb", verb), ("or", &join_or(&names))]),
+        }
     }
 
     /// Find the faint things here not yet found, and say what was found.
-    fn search(&self, world: &WorldEngine, state: &mut PlayState, opening: &str) -> ActionResult {
-        let Some(view) = self.whole_view(world, state) else { return ActionResult::say("You're nowhere.") };
+    /// `closely` is examining the room, which words its finds its own way.
+    fn search(&self, world: &WorldEngine, state: &mut PlayState, closely: bool) -> ActionResult {
+        let Some(view) = self.whole_view(world, state) else { return ActionResult::say(say(world, state.turn, "nowhere", &[])) };
         let mut found: Vec<(EntityKind, String, String)> = Vec::new();
         let faint = |kind, id: &str| world.visibility(kind, id, At::play(state)) == Visibility::Faint && !state.has_noticed(kind.type_name(), id);
         for o in &view.objects {
@@ -177,7 +171,7 @@ impl GameEngine {
         }
         for e in view.exits.iter().filter(|e| e.target_exists) {
             if faint(EntityKind::Location, &e.target) {
-                found.push((EntityKind::Location, e.target.clone(), format!("a way {}", e.direction)));
+                found.push((EntityKind::Location, e.target.clone(), say(world, state.turn, "a_way", &[("direction", &e.direction)])));
             }
         }
         // The room's `## When: #searched` section, if any, comes first.
@@ -185,7 +179,7 @@ impl GameEngine {
         if found.is_empty() {
             return ActionResult::say(match said {
                 Some(text) => text,
-                None => format!("{}, but find nothing new.", opening),
+                None => say(world, state.turn, if closely { "look_closely_nothing" } else { "search_nothing" }, &[]),
             });
         }
         let mut changes = Vec::new();
@@ -195,8 +189,8 @@ impl GameEngine {
         }
         let names: Vec<String> = found.into_iter().map(|(_, _, name)| name).collect();
         let text = match said {
-            Some(said) => format!("{}\n\nYou find {}.", said, join_and(&names)),
-            None => format!("{} and find {}.", opening, join_and(&names)),
+            Some(said) => format!("{}\n\n{}", said, say(world, state.turn, "found", &[("list", &join_and(&names))])),
+            None => say(world, state.turn, if closely { "look_closely_found" } else { "search_found" }, &[("list", &join_and(&names))]),
         };
         ActionResult { text, changes, note: None }
     }
@@ -204,17 +198,17 @@ impl GameEngine {
     fn look(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
         match self.view(world, state) {
             Some(view) => ActionResult::say(crate::render::play_blocks(&view, &|n| world.link_for(n), world.play_text()).to_plain()),
-            None => ActionResult::say("You're nowhere."),
+            None => ActionResult::say(say(world, state.turn, "nowhere", &[])),
         }
     }
 
     fn go(&self, world: &WorldEngine, state: &mut PlayState, direction: &str) -> ActionResult {
         let direction = expand_direction(direction);
         if direction.is_empty() {
-            return ActionResult::say("Go where?");
+            return ActionResult::say(say(world, state.turn, "go_where", &[]));
         }
         let Some(here) = world.location_at(&state.location, At::play(state)) else {
-            return ActionResult::say("You're nowhere.");
+            return ActionResult::say(say(world, state.turn, "nowhere", &[]));
         };
         // `go to the river`: the whole phrase as an exit first, then
         // without the `to` and an article (REQ-PC-20).
@@ -230,14 +224,14 @@ impl GameEngine {
             }
         };
         let Some(named) = here.connections.get(&direction) else {
-            return ActionResult::say(format!("You can't go {} from here.", direction));
+            return ActionResult::say(say(world, state.turn, "no_exit", &[("direction", &direction)]));
         };
         // An exit names a room, or a door that says where it leads.
         let mut target = named.clone();
         if world.get_location(named).is_none() {
             if let Some(door) = world.door_at(named, At::play(state)) {
                 if !shown(world, state, EntityKind::Door, &door.id) {
-                    return ActionResult::say(format!("You can't go {} from here.", direction));
+                    return ActionResult::say(say(world, state.turn, "no_exit", &[("direction", &direction)]));
                 }
                 if !door.passable {
                     // The door's `## When: #go` section says why, else built in.
@@ -246,18 +240,17 @@ impl GameEngine {
                     let stays = Outcome(self.current_state(world, state, EntityKind::Door, &door.id).unwrap_or_else(|| "no-action".into()));
                     let replies = self.replies(world, state, "go", (EntityKind::Door, &door.id), None, &stays);
                     return ActionResult::say(match replies.is_empty() {
-                        true => format!(
-                            "The {} is {}.",
-                            door.title.to_lowercase(),
-                            if self.current_state(world, state, EntityKind::Door, &door.id).as_deref() == Some("locked") { "locked" } else { "closed" }
-                        ),
+                        true => {
+                            let locked = self.current_state(world, state, EntityKind::Door, &door.id).as_deref() == Some("locked");
+                            say(world, state.turn, if locked { "door_locked" } else { "door_closed" }, &[("door", &door.title.to_lowercase())])
+                        }
                         false => self.say_replies(world, state, &replies),
                     });
                 }
                 match door.leads_to(&state.location) {
                     Some(to) => target = to.to_string(),
                     None => {
-                        return ActionResult::say(format!("You can't go {} from here.", direction))
+                        return ActionResult::say(say(world, state.turn, "no_exit", &[("direction", &direction)]))
                             .with_note(format!("door `{}` doesn't say where it leads from `{}`", door.id, state.location))
                     }
                 }
@@ -265,10 +258,10 @@ impl GameEngine {
         }
         let target = &target;
         if world.get_location(target).is_some() && !shown(world, state, EntityKind::Location, target) {
-            return ActionResult::say(format!("You can't go {} from here.", direction));
+            return ActionResult::say(say(world, state.turn, "no_exit", &[("direction", &direction)]));
         }
         if world.get_location(target).is_none() {
-            return ActionResult::say(format!("You can't go {} from here.", direction))
+            return ActionResult::say(say(world, state.turn, "no_exit", &[("direction", &direction)]))
                 .with_note(format!("the {} exit leads to `{}`, which doesn't exist yet", direction, target));
         }
         let from = std::mem::replace(&mut state.location, target.clone());
@@ -280,14 +273,14 @@ impl GameEngine {
 
     fn take(&self, world: &WorldEngine, state: &mut PlayState, noun: &str) -> ActionResult {
         if noun.trim().is_empty() {
-            return ActionResult::say("Take what?");
+            return ActionResult::say(say(world, state.turn, "take_what", &[]));
         }
         let view = match self.view(world, state) {
             Some(v) => v,
-            None => return ActionResult::say("You're nowhere."),
+            None => return ActionResult::say(say(world, state.turn, "nowhere", &[])),
         };
         if let Some(carried) = resolve(noun, &self.carried(world, state), the_object).ok().flatten() {
-            return ActionResult::say(format!("You already have {}.", the_object(&carried)));
+            return ActionResult::say(say(world, state.turn, "already_have", &[("thing", &the_object(&carried))]));
         }
         // What's in the room, and what the things here hold (photos on a
         // wall, a key in its lock), each with its holder.
@@ -298,24 +291,24 @@ impl GameEngine {
             Ok(Some(o)) => o,
             Ok(None) => {
                 if resolve(noun, &view.characters, person).ok().flatten().is_some() {
-                    return ActionResult::say("You can't take people.");
+                    return ActionResult::say(say(world, state.turn, "take_person", &[]));
                 }
-                return ActionResult::say(format!("There's no {} here.", noun.trim()));
+                return ActionResult::say(say(world, state.turn, "not_here", &[("noun", noun.trim())]));
             }
             Err(which) => return ActionResult::say(self.which(world, state, "take", noun, EntityKind::Object, &which)),
         };
         let name = object_name(&object);
         let Some(card) = world.object_at(&object.id, At::play(state)) else {
-            return ActionResult::say(format!("You can't take the {}.", name))
+            return ActionResult::say(say(world, state.turn, "take_scenery", &[("name", &name)]))
                 .with_note(format!("`{}` is scenery with no card, so it can't be taken", object.id));
         };
         if card.weight.as_deref().map_or(false, |w| w.eq_ignore_ascii_case("immovable")) {
-            return ActionResult::say(format!("The {} won't budge.", name));
+            return ActionResult::say(say(world, state.turn, "immovable", &[("name", &name)]));
         }
         let from = self.detach(world, state, &object.id);
         state.inventory.push(object.id.clone());
         ActionResult {
-            text: self.take_reply(world, state, &object.id).unwrap_or_else(|| format!("You take the {}.", name)),
+            text: self.take_reply(world, state, &object.id).unwrap_or_else(|| say(world, state.turn, "taken", &[("name", &name)])),
             changes: vec![Change::Took { object: object.id.clone(), from }],
             note: None,
         }
@@ -323,18 +316,18 @@ impl GameEngine {
 
     fn examine(&self, world: &WorldEngine, state: &mut PlayState, noun: &str) -> ActionResult {
         if noun.trim().is_empty() {
-            return ActionResult::say("Examine what?");
+            return ActionResult::say(say(world, state.turn, "examine_what", &[]));
         }
         let view = match self.view(world, state) {
             Some(v) => v,
-            None => return ActionResult::say("You're nowhere."),
+            None => return ActionResult::say(say(world, state.turn, "nowhere", &[])),
         };
         // Examining the room itself looks closely, finding faint things.
         let wanted = noun.trim().to_lowercase();
         let wanted = wanted.strip_prefix("the ").unwrap_or(&wanted);
         if ["room", "here", "around"].contains(&wanted) || wanted == view.title.to_lowercase() || wanted == view.id.to_lowercase() {
             let look = crate::render::play_blocks(&view, &|n| world.link_for(n), world.play_text()).to_plain();
-            let mut found = self.search(world, state, "You look closely");
+            let mut found = self.search(world, state, true);
             found.text = format!("{}\n\n{}", look, found.text);
             return found;
         }
@@ -350,7 +343,7 @@ impl GameEngine {
                 let text = self.with_contents(world, state, &door.id, &text);
                 let text = text.trim();
                 return if text.is_empty() {
-                    ActionResult::say(format!("You see nothing special about {}.", the_object(&object)))
+                    ActionResult::say(say(world, state.turn, "nothing_special", &[("thing", &the_object(&object))]))
                 } else {
                     ActionResult::say(prose(world, &world.fill(text, &scope)))
                 };
@@ -366,7 +359,7 @@ impl GameEngine {
                         let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
                         ActionResult::say(prose(world, &world.fill(text.trim(), &scope)))
                     }
-                    _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
+                    _ => ActionResult::say(say(world, state.turn, "nothing_special", &[("thing", &the_object(&object))])),
                 }
             }
             Err(which) => return ActionResult::say(self.which(world, state, "examine", noun, EntityKind::Object, &which)),
@@ -378,10 +371,10 @@ impl GameEngine {
                     let scope = Scope { at: At::play(state), this: Some((EntityKind::Character, &person.id)), here: None };
                     ActionResult::say(prose(world, &world.fill(text.trim(), &scope)))
                 }
-                _ => ActionResult::say(format!("You see nothing special about {}.", person.display_name())),
+                _ => ActionResult::say(say(world, state.turn, "nothing_special", &[("thing", &person.display_name())])),
             },
             Err(which) => ActionResult::say(self.which(world, state, "examine", noun, EntityKind::Character, &which)),
-            Ok(None) => ActionResult::say(format!("There's no {} here.", noun.trim())),
+            Ok(None) => ActionResult::say(say(world, state.turn, "not_here", &[("noun", noun.trim())])),
         }
     }
 
@@ -392,11 +385,11 @@ impl GameEngine {
     fn use_object(&self, world: &WorldEngine, state: &mut PlayState, verb: &str, noun: &str, with: Option<&str>) -> ActionResult {
         let verb = verb.trim().to_lowercase();
         if noun.trim().is_empty() {
-            return ActionResult::say(format!("What do you want to {}?", verb));
+            return ActionResult::say(say(world, state.turn, "no_noun", &[("verb", &verb)]));
         }
         let view = match self.view(world, state) {
             Some(v) => v,
-            None => return ActionResult::say("You're nowhere."),
+            None => return ActionResult::say(say(world, state.turn, "nowhere", &[])),
         };
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
@@ -422,11 +415,11 @@ impl GameEngine {
             Ok(None) => {
                 return match resolve(noun, &view.characters, person) {
                     Ok(Some(p)) if matches!(verb.as_str(), "talk" | "speak" | "chat" | "ask") => {
-                        ActionResult::say(format!("{} has nothing to say.", person(&p)))
+                        ActionResult::say(say(world, state.turn, "talk_nothing", &[("person", &person(&p))]))
                     }
-                    Ok(Some(p)) => ActionResult::say(format!("You can't {} {}.", verb, person_mid(&p))),
+                    Ok(Some(p)) => ActionResult::say(say(world, state.turn, "cant_verb_person", &[("verb", &verb), ("person", &person_mid(&p))])),
                     Err(which) => ActionResult::say(self.which(world, state, &verb, noun, EntityKind::Character, &which)),
-                    Ok(None) => ActionResult::say(format!("There's no {} here.", noun.trim())),
+                    Ok(None) => ActionResult::say(say(world, state.turn, "not_here", &[("noun", noun.trim())])),
                 }
             }
         };
@@ -444,7 +437,7 @@ impl GameEngine {
             Some(w) => match resolve(w, &things, the_object) {
                 Ok(Some(u)) => Some(u),
                 Err(which) => return ActionResult::say(self.which(world, state, &verb, w, EntityKind::Object, &which)),
-                Ok(None) => return ActionResult::say(format!("There's no {} here.", w)),
+                Ok(None) => return ActionResult::say(say(world, state.turn, "not_here", &[("noun", w)])),
             },
         };
         let used_kind = used.as_ref().map(|u| kind_of(&u.id));
@@ -480,10 +473,10 @@ impl GameEngine {
             // with no `requires:`; otherwise it is as good as absent
             // (Bruce, 2026-11-23).
             if named_hidden && !action.requires_has.is_empty() {
-                return ActionResult::say(format!("There's no {} here.", noun.trim()));
+                return ActionResult::say(say(world, state.turn, "not_here", &[("noun", noun.trim())]));
             }
             if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
-                return ActionResult::say(builtin_refusal(&verb, &name, state.turn));
+                return ActionResult::say(say(world, state.turn, "refused", &[("verb", &verb), ("name", &name)]));
             }
             acted = true;
             let before = self.current_state(world, state, this_kind, &object.id);
@@ -529,9 +522,9 @@ impl GameEngine {
         let replies = self.replies(world, state, &verb, (this_kind, &object.id), used_ref.as_ref().map(|(k, id)| (*k, id.as_str())), &outcome);
         let text = if replies.is_empty() {
             if changes.is_empty() && !acted {
-                "Nothing happens.".to_string()
+                say(world, state.turn, "nothing", &[])
             } else {
-                builtin_reply(&verb, &name, state.turn)
+                say(world, state.turn, "acted", &[("verb", &verb), ("name", &name)])
             }
         } else {
             self.say_replies(world, state, &replies)
@@ -965,17 +958,11 @@ fn resolve(noun: &str, things: &[EntityRef], _phrase: fn(&EntityRef) -> String) 
     }
 }
 
-/// The reply to an action with no response block, from its verb and the
-/// object's name, varied by turn so repeats don't read the same.
-fn builtin_reply(verb: &str, name: &str, turn: u64) -> String {
-    let forms = ["You {verb} the {name}.", "You {verb} the {name}. Something changes."];
-    forms[(turn as usize) % forms.len()].replace("{verb}", verb).replace("{name}", name)
-}
-
-/// The reply to a refused action with no `refused` block.
-fn builtin_refusal(verb: &str, name: &str, turn: u64) -> String {
-    let forms = ["You can't {verb} the {name} yet.", "Not yet: you can't {verb} the {name}."];
-    forms[(turn as usize) % forms.len()].replace("{verb}", verb).replace("{name}", name)
+/// The world's `[engine]` reply `key` for `turn`, with `args` filled
+/// (`design/ENGINE_TEXT.md`).
+/// A key with several wordings picks one by turn, never at random.
+fn say(world: &WorldEngine, turn: u64, key: &str, args: &[(&str, &str)]) -> String {
+    world.texts().text_at("engine", key, args, turn)
 }
 
 /// Prose as play shows it: Markdown rendered, links shown as their text.
@@ -1438,7 +1425,7 @@ mod tests {
     fn the_which_reply_can_be_replaced() {
         let (_d, world) = world();
         let mut game = GameEngine::new();
-        game.ask_which = |verb, _noun, c, _turn| format!("Which one do you want to {}? {}", verb, c.join(" or "));
+        game.ask_which = Some(|verb, _noun, c, _turn| format!("Which one do you want to {}? {}", verb, c.join(" or ")));
         let mut state = game.start(&world, "castle/yard").unwrap();
         let r = game.act(&world, &mut state, &PlayAction::Take("sword".into()));
         assert_eq!(r.text, "Which one do you want to take? the rusty sword or the old sword");

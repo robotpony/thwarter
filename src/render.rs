@@ -226,7 +226,7 @@ pub fn play_blocks(view: &LocationView, links: Resolver, text: &crate::engines::
     }
     let body = view.body.trim();
     if body.is_empty() {
-        blocks.push(Block::line(BlockKind::Notice, "(no description yet)", !blocks.is_empty()));
+        blocks.push(Block::line(BlockKind::Notice, text.no_description.clone(), !blocks.is_empty()));
     } else {
         let mut prose = prose_blocks(body, links).blocks;
         if let Some(first) = prose.first_mut() {
@@ -266,7 +266,8 @@ pub fn play_blocks(view: &LocationView, links: Resolver, text: &crate::engines::
     }
     for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
         if let Some(beyond) = &door.beyond {
-            after.push(Block::line(BlockKind::Exits, format!("Through the {} you can see the {}.", door.title.to_lowercase(), beyond), false));
+            let line = crate::engines::texts::fill(&text.see_through, &[("door", &door.title.to_lowercase()), ("room", beyond)]);
+            after.push(Block::line(BlockKind::Exits, line, false));
         }
     }
     if let Some(first) = after.first_mut() {

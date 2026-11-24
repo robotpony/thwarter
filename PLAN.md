@@ -130,7 +130,7 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 Every sentence the engine, play and the console write comes from a text table with compiled-in defaults, the same shape everywhere (Bruce, 2026-11-24). Started 2026-11-24, at Bruce's go. Done when no user-facing string is left in the source outside the defaults files and a test keeps it that way.
 
 - [x] One `Texts` type for `[play]`, `[engine]` and `[console]` tables, defaults from `src/builtins/text/` [coder] (`design/ENGINE_TEXT.md` › The shape)
-- [ ] Engine and play strings become `[engine]` keys, the default text unchanged [coder]
+- [x] Engine and play strings become `[engine]` keys, the default text unchanged [coder]
 - [ ] Console strings become `[console]` keys, the default text unchanged [console]
 - [ ] A test that fails on a new user-facing string outside the defaults [coder, console]
 - [ ] Overrides: `world.toml`'s `[engine]`, the personal config's `[console]`, and a warning for an unused key [coder, console]

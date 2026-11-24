@@ -52,6 +52,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.64.0 (2026-11-24)
+
+### Changed
+
+- Text as data, step 2: every built-in reply the engine writes for a player is an `[engine]` key in `src/builtins/text/engine.toml`, its wording unchanged, each commented with its outcome tag and who may replace it. Parser replies, missing nouns, refusals, the locked and closed exits, ambiguity questions, search finds and "Nothing happens." all read from it, and every reply picks a list's wording by turn. A world rewords any of them in `world.toml`'s `[engine]` table.
+- `[play]` gains `see_through` ("Through the {door} you can see the {room}.") and `no_description` ("(no description yet)"), which were literals in the room view. The test world's reference copy lists them.
+- `GameEngine::ask_which` is now an `Option`: `None` uses `[engine] which`.
+
 ## 0.63.2 (2026-11-24)
 
 ### Fixed

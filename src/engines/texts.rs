@@ -109,7 +109,7 @@ impl Texts {
         for (key, v) in given {
             let Some(default) = defaults.get(key) else {
                 let keys: Vec<&str> = defaults.keys().map(String::as_str).collect();
-                let known = if keys.len() <= 12 { format!("; they are {}", keys.join(", ")) } else { String::new() };
+                let known = if keys.len() <= 20 { format!("; they are {}", keys.join(", ")) } else { String::new() };
                 warnings.push(format!("{}: `[{}] {}` isn't a {} setting{}", source, table, key, table, known));
                 continue;
             };
@@ -266,6 +266,42 @@ mod tests {
         let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
         assert_eq!(texts.list(&s(&["a", "b", "c"])), "a, b, and c");
         assert_eq!(texts.list_or(&s(&["a", "b"])), "a or b");
+    }
+
+    /// Each `[engine]` key is used by the engine, so the defaults file is
+    /// the list of every reply and none is left behind.
+    #[test]
+    fn every_engine_key_is_used() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src/engines");
+        let source: String = ["game_engine.rs", "player_commands.rs", "turn.rs"]
+            .iter()
+            .map(|f| std::fs::read_to_string(format!("{}/{}", dir, f)).unwrap())
+            .collect();
+        for key in Texts::defaults().keys("engine") {
+            assert!(source.contains(&format!("\"{}\"", key)), "`[engine] {}` isn't used", key);
+        }
+    }
+
+    #[test]
+    fn a_world_rewords_a_built_in_reply() {
+        use crate::engines::{GameEngine, Parsed, WorldEngine};
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("hall.md"), "---\nid: hall\ntitle: Hall\ntype: location\n---\nA hall.\n").unwrap();
+        std::fs::write(dir.path().join("world.toml"), "[settings]\nstarting_location = \"hall\"\n\n[engine]\nnot_here = \"No {noun} in sight.\"\nno_exit = [\"No way {direction}.\", \"Not {direction}, then.\"]\nnot_understood = \"Eh? {line}\"\n").unwrap();
+        let mut world = WorldEngine::new();
+        world.load_world(dir.path()).unwrap();
+        assert!(world.current_warnings().is_empty(), "{:?}", world.current_warnings());
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "hall").unwrap();
+        let mut say = |line: &str| match game.parse_command(&world, line, &state) {
+            Parsed::Action(a) => game.act(&world, &mut state, &a).text,
+            Parsed::Reply(t) | Parsed::Unknown(t) => t,
+        };
+        assert_eq!(say("take lamp"), "No lamp in sight.");
+        let first = say("north");
+        let second = say("north");
+        assert!(first != second && [first.as_str(), second.as_str()].contains(&"No way north."), "{} / {}", first, second);
+        assert_eq!(say("xyzzy"), "Eh? xyzzy");
     }
 
     #[test]

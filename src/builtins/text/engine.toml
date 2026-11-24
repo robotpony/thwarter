@@ -1,4 +1,53 @@
 # The engine's built-in replies (design/ENGINE_TEXT.md). A world changes
 # any of these in its world.toml's [engine] table; a story's own
-# `## When:` sections answer before them. A list picks by turn.
+# `## When:` sections answer before them. A list picks one wording by
+# turn (turn % len), never at random. {Name} capitalizes a slot.
+#
+# The comment after each key is its outcome tag, then who may replace it:
+# thing (the thing, its room, the chapter or the world) or world (the
+# chapter or the world only).
 [engine]
+
+# Reading the line
+not_understood = "I don't understand \"{line}\"."  # #not-understood, world
+no_noun = "What do you want to {verb}?"            # #no-noun, world
+go_where = "Go where?"                             # #go #no-noun, world
+take_what = "Take what?"                           # #take #no-noun, world
+pick_up_what = "Pick up what?"                     # #take #no-noun, world
+examine_what = "Examine what?"                     # #examine #no-noun, world
+look_at_what = "Look at what?"                     # #examine #no-noun, world
+not_here = "There's no {noun} here."               # #not-here, world
+which = "Which {noun} do you want to {verb}, {or}?"  # #ambiguous, thing
+who = "Who do you want to {verb}, {or}?"           # #ambiguous, thing
+
+# Where you are
+nowhere = "You're nowhere."                        # #nowhere, world
+nowhere_gone = "You're nowhere: this place no longer exists."  # #nowhere, world
+
+# Going
+no_exit = "You can't go {direction} from here."    # #go #no-exit, world
+door_locked = "The {door} is locked."              # #go #locked, thing
+door_closed = "The {door} is closed."              # #go #closed, thing
+
+# Taking
+taken = "You take the {name}."                     # #take, thing
+already_have = "You already have {thing}."         # #take #carried, thing
+take_person = "You can't take people."             # #take #person, thing
+take_scenery = "You can't take the {name}."        # #take #scenery, thing
+immovable = "The {name} won't budge."              # #take #immovable, thing
+
+# Looking
+nothing_special = "You see nothing special about {thing}."  # #examine #nothing, thing
+search_nothing = "You search carefully, but find nothing new."  # #search #nothing, world
+search_found = "You search carefully and find {list}."  # #search #found, world
+look_closely_nothing = "You look closely, but find nothing new."  # #examine-room #nothing, world
+look_closely_found = "You look closely and find {list}."  # #examine-room #found, world
+found = "You find {list}."                         # #search #found, after the room's own #searched reply
+a_way = "a way {direction}"                        # a found exit, in {list}
+
+# Other verbs
+nothing = "Nothing happens."                       # #nothing, thing
+acted = ["You {verb} the {name}.", "You {verb} the {name}. Something changes."]  # #acted, thing
+refused = ["You can't {verb} the {name} yet.", "Not yet: you can't {verb} the {name}."]  # #refused, thing
+talk_nothing = "{Person} has nothing to say."      # #talk #nothing, thing
+cant_verb_person = "You can't {verb} {person}."    # #person, thing
