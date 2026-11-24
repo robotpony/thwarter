@@ -1276,6 +1276,7 @@ impl WorldEngine {
             exits,
             characters,
             objects,
+            held: Vec::new(),
         })
     }
 

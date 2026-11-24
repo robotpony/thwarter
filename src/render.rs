@@ -261,9 +261,48 @@ fn player_blocks(view: &LocationView, links: Resolver) -> Rendered {
         spans.push(Span::plain("."));
         Some(Block::new(BlockKind::Here, spans, false))
     };
-    blocks.extend(names(&view.objects, EntityKind::Object, "You see"));
+    blocks.extend(seen(view));
     blocks.extend(names(&view.characters, EntityKind::Character, "Here"));
     Rendered { blocks }
+}
+
+/// "You see:" in play: every visible thing by title, each held thing
+/// right after what holds it, "Old photo (on the walls)" (REQ-CF-31), and
+/// what the doors hold last.
+fn seen(view: &LocationView) -> Option<Block> {
+    let mut entries: Vec<(&crate::engines::EntityRef, Option<&str>)> = Vec::new();
+    fn add<'a>(view: &'a LocationView, holder: &str, entries: &mut Vec<(&'a crate::engines::EntityRef, Option<&'a str>)>) {
+        for held in view.held.iter().filter(|h| h.holder == holder) {
+            if entries.iter().any(|(r, _)| r.id == held.thing.id) {
+                continue;
+            }
+            entries.push((&held.thing, Some(held.holder_name.as_str())));
+            add(view, &held.thing.id, entries);
+        }
+    }
+    for object in &view.objects {
+        entries.push((object, None));
+        add(view, &object.id, &mut entries);
+    }
+    for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
+        add(view, &door.id, &mut entries);
+    }
+    if entries.is_empty() {
+        return None;
+    }
+    let mut spans = vec![Span::plain("You see: ")];
+    for (i, (r, holder)) in entries.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::plain(", "));
+        }
+        let link = Link { name: r.id.clone(), target: r.name.as_ref().map(|_| (EntityKind::Object, r.id.clone())) };
+        spans.push(Span { text: r.display_name(), style: Style { link: Some(link), ..Default::default() } });
+        if let Some(holder) = holder {
+            spans.push(Span::plain(format!(" (on the {})", holder.to_lowercase())));
+        }
+    }
+    spans.push(Span::plain("."));
+    Some(Block::new(BlockKind::Here, spans, false))
 }
 
 /// A location as an author checks it: title and id, coordinates,
@@ -796,6 +835,7 @@ mod tests {
                 ExitView { direction: "north".into(), target: "castle/great-hall".into(), target_exists: true, door: None },
                 ExitView { direction: "down".into(), target: "castle/cellar".into(), target_exists: false, door: None },
             ],
+            held: Vec::new(),
             characters: vec![
                 EntityRef { id: "guard-captain".into(), name: Some("Captain Marcus".into()) },
                 EntityRef { id: "ghost".into(), name: None },

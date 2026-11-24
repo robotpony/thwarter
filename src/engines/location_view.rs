@@ -14,6 +14,18 @@ pub struct LocationView {
     pub exits: Vec<ExitView>,
     pub characters: Vec<EntityRef>,
     pub objects: Vec<EntityRef>,
+    /// What the room's objects and doors hold, as play sees it (REQ-CF-31):
+    /// each with its holder, in the order they're shown. Empty outside play.
+    pub held: Vec<Held>,
+}
+
+/// A thing another thing holds: a photo on a wall, a key in a lock.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Held {
+    pub thing: EntityRef,
+    /// The holder's id and its name as play shows it.
+    pub holder: String,
+    pub holder_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

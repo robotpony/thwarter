@@ -479,9 +479,10 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "hallway").unwrap();
         let mut s = |line: &str| say(&game, &world, &mut state, line);
-        // The room lists only what's directly in it.
+        // The room lists every visible thing by title, each held thing
+        // after what holds it.
         let look = s("look");
-        assert!(look.contains("You see: Walls.") && !look.contains("photo"), "{}", look);
+        assert!(look.contains("You see: Walls, Old photo (on the walls), Shelf (on the walls), Vase (on the shelf)."), "{}", look);
         // A holder lists what it holds; what that holds is in scope too.
         assert_eq!(s("x walls"), "Papered walls.\n\nYou see: Old photo, Shelf.");
         assert_eq!(s("look at photo"), "A family, unsmiling.");
@@ -490,6 +491,7 @@ mod tests {
         assert_eq!(s("x shelf"), "A narrow shelf.");
         assert_eq!(s("take photo"), "You take the old photo.");
         assert_eq!(s("x walls"), "Papered walls.\n\nYou see: Shelf.");
+        assert!(s("look").contains("You see: Walls, Shelf (on the walls)."));
         assert!(s("inventory").contains("Old photo"));
 
         // Placed twice is a warning; a cycle is a problem.

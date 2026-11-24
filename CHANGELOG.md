@@ -37,6 +37,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.49.1 (2026-11-23)
+
+### Changed
+
+- Looking lists what visible objects hold too, by title, each right after its holder: "You see: Walls, Old photo (on the walls), Shelf (on the walls), Vase (on the shelf)." What doors hold comes last (a key in its lock). Hidden, faint and absent things follow their visibility, and the room view, examine and inventory all use titles (Bruce; REQ-CF-31). `LocationView` gains `held`.
+
 ## 0.49.0 (2026-11-23)
 
 ### Added
