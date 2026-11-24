@@ -262,6 +262,60 @@ impl Console {
         }
     }
 
+    /// `/add <thing> [room or character]`: puts a person or thing into a
+    /// room (this one if none is named), or an object into a character's
+    /// inventory, without taking it from anywhere else (Bruce, 2026-11-23).
+    /// A name with no card becomes scenery the room lists (REQ-CF-8).
+    pub(super) fn add_thing(&mut self, args: &[&str]) -> String {
+        let (thing, target) = match args {
+            [thing] => match self.current_room() {
+                Some(here) => (*thing, here),
+                None => return format!("/add {} needs a room: go to one, or /add {} <room>.", thing, thing),
+            },
+            [thing, target] => (*thing, target.to_string()),
+            _ => return "Usage: /add <thing> [room or character], for example /add chair bedroom".to_string(),
+        };
+        if let Some(problem) = bare_id_problem(thing) {
+            return problem;
+        }
+        let engine = &self.world.engine;
+        let is_character = engine.characters.contains_key(thing);
+        let room = self.room_id(&target);
+        let (kind, id, key) = if engine.get_location(&room).is_some() {
+            (Kind::Room, room, if is_character { "characters" } else { "objects" })
+        } else if engine.characters.contains_key(target.as_str()) && !is_character {
+            (Kind::Character, target.clone(), "inventory")
+        } else if engine.characters.contains_key(target.as_str()) {
+            return format!("{} is a character; characters go in rooms, not with other characters.", thing);
+        } else {
+            return format!("There's no room or character called `{}` to add {} to.", target, thing);
+        };
+        let mut items: Vec<String> = match kind {
+            Kind::Room => {
+                let location = self.world.engine.get_location(&id).expect("checked above");
+                if is_character { location.characters.clone() } else { location.objects.clone() }
+            }
+            _ => self.world.engine.characters[&id].inventory.clone(),
+        };
+        let place = if kind == Kind::Room { id.clone() } else { format!("{}'s inventory", id) };
+        if items.iter().any(|i| i == thing) {
+            return format!("{} is already in {}.", thing, place);
+        }
+        items.push(thing.to_string());
+        let card = is_character || self.world.engine.objects.contains_key(thing);
+        match self.save(kind, &id, &[Edit::SetList { key: key.into(), items }]) {
+            Ok(path) => {
+                let note = if card {
+                    String::new()
+                } else {
+                    format!(", as scenery with no card yet (/edit object {} gives it one)", thing)
+                };
+                self.after_writes(&[path], format!("Added {} to {}{}.", thing, place, note))
+            }
+            Err(e) => e,
+        }
+    }
+
     /// `/move <thing> <room or character>`: puts a person or thing somewhere
     /// else (Bruce, 2026-11-23). A character goes to a room, and its
     /// `default_location` follows; an object goes to a room or into a

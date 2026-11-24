@@ -176,7 +176,8 @@ impl Console {
             ("link", args) if self.mode == Mode::Edit => self.link(args),
             ("unlink", args) if self.mode == Mode::Edit => self.unlink(args),
             ("move", args) if self.mode == Mode::Edit => self.move_thing(args),
-            ("new" | "set" | "link" | "unlink" | "move", _) => {
+            ("add", args) if self.mode == Mode::Edit => self.add_thing(args),
+            ("new" | "set" | "link" | "unlink" | "move" | "add", _) => {
                 format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", name)
             }
             ("", _) => "Type /help for commands.".to_string(),
@@ -222,6 +223,7 @@ impl Console {
                 "  /set <key> <value>                   one field; attributes.health 80 sets one entry".to_string(),
                 "  /link <direction> <room>             add or change one exit from this room".to_string(),
                 "  /unlink <direction>                  remove one exit from this room".to_string(),
+                "  /add <thing> [room or character]     put a person or thing here too (scenery if no card)".to_string(),
                 "  /move <thing> <room or character>    put a person or thing somewhere else".to_string(),
                 String::new(),
                 "Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):".to_string(),

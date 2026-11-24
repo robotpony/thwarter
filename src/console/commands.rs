@@ -31,6 +31,7 @@ pub const COMMANDS: &[Command] = &[
     command("set", "<key> <value>", "change one field of where you are", true),
     command("link", "<direction> <room>", "add or change an exit from this room", true),
     command("unlink", "<direction>", "remove an exit from this room", true),
+    command("add", "<thing> [room or character]", "put a person or thing here too; scenery if it has no card", true),
     command("move", "<thing> <room or character>", "put something somewhere else, or a room in an area", true),
     command("save", "[name]", "save the game", false),
     command("load", "[name]", "load a saved game", false),
@@ -145,7 +146,13 @@ impl Console {
                 things.iter_mut().for_each(|s| s.more = true);
                 dedupe(things)
             }
-            ("move", [_]) => {
+            ("add", []) => {
+                let mut things = self.things_of(Kind::Character);
+                things.extend(self.things_of(Kind::Object));
+                things.iter_mut().for_each(|s| s.more = false);
+                things
+            }
+            ("move" | "add", [_]) => {
                 let mut places = self.rooms();
                 places.extend(self.things_of(Kind::Character));
                 dedupe(places)

@@ -29,6 +29,13 @@ The author is a player of sorts, like a game master running a table (Bruce, 2026
   ```
 
 - REQ-CON-5: Edit mode MUST offer commands that create or change one thing at a time, for example `/new room north <id>` (a new room, linked north of the current one), `/new object`, `/new character`, `/set` (one field), `/link` (add or change one exit) and `/unlink` (remove one exit). Each MUST save the change to the file (REQ-ENG-7) and report any problems it causes (REQ-ENG-8). The author always names a new entity's `id`; the console MUST NOT make one up, since an `id` can't be renamed yet. In a room, the first word after `/new room` is a direction; outside a room, it's the new room's `id`.
+- REQ-CON-41: `/add <thing> [room or character]` MUST put a person or thing into a room, the current one if none is named, or an object into a character's inventory, without taking it from anywhere else (Bruce, 2026-11-23). A name with no card goes in as scenery (REQ-CF-8).
+
+  ```
+  in / > /add chair bedroom
+  Added chair to bedroom, as scenery with no card yet (/edit object chair gives it one).
+  ```
+
 - REQ-CON-40: `/move <thing> <room or character>` MUST put a person or thing somewhere else (Bruce, 2026-11-23): a character into another room, with its `default_location` following, or an object into a room or a character's inventory. It takes the thing out of every room list and inventory that held it, and the thing's own file stays where it is. `/move <id> global|area|local` changes scope instead (REQ-CON-29). A room moves into an area folder: `/move hallway house` makes it `house/hallway`, with its file moved and every exit to it updated, and a room as the target stands for its own area, so `/move hallway bedroom` puts hallway beside bedroom (Bruce, 2026-11-23). The writer's rename does the move, and the report lists every file it updated and any reference left to fix by hand.
 
   ```

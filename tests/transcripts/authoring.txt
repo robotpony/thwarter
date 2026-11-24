@@ -194,3 +194,19 @@ Objects:
 Moved house/well → village/well: moved house/well.md → village/well.md, updated 3 files (npcs/elder, village/square, village/tower).
 > go /village/well
 The Well (room)
+> go /village/square
+Village Square (room)
+> /add chair
+Added chair to village/square, as scenery with no card yet (/edit object chair gives it one).
+> /add chair
+chair is already in village/square.
+> /add rope village/well
+Added rope to village/well.
+> /add elder village/well
+elder is already in village/well.
+> /add bench smith
+Added bench to smith's inventory.
+> /add chair nowhere
+There's no room or character called `nowhere` to add chair to.
+> /add
+Usage: /add <thing> [room or character], for example /add chair bedroom

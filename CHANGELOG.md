@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.41.0 (2026-11-23)
+
+### Added
+
+- `/add <thing> [room or character]` (REQ-CON-41, Bruce, 2026-11-23): puts a person or thing into a room (this one if none is named), or an object into a character's inventory, without taking it from anywhere else; `/move` is for taking it away too. A name with no card goes in as scenery, and the reply says `/edit object <id>` gives it one. It's in `/help`, the `/` menu (with the world's characters and objects offered) and the transcript guard.
+
 ## 0.40.1 (2026-11-23)
 
 ### Added
