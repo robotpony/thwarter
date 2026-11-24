@@ -256,5 +256,7 @@ Characters:
 
 Objects:
   Bench (bench)
+    Brass Lantern (lantern)
   Chair (chair)
+    Rope (rope)
   Iron Key (iron-key)
