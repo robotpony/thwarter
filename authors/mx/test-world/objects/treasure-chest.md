@@ -23,11 +23,10 @@ security:
 
 An ornate wooden chest bound with iron and secured with multiple locks. The wood is polished to a high sheen, and precious metals inlay complex patterns across its surface. Despite its beauty, the chest is built like a fortress, designed to protect whatever treasures lie within.
 
-<!-- thwarter:action examine -->
 The craftsmanship rivals the finest furniture.
 
-<!-- thwarter:action attempt-open -->
+## When: #attempt-open
 The locks hold firm against your efforts.
 
-<!-- thwarter:action listen -->
+## When: #listen
 You hear the faint sound of coins shifting inside.

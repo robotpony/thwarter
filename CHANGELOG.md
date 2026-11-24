@@ -37,6 +37,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.46.1 (2026-11-23)
+
+### Changed
+
+- The test world's nine objects that had marker replies have them back, as `## When: #<verb>` sections with the author's text word for word; an `examine` reply is now part of the object's description. None had a refusal.
+- A closed door's reply to `go` is its `## When: #go` section, if one matches, else the built-in "The door is closed." The `door` and `portal` built-ins had no replies to move, so they're unchanged.
+
 ## 0.46.0 (2026-11-23)
 
 ### Added

@@ -22,11 +22,11 @@ stats:
 
 A gnarled staff carved from ancient oakwood, still showing signs of life with small leaves sprouting from its surface. The wood is warm to the touch and seems to pulse with the slow rhythm of growing trees. Runes spiral around its length, glowing faintly with natural magic.
 
-<!-- thwarter:action channel -->
+## When: #channel
 Natural energy flows through the staff.
 
-<!-- thwarter:action plant -->
+## When: #plant
 The staff could take root if planted.
 
-<!-- thwarter:action commune -->
+## When: #commune
 You feel connected to all growing things.

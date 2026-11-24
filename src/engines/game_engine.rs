@@ -206,7 +206,11 @@ impl GameEngine {
                     return ActionResult::say(format!("You can't go {} from here.", direction));
                 }
                 if !door.passable {
-                    return ActionResult::say(format!("The {} is closed.", door.title.to_lowercase()));
+                    // The door's `## When: #go` section says why, else built in.
+                    return ActionResult::say(match self.reply(world, state, "go", (EntityKind::Door, &door.id), None) {
+                        Some((kind, id, text)) => prose(world, &world.fill(&text, &Scope { at: At::play(state), this: Some((kind, &id)), here: None })),
+                        None => format!("The {} is closed.", door.title.to_lowercase()),
+                    });
                 }
                 match door.leads_to(&state.location) {
                     Some(to) => target = to.to_string(),

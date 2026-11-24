@@ -143,7 +143,7 @@ mod tests {
         write("objects/stick.md", "---\nid: stick\ntitle: Stick\ntype: object\nobject_type: x\n---\nA stick.\n");
         write("objects/lamp.md", "---\nid: lamp\ntitle: Lamp\ntype: object\nobject_type: x\n---\nA lamp.\n");
         // A door whose state and action share a name.
-        write("doors/hatch/index.md", "---\nid: hatch\ntitle: Hatch\ntype: door\nstate: closed\nsides:\n  bedroom: { direction: up }\n  attic: { direction: down }\nactions:\n  open: { becomes: { this: open } }\n---\nA hatch.\n\n## When: #closed\nIt's bolted from this side.\n\n## When: #open\nThe hatch hangs open.\n");
+        write("doors/hatch/index.md", "---\nid: hatch\ntitle: Hatch\ntype: door\nstate: closed\nsides:\n  bedroom: { direction: up }\n  attic: { direction: down }\nactions:\n  open: { becomes: { this: open } }\n---\nA hatch.\n\n## When: #closed\nIt's bolted from this side.\n\n## When: #go #closed\nThe bolt holds.\n\n## When: #open\nThe hatch hangs open.\n");
         write("doors/hatch/closed.md", "---\ninherits: index\npassable: no\n---\n");
         write("doors/hatch/open.md", "---\ninherits: index\npassable: yes\n---\n");
         write("attic.md", "---\nid: attic\ntitle: Attic\ntype: location\nconnections: { down: hatch }\n---\nDust.\n");
@@ -184,7 +184,8 @@ mod tests {
 
         // `#open` is the open hatch's description and the reply to opening it.
         assert!(s("look").contains("It's bolted from this side."));
-        assert_eq!(s("go up"), "The hatch is closed.");
+        // A refused exit's reply is the door's `#go` section.
+        assert_eq!(s("go up"), "The bolt holds.");
         assert_eq!(s("open hatch"), "The hatch hangs open.");
         assert_eq!(s("x hatch"), "A hatch.\n\nThe hatch hangs open.");
         assert!(s("go up").starts_with("Attic"));
@@ -211,5 +212,16 @@ mod tests {
         state.inventory.push("stick".into());
         state.inventory.push("lamp".into());
         assert_eq!(say(&game, &world, &mut state, "hit lamp with stick"), "The hall echoes with the crack.");
+    }
+
+    #[test]
+    fn the_test_worlds_replies_are_sections() {
+        let mut world = WorldEngine::new();
+        world.load_world(std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/authors/mx/test-world"))).unwrap();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/treasury").unwrap();
+        assert_eq!(say(&game, &world, &mut state, "listen chest"), "You hear the faint sound of coins shifting inside.");
+        // An `examine` reply is part of the description now.
+        assert!(say(&game, &world, &mut state, "x chest").ends_with("The craftsmanship rivals the finest furniture."));
     }
 }
