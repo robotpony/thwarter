@@ -65,8 +65,9 @@ pub struct Choice {
 /// What an option does, after its `->`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Construct {
-    /// `set <key>`: the author types the value.
-    Set { key: String },
+    /// `set <key>`: the author types the value; `set <key> <value>`: the
+    /// value written in the option, with nothing to ask.
+    Set { key: String, value: Option<String> },
     /// `recipe <name> <args>`: shorthand for console commands.
     Recipe { name: String, args: Vec<String> },
     /// `ask thing`: pick a thing here. `then` is what follows a comma,
@@ -83,7 +84,8 @@ impl Construct {
         let text = text.trim();
         let words: Vec<&str> = text.split_whitespace().collect();
         match words.as_slice() {
-            ["set", key] => Construct::Set { key: key.to_string() },
+            ["set", key] => Construct::Set { key: key.to_string(), value: None },
+            ["set", key, value @ ..] => Construct::Set { key: key.to_string(), value: Some(value.join(" ")) },
             ["recipe", name, args @ ..] => Construct::Recipe { name: name.to_string(), args: args.iter().map(|a| a.to_string()).collect() },
             ["ask", "value", name] => Construct::AskValue { name: name.to_string(), default: None },
             ["ask", "value", name, default @ ..] => Construct::AskValue { name: name.to_string(), default: Some(default.join(" ")) },
@@ -200,7 +202,7 @@ pub fn question_file(rel: &Path) -> Option<(PathBuf, String)> {
 mod tests {
     use super::*;
 
-    const LAMP: &str = "## Where does it start?\nPick one.\n- Loose, it can be taken (default)\n- Hanging on a wall, pulled free -> recipe fixed-until pull\n- On something here -> ask thing, then move into it\n\n## How bright?\n- Dim → set brightness\n- Ask me -> ask value brightness 3\n- Glowing (default)\n- Wobbly (default) -> dance about\n";
+    const LAMP: &str = "## Where does it start?\nPick one.\n- Loose, it can be taken (default)\n- Hanging on a wall, pulled free -> recipe fixed-until pull\n- On something here -> ask thing, then move into it\n\n## How bright?\n- Dim → set brightness\n- Preset -> set title Brass  lantern\n- Ask me -> ask value brightness 3\n- Glowing (default)\n- Wobbly (default) -> dance about\n";
 
     #[test]
     fn a_set_reads_questions_hints_options_and_constructs() {
@@ -213,8 +215,9 @@ mod tests {
         assert_eq!(q.options[1].action, Some(Construct::Recipe { name: "fixed-until".into(), args: vec!["pull".into()] }));
         assert_eq!(q.options[2].action, Some(Construct::AskThing { then: Some("then move into it".into()) }));
         let q = &set.questions[1];
-        assert_eq!(q.options[0].action, Some(Construct::Set { key: "brightness".into() }));
-        assert_eq!(q.options[1].action, Some(Construct::AskValue { name: "brightness".into(), default: Some("3".into()) }));
+        assert_eq!(q.options[0].action, Some(Construct::Set { key: "brightness".into(), value: None }));
+        assert_eq!(q.options[1].action, Some(Construct::Set { key: "title".into(), value: Some("Brass lantern".into()) }));
+        assert_eq!(q.options[2].action, Some(Construct::AskValue { name: "brightness".into(), default: Some("3".into()) }));
         assert_eq!(q.default_choice().unwrap().label, "Glowing", "the first (default) wins");
         assert_eq!(warnings.len(), 2, "{:?}", warnings);
         assert!(warnings[0].contains("does `dance about`, which isn't set, recipe, ask thing or ask value"), "{:?}", warnings);

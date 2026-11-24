@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn answers_become_the_commands_they_stand_for() {
-        let set = |key: &str| Some(Construct::Set { key: key.into() });
+        let set = |key: &str| Some(Construct::Set { key: key.into(), value: None });
         let a = |c, g: Option<&str>| Answer { choice: choice(c), given: g.map(str::to_string) };
         assert_eq!(commands_for("lantern", &a(set("title"), Some("Old lamp"))), vec!["/set title \"Old lamp\""]);
         assert!(commands_for("lantern", &a(set("title"), None)).is_empty());

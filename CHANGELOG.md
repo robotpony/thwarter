@@ -50,6 +50,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.62.0 (2026-11-24)
+
+### Added
+
+- A question's `set <key> <value>` option carries its value, `Construct::Set { key, value: Some(..) }`, so `- Brass lantern (default) -> set title Brass lantern` needs nothing typed; `set <key>` alone still asks (REQ-CF-32). The console's test constructor gains `value: None`, agreed with the console coder.
+
 ## 0.61.2 (2026-11-24)
 
 ### Changed
