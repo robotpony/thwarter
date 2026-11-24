@@ -11,6 +11,8 @@ pub enum Matcher {
     /// Plain text, with or without case.
     Text { query: String, case_sensitive: bool },
     Regex(regex::Regex),
+    /// Everything: for listing the things of a kind or in a place.
+    All,
 }
 
 impl Matcher {
@@ -46,6 +48,7 @@ impl Matcher {
                 }
             }
             Matcher::Regex(re) => re.find(text).map(|m| m.range()),
+            Matcher::All => Some(0..0),
         }
     }
 }
@@ -86,15 +89,20 @@ fn snippet(text: &str, range: std::ops::Range<usize>) -> String {
 
 impl WorldEngine {
     /// Every thing whose id, title or prose matches, of the given kinds (all
-    /// if empty), sorted by kind then id. With `under`, only rooms in that
-    /// folder (`castle/`), and the things those rooms hold or where
-    /// characters start.
+    /// if empty), sorted by kind then id. With `under`, only things whose
+    /// files are in that folder (`castle/`), and the things its rooms hold
+    /// or where characters start.
     pub fn search(&self, matcher: &Matcher, kinds: &[EntityKind], text_only: bool, under: Option<&str>) -> Vec<Hit> {
         let under = under.map(|u| u.trim_end_matches('/').to_string());
         let in_area = |room: &str| under.as_ref().map_or(true, |u| room == u || room.starts_with(&format!("{}/", u)));
         let rooms: Vec<&String> = self.loaded_locations.keys().filter(|r| in_area(r)).collect();
+        let root = self.world_root.clone().unwrap_or_default();
+        let filed_under = |kind: EntityKind, id: &str| -> bool {
+            let (Some(u), Some(thing)) = (under.as_ref(), self.thing(kind, id)) else { return false };
+            thing.index.path.strip_prefix(&root).map_or(false, |rel| rel.starts_with(u))
+        };
         let placed = |kind: EntityKind, id: &str| -> bool {
-            if under.is_none() {
+            if under.is_none() || filed_under(kind, id) {
                 return true;
             }
             match kind {

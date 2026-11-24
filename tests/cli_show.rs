@@ -143,4 +143,13 @@ fn search_finds_text_and_broken_exits() {
     assert!(!ok && err.contains("isn't a regular expression"), "{}", err);
     let (ok, _, err) = run(&[]);
     assert!(!ok && err.contains("needs a query"), "{}", err);
+    // Listing: a kind, a folder, or both, with no query.
+    let (ok, out, _) = run(&["--type", "character"]);
+    assert!(ok && out.trim() == "character guard  Guard", "{}", out);
+    let (ok, out, _) = run(&["--type", "object", "objects/"]);
+    assert!(ok && out.contains("object diary  Diary") && out.contains("object vault  Vault key"), "{}", out);
+    let (ok, out, _) = run(&["--type", "object", ""]);
+    assert!(ok && out.lines().count() == 2, "{}", out);
+    let (ok, _, err) = run(&["--type", "text"]);
+    assert!(!ok && err.contains("--type text needs a query"), "{}", err);
 }

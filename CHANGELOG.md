@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.39.1 (2026-11-23)
+
+### Fixed
+
+- `thwart search` lists things: with no query, or an empty one, a `--type` or a location lists everything there (`thwart search --type character castle/`). A lone argument ending in `/`, or naming a folder in the world exactly that isn't also a thing's id, is taken as the location, not the query, so `thwart search castle/` lists the castle. A location now also covers things whose own files are in that folder (`objects/`), as well as what its rooms hold.
+
 ## 0.39.0 (2026-11-23)
 
 ### Added
