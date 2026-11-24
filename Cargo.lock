@@ -1291,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "thwarter"
-version = "0.42.1"
+version = "0.43.0"
 dependencies = [
  "anyhow",
  "chrono",

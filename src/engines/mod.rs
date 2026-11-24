@@ -12,6 +12,7 @@ pub mod character_engine;
 pub mod narrative_engine;
 pub mod game_engine;
 pub mod player_commands;
+pub mod saves;
 
 pub use world_engine::*;
 pub use location_view::*;
@@ -19,3 +20,4 @@ pub use character_engine::*;
 pub use narrative_engine::*;
 pub use game_engine::*;
 pub use player_commands::{Parsed, DIRECTIONS};
+pub use saves::{list_saves, load_named, save_named, save_path, DEFAULT_SAVE};

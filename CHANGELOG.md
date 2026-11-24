@@ -35,6 +35,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.43.0 (2026-11-23)
+
+### Added
+
+- Saves are the engine's, so every client stores games the same way (REQ-PC-18, REQ-ENG-34), as agreed with the console coder: `engines::saves` has `DEFAULT_SAVE`, `save_dir`, `save_path` and `list_saves`, moved from the console with the same paths so existing saves still load, and new `save_named` and `load_named`, which save and load by name for a world. The save folder now comes from `settings::state_dir`, which ignores a relative `XDG_STATE_HOME` as XDG asks. The console's `src/console/saves.rs` stays until `/save` and `/load` switch over.
+
 ## 0.42.1 (2026-11-23)
 
 ### Changed
