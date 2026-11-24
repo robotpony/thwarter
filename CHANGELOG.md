@@ -49,6 +49,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.61.0 (2026-11-24)
+
+### Added
+
+- The question picker (REQ-CON-46): when `/add` or `/new` makes something new, the console asks the nearest question set for it (the coder's `questions_for`, 79b367a): its own name first, as a template's set, then its kind's, then the built-in. Each question shows its hint and options; ↑↓ choose and Enter picks. An option that needs something asks for it: text for `set` and `ask value` (with its default filled in), a pick of what's in the room for `ask thing`. Esc takes the defaults for this question and the rest. The answers then run as the console commands they stand for, with edit mode at the new thing, and the output lists them under "The answers were:"; then the editor opens on the thing. Placing a thing that already exists asks nothing.
+
 ## 0.60.0 (2026-11-24)
 
 ### Added

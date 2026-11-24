@@ -251,7 +251,7 @@ Decided by Bruce, 2026-11-23.
 
 ## Making things well
 
-Bruce, 2026-11-24: console commands should solve common problems easily, through small verbs, recipes built from them, and questions that `/add` and `/new` can ask. The question file's format is in `design/CONTENT_FORMAT.md` (REQ-CF-32). REQ-CON-44 and 45 are built (0.60.0); REQ-CON-46 is *proposed* until built.
+Bruce, 2026-11-24: console commands should solve common problems easily, through small verbs, recipes built from them, and questions that `/add` and `/new` can ask. The question file's format is in `design/CONTENT_FORMAT.md` (REQ-CF-32). REQ-CON-44 to 46 are built (46 in 0.61.0).
 
 - REQ-CON-44: Small verbs MUST cover states and actions: `/state <name> [start]` makes a state (turning a one-file thing into a bundle first), `/set <key> <value> in <state>` changes one state's file, and `/action <verb> <from> --> <to>` writes the action and opens its reply section in the editor, making the `to` state if it doesn't exist.
 - REQ-CON-45: Recipes MUST be shorthand for those verbs, and MUST print the commands they ran so an author learns them. First four, as Bruce picked: `fixed-until <verb>` (an immovable starting state and a free one), `locked-with <key>`, `switch <verbs> <states>` (two states with an action each way), and `container in|on`.
@@ -266,7 +266,7 @@ Bruce, 2026-11-24: console commands should solve common problems easily, through
     /action pull hanging --> loose
   ```
 
-- REQ-CON-46: When there's a question file for what's being made, `/add` and `/new` MUST ask its questions in a picker like the `/` menu's, then run the answers and print the commands they stood for. Esc takes the defaults for the rest. The file is `questions/<template or kind>.md`, found the way templates are, from the new thing's folder out to the root and then the built-ins compiled in from `src/builtins/questions/`; the nearest whole file wins, a template's set before its kind's (`design/CONTENT_FORMAT.md` › `type: questions`, REQ-CF-32). An answer uses one of four constructs: `set <key>`, `recipe …`, `ask thing`, or `ask value <name> <default>`.
+- REQ-CON-46: When `/add` or `/new` makes something new and there's a question file for it, they MUST ask its questions (placing a thing that exists asks nothing) in a picker like the `/` menu's, then run the answers and print the commands they stood for. Esc takes the defaults for the rest. The file is `questions/<template or kind>.md`, found the way templates are, from the new thing's folder out to the root and then the built-ins compiled in from `src/builtins/questions/`; the nearest whole file wins, a template's set before its kind's (`design/CONTENT_FORMAT.md` › `type: questions`, REQ-CF-32). An answer uses one of four constructs: `set <key>`, `recipe …`, `ask thing`, or `ask value <name> <default>`.
 
   ```
    A lantern, from the built-in lantern questions                  2 of 4

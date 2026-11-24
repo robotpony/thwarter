@@ -256,6 +256,7 @@ impl Console {
                 EntityKind::Object => Kind::Object,
                 EntityKind::Door => Kind::Door,
             };
+            self.pending_questions = self.questions_for_new(kind, &id);
             if let Some(path) = self.world.path_of(kind, &id) {
                 if let Ok(target) = self.open_target(kind, id, path) {
                     self.pending_edit = Some(target);
@@ -270,7 +271,18 @@ impl Console {
     /// new card. On a terminal only, and not after a refusal.
     pub(super) fn add_and_edit(&mut self, args: &[&str]) -> String {
         self.added = None;
+        self.created.clear();
+        let knew: std::collections::BTreeSet<String> =
+            self.world.files.values().filter(|e| e.kind.is_thing()).map(|e| e.id.clone()).collect();
         let out = self.add_thing(args);
+        // Questions only for something new, not for placing what exists.
+        if self.interactive {
+            if let Some((kind, id)) = self.added.clone() {
+                if !knew.contains(&id) {
+                    self.pending_questions = self.questions_for_new(kind, &id);
+                }
+            }
+        }
         if let (true, Some((kind, id))) = (self.interactive, self.added.take()) {
             let cardless = kind == Kind::Object && self.world.path_of(Kind::Object, &id).is_none();
             let target = if cardless {

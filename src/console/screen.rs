@@ -7,7 +7,9 @@
 //! status bar); this module only lays it out and handles keys. Scripts and
 //! transcripts don't come here: they stay line-based (REQ-CON-9).
 
+use super::asking::{needs, Answer, Asking, Needs};
 use super::commands::Completion;
+use crate::engines::questions::Choice;
 use super::editor::Editor;
 use super::full_edit::{EditFiles, EditTarget};
 use super::panels::{folded, Row};
@@ -53,6 +55,9 @@ pub struct Screen<'a> {
     editing: Option<(Editor<'a>, EditTarget)>,
     /// The `/` menu, while it's open (REQ-CON-33).
     menu: Option<Menu>,
+    /// Questions about a thing just made, while they're being asked
+    /// (REQ-CON-46); the editor opens on the thing after them.
+    picker: Option<Picker<'a>>,
     /// The line Esc closed the menu on; it stays closed until the line changes.
     menu_dismissed: Option<String>,
     sidebar_scroll: usize,
@@ -78,6 +83,7 @@ impl<'a> Screen<'a> {
             browsing: None,
             editing: None,
             menu: None,
+            picker: None,
             menu_dismissed: None,
             sidebar_scroll: 0,
             page: Cell::new(20),
@@ -118,6 +124,10 @@ impl<'a> Screen<'a> {
                 let report = lock(console).edit_closed(&target, editor.closed());
                 self.push(&report);
             }
+            return;
+        }
+        if self.picker.is_some() {
+            self.picker_key(input, console);
             return;
         }
         if self.menu.is_some() && self.menu_key(&input, console) {
@@ -255,9 +265,87 @@ impl<'a> Screen<'a> {
             Flow::Continue => {}
         }
         let mut console = lock(console);
+        // Questions come first; the editor opens on the thing after them.
+        if let Some(asking) = console.take_pending_questions() {
+            let reopen = console.take_pending_edit().is_some();
+            self.picker = Some(Picker::new(asking, reopen));
+            return;
+        }
         if let Some(target) = console.take_pending_edit() {
             let document = console.edit_document(&target);
             self.editing = Some((Editor::new(document), target));
+        }
+    }
+
+    /// A key while questions are being asked.
+    fn picker_key(&mut self, input: Input, console: &Mutex<Console>) {
+        let Some(picker) = self.picker.as_mut() else { return };
+        let question = &picker.asking.set.questions[picker.at];
+        match &mut picker.step {
+            Step::Choose => match input.key {
+                Key::Up => picker.selected = (picker.selected + question.options.len() - 1) % question.options.len().max(1),
+                Key::Down => picker.selected = (picker.selected + 1) % question.options.len().max(1),
+                Key::Enter => {
+                    let choice = question.options[picker.selected].clone();
+                    match needs(&choice) {
+                        None => picker.answer(choice, None),
+                        Some(Needs::Text { prompt, default }) => {
+                            let mut area = input_line();
+                            if let Some(default) = default {
+                                area.insert_str(default);
+                            }
+                            picker.step = Step::Typing { choice, prompt, area };
+                        }
+                        Some(Needs::Thing) => {
+                            let things = lock(console).things_to_pick(&picker.asking.id);
+                            if things.is_empty() {
+                                picker.answer(choice, None);
+                            } else {
+                                picker.step = Step::Picking { choice, things, selected: 0 };
+                            }
+                        }
+                    }
+                }
+                Key::Esc => picker.use_defaults(),
+                _ => {}
+            },
+            Step::Typing { choice, area, .. } => match input.key {
+                Key::Enter => {
+                    let (choice, given) = (choice.clone(), area.lines().join(" "));
+                    picker.answer(choice, Some(given));
+                }
+                Key::Esc => picker.step = Step::Choose,
+                _ => {
+                    area.input(input);
+                }
+            },
+            Step::Picking { choice, things, selected } => match input.key {
+                Key::Up => *selected = (*selected + things.len() - 1) % things.len(),
+                Key::Down => *selected = (*selected + 1) % things.len(),
+                Key::Enter => {
+                    let (choice, given) = (choice.clone(), things[*selected].clone());
+                    picker.answer(choice, Some(given));
+                }
+                Key::Esc => picker.step = Step::Choose,
+                _ => {}
+            },
+        }
+        if self.picker.as_ref().is_some_and(|p| p.done()) {
+            let picker = self.picker.take().expect("checked");
+            let report = lock(console).run_answers(&picker.asking, &picker.answers);
+            if !report.is_empty() {
+                self.push(&report);
+            }
+            if picker.reopen {
+                let guard = lock(console);
+                let kind = picker.asking.kind;
+                if let Some(path) = guard.world.path_of(kind, &picker.asking.id) {
+                    if let Ok(target) = guard.open_target(kind, picker.asking.id.clone(), path) {
+                        let document = guard.edit_document(&target);
+                        self.editing = Some((Editor::new(document), target));
+                    }
+                }
+            }
         }
     }
 
@@ -367,7 +455,9 @@ impl<'a> Screen<'a> {
             Some((editor, target)) => editor.draw(frame, output_area, &console.lookup_for(target)),
             None => {
                 self.draw_output(frame, output_area);
-                if let Some(menu) = &self.menu {
+                if let Some(picker) = &self.picker {
+                    picker.draw(frame, output_area);
+                } else if let Some(menu) = &self.menu {
                     draw_menu(frame, output_area, menu);
                 }
             }
@@ -433,6 +523,122 @@ impl<'a> Screen<'a> {
         }
         frame.render_widget(Paragraph::new(lines), bottom);
     }
+}
+
+/// Questions being asked about one new thing.
+struct Picker<'a> {
+    asking: Asking,
+    /// Which question.
+    at: usize,
+    selected: usize,
+    step: Step<'a>,
+    answers: Vec<Answer>,
+    /// Whether to open the editor on the thing afterwards.
+    reopen: bool,
+}
+
+/// Where a question is: choosing an option, or giving what it needs.
+enum Step<'a> {
+    Choose,
+    Typing { choice: Choice, prompt: String, area: TextArea<'a> },
+    Picking { choice: Choice, things: Vec<String>, selected: usize },
+}
+
+impl<'a> Picker<'a> {
+    fn new(asking: Asking, reopen: bool) -> Self {
+        let selected = default_index(&asking.set.questions[0]);
+        Picker { asking, at: 0, selected, step: Step::Choose, answers: Vec::new(), reopen }
+    }
+
+    fn done(&self) -> bool {
+        self.at >= self.asking.set.questions.len()
+    }
+
+    /// Records an answer and moves to the next question.
+    fn answer(&mut self, choice: Choice, given: Option<String>) {
+        self.answers.push(Answer { choice, given });
+        self.at += 1;
+        self.step = Step::Choose;
+        if let Some(next) = self.asking.set.questions.get(self.at) {
+            self.selected = default_index(next);
+        }
+    }
+
+    /// Esc: the defaults for this question and the rest. A default that
+    /// needs typing takes its own default value, or is left out.
+    fn use_defaults(&mut self) {
+        while let Some(question) = self.asking.set.questions.get(self.at) {
+            let Some(choice) = question.default_choice().cloned() else {
+                self.at += 1;
+                continue;
+            };
+            let given = match needs(&choice) {
+                Some(Needs::Text { default, .. }) => default,
+                _ => None,
+            };
+            self.answer(choice, given);
+        }
+    }
+
+    fn draw(&self, frame: &mut Frame, area: Rect) {
+        let set = &self.asking.set;
+        let Some(question) = set.questions.get(self.at) else { return };
+        let mut lines = vec![
+            Line::styled(
+                format!(" A new {}, with the questions in {}   {} of {}", self.asking.id, self.asking.shown_path, self.at + 1, set.questions.len()),
+                style(Role::Chrome),
+            ),
+            Line::from(""),
+            Line::styled(format!(" {}", question.text), style(Role::Title)),
+        ];
+        if !question.hint.is_empty() {
+            lines.push(Line::styled(format!(" {}", question.hint), style(Role::Note)));
+        }
+        lines.push(Line::from(""));
+        match &self.step {
+            Step::Choose => {
+                for (i, option) in question.options.iter().enumerate() {
+                    let mark = if i == self.selected { "▸" } else { " " };
+                    let mut line = Line::from(format!(" {} {}. {}", mark, i + 1, option.label));
+                    if i == self.selected {
+                        line = line.style(Style::default().add_modifier(ratatui::style::Modifier::REVERSED));
+                    }
+                    lines.push(line);
+                }
+            }
+            Step::Typing { prompt, area, .. } => {
+                lines.push(Line::from(format!(" {} {}", prompt, area.lines().join(" "))));
+            }
+            Step::Picking { things, selected, .. } => {
+                lines.push(Line::styled(" Which one?", style(Role::Note)));
+                for (i, thing) in things.iter().enumerate() {
+                    let mark = if i == *selected { "▸" } else { " " };
+                    let mut line = Line::from(format!(" {} {}", mark, thing));
+                    if i == *selected {
+                        line = line.style(Style::default().add_modifier(ratatui::style::Modifier::REVERSED));
+                    }
+                    lines.push(line);
+                }
+            }
+        }
+        let keys = match self.step {
+            Step::Choose => " ↑↓ choose · enter pick · esc use defaults for the rest ",
+            Step::Typing { .. } => " type · enter done · esc back ",
+            Step::Picking { .. } => " ↑↓ choose · enter pick · esc back ",
+        };
+        let height = (lines.len() as u16 + 2).min(area.height);
+        let popup = Rect { x: area.x, y: area.bottom().saturating_sub(height), width: area.width, height };
+        frame.render_widget(ratatui::widgets::Clear, popup);
+        let block = Block::default()
+            .borders(Borders::TOP | Borders::BOTTOM)
+            .border_style(style(Role::Chrome))
+            .title_bottom(Line::styled(keys, style(Role::Chrome)).right_aligned());
+        frame.render_widget(Paragraph::new(lines).block(block), popup);
+    }
+}
+
+fn default_index(question: &crate::engines::questions::Question) -> usize {
+    question.options.iter().position(|o| o.default).unwrap_or(0)
 }
 
 /// The `/` menu: what it offers, and which one is chosen.
@@ -904,6 +1110,35 @@ mod tests {
         assert!(second.output.iter().any(|l| l == "  > look"), "{:?}", second.output);
         press(&mut second, &console, Key::Up);
         assert_eq!(second.input_text(), "look", "Up reaches last session");
+    }
+
+    #[test]
+    fn a_new_thing_is_asked_its_questions_and_esc_takes_the_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("tiny");
+        for entry in walkdir::WalkDir::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny")) {
+            let entry = entry.unwrap();
+            let to = root.join(entry.path().strip_prefix(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny")).unwrap());
+            if entry.file_type().is_dir() {
+                std::fs::create_dir_all(&to).unwrap();
+            } else {
+                std::fs::copy(entry.path(), &to).unwrap();
+            }
+        }
+        let mut console = Console::open(&root, super::super::Mode::Edit).unwrap();
+        console.interactive = true;
+        let console = Mutex::new(console);
+        let mut screen = Screen::new("", None);
+        typed(&mut screen, &console, "go /village/square");
+        typed(&mut screen, &console, "/add rock");
+        assert!(screen.picker.is_some(), "the built-in object questions are asked");
+        let text = screen_text(&screen, &console, 110, 24);
+        assert!(text.contains("Where does it start?"), "{}", text);
+        assert!(text.contains("<built-in>"), "{}", text);
+        press(&mut screen, &console, Key::Esc);
+        assert!(screen.picker.is_none());
+        assert!(screen.output.iter().any(|l| l.trim() == "/new object rock thing"), "{:?}", screen.output);
+        assert!(screen.editing.is_some(), "then the editor opens on it");
     }
 
     #[test]

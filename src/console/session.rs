@@ -60,6 +60,8 @@ pub struct Console {
     pub(super) looked_at: Option<String>,
     /// The last play action's author notes, for the sidebar on a terminal.
     pub(super) notes: Vec<String>,
+    /// Questions `/add` or `/new` left for the screen to ask.
+    pub(super) pending_questions: Option<super::asking::Asking>,
     /// What `/add` just added, for it to open in the editor.
     pub(super) added: Option<(Kind, String)>,
     /// What the current command created, as (kind, id), for `/new` to open.
@@ -106,6 +108,7 @@ impl Console {
             asked: None,
             created: Vec::new(),
             added: None,
+            pending_questions: None,
             unknown_log: None,
         };
         if mode == Mode::Play {

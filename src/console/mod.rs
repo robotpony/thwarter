@@ -6,6 +6,7 @@
 //! as `> line` instead of printing a prompt, so its output reads as a
 //! transcript (REQ-CON-9).
 
+mod asking;
 mod author;
 mod commands;
 mod doors;
