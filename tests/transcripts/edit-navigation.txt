@@ -18,16 +18,16 @@ Village Square (village/square)
 
 A small square of packed earth. An old well stands to the north.
 
-Exits:
-  north  village/well
-  east   village/inn  (missing)
-
-Characters:
+The Elder is here.
   The Elder (elder)
 
-Objects:
+You see a brass lantern and a bench.
   Brass Lantern (lantern)
   bench  (no card)
+
+You can go north or east.
+  north  village/well
+  east   village/inn  (not written yet)
 > n
 The Well (room)
 > s

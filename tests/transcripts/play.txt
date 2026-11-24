@@ -80,7 +80,7 @@ The Well (village/well)
 
 A mossy stone well. The rope is long gone.
 
-Exits:
+You can go south.
   south  village/square
 > go /village/well
 The Well (room)

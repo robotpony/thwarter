@@ -10,7 +10,6 @@ use super::world::{Kind, World};
 use super::Mode;
 use crate::engines::GameEngine;
 use crate::models::game::PlayState;
-use crate::render::render_location;
 use anyhow::Result;
 use std::path::Path;
 use std::time::Instant;
@@ -600,7 +599,7 @@ impl Console {
         };
         match entry.kind {
             Kind::Room => match self.world.engine.describe_location(&entry.id) {
-                Some(view) => render_location(&view),
+                Some(view) => crate::render::render_location_with(&view, &self.room_texts()),
                 None => format!("{} is not in the world.", entry.id),
             },
             Kind::Character => match self.world.engine.characters.get(&entry.id) {
@@ -826,7 +825,11 @@ pub(super) fn suggest(text: &str, commands: &[&str]) -> String {
 /// `[console]` from `config.toml` laid over them. Problems in it are
 /// skipped, keeping the default for that key.
 fn console_texts() -> crate::engines::texts::Texts {
-    let mut texts = crate::engines::texts::Texts::defaults();
+    with_personal(crate::engines::texts::Texts::defaults())
+}
+
+/// `texts` with the author's own `[console]` from `config.toml` over it.
+fn with_personal(mut texts: crate::engines::texts::Texts) -> crate::engines::texts::Texts {
     let Some(path) = crate::settings::config_dir().map(|d| d.join("config.toml")) else { return texts };
     let Ok(text) = std::fs::read_to_string(&path) else { return texts };
     let Ok(value) = text.parse::<toml::Value>() else { return texts };
@@ -836,6 +839,13 @@ fn console_texts() -> crate::engines::texts::Texts {
 }
 
 impl Console {
+    /// The texts edit mode's room view uses: the world's `[play]` and
+    /// `[engine]`, with the author's `[console]` over them, so the world's
+    /// wording shows while it's being written (Bruce, 2026-11-24).
+    pub(super) fn room_texts(&self) -> crate::engines::texts::Texts {
+        with_personal(self.world.engine.texts().clone())
+    }
+
     /// A line of the console's own text, from `[console]` (REQ-ENG-49).
     pub(super) fn t(&self, key: &str, args: &[(&str, &str)]) -> String {
         self.texts.text("console", key, args)

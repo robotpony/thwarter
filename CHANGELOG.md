@@ -53,6 +53,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.64.2 (2026-11-24)
+
+### Changed
+
+- Edit mode's room view uses the world's own text tables with the author's `[console]` over them (`render_location_with`, the coder's 4fdf9b3), so it reads in the world's `[play]` sentences while it's being written, with the author detail indented under each. Transcripts reblessed for the new view.
+
 ## 0.64.1 (2026-11-24)
 
 ### Changed
