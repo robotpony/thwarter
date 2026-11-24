@@ -32,3 +32,15 @@ root_world = "World settings"
 root_questions = "Question sets: {count}"
 root_templates = "Templates: {count}"
 root_chapters = "Chapters: {count}"
+
+# Edit mode's room view and `thwart show <room>` (render.rs). Its
+# sentences are the world's [play] ones; these are the author's detail
+# lines under them. {id} and {door_id} are shown as ids.
+room_exit = "{direction}  {room}"
+room_exit_through = "{direction}  {room} through {door} ({door_id}), {state}"
+room_not_written = "  (not written yet)"
+room_person = "{name} ({id})"
+room_person_missing = "{id}  (not written yet)"
+room_thing = "{name} ({id})"
+room_thing_no_card = "{id}  (no card)"
+room_held_by_door = "{Word} the {door}:"

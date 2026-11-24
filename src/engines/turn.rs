@@ -534,7 +534,7 @@ mod tests {
         let view = world.describe_location_at("hallway", At::default()).unwrap();
         assert_eq!(view.held.len(), 3);
         let text = render_location_as(&view, RenderStyle::Author);
-        assert!(text.contains("Objects:\n  Walls (walls)\n    Old photo (photo-1)\n    Shelf (shelf)\n      Vase (vase)"), "{}", text);
+        assert!(text.contains("You see some walls.\n  Walls (walls)\n    Old photo (photo-1)\n    Shelf (shelf)\n      Vase (vase)"), "{}", text);
     }
 
     #[test]

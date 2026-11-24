@@ -1377,7 +1377,8 @@ impl WorldEngine {
                                 passable: door.passable,
                                 transparent: door.transparent,
                                 beyond,
-                                state: None,
+                                // Its starting state; play sets the current one.
+                                state: self.thing(EntityKind::Door, &door.id).and_then(|t| t.starting_state.clone()),
                             }),
                         };
                     }

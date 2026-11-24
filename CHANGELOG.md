@@ -53,6 +53,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.64.1 (2026-11-24)
+
+### Changed
+
+- Edit mode's room view and `thwart show <room>` read as the world does (Bruce's playtest): no "Exits:", "Characters:" or "Objects:" headings. Who's here, what's here (scenery too) and the ways out are the world's `[play]` sentences, each followed by the author's detail as indented lines from new `[console]` keys: ids, where each exit leads, and what isn't written yet ("(not written yet)", was "(missing)" and "(not found)").
+- A door exit leads with the door's title, then its id, then its state: "down   castle/vault through Iron door (vault-door), locked". Before, it showed only the id and "not passable".
+- `render::render_location_with(view, texts)` words the view with a world's `[play]` and the author's `[console]`; `render_location` uses the defaults. A door's `DoorView::state` is its starting state outside play.
+
 ## 0.64.0 (2026-11-24)
 
 ### Changed

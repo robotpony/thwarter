@@ -3,6 +3,8 @@
 //! colour and no trailing newline, so it can be printed or compared in
 //! transcripts as is.
 
+use crate::engines::play_text::PlayText;
+use crate::engines::texts::Texts;
 use crate::engines::{EntityKind, LocationView};
 use crate::parsers::link_target;
 use pulldown_cmark::{Event, Options, Parser, Tag};
@@ -208,7 +210,7 @@ pub fn render_location_as(view: &LocationView, style: RenderStyle) -> String {
 /// `render_location_as` prints. `links` resolves links in the prose.
 pub fn location_blocks(view: &LocationView, style: RenderStyle, links: Resolver) -> Rendered {
     match style {
-        RenderStyle::Author => author_blocks(view),
+        RenderStyle::Author => author_blocks(view, &Texts::defaults()),
         RenderStyle::Player => play_blocks(view, links, &crate::engines::play_text::PlayText::default()),
     }
     .cleaned()
@@ -319,59 +321,152 @@ pub fn held_line(view: &LocationView, text: &crate::engines::play_text::PlayText
     Some(Block::line(BlockKind::Here, line, false))
 }
 
-/// A location as an author checks it: title and id, coordinates,
-/// description (or `(no description yet)`), exits, then who and what is
-/// there. An exit to an unknown room says `(missing)`; an object with no
-/// card says `(no card)`; a character with no card says `(not found)`.
-/// The description is shown as written.
-fn author_blocks(view: &LocationView) -> Rendered {
+/// A location as an author checks it while writing (Bruce, 2026-11-24;
+/// `design/ENGINE_TEXT.md`): its title and id, coordinates, description,
+/// then who's here, what's here and the ways out in the world's own
+/// `[play]` sentences, each followed by the author's detail as indented
+/// lines from `[console]`: ids, where each exit leads, each door's title,
+/// id and state, and what isn't written yet. An empty list isn't shown.
+fn author_blocks(view: &LocationView, texts: &Texts) -> Rendered {
+    let play = PlayText::from_texts(texts);
+    let c = |key: &str, args: &[(&str, &str)]| texts.text("console", key, args);
     let mut blocks = vec![Block::line(BlockKind::Title, format!("{} ({})", view.title, view.id), false)];
-    if let Some(c) = &view.coordinates {
-        blocks.push(Block::line(BlockKind::Notice, format!("at ({}, {}, {})", c.x, c.y, c.z), false));
+    if let Some(at) = &view.coordinates {
+        blocks.push(Block::line(BlockKind::Notice, format!("at ({}, {}, {})", at.x, at.y, at.z), false));
     }
     let body = view.body.trim();
-    // Matches the console's character and object views.
     blocks.push(if body.is_empty() {
-        Block::line(BlockKind::Notice, "(no description yet)", true)
+        Block::line(BlockKind::Notice, play.no_description.clone(), true)
     } else {
         Block::line(BlockKind::Paragraph, body, true)
     });
 
-    // An empty list isn't shown (Bruce, 2026-11-24).
-    if !view.exits.is_empty() {
-        blocks.push(Block::line(BlockKind::Exits, "Exits:", true));
+    // Who's here.
+    if !view.characters.is_empty() {
+        let names: Vec<String> = view.characters.iter().map(|r| r.display_name()).collect();
+        let template = if names.len() == 1 { &play.character } else { &play.characters };
+        blocks.push(Block::line(BlockKind::Here, play.fill(template, &names), true));
+        for r in &view.characters {
+            blocks.push(detail_line(texts, r, EntityKind::Character, "room_person", "room_person_missing", 1));
+        }
+    }
+
+    // What's here, scenery too, each with what it holds under it.
+    if !view.objects.is_empty() {
+        let names: Vec<String> = view.objects.iter().map(|r| crate::engines::play_text::with_article(&r.display_name())).collect();
+        blocks.push(Block::line(BlockKind::Here, play.fill(&play.objects, &names), true));
+        let mut seen = Vec::new();
+        for r in &view.objects {
+            blocks.push(detail_line(texts, r, EntityKind::Object, "room_thing", "room_thing_no_card", 1));
+            held_under(texts, view, &r.id, 2, &mut blocks, &mut seen);
+        }
+        for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
+            let mut lines = Vec::new();
+            held_under(texts, view, &door.id, 2, &mut lines, &mut seen);
+            if !lines.is_empty() {
+                let word = view.held.iter().find(|h| h.holder == door.id).map_or("on".to_string(), |h| h.word.clone());
+                blocks.push(Block::line(BlockKind::Here, format!("  {}", c("room_held_by_door", &[("word", &word), ("door", &door.title.to_lowercase())])), false));
+                blocks.extend(lines);
+            }
+        }
+    }
+
+    // The ways out.
+    if view.exits.is_empty() {
+        blocks.push(Block::line(BlockKind::Exits, play.no_exits.clone(), true));
+    } else {
+        let ways: Vec<String> = view
+            .exits
+            .iter()
+            .map(|e| match &e.door {
+                Some(door) => play.door_exit(&e.direction, &door.title, door.state.as_deref() == Some("open")),
+                None => e.direction.clone(),
+            })
+            .collect();
+        blocks.push(Block::line(BlockKind::Exits, play.fill(&play.exits, &ways), true));
         let width = view.exits.iter().map(|e| e.direction.len()).max().unwrap_or(0);
         for exit in &view.exits {
-            let target = Style {
-                link: Some(Link {
-                    name: exit.target.clone(),
-                    target: exit.target_exists.then(|| (EntityKind::Location, exit.target.clone())),
-                }),
-                missing: !exit.target_exists,
-                ..Default::default()
+            let room = Span {
+                text: exit.target.clone(),
+                style: Style {
+                    link: Some(Link { name: exit.target.clone(), target: exit.target_exists.then(|| (EntityKind::Location, exit.target.clone())) }),
+                    missing: !exit.target_exists,
+                    ..Default::default()
+                },
             };
-            let mut spans = vec![
-                Span::plain(format!("  {:<width$}  ", exit.direction, width = width)),
-                Span { text: exit.target.clone(), style: target },
-            ];
+            let direction = Span::plain(format!("  {:<width$}", exit.direction, width = width));
+            let mut slots: Vec<(&str, Span)> = vec![("direction", direction), ("room", room)];
+            let key = match &exit.door {
+                Some(door) => {
+                    let link = Link { name: door.id.clone(), target: Some((EntityKind::Door, door.id.clone())) };
+                    slots.push(("door", Span::plain(door.title.clone())));
+                    slots.push(("door_id", Span { text: door.id.clone(), style: Style { link: Some(link), ..Default::default() } }));
+                    let state = door.state.clone().unwrap_or_else(|| if door.passable { "open".into() } else { "closed".into() });
+                    slots.push(("state", Span::plain(state)));
+                    "room_exit_through"
+                }
+                None => "room_exit",
+            };
+            let mut spans = spans_from(&c(key, &[]), slots);
             if !exit.target_exists {
-                spans.push(Span { text: "  (missing)".into(), style: Style { missing: true, ..Default::default() } });
-            }
-            if let Some(door) = &exit.door {
-                let link = Link { name: door.id.clone(), target: Some((EntityKind::Door, door.id.clone())) };
-                spans.push(Span::plain("  (through "));
-                spans.push(Span { text: door.id.clone(), style: Style { link: Some(link), ..Default::default() } });
-                spans.push(Span::plain(if door.passable { ", passable)" } else { ", not passable)" }));
+                spans.push(Span { text: c("room_not_written", &[]), style: Style { missing: true, ..Default::default() } });
             }
             blocks.push(Block::new(BlockKind::Exits, spans, false));
         }
     }
-
-    push_refs(&mut blocks, "Characters", &view.characters, "not found", EntityKind::Character);
-    push_refs(&mut blocks, "Objects", &view.objects, "no card", EntityKind::Object);
-    push_held(&mut blocks, view);
     Rendered { blocks }
 }
+
+/// One indented author line for a person or thing: its name and id, or
+/// its id and why it has no card.
+fn detail_line(texts: &Texts, r: &crate::engines::EntityRef, kind: EntityKind, key: &str, missing_key: &str, depth: usize) -> Block {
+    let found = r.name.is_some();
+    let id = Span {
+        text: r.id.clone(),
+        style: Style { link: Some(Link { name: r.id.clone(), target: found.then(|| (kind, r.id.clone())) }), missing: !found, ..Default::default() },
+    };
+    let template = texts.text("console", if found { key } else { missing_key }, &[]);
+    let mut spans = vec![Span::plain("  ".repeat(depth))];
+    spans.extend(spans_from(&template, vec![("name", Span::plain(r.name.clone().unwrap_or_default())), ("id", id)]));
+    Block::new(BlockKind::Here, spans, false)
+}
+
+/// What `holder` holds, however deep, as indented author lines.
+fn held_under(texts: &Texts, view: &LocationView, holder: &str, depth: usize, out: &mut Vec<Block>, seen: &mut Vec<String>) {
+    for h in view.held.iter().filter(|h| h.holder == holder) {
+        if seen.contains(&h.thing.id) {
+            continue;
+        }
+        seen.push(h.thing.id.clone());
+        out.push(detail_line(texts, &h.thing, EntityKind::Object, "room_thing", "room_thing_no_card", depth));
+        held_under(texts, view, &h.thing.id, depth + 1, out, seen);
+    }
+}
+
+/// `template` as spans: its text plain, and each `{slot}` the span given
+/// for it, so ids keep their links and styles. An unknown slot stays as
+/// written.
+fn spans_from(template: &str, slots: Vec<(&str, Span)>) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let mut rest = template;
+    while let Some(open) = rest.find('{') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('}') else { break };
+        if open > 0 {
+            spans.push(Span::plain(&rest[..open]));
+        }
+        match slots.iter().find(|(name, _)| *name == &after[..close]) {
+            Some((_, span)) => spans.push(span.clone()),
+            None => spans.push(Span::plain(&rest[open..open + close + 2])),
+        }
+        rest = &after[close + 1..];
+    }
+    if !rest.is_empty() {
+        spans.push(Span::plain(rest));
+    }
+    spans
+}
+
 
 /// A map as ASCII (`thwart map`): each room a `[Title]` box on its grid
 /// cell, `@` for the room it's drawn from and `?` for one not written
@@ -579,89 +674,17 @@ pub fn render_thing_sources(thing: &crate::engines::bundles::Thing, shown_state:
     clean_text(&out.join("\n"))
 }
 
-/// `author_blocks` as text: what `thwart show` prints.
+/// `author_blocks` as text with the default wording.
 pub fn render_location(view: &LocationView) -> String {
-    author_blocks(view).cleaned().to_plain()
+    render_location_with(view, &Texts::defaults())
 }
 
-/// What the room's objects hold, each under its holder and indented one
-/// step further, as `push_refs` lists the objects (REQ-CF-31). Lines go
-/// right after their holder's.
-fn push_held(blocks: &mut Vec<Block>, view: &LocationView) {
-    if view.held.is_empty() {
-        return;
-    }
-    fn line(r: &crate::engines::EntityRef, depth: usize) -> Block {
-        let pad = "  ".repeat(depth + 1);
-        let link = |missing: bool| Style { link: Some(Link { name: r.id.clone(), target: (!missing).then(|| (EntityKind::Object, r.id.clone())) }), missing, ..Default::default() };
-        let spans = match &r.name {
-            Some(name) => vec![Span::plain(format!("{}{} (", pad, name)), Span { text: r.id.clone(), style: link(false) }, Span::plain(")")],
-            None => vec![Span::plain(pad), Span { text: r.id.clone(), style: link(true) }, Span { text: "  (no card)".into(), style: Style { missing: true, ..Default::default() } }],
-        };
-        Block::new(BlockKind::Here, spans, false)
-    }
-    fn under(view: &LocationView, holder: &str, depth: usize, out: &mut Vec<(String, Block)>, seen: &mut Vec<String>) {
-        for h in view.held.iter().filter(|h| h.holder == holder) {
-            if seen.contains(&h.thing.id) {
-                continue;
-            }
-            seen.push(h.thing.id.clone());
-            out.push((holder.to_string(), line(&h.thing, depth)));
-            under(view, &h.thing.id, depth + 1, out, seen);
-        }
-    }
-    // Each object's lines, then what doors hold under a heading of their own.
-    let mut seen = Vec::new();
-    let mut result: Vec<Block> = Vec::new();
-    let objects: Vec<&crate::engines::EntityRef> = view.objects.iter().collect();
-    let start = blocks.len() - objects.len();
-    let (head, rows) = blocks.split_at(start);
-    let mut rebuilt: Vec<Block> = head.to_vec();
-    for (object, row) in objects.iter().zip(rows.iter()) {
-        rebuilt.push(row.clone());
-        let mut lines = Vec::new();
-        under(view, &object.id, 1, &mut lines, &mut seen);
-        rebuilt.extend(lines.into_iter().map(|(_, b)| b));
-    }
-    for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
-        let mut lines = Vec::new();
-        under(view, &door.id, 1, &mut lines, &mut seen);
-        if !lines.is_empty() {
-            result.push(Block::line(BlockKind::Here, format!("{} the {}:", capitalize(&view.held.iter().find(|h| h.holder == door.id).map_or("on".to_string(), |h| h.word.clone())), door.title.to_lowercase()), false));
-            result.extend(lines.into_iter().map(|(_, b)| b));
-        }
-    }
-    *blocks = rebuilt;
-    blocks.extend(result);
+/// `author_blocks` as text, worded by `texts`: a world's `[play]` and the
+/// author's `[console]`. What `thwart show` and edit mode's `look` print.
+pub fn render_location_with(view: &LocationView, texts: &Texts) -> String {
+    author_blocks(view, texts).cleaned().to_plain()
 }
 
-fn capitalize(word: &str) -> String {
-    let mut chars = word.chars();
-    chars.next().map(|c| c.to_uppercase().collect::<String>() + chars.as_str()).unwrap_or_default()
-}
-
-fn push_refs(blocks: &mut Vec<Block>, heading: &str, refs: &[crate::engines::EntityRef], missing_label: &str, kind: EntityKind) {
-    if refs.is_empty() {
-        return;
-    }
-    blocks.push(Block::line(BlockKind::Here, format!("{}:", heading), true));
-    for r in refs {
-        let link = |missing: bool| Style {
-            link: Some(Link { name: r.id.clone(), target: (!missing).then(|| (kind, r.id.clone())) }),
-            missing,
-            ..Default::default()
-        };
-        let spans = match &r.name {
-            Some(name) => vec![Span::plain(format!("  {} (", name)), Span { text: r.id.clone(), style: link(false) }, Span::plain(")")],
-            None => vec![
-                Span::plain("  "),
-                Span { text: r.id.clone(), style: link(true) },
-                Span { text: format!("  ({})", missing_label), style: Style { missing: true, ..Default::default() } },
-            ],
-        };
-        blocks.push(Block::new(BlockKind::Here, spans, false));
-    }
-}
 
 /// Prose as the player reads it (REQ-CF-28 to 30): Markdown's headings,
 /// emphasis, lists, quotes and code become blocks and styles, never raw
@@ -921,16 +944,16 @@ at (0, 1, 0)
 
 A dry fountain.
 
-Exits:
-  north  castle/great-hall
-  down   castle/cellar  (missing)
-
-Characters:
+Captain Marcus and Ghost are here.
   Captain Marcus (guard-captain)
-  ghost  (not found)
+  ghost  (not written yet)
 
-Objects:
-  fountain  (no card)";
+You see a fountain.
+  fountain  (no card)
+
+You can go north or down.
+  north  castle/great-hall
+  down   castle/cellar  (not written yet)";
         assert_eq!(render_location(&view()), expected);
     }
 
@@ -972,7 +995,7 @@ You can go north or down.";
         v.coordinates = None;
         v.body = "  \n".into();
         let text = render_location(&v);
-        assert!(text.starts_with("Castle Courtyard (castle/courtyard)\n\n(no description yet)\n\nExits:\n"), "{}", text);
+        assert!(text.starts_with("Castle Courtyard (castle/courtyard)\n\n(no description yet)\n\nCaptain Marcus"), "{}", text);
     }
 
     /// The player view as it was before blocks, kept to prove `to_plain`
