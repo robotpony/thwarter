@@ -263,6 +263,8 @@ sides:
 - A one-way door has one side that is never passable (a trapdoor you fall through, a door that locks behind you). To be tested.
 - A standard door joins exactly two rooms. A portal is a special type of door that can join more.
 - The room view shows the door's current text beside its exits; the room's own prose never changes for a door.
+- Trying to go through a door that isn't passable gives the door's `<!-- thwarter:action go refused -->` block from its current state, so a closed door and a locked one can say different things; without one, a built-in reply ("The iron door is closed."). Decided by the commander, 2026-11-23, following Responses.
+- Built in 0.33.0 (bbd1e64): doors, portals, the built-in `door` and `portal` (bundles with `closed`, the starting state, and `open`), and the validation rules.
 
 ## Hidden things
 
