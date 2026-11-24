@@ -165,13 +165,10 @@ impl Console {
 
     /// Adds `room` as one of `door`'s sides, and its exit through it.
     fn link_side(&mut self, door: &str, room: &str, direction: &str, written: &mut Vec<PathBuf>) -> Result<(), String> {
-        // The writer sets single values in a map, and a side is a small map
-        // of its own, so the side goes into the file's text under `sides:`,
-        // saved whole (the writer still checks it parses as this door).
-        let path = self.world.path_of(Kind::Door, door).ok_or_else(|| format!("{} has no file to add a side to.", door))?;
-        let text = std::fs::read_to_string(self.world.root.join(format!("{}.md", path))).map_err(|e| format!("Can't read {}.md: {}", path, e))?;
-        let text = with_side(&text, room, direction).ok_or_else(|| format!("{}.md has no `sides:` to add {} to; /edit it.", path, room))?;
-        written.push(self.save(Kind::Door, door, &[Edit::ReplaceAll(text)])?);
+        let mut side = serde_yaml::Mapping::new();
+        side.insert(Value::String("direction".into()), Value::String(direction.to_string()));
+        let edit = Edit::SetMapEntry { key: "sides".into(), subkey: room.to_string(), value: Value::Mapping(side) };
+        written.push(self.save(Kind::Door, door, &[edit])?);
         let edit = Edit::SetMapEntry { key: "connections".into(), subkey: direction.to_string(), value: Value::String(door.to_string()) };
         written.push(self.save(Kind::Room, room, &[edit])?);
         Ok(())
@@ -218,24 +215,6 @@ fn side_of(direction: &str, room: &str) -> String {
     } else {
         format!("{} from {}", direction, room)
     }
-}
-
-/// `text` with `room: { direction: <direction> }` added at the end of its
-/// frontmatter's `sides:` map, or `None` if it has none.
-fn with_side(text: &str, room: &str, direction: &str) -> Option<String> {
-    let lines: Vec<&str> = text.lines().collect();
-    let start = lines.iter().position(|l| l.trim_end() == "sides:")?;
-    let mut end = start + 1;
-    while end < lines.len() && lines[end].starts_with(' ') {
-        end += 1;
-    }
-    let mut out: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
-    out.insert(end, format!("  {}: {{ direction: {} }}", room, direction));
-    let mut joined = out.join("\n");
-    if text.ends_with('\n') {
-        joined.push('\n');
-    }
-    Some(joined)
 }
 
 fn usage() -> String {

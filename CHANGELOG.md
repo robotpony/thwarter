@@ -39,6 +39,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.57.1 (2026-11-24)
+
+### Changed
+
+- `/add <room> <door>` writes the new side with the writer's `SetMapEntry`, which takes a small map now (492a954), instead of editing the door file's text.
+
 ## 0.57.0 (2026-11-24)
 
 ### Added
