@@ -32,27 +32,26 @@ pub fn validate_command(
         report.objects_loaded
     ));
 
-    let problems = engine.problems(&report, strict);
-    for warning in &report.warnings {
+    let validation = engine.validation(strict);
+    for warning in &validation.warnings {
         formatter.print_warning(warning);
     }
-
-    if problems.is_empty() {
-        formatter.print_success("Validation passed: no broken references found");
+    for problem in &validation.problems {
+        formatter.print_error(problem);
+    }
+    if validation.passed() {
+        formatter.print_success(&validation.summary());
     } else {
-        for problem in &problems {
-            formatter.print_error(problem);
-        }
-        formatter.print_error(&format!("Validation failed: {} problem(s) found", problems.len()));
+        formatter.print_error(&validation.summary());
     }
 
     if let Some(output_file) = output {
-        let report_text = problems.join("\n");
+        let report_text = validation.problems.join("\n");
         std::fs::write(&output_file, report_text)?;
         formatter.print_info(&format!("Validation report saved to: {}", output_file));
     }
 
-    if problems.is_empty() {
+    if validation.passed() {
         Ok(())
     } else {
         Err(AlreadyReported.into())

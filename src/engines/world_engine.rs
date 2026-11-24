@@ -179,6 +179,29 @@ pub struct Version {
     pub chapter: Option<ChapterKey>,
 }
 
+/// The result of checking a world (REQ-ENG-44): problems fail it,
+/// warnings don't.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Validation {
+    pub problems: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+impl Validation {
+    pub fn passed(&self) -> bool {
+        self.problems.is_empty()
+    }
+
+    /// The closing line, worded the same in every client.
+    pub fn summary(&self) -> String {
+        match (self.problems.len(), self.warnings.len()) {
+            (0, 0) => "Validation passed: no problems or warnings".to_string(),
+            (0, w) => format!("Validation passed: no problems, {} warning(s)", w),
+            (p, w) => format!("Validation failed: {} problem(s), {} warning(s)", p, w),
+        }
+    }
+}
+
 /// Summary of a `load_world` pass: what was loaded, and every file that
 /// failed to parse. A partial load is not a hard error; callers (the
 /// `validate` and `show` commands in particular) need to see both what
@@ -1121,6 +1144,13 @@ impl WorldEngine {
         warnings
     }
 
+    /// What `thwart validate` reports, for the world as it is now: every
+    /// client that checks a world calls this, so the console's check and
+    /// the command line's never differ (REQ-ENG-44).
+    pub fn validation(&self, strict: bool) -> Validation {
+        Validation { problems: self.current_problems(strict), warnings: self.current_warnings() }
+    }
+
     /// The one file `(kind, id)` was loaded from. An error if it wasn't
     /// loaded, or if two files define it.
     pub fn source_path(&self, kind: EntityKind, id: &str) -> Result<&Path> {
@@ -1580,6 +1610,17 @@ mod tests {
         let mut engine = WorldEngine::new();
         let report = engine.load_world(dir.path()).unwrap();
         (dir, engine, report)
+    }
+
+    #[test]
+    fn validation_is_the_current_problems_and_warnings() {
+        let (_dir, engine, report) = small_world();
+        let v = engine.validation(false);
+        assert_eq!(v.problems, engine.problems(&report, false));
+        assert_eq!(v.warnings, report.warnings);
+        assert!(!v.passed());
+        assert!(v.summary().starts_with("Validation failed: 1 problem(s)"), "{}", v.summary());
+        assert_eq!(Validation::default().summary(), "Validation passed: no problems or warnings");
     }
 
     #[test]

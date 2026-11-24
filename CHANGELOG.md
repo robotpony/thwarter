@@ -39,6 +39,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.52.0 (2026-11-24)
+
+### Added
+
+- `WorldEngine::validation(strict)` gives what `thwart validate` reports for the world as it is now: problems, warnings and a summary line. `thwart validate` uses it, and the console's `/validate` will, so the two never differ (REQ-ENG-44).
+
+### Changed
+
+- `thwart validate` ends with one summary that counts warnings too: "Validation passed: no problems, 3 warning(s)" or "Validation failed: 2 problem(s), 3 warning(s)".
+
 ## 0.51.4 (2026-11-23)
 
 ### Fixed
