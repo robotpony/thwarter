@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.39.2 (2026-11-23)
+
+### Added
+
+- The console logs input it didn't understand to `$XDG_STATE_HOME/thwarter/unknown-commands.log` (`~/.local/state/...` by default), so the console coder can review what authors and players reach for when Bruce asks (Bruce, 2026-11-23). Each line is tab-separated: when, the world's folder, the mode, where (edit mode's place or the player's room), the kind (`command` for an unknown `/command`, `edit` for a word edit mode doesn't know, `play` for a verb play doesn't understand) and what was typed. Only terminal sessions log, not scripts or transcripts. `/status` shows the log's path and how many lines it holds.
+
 ## 0.39.1 (2026-11-23)
 
 ### Fixed

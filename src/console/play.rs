@@ -22,7 +22,10 @@ impl Console {
             Verb::Examine(noun) => PlayAction::Examine(noun),
             Verb::Inventory => PlayAction::Inventory,
             Verb::Incomplete(question) => return question,
-            Verb::Unknown(typed) => return format!("I don't understand `{}`.", typed),
+            Verb::Unknown(typed) => {
+                self.log_unknown("play", line);
+                return format!("I don't understand `{}`.", typed);
+            }
         };
         let Some(state) = self.game.as_mut() else {
             return "No game is in progress. /play here starts one in the room edit mode is in.".to_string();

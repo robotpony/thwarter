@@ -88,6 +88,10 @@ impl Console {
             if warnings == 1 { "" } else { "s" }
         ));
         out.push(format!("Build: thwart {}", env!("CARGO_PKG_VERSION")));
+        if let Some(log) = &self.unknown_log {
+            let lines = std::fs::read_to_string(log).map(|t| t.lines().count()).unwrap_or(0);
+            out.push(format!("Unknown input: {} ({} logged)", log.display(), lines));
+        }
         out.join("\n")
     }
 

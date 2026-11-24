@@ -55,6 +55,9 @@ pub struct Console {
     pub(super) pending_edit: Option<super::full_edit::EditTarget>,
     /// Where edit mode has been, most recent last, for `go back`.
     pub(super) trail: Vec<Place>,
+    /// Where input the console didn't understand is logged, for reviewing
+    /// what authors and players reach for. Only a terminal session sets it.
+    pub(super) unknown_log: Option<std::path::PathBuf>,
 }
 
 /// How many places `go back` remembers.
@@ -87,6 +90,7 @@ impl Console {
             interactive: false,
             pending_edit: None,
             trail: Vec::new(),
+            unknown_log: None,
         };
         if mode == Mode::Play {
             if let Some(room) = console.world.default_room() {
@@ -171,7 +175,10 @@ impl Console {
                 format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", name)
             }
             ("", _) => "Type /help for commands.".to_string(),
-            _ => format!("Unknown command `/{}`. Type /help for commands.", name),
+            _ => {
+                self.log_unknown("command", &format!("/{}", command));
+                format!("Unknown command `/{}`. Type /help for commands.", name)
+            }
         };
         (out, Flow::Continue)
     }
@@ -309,7 +316,10 @@ impl Console {
             Verb::Take(_) | Verb::Inventory => {
                 "That's a play-mode verb. Here, /new and /set change what's in a room; /play here tries it.".to_string()
             }
-            Verb::Unknown(_) => format!("Edit mode doesn't know `{}`. Type /help for commands.", first),
+            Verb::Unknown(_) => {
+                self.log_unknown("edit", line);
+                format!("Edit mode doesn't know `{}`. Type /help for commands.", first)
+            }
         }
     }
 
@@ -384,6 +394,33 @@ impl Console {
                 format!("There's no `{}` here. go {} looks for it anywhere in the world.", noun, noun)
             }
             Some(Err(message)) => message,
+        }
+    }
+
+    /// Appends one line to the unknown-input log: when, the world, the
+    /// mode, where, what kind of input (`command`, `edit`, `play`) and what
+    /// was typed, tab-separated. A log that can't be written is skipped.
+    pub(super) fn log_unknown(&self, kind: &str, typed: &str) {
+        let Some(path) = &self.unknown_log else { return };
+        let at = match self.mode {
+            Mode::Play => self.game.as_ref().map(|g| g.location.clone()).unwrap_or_default(),
+            Mode::Edit => self.pwd(),
+        };
+        let line = format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\n",
+            chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+            self.world.root.display(),
+            self.mode.name(),
+            at,
+            kind,
+            typed.replace(['\t', '\n'], " ")
+        );
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = file.write_all(line.as_bytes());
         }
     }
 
@@ -626,6 +663,31 @@ mod tests {
     use super::*;
     use std::fs;
     use walkdir::WalkDir;
+
+    #[test]
+    fn unknown_input_is_logged_with_where_it_was_typed() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("state/thwarter/unknown-commands.log");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/transcripts/worlds/tiny");
+        let mut console = Console::open(&root, Mode::Edit).unwrap();
+        console.unknown_log = Some(log.clone());
+        console.handle("go /village/square");
+        console.handle("/bogus thing");
+        console.handle("dance");
+        console.handle("/play");
+        console.handle("light the lantern");
+        console.handle("look");
+        let text = fs::read_to_string(&log).unwrap();
+        let rows: Vec<Vec<&str>> = text.lines().map(|l| l.split('\t').skip(2).collect()).collect();
+        assert_eq!(
+            rows,
+            vec![
+                vec!["edit", "village/square", "command", "/bogus thing"],
+                vec!["edit", "village/square", "edit", "dance"],
+                vec!["play", "village/square", "play", "light the lantern"],
+            ]
+        );
+    }
 
     const FIXTURE: &str = "tests/transcripts/worlds/tiny";
 
