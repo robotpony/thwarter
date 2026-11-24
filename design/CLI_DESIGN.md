@@ -6,7 +6,7 @@ This document defines the command-style interface for the Thwarter command line 
 
 ## Status
 
-For what's actually implemented versus still a mock or unbuilt, see the implementation status table in `design/ARCHITECTURE.md`. Short version: `validate` and `show` do real work against loaded world content; `search`, `map`, `debug`, `go`, `do`, `test`, and `create` are either honestly-labeled "not implemented" or not wired into the CLI at all. Everything below this line is the target interface, not a description of current behavior.
+For what's actually implemented versus still a mock or unbuilt, see the implementation status table in `design/ARCHITECTURE.md`. Short version: `validate`, `show` and `map` do real work against loaded world content; `search`, `debug`, `go`, `do`, `test`, and `create` are either honestly-labeled "not implemented" or not wired into the CLI at all. Everything below this line is the target interface, not a description of current behavior.
 
 ## Command Structure
 
@@ -105,6 +105,14 @@ thwart map --output=worldmap.txt               # Save to file
 - `--style=<ascii|unicode|compact>` - Map rendering style
 - `--output=<file>` - Save map to file
 - `--connections` - Show connection types between locations
+
+`--player`, `--style` other than ascii, and `--connections` aren't built yet; each says so (REQ-CLI-7, REQ-CLI-17).
+
+**Reading the map:**
+- `@` marks the location the map starts from
+- `?` marks an exit to a location that isn't written yet
+- `+` marks a door, `#` a closed door
+- `Also:` lists, below the grid, exits the grid can't draw (diagonals that collide, `up`, `behind` and other free-text directions)
 
 #### `search` - Find Content
 ```bash
