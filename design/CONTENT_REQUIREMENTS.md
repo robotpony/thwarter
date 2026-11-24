@@ -6,6 +6,8 @@ Split out of `REQUIREMENTS.md` on 2026-11-23. The REQ-CF and REQ-WS ids are stab
 
 ## Files
 
+`design/SECTIONS.md`, agreed in outline by Bruce and under trial, changes REQ-CF-13, 17, 28 and 29 (states as `## When:` sections, no marker comments). The requirements here are rewritten when the trial confirms it.
+
 - REQ-CF-1: Every content file MUST be a Markdown file whose frontmatter is a `---`-delimited YAML block starting on the file's first line.
 - REQ-CF-2: Frontmatter MUST include `id` (stable identifier), `title` (display name), and `type` (`location`, `character`, or `object`). A file missing any of these three MUST fail to load with an error identifying the file and the missing field, not load with a default or placeholder value.
 - REQ-CF-3: The Markdown body following the closing `---` MUST hold everything a player reads: the entity's description, then any response blocks (REQ-CF-17). The format MUST NOT require or expect a title heading in the body; `title` lives in frontmatter exactly once, and is the only content frontmatter may hold.

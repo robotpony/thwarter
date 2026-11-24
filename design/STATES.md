@@ -2,6 +2,8 @@
 
 Status: Agreed, with open questions (below). Reviewed decision by decision with Bruce on 2026-11-23. Nothing here is built yet. Items marked *proposed* are the commander's suggestions that Bruce hasn't confirmed yet; everything else Bruce has agreed to.
 
+`design/SECTIONS.md`, agreed in outline by Bruce and under trial, writes states as `## When:` sections and retires the `<!-- thwarter:... -->` markers. Where the two disagree, `design/SECTIONS.md` is the direction; this document is updated when the trial confirms it.
+
 ## Summary
 
 A room, object or character is either one Markdown file or a folder of them (a bundle). A bundle holds versions of the thing: its states (bread that is fresh or stale) and its changes over the story (chapter overlays). Major changes are separate files; minor ones are variables in the prose. An author never writes conditions into prose, and rarely writes them anywhere.
