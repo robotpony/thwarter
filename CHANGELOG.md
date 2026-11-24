@@ -8,6 +8,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Added
 
+- `LICENSE`: the MIT licence text, matching `Cargo.toml`'s `license = "MIT"`, copyright Bruce Alderson, 2025 to 2026.
 - `design/SECTIONS.md`: agreed in outline by Bruce, to be tested; content is shown when a `## When:` heading's tags match the game state, reply sections replace actions and response markers, `@` names characters and `#` tags, and the marker comments retire.
 - `design/PLAYER_COMMANDS.md`: the player command language every client shares, REQ-PC-1 to 19, drafted from the console's play mode as built, at Bruce's request.
 - `.github/workflows/ci.yml`: GitHub Actions builds every target and runs every test, with the lock file as committed, on each push and pull request.
