@@ -18,6 +18,7 @@ pub const BUILTINS: &[(&str, &[(&str, &str)])] = &[
             ("door/index.md", include_str!("../builtins/door/index.md")),
             ("door/closed.md", include_str!("../builtins/door/closed.md")),
             ("door/open.md", include_str!("../builtins/door/open.md")),
+            ("door/actions.rhai", include_str!("../builtins/door/actions.rhai")),
         ],
     ),
     (
@@ -36,6 +37,7 @@ pub const BUILTINS: &[(&str, &[(&str, &str)])] = &[
             ("portal/index.md", include_str!("../builtins/portal/index.md")),
             ("portal/closed.md", include_str!("../builtins/portal/closed.md")),
             ("portal/open.md", include_str!("../builtins/portal/open.md")),
+            ("portal/actions.rhai", include_str!("../builtins/portal/actions.rhai")),
         ],
     ),
 ];

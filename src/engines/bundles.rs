@@ -114,6 +114,8 @@ pub struct Thing {
     pub scripts: Vec<super::scripts::Script>,
     /// The actions its scripts define, by function name.
     pub script_actions: Vec<String>,
+    /// Those its own script defines, not a template's.
+    pub own_script_actions: Vec<String>,
 }
 
 /// The most templates one thing may chain through (`design/STATES.md` ›
@@ -854,7 +856,9 @@ fn build_thing(
         }
     }
     let own_folder = bundle.as_ref().and_then(|_| index.path.parent().map(Path::to_path_buf));
-    scripts.extend(script_of(&index, own_folder, built));
+    let own = script_of(&index, own_folder, built);
+    let own_script_actions = super::scripts::compile(&own).ok().flatten().map(|a| super::scripts::functions(&a)).unwrap_or_default();
+    scripts.extend(own);
     let script_actions = match super::scripts::compile(&scripts) {
         Ok(ast) => ast.map(|a| super::scripts::functions(&a)).unwrap_or_default(),
         Err(e) => {
@@ -912,6 +916,7 @@ fn build_thing(
         template_states,
         scripts,
         script_actions,
+        own_script_actions,
     };
 
     // The starting version is what the world tables hold.

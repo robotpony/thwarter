@@ -39,6 +39,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.51.4 (2026-11-23)
+
+### Fixed
+
+- The `door` and `portal` built-ins can be opened and closed: each has an `actions.rhai` with `open` and `close`, and replies where the door ends up ("It swings open.", "It's shut now.", "It's already open."). Before, a door from either stayed shut (REQ-CF-19).
+- An exit that names a thing of the wrong kind says what it is: "the exit west names `door`, which is an object, not a room or a door", instead of "points at unknown location".
+
+### Changed
+
+- A thing's own frontmatter action runs instead of a template's script of the same name; its own script still runs first (REQ-ENG-38).
+
 ## 0.51.3 (2026-11-23)
 
 ### Changed

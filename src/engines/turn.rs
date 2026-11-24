@@ -549,4 +549,35 @@ mod tests {
         say(&game, &world, &mut state, "unlock iron door with key");
         assert!(say(&game, &world, &mut state, "look").contains("a brass key in the iron door"));
     }
+
+    #[test]
+    fn every_door_built_in_opens_and_closes_and_a_wrong_kind_of_exit_says_what_it_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let write = |rel: &str, text: &str| {
+            let p = dir.path().join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        };
+        write("bedroom.md", "---\nid: bedroom\ntitle: Bedroom\ntype: location\nconnections: { west: bedroom-door, north: chair }\n---\nA bedroom.\n");
+        write("hallway.md", "---\nid: hallway\ntitle: Hallway\ntype: location\nconnections: { east: bedroom-door }\n---\nA hallway.\n");
+        write("chair.md", "---\nid: chair\ntitle: Chair\ntype: object\nobject_type: furniture\n---\n");
+        write("doors/bedroom-door.md", "---\nid: bedroom-door\ntitle: Door\ntype: door\ninherits: door\nsides:\n  bedroom: { direction: west }\n  hallway: { direction: east }\n---\n");
+        let mut world = WorldEngine::new();
+        world.load_world(dir.path()).unwrap();
+        assert!(world.current_problems(false).iter().any(|p| p == "bedroom: the exit north names `chair`, which is an object, not a room or a door"), "{:?}", world.current_problems(false));
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "bedroom").unwrap();
+        let mut s = |line: &str| say(&game, &world, &mut state, line);
+        assert_eq!(s("west"), "The door is closed.");
+        assert_eq!(s("close door"), "It's already shut.");
+        assert_eq!(s("open door"), "It swings open.");
+        assert_eq!(s("open door"), "It's already open.");
+        assert!(s("west").starts_with("A hallway."));
+        assert_eq!(s("close door"), "It's shut now.");
+        // A portal opens the same way.
+        let (_d, mut world) = (dir, world);
+        world.set_file(&_d.path().join("doors/bedroom-door.md"), "---\nid: bedroom-door\ntitle: Ring\ntype: door\ninherits: portal\nsides:\n  bedroom: { direction: west }\n  hallway: { direction: east }\n---\n");
+        let mut state = game.start(&world, "bedroom").unwrap();
+        assert_eq!(say(&game, &world, &mut state, "open ring"), "It swings open.");
+    }
 }

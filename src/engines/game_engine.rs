@@ -450,7 +450,13 @@ impl GameEngine {
         // frontmatter action, else nothing (`design/SECTIONS.md` ›
         // Scripts). The outcome is the state the thing moved into, or why
         // it didn't move.
-        let script = world.thing(this_kind, &object.id).filter(|t| t.script_actions.contains(&super::scripts::function_name(&verb)));
+        // The thing's own script wins; a template's script yields to the
+        // thing's own frontmatter action of the same name.
+        let function = super::scripts::function_name(&verb);
+        let frontmatter = actions.keys().any(|name| name.eq_ignore_ascii_case(&key));
+        let script = world
+            .thing(this_kind, &object.id)
+            .filter(|t| t.own_script_actions.contains(&function) || (t.script_actions.contains(&function) && !frontmatter));
         // Whether an action ran: then, with no reply, the reply is built in.
         let mut acted = false;
         let outcome = if let Some(thing) = script {
@@ -1574,7 +1580,10 @@ mod tests {
         world.set_file(&dir.path().join("castle/doors/vault-door/index.md"), "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: door\nsides:\n  castle/hall: { direction: down }\n  castle/vault: { direction: up }\nactions:\n  open: { becomes: { this: open } }\n---\n");
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/hall").unwrap();
-        assert!(game.act(&world, &mut state, &PlayAction::Use { verb: "open".into(), noun: "door".into(), with: None }).text.starts_with("You open the iron door."), "`this` is the door");
+        // Its own frontmatter action runs (not the built-in's script), and
+        // the built-in's reply for ending up open answers.
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Use { verb: "open".into(), noun: "door".into(), with: None }).text, "It swings open.");
+        assert_eq!(state.state_of("door", "vault-door"), Some("open"), "`this` is the door");
         game.act(&world, &mut state, &PlayAction::Go("down".into()));
         assert_eq!(state.location, "castle/vault");
     }

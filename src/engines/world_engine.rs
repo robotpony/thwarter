@@ -1227,8 +1227,18 @@ impl WorldEngine {
             }
         }
         for (from, direction, target) in self.broken_connections() {
+            // An existing thing of the wrong kind says what it is.
+            let kinds: Vec<&str> = self.kinds_with_id(&target).into_iter().filter(|k| !matches!(k, EntityKind::Location | EntityKind::Door)).map(|k| k.type_name()).collect();
             match self.link_ambiguity(&target, Some(EntityKind::Location)) {
                 Some(why) => problems.push(format!("{}: connection `{}` is ambiguous: {}", from, direction, why)),
+                None if !kinds.is_empty() => problems.push(format!(
+                    "{}: the exit {} names `{}`, which is {} {}, not a room or a door",
+                    from,
+                    direction,
+                    target,
+                    if kinds[0].starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" },
+                    kinds.join(" and ")
+                )),
                 None => problems.push(format!(
                     "{}: connection `{}` points at unknown location `{}`",
                     from, direction, target
