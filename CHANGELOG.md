@@ -46,6 +46,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.58.1 (2026-11-24)
+
+### Changed
+
+- Edit mode's views leave out an empty list rather than saying "none" (Bruce, 2026-11-24): `Actions: none`, `Carries: none`, `Story values: none` and the like don't show, and a list that has entries still does.
+
 ## 0.58.0 (2026-11-24)
 
 ### Added

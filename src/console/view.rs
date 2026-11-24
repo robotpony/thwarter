@@ -16,7 +16,7 @@ pub fn character(c: &Character) -> String {
     out.push(String::new());
     out.push(format!("Starts in: {}", c.default_location.as_deref().unwrap_or("nowhere")));
     out.push(list("Carries", &c.inventory));
-    out.join("\n")
+    tidy(out)
 }
 
 /// An object as edit mode shows it; its file and type are in the sidebar.
@@ -28,7 +28,7 @@ pub fn object(o: &GameObject) -> String {
     actions.sort();
     out.push(String::new());
     out.push(list("Actions", &actions.into_iter().cloned().collect::<Vec<_>>()));
-    out.join("\n")
+    tidy(out)
 }
 
 /// The world's own settings, as edit mode shows any file in `world/`.
@@ -53,7 +53,7 @@ pub fn world(def: &WorldDef, path: &str) -> String {
         out.push(format!("Player: {}", player.title));
         out.push(list("Player values", &vars));
     }
-    out.join("\n")
+    tidy(out)
 }
 
 fn description(text: &str) -> String {
@@ -63,9 +63,27 @@ fn description(text: &str) -> String {
     }
 }
 
+/// The lines joined, with the blanks an empty list leaves behind folded
+/// away: no two blank lines together, none at the end.
+fn tidy(lines: Vec<String>) -> String {
+    let mut out: Vec<String> = Vec::new();
+    for line in lines {
+        if line.is_empty() && out.last().is_some_and(|l: &String| l.is_empty()) {
+            continue;
+        }
+        out.push(line);
+    }
+    while out.last().is_some_and(|l| l.is_empty()) {
+        out.pop();
+    }
+    out.join("\n")
+}
+
+/// "Actions: light, open", or nothing when there are none (Bruce,
+/// 2026-11-24: an empty list isn't worth a line).
 fn list(heading: &str, items: &[String]) -> String {
     if items.is_empty() {
-        format!("{}: none", heading)
+        String::new()
     } else {
         format!("{}: {}", heading, items.join(", "))
     }

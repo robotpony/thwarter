@@ -62,8 +62,6 @@ Bench (object)
 Bench (bench)
 
 (no description yet)
-
-Actions: none
 > go back
 Village Square (room)
 > go /village/square
@@ -241,8 +239,6 @@ old shirt (object)
 old shirt (old-shirt)
 
 (no description yet)
-
-Actions: none
 > go /village/square
 Village Square (room)
 > /move rope chair
