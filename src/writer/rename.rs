@@ -486,12 +486,11 @@ mod tests {
 
     #[test]
     fn a_rename_is_refused_before_anything_is_written() {
-        let (dir, mut engine, writer) = world();
+        let (dir, _, writer) = world();
         let d = dir.path();
         write(d, "house/hallway.md", "not a thing\n");
-        let mut fresh = WorldEngine::new();
-        fresh.load_world(d).unwrap();
-        engine = fresh;
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
         let before = fs::read_to_string(d.join("kitchen.md")).unwrap();
         for (old, new, why) in [
             ("hallway", "house/hallway", "already exists"),

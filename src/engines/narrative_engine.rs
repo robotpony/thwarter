@@ -51,11 +51,7 @@ impl NarrativeEngine {
     pub fn check_narrative_progress(&mut self) {
         // TODO: Check and update narrative arc progress based on completed plot points
     }
-    
-    pub fn evaluate_alternative_text(&self, conditions: &str) -> bool {
-        // TODO: Implement condition evaluation for alternative text
-        true
-    }
+
 }
 
 impl Default for NarrativeEngine {

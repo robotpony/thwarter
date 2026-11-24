@@ -43,6 +43,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.57.4 (2026-11-24)
+
+### Removed
+
+- `NarrativeEngine::evaluate_alternative_text`, an unused stub that always returned true and was the only build warning. Conditional text is `## When:` sections now (`design/SECTIONS.md`). Recover it with `git show cdbf701:src/engines/narrative_engine.rs`.
+
+### Fixed
+
+- A rename test assigned an engine it never read, the one warning when building the tests.
+
 ## 0.57.3 (2026-11-24)
 
 ### Changed
