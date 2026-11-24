@@ -4,7 +4,7 @@ The command language every client shares (Bruce, 2026-11-23): what a player can 
 
 The console's play mode is one such client. Its own commands (`/edit`, `/play here` and the rest) are in `design/CONSOLE_REQUIREMENTS.md`, not here.
 
-Owner: commander. Ids: REQ-PC. Each requirement says whether it's built, as of 0.46.1.
+Owner: commander. Ids: REQ-PC. Each requirement says whether it's built, as of 0.47.0.
 
 ## Summary
 
@@ -15,7 +15,7 @@ A line is a verb and maybe a noun. The engine turns it into an action (look, go,
 - REQ-PC-1: The engine MUST parse a typed line into an action, a reply, or an unknown line, through one call any client can use: `GameEngine::parse_command(&WorldEngine, line, &PlayState) -> Parsed`. `Parsed` is `Action`, `Reply` (a verb missing its noun) or `Unknown` (REQ-PC-5's reply, kept apart so a client can log what players tried). Only an `Action` goes on to `act`, so only it can count as a turn. An object action is `PlayAction::Use { verb, noun, with }`, where `with` is what it's done with (`hit window with stick`), articles dropped from both. A client MAY also build actions directly (a button for "north"), skipping the parser. *Built* (0fe9754, REQ-ENG-32), and the console's play mode parses through it (a1e8f1b).
 - REQ-PC-2: Parsing MUST ignore case and surrounding space, and split the line into words. *Built.*
 - REQ-PC-3: An article (`the`, `a`, `an`) MUST be dropped before a noun: `take the lantern`, `look at a well`. *Built.*
-- REQ-PC-20: A `to` or `at` straight after the verb MUST be dropped too, then any article: `listen to the chest`, `talk to the captain`. Prepositions that change the meaning (`in`, `into`, `on`, `under`) MUST NOT be dropped; `look in box` waits on Open question 5 (multi-word verbs). *Proposed*, for the coder.
+- REQ-PC-20: A `to` or `at` straight after the verb MUST be dropped too, then any article: `listen to the chest`, `talk to the captain`. Prepositions that change the meaning (`in`, `into`, `on`, `under`) MUST NOT be dropped; `look in box` waits on Open question 5 (multi-word verbs). `go` is the exception, since an exit can be named "to the river": the engine tries the whole phrase as an exit first, then without the `to`. *Built* (7437e1f, REQ-ENG-37), apart from `go`'s fallback.
 - REQ-PC-4: A known verb with no noun MUST get a reply asking for one, and change nothing: `Take what?`, `Go where?`, `Look at what?`. A verb that some object has as an action counts as known: a bare `pull` gets `What do you want to pull?`. *Built.*
 - REQ-PC-5: A line the engine can't read MUST get ``I don't understand `<line>`.``, and change nothing. It MUST NOT count as a turn (REQ-ENG-23). That includes a verb no thing has, alone (`dance`), and a built-in verb used another way (`i lamp`, `n please`), which never becomes an object action. *Built.*
 
