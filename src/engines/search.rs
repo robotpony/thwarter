@@ -128,21 +128,22 @@ impl WorldEngine {
             }
             let Some(entity) = self.current(kind, &id, super::At::default()) else { continue };
             let title = entity.title().to_string();
-            let prose = match &entity {
+            let mut prose = match &entity {
                 ParsedEntity::Location(l) => l.description.clone(),
                 ParsedEntity::Character(c) => c.description.clone(),
-                ParsedEntity::Object(o) => {
-                    let mut text = o.description.clone();
-                    let mut names: Vec<&String> = o.responses.keys().collect();
-                    names.sort();
-                    for name in names {
-                        text.push('\n');
-                        text.push_str(&o.responses[name]);
-                    }
-                    text
-                }
+                ParsedEntity::Object(o) => o.description.clone(),
                 ParsedEntity::Door(d) => d.description.clone(),
             };
+            // The prose of its other states and its sections, too.
+            if let Some(thing) = self.thing(kind, &id) {
+                let others = thing.states.values().chain(thing.index.sections.iter().map(|c| &c.layer));
+                for layer in others {
+                    if !layer.body.trim().is_empty() && !prose.contains(layer.body.trim()) {
+                        prose.push('\n');
+                        prose.push_str(layer.body.trim());
+                    }
+                }
+            }
             let hit = |field, snippet| Hit { kind, id: id.clone(), title: title.clone(), field, snippet };
             if !text_only && matcher.find(&id).is_some() {
                 hits.push(hit(Field::Id, None));

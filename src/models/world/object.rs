@@ -25,11 +25,8 @@ pub struct GameObject {
     /// descriptive values ("priceless", "unknown").
     pub value: Option<String>,
     /// Named actions (`design/STATES.md` › Changing state), e.g. `pull`
-    /// with its reply and what it changes.
+    /// and what it changes.
     pub actions: HashMap<String, ObjectAction>,
-    /// Response prose by action (`pull`, `pull refused`), from the body's
-    /// `<!-- thwarter:action ... -->` blocks.
-    pub responses: HashMap<String, String>,
     /// Everything else an author attaches: properties, effects, stats,
     /// contents, security, or any future section. Validated loosely (must
     /// be a YAML mapping); interpreted by whatever engine code cares.
@@ -47,19 +44,16 @@ impl GameObject {
             weight: None,
             value: None,
             actions: HashMap::new(),
-            responses: HashMap::new(),
             extra: HashMap::new(),
         }
     }
 }
 
 /// What one of an object's actions does: `actions: { pull: { becomes: {
-/// castle/vault: open } } }`. Its reply is prose in the body.
+/// castle/vault: open } } }`. Its reply is the prose of the state it
+/// reaches (`design/SECTIONS.md` › Replies).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ObjectAction {
-    /// Whether frontmatter defines it; `false` for an action that is only
-    /// a response block.
-    pub mechanics: bool,
     /// Thing id to the state it switches to.
     pub becomes: BTreeMap<String, String>,
     /// Values to set, by full name (`story.king`, `knife.sharp`, or
@@ -71,9 +65,3 @@ pub struct ObjectAction {
     pub requires_has: Vec<String>,
 }
 
-impl ObjectAction {
-    /// An action that is only a response block in the body.
-    pub fn reply_only() -> Self {
-        Self::default()
-    }
-}

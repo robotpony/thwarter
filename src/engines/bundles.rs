@@ -136,6 +136,12 @@ impl Thing {
         self.stack(state, chapter).into_iter().map(|(layer, _)| layer).collect()
     }
 
+    /// The reply section for a reserved tag (`#ambiguous`, `#searched`) in
+    /// its own file, else its nearest template's.
+    pub fn reply(&self, tag: &str) -> Option<&str> {
+        std::iter::once(&self.index).chain(self.templates.iter().rev()).find_map(|l| l.reply(tag))
+    }
+
     /// `layers`, each marked whether it comes from a folder above (whose
     /// description is added to the thing's rather than replacing it).
     fn stack<'a>(&'a self, state: Option<&str>, chapter: Option<&ChapterKey>) -> Vec<(&'a Layer, bool)> {
@@ -792,6 +798,9 @@ fn build_thing(
 ) -> Option<(Thing, ParsedEntity)> {
     let shown = index.path.display().to_string();
     let own_states = bundle.as_ref().and_then(|b| states.get(b)).cloned().unwrap_or_default();
+    for layer in std::iter::once(&index).chain(own_states.values()) {
+        built.warnings.extend(layer.warnings.iter().cloned());
+    }
     let own_overlays = bundle.as_ref().and_then(|b| overlays.get(b)).cloned().unwrap_or_default();
     let scope = match &bundle {
         Some(b) => b.clone(),
@@ -1166,21 +1175,24 @@ mod tests {
     }
 
     #[test]
-    fn an_areas_chapter_prose_is_added_and_blocks_merge_by_name() {
+    fn an_areas_chapter_prose_is_added_and_sections_stay_out_of_the_description() {
         let (dir, mut engine) = castle();
         let d = dir.path();
         engine.set_file(&d.join("castle/chapters/after-the-king.md"), "---\n---\nBlack banners hang from every wall.\n");
         let hall = engine.version(EntityKind::Location, "castle/hall", None, Some("after-the-king")).unwrap();
         assert_eq!(location(&hall).description, "Stone.\n\nBlack banners hang from every wall.");
 
-        engine.set_file(&d.join("objects/lever/index.md"), "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull: { becomes: { castle/vault: open } }\n---\nA lever.\n\n<!-- thwarter:action pull -->\nClunk.\n\n<!-- thwarter:action kick -->\nOw.\n");
-        engine.set_file(&d.join("objects/lever/rusted.md"), "---\ninherits: index\n---\n<!-- thwarter:action pull -->\nIt grinds and sticks.\n");
+        engine.set_file(&d.join("objects/lever/index.md"), "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull: { becomes: { castle/vault: open } }\n---\nA lever.\n\n## When: #pull\nClunk.\n");
+        engine.set_file(&d.join("objects/lever/rusted.md"), "---\ninherits: index\n---\n<!-- only a note -->\n");
         let rusted = engine.version(EntityKind::Object, "lever", Some("rusted"), None).unwrap();
         let ParsedEntity::Object(o) = &rusted.entity else { panic!() };
-        assert_eq!(o.description, "A lever."); // a state with only a block keeps the description
-        assert_eq!(o.responses["pull"], "It grinds and sticks.");
-        assert_eq!(o.responses["kick"], "Ow.");
-        assert!(rusted.merged.blocks.iter().any(|(k, _, p)| k == "action pull" && p.ends_with("rusted.md")));
+        // A state of only a comment keeps the description, and a section
+        // isn't part of it.
+        assert_eq!(o.description, "A lever.");
+        let thing = engine.thing(EntityKind::Object, "lever").unwrap();
+        assert_eq!(thing.index.sections.len(), 1);
+        assert_eq!(thing.index.sections[0].tags, ["#pull"]);
+        assert_eq!(thing.state_names(), ["rusted"]);
     }
 
     #[test]

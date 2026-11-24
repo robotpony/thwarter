@@ -6,8 +6,14 @@
 //! `Merged` is the result of stacking them, before it is typed as a
 //! location, object or character. Every key remembers the file it came
 //! from, for error messages and the console's "(from index)" labels.
+//!
+//! A file's body may hold keyword sections (`design/SECTIONS.md`):
+//! `## When: #locked` or `## Unless: #locked`, each with an optional
+//! ` ```thwarter ` block of data first and its own prose. Each section is
+//! kept as a layer of its own, out of the description. Sections never
+//! create states; they're shown when their tags match the game state.
 
-use crate::parsers::{Body, MarkdownParser, ParsedDocument};
+use crate::parsers::{MarkdownParser, ParsedDocument};
 use serde_yaml::{Mapping, Value};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -29,12 +35,151 @@ fn depth(value: &Value) -> usize {
     }
 }
 
+/// Tags a section may use that aren't states: replies for engine moments
+/// (`design/SECTIONS.md` › Replies).
+pub const RESERVED_TAGS: &[&str] = &["#ambiguous", "#searched"];
+
 /// One file's frontmatter and prose, untyped.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Layer {
     pub path: PathBuf,
     pub metadata: Mapping,
+    /// The prose outside any keyword section.
     pub body: String,
+    /// The keyword sections, in file order.
+    pub sections: Vec<Section>,
+    /// What's odd about the file but still read, such as a `thwarter`
+    /// block outside a section.
+    pub warnings: Vec<String>,
+}
+
+/// A `## When:` or `## Unless:` section.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Section {
+    /// `Unless:` rather than `When:`.
+    pub unless: bool,
+    /// Its tags as written: `#open` for a state or an action, `@stick`
+    /// for a thing (`design/SECTIONS.md`).
+    pub tags: Vec<String>,
+    /// Its block's data and its prose, with the file's path.
+    pub layer: Layer,
+}
+
+impl Section {
+    /// The reserved tag this section answers to (`#ambiguous`), if any.
+    pub fn reserved(&self) -> Option<&str> {
+        match self.tags.as_slice() {
+            [tag] if !self.unless && RESERVED_TAGS.contains(&tag.as_str()) => Some(tag),
+            _ => None,
+        }
+    }
+
+    /// Whether it matches a turn whose tags are `has`: `When:` if every
+    /// tag is there, `Unless:` if none is.
+    pub fn matches(&self, has: impl Fn(&str) -> bool) -> bool {
+        if self.unless {
+            !self.tags.iter().any(|t| has(t))
+        } else {
+            self.tags.iter().all(|t| has(t))
+        }
+    }
+}
+
+/// Split a body into its default prose and its keyword sections. Only
+/// `##` headings starting `When:` or `Unless:` open a section, which runs
+/// to the next `#` or `##` heading; headings inside fenced code are
+/// ignored.
+fn split_sections(path: &Path, body: &str) -> Result<(String, Vec<Section>, Vec<String>), String> {
+    let mut default: Vec<&str> = Vec::new();
+    let mut sections: Vec<(bool, Vec<String>, Vec<&str>, usize)> = Vec::new();
+    let mut in_section = false;
+    let mut fence: Option<&str> = None;
+    for (n, line) in body.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if let Some(open) = fence {
+            if trimmed.starts_with(open) {
+                fence = None;
+            }
+        } else if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            fence = Some(&trimmed[..3]);
+        } else if let Some(heading) = line.strip_prefix("## ").or_else(|| line.strip_prefix("# ").map(|_| "")) {
+            let heading = heading.trim();
+            let keyword = heading.strip_prefix("When:").map(|r| (false, r)).or_else(|| heading.strip_prefix("Unless:").map(|r| (true, r)));
+            match keyword {
+                Some((unless, rest)) => {
+                    let mut tags = Vec::new();
+                    for word in rest.split_whitespace() {
+                        let name = word.strip_prefix('#').or_else(|| word.strip_prefix('@'));
+                        match name.filter(|t| !t.is_empty() && !t.contains(['#', '@'])) {
+                            Some(_) => tags.push(word.to_string()),
+                            None => return Err(format!("`{}` takes #states and @things, and `{}` is neither", heading, word)),
+                        }
+                    }
+                    if tags.is_empty() {
+                        return Err(format!("`{}` names no #state or @thing", heading));
+                    }
+                    sections.push((unless, tags, Vec::new(), n));
+                    in_section = true;
+                    continue;
+                }
+                None => in_section = false,
+            }
+        }
+        match (in_section, sections.last_mut()) {
+            (true, Some(section)) => section.2.push(line),
+            _ => default.push(line),
+        }
+    }
+
+    let mut warnings = Vec::new();
+    let default = default.join("\n").trim().to_string();
+    if default.lines().any(|l| is_block_fence(l)) {
+        warnings.push(format!("{}: a ```thwarter block outside a `## When:` section is shown as code; frontmatter holds the default data", path.display()));
+    }
+    let mut out = Vec::new();
+    for (unless, tags, lines, _) in sections {
+        let heading = format!("{} {}", if unless { "Unless:" } else { "When:" }, tags.join(" "));
+        let text = lines.join("\n");
+        let text = text.trim();
+        let (metadata, prose) = match text.lines().next() {
+            Some(first) if is_block_fence(first) => {
+                let rest = &text[first.len()..];
+                let end = rest.lines().position(|l| l.trim() == "```").ok_or_else(|| format!("the ```thwarter block in `## {}` is never closed", heading))?;
+                let yaml: Vec<&str> = rest.lines().skip(1).take(end - 1).collect();
+                let after: Vec<&str> = rest.lines().skip(end + 1).collect();
+                let yaml = yaml.join("\n");
+                let value: Value = if yaml.trim().is_empty() {
+                    Value::Null
+                } else {
+                    serde_yaml::from_str(&yaml).map_err(|e| format!("the ```thwarter block in `## {}` doesn't parse: {}", heading, e))?
+                };
+                if depth(&value) > MAX_DEPTH {
+                    return Err(format!("the ```thwarter block in `## {}` nests more than {} levels deep", heading, MAX_DEPTH));
+                }
+                let mut map = match value {
+                    Value::Null => Mapping::new(),
+                    Value::Mapping(m) => m,
+                    _ => return Err(format!("the ```thwarter block in `## {}` must be a map of keys and values", heading)),
+                };
+                for key in ["id", "type", "state"] {
+                    if map.remove(key).is_some() {
+                        warnings.push(format!("{}: `## {}` sets `{}`, which a state can't change, so it's ignored", path.display(), heading, key));
+                    }
+                }
+                (map, after.join("\n").trim().to_string())
+            }
+            _ => (Mapping::new(), text.to_string()),
+        };
+        if prose.lines().any(|l| is_block_fence(l)) {
+            warnings.push(format!("{}: only a ```thwarter block first in `## {}` is read as data; a later one is shown as code", path.display(), heading));
+        }
+        out.push(Section { unless, tags, layer: Layer { path: path.to_path_buf(), metadata, body: prose, ..Default::default() } });
+    }
+    Ok((default, out, warnings))
+}
+
+fn is_block_fence(line: &str) -> bool {
+    line.trim().strip_prefix("```").map(str::trim) == Some("thwarter")
 }
 
 impl Layer {
@@ -53,7 +198,8 @@ impl Layer {
             Value::Mapping(map) => map,
             _ => return Err("frontmatter must be a map of keys and values".to_string()),
         };
-        Ok(Layer { path: path.to_path_buf(), metadata, body: doc.body })
+        let (body, sections, warnings) = split_sections(path, &doc.body)?;
+        Ok(Layer { path: path.to_path_buf(), metadata, body, sections, warnings })
     }
 
     /// The value of a top-level key, if it is a string.
@@ -69,7 +215,12 @@ impl Layer {
     /// if something is left once author comments are removed, so an
     /// overlay holding only a note never blanks a room.
     pub fn has_prose(&self) -> bool {
-        !strip_comments(&Body::parse(&self.body).description).trim().is_empty()
+        !strip_comments(&self.body).trim().is_empty()
+    }
+
+    /// The prose of its section for a reserved tag (`#ambiguous`).
+    pub fn reply(&self, tag: &str) -> Option<&str> {
+        self.sections.iter().find(|s| s.reserved() == Some(tag)).map(|s| s.layer.body.as_str()).filter(|t| !strip_comments(t).trim().is_empty())
     }
 }
 
@@ -106,9 +257,6 @@ pub struct Merged {
     /// The file the thing's own description came from; `None` if no
     /// layer had one.
     pub body_source: Option<PathBuf>,
-    /// Response blocks (`action pull`, `action pull refused`), each with
-    /// the file it came from, in the order first seen.
-    pub blocks: Vec<(String, String, PathBuf)>,
     /// Each list a layer replaced and each key a `null` removed. These
     /// warn, never fail (Bruce, 2026-11-23).
     pub warnings: Vec<String>,
@@ -129,35 +277,25 @@ impl Merged {
     /// Put one of the thing's own layers on top. Scalars and lists replace
     /// what's below, maps merge key by key all the way down, and `null`
     /// removes an inherited key. The description replaces the one below
-    /// only if the layer has one; each response block replaces only its
-    /// namesake.
+    /// only if the layer has one.
     pub fn apply(&mut self, layer: &Layer) {
         self.merge_frontmatter(layer);
-        let body = Body::parse(&layer.body);
         if layer.has_prose() {
-            self.own = body.description.clone();
+            self.own = layer.body.clone();
             self.body_source = Some(layer.path.clone());
         }
-        self.merge_blocks(&body, &layer.path);
         self.compose();
     }
 
-    /// Put a layer from a folder above the thing on top: frontmatter and
-    /// blocks merge as for `apply`, but its description is added after
-    /// the thing's rather than replacing it (Bruce, 2026-11-23).
+    /// Put a layer from a folder above the thing on top: frontmatter
+    /// merges as for `apply`, but its description is added after the
+    /// thing's rather than replacing it (Bruce, 2026-11-23).
     pub fn apply_area(&mut self, layer: &Layer) {
         self.merge_frontmatter(layer);
-        let body = Body::parse(&layer.body);
         if layer.has_prose() {
-            self.added.push(body.description.clone());
+            self.added.push(layer.body.clone());
         }
-        self.merge_blocks(&body, &layer.path);
         self.compose();
-    }
-
-    /// A response block's text, if any layer has one.
-    pub fn block(&self, key: &str) -> Option<&str> {
-        self.blocks.iter().find(|(k, _, _)| k == key).map(|(_, t, _)| t.as_str())
     }
 
     fn merge_frontmatter(&mut self, layer: &Layer) {
@@ -168,15 +306,6 @@ impl Merged {
         let mut metadata = std::mem::take(&mut self.metadata);
         self.merge_map(&mut metadata, &over, "", &layer.path);
         self.metadata = metadata;
-    }
-
-    fn merge_blocks(&mut self, body: &Body, path: &Path) {
-        for (key, text) in &body.blocks {
-            match self.blocks.iter_mut().find(|(k, _, _)| k == key) {
-                Some(existing) => *existing = (key.clone(), text.clone(), path.to_path_buf()),
-                None => self.blocks.push((key.clone(), text.clone(), path.to_path_buf())),
-            }
-        }
     }
 
     fn compose(&mut self) {
@@ -250,11 +379,7 @@ impl Merged {
 
     /// The merged result, ready to be typed.
     pub fn document(&self) -> ParsedDocument {
-        let body = Body {
-            description: self.body.clone(),
-            blocks: self.blocks.iter().map(|(k, t, _)| (k.clone(), t.clone())).collect(),
-        };
-        ParsedDocument { metadata: Value::Mapping(self.metadata.clone()), body: body.render() }
+        ParsedDocument { metadata: Value::Mapping(self.metadata.clone()), body: self.body.clone() }
     }
 }
 
@@ -342,5 +467,51 @@ mod tests {
     fn frontmatter_that_is_not_a_map_is_refused() {
         assert!(Layer::parse(Path::new("x.md"), "---\n- a\n---\n").is_err());
         assert!(Layer::parse(Path::new("x.md"), "---\n---\n").unwrap().metadata.is_empty());
+    }
+
+    #[test]
+    fn sections_split_out_with_their_blocks_and_never_join_the_description() {
+        let text = "---\ntitle: Door\n---\nA heavy door.\n\n## Notes\nPlain heading.\n\n## When: #locked\n```thwarter\npassable: no\nid: nope\n```\nA padlock hangs here.\n\n### Detail\nStill locked prose.\n\n## Unless: #open @lamp\nDark.\n\n```\n## When: #fake\n```\n";
+        let l = layer("door.md", text);
+        assert_eq!(l.body, "A heavy door.\n\n## Notes\nPlain heading.");
+        assert_eq!(l.sections.len(), 2);
+        let locked = &l.sections[0];
+        assert!(!locked.unless);
+        assert_eq!(locked.tags, ["#locked"]);
+        assert_eq!(locked.layer.metadata["passable"], Value::from("no")); // YAML 1.2
+        assert!(locked.layer.metadata.get("id").is_none());
+        assert_eq!(locked.layer.body, "A padlock hangs here.\n\n### Detail\nStill locked prose.");
+        let dark = &l.sections[1];
+        // A heading inside fenced code doesn't open a section.
+        assert!(dark.unless && dark.tags == ["#open", "@lamp"] && dark.layer.body == "Dark.\n\n```\n## When: #fake\n```");
+        assert!(l.warnings.iter().any(|w| w.contains("sets `id`")), "{:?}", l.warnings);
+
+        // All of `When:`, none of `Unless:`.
+        let turn = |tags: &'static [&'static str]| move |t: &str| tags.contains(&t);
+        assert!(locked.matches(turn(&["#locked", "@door"])));
+        assert!(!locked.matches(turn(&["#open"])));
+        assert!(dark.matches(turn(&["#closed"])));
+        assert!(!dark.matches(turn(&["@lamp"])));
+
+        let reply = layer("t.md", "---\n---\n## When: #ambiguous\nWhich one?\n");
+        assert_eq!(reply.reply("#ambiguous"), Some("Which one?"));
+        assert_eq!(reply.sections[0].reserved(), Some("#ambiguous"));
+    }
+
+    #[test]
+    fn bad_sections_are_problems_or_warnings() {
+        for (body, why) in [
+            ("## When: locked\n", "is neither"),
+            ("## When:\n", "names no #state"),
+            ("## When: #a\n```thwarter\nx: [\n```\n", "doesn't parse"),
+            ("## When: #a\n```thwarter\nx: 1\n", "never closed"),
+            ("## When: #a\n```thwarter\n- 1\n```\n", "must be a map"),
+        ] {
+            let err = Layer::parse(Path::new("x.md"), &format!("---\n---\n{}", body)).unwrap_err();
+            assert!(err.contains(why), "{}: {}", body, err);
+        }
+        let l = layer("x.md", "---\n---\n```thwarter\na: 1\n```\n\n## When: #a\nText.\n\n```thwarter\nb: 2\n```\n");
+        assert!(l.warnings.iter().any(|w| w.contains("outside a `## When:` section")), "{:?}", l.warnings);
+        assert!(l.warnings.iter().any(|w| w.contains("a later one is shown as code")), "{:?}", l.warnings);
     }
 }

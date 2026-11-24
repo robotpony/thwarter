@@ -5,7 +5,6 @@
 //! `world/styles/` belongs to the writing helpers and isn't read here.
 
 use super::layers::Layer;
-use crate::parsers::Body;
 use serde_yaml::{Mapping, Value};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -127,7 +126,7 @@ impl WorldDef {
         self.author = text("author");
         self.version = text("version");
         self.start = layer.metadata.get("start").and_then(crate::parsers::id_value);
-        self.intro = Body::parse(&layer.body).description;
+        self.intro = layer.body.clone();
         self.source = Some(layer.path.clone());
     }
 
@@ -157,7 +156,7 @@ impl WorldDef {
         };
         self.player = Some(PlayerDef {
             title: layer.str_key("title").unwrap_or("you").to_string(),
-            description: Body::parse(&layer.body).description,
+            description: layer.body.clone(),
             vars,
             path: layer.path.clone(),
         });

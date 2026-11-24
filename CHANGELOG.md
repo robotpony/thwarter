@@ -37,6 +37,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.45.0 (2026-11-23)
+
+### Added
+
+- The loader reads keyword sections (`design/SECTIONS.md`, REQ-ENG-35): a `## When:` or `## Unless:` heading with `#states` and `@things` opens a section that runs to the next `#` or `##` heading, with an optional ` ```thwarter ` block of data first. Sections stay out of the description and never create states. A misplaced block, or `id`, `type` or `state` in one, is a warning; a bad heading or block is a problem. Matching against a turn's tags (all of them for `When:`, none for `Unless:`) is in place for the description and reply work that follows.
+- `## When: #ambiguous` in a shared template is the reply when a noun matches several things, replacing the `reply ambiguous` marker.
+- `becomes: { this: open }`: `this` is the thing whose action it is.
+
+### Removed
+
+- `<!-- thwarter:... -->` markers are no longer read: `<!-- -->` is only a comment, and play never shows one (Bruce, `design/SECTIONS.md`). Gone with them: `Body`, `response_marker`, `GameObject.responses`, `Door.responses`, actions defined only by a response block, the response warnings, `go refused` and `examine` blocks, and `thwart show`'s "(no response)". Frontmatter `actions:` still work and reply with a built-in reply. The test world's nine objects with markers have lost those replies until they're rewritten as sections (`PLAN.md` › Phase 6); there's no conversion. `--strip-comments` now strips every comment. Recover the marker code with `git show e930cb5:src/parsers/markdown_parser.rs`.
+
 ## 0.44.1 (2026-11-23)
 
 ### Changed

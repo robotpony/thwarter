@@ -5,7 +5,6 @@
 //! without `index.md` still works, with its folder name as the pen name.
 
 use super::layers::Layer;
-use crate::parsers::Body;
 use serde::Serialize;
 use serde_yaml::Value;
 use std::collections::BTreeMap;
@@ -67,7 +66,7 @@ pub fn read_persona(folder: &Path) -> Result<Option<Persona>, String> {
         title: layer.str_key("title").unwrap_or(&id).to_string(),
         id,
         contacts,
-        bio: Body::parse(&layer.body).description,
+        bio: layer.body.clone(),
         style: layer.str_key("style").map(str::to_string),
         world: layer.str_key("world").map(str::to_string),
         path: Some(index),

@@ -389,8 +389,8 @@ pub fn render_map(map: &crate::engines::map::Map) -> String {
 }
 
 /// An object as an author checks it (`thwart show <object>`): title and
-/// id, its type, its description as written, then its fields, actions
-/// and responses.
+/// id, its type, its description as written, then its fields and
+/// actions.
 pub fn render_object(o: &crate::models::world::GameObject) -> String {
     let mut out = vec![format!("{} ({})", o.title, o.id)];
     let mut kind = format!("object, {}", o.object_type);
@@ -434,9 +434,8 @@ pub fn render_object(o: &crate::models::world::GameObject) -> String {
             if !a.requires_has.is_empty() {
                 what.push(format!("needs {}", a.requires_has.join(", ")));
             }
-            let reply = if o.responses.contains_key(name) { "" } else { "  (no response)" };
             let detail = if what.is_empty() { String::new() } else { format!(": {}", what.join("; ")) };
-            out.push(format!("  {}{}{}", name, detail, reply));
+            out.push(format!("  {}{}", name, detail));
         }
     }
     clean_text(&out.join("\n"))

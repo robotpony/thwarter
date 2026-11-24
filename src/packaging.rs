@@ -5,7 +5,6 @@
 
 use crate::engines::persona::Persona;
 use crate::engines::WorldEngine;
-use crate::parsers::response_marker;
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
@@ -49,21 +48,20 @@ pub struct PackagePlan {
     pub output: PathBuf,
 }
 
-/// An author comment: `<!-- ... -->` that isn't a response marker.
+/// An author comment: any `<!-- ... -->` (`design/SECTIONS.md`: comments
+/// are never syntax).
 fn comment_spans(text: &str) -> Vec<std::ops::Range<usize>> {
     let mut spans = Vec::new();
     let mut from = 0;
     while let Some(start) = text[from..].find("<!--").map(|i| i + from) {
         let end = text[start..].find("-->").map(|i| start + i + 3).unwrap_or(text.len());
-        if response_marker(&text[start..end]).is_none() {
-            spans.push(start..end);
-        }
+        spans.push(start..end);
         from = end;
     }
     spans
 }
 
-/// `text` without its author comments; response markers stay. A comment
+/// `text` without its author comments. A comment
 /// alone on its line takes the line with it.
 pub fn strip_author_comments(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -456,9 +454,9 @@ mod tests {
     }
 
     #[test]
-    fn author_comments_strip_but_markers_stay() {
+    fn author_comments_strip_and_an_old_marker_is_one() {
         let text = "A hall. <!-- inline -->\n<!-- alone -->\n<!-- thwarter:action pull -->\nClunk.\n";
-        assert_eq!(strip_author_comments(text), "A hall. \n<!-- thwarter:action pull -->\nClunk.\n");
-        assert_eq!(comment_spans(text).len(), 2);
+        assert_eq!(strip_author_comments(text), "A hall. \nClunk.\n");
+        assert_eq!(comment_spans(text).len(), 3);
     }
 }

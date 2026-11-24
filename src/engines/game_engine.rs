@@ -19,7 +19,7 @@ pub struct GameEngine {
     /// story's voice ("Which door do you want to open?").
     /// `noun` is what the player typed, without "the"; `turn` lets a
     /// reply vary. Used when the candidates share no template with a
-    /// `<!-- thwarter:reply ambiguous -->` block.
+    /// `## When: #ambiguous` section.
     pub ask_which: fn(verb: &str, noun: &str, candidates: &[String], turn: u64) -> String,
 }
 
@@ -109,8 +109,8 @@ impl GameEngine {
     }
 
     /// The reply when `noun` matches several things: the
-    /// `reply ambiguous` block of the nearest template they all share,
-    /// else `ask_which`.
+    /// `## When: #ambiguous` section of the nearest template they all
+    /// share, else `ask_which`.
     #[allow(clippy::too_many_arguments)]
     fn which(&self, world: &WorldEngine, state: &PlayState, verb: &str, noun: &str, kind: EntityKind, candidates: &[EntityRef]) -> String {
         let chains: Vec<Vec<&crate::engines::layers::Layer>> = candidates
@@ -120,8 +120,7 @@ impl GameEngine {
         if let Some(first) = chains.first() {
             for template in first {
                 let shared = chains[1..].iter().all(|chain| chain.iter().any(|t| t.path == template.path));
-                let block = crate::parsers::Body::parse(&template.body);
-                if let (true, Some(text)) = (shared, block.block("reply ambiguous")) {
+                if let (true, Some(text)) = (shared, template.reply("#ambiguous")) {
                     if !text.trim().is_empty() {
                         return prose(world, &world.fill(text.trim(), &Scope { at: At::play(state), this: None, here: None }));
                     }
@@ -193,12 +192,7 @@ impl GameEngine {
                     return ActionResult::say(format!("You can't go {} from here.", direction));
                 }
                 if !door.passable {
-                    // The door's own words for it, from its current state
-                    // (`<!-- thwarter:action go refused -->`), else built in.
-                    return ActionResult::say(match door.responses.get("go refused").map(|t| t.trim()).filter(|t| !t.is_empty()) {
-                        Some(text) => prose(world, &world.fill(text, &Scope { at: At::play(state), this: Some((EntityKind::Door, &door.id)), here: None })),
-                        None => format!("The {} is closed.", door.title.to_lowercase()),
-                    });
+                    return ActionResult::say(format!("The {} is closed.", door.title.to_lowercase()));
                 }
                 match door.leads_to(&state.location) {
                     Some(to) => target = to.to_string(),
@@ -286,27 +280,19 @@ impl GameEngine {
             Ok(Some(object)) if world.door_at(&object.id, At::play(state)).is_some() && world.object_at(&object.id, At::play(state)).is_none() => {
                 let door = world.door_at(&object.id, At::play(state)).unwrap();
                 let scope = Scope { at: At::play(state), this: Some((EntityKind::Door, &door.id)), here: None };
-                let text = [door.description.trim(), door.responses.get("examine").map_or("", |t| t.trim())]
-                    .into_iter()
-                    .filter(|p| !p.is_empty())
-                    .collect::<Vec<_>>()
-                    .join("\n\n");
+                let text = door.description.trim();
                 return if text.is_empty() {
                     ActionResult::say(format!("You see nothing special about {}.", the_object(&object)))
                 } else {
-                    ActionResult::say(prose(world, &world.fill(&text, &scope)))
+                    ActionResult::say(prose(world, &world.fill(text, &scope)))
                 };
             }
             Ok(Some(object)) => {
-                // The description, then an `examine` response if the author wrote one.
+                // The description, with what its state adds.
                 return match world.object_at(&object.id, At::play(state)) {
-                    Some(card) if !card.description.trim().is_empty() || card.responses.contains_key("examine") => {
-                        let parts: Vec<&str> = [card.description.trim(), card.responses.get("examine").map_or("", |t| t.trim())]
-                            .into_iter()
-                            .filter(|p| !p.is_empty())
-                            .collect();
+                    Some(card) if !card.description.trim().is_empty() => {
                         let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
-                        ActionResult::say(prose(world, &world.fill(&parts.join("\n\n"), &scope)))
+                        ActionResult::say(prose(world, &world.fill(card.description.trim(), &scope)))
                     }
                     _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
                 }
@@ -370,17 +356,15 @@ impl GameEngine {
         };
         let cant = || ActionResult::say(format!("You can't {} {}.", verb, the_object(&object)));
         // An object's actions, or a door's (`open door`, `unlock door`).
-        let (this_kind, card_actions, card_responses) = match (world.object_at(&object.id, At::play(state)), world.door_at(&object.id, At::play(state))) {
-            (Some(o), _) => (EntityKind::Object, o.actions, o.responses),
-            (None, Some(d)) => (EntityKind::Door, d.actions, d.responses),
+        let (this_kind, actions) = match (world.object_at(&object.id, At::play(state)), world.door_at(&object.id, At::play(state))) {
+            (Some(o), _) => (EntityKind::Object, o.actions),
+            (None, Some(d)) => (EntityKind::Door, d.actions),
             (None, None) => return cant(),
         };
-        let card = Card { actions: card_actions, responses: card_responses };
         let key = verb.replace(' ', "-");
-        let Some((found, action)) = card.actions.iter().find(|(name, _)| name.eq_ignore_ascii_case(&key)) else {
+        let Some(action) = actions.iter().find(|(name, _)| name.eq_ignore_ascii_case(&key)).map(|(_, a)| a.clone()) else {
             return cant();
         };
-        let (key, action) = (found.clone(), action.clone());
         // A hidden thing answers to its exact name only for an action with
         // no `requires:`; otherwise it is as good as absent (Bruce,
         // 2026-11-23).
@@ -390,11 +374,7 @@ impl GameEngine {
 
         let name = object_name(&object);
         if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
-            let scope = Scope { at: At::play(state), this: Some((this_kind, &object.id)), here: None };
-            return ActionResult::say(match card.responses.get(&format!("{} refused", key)) {
-                Some(text) if !text.trim().is_empty() => prose(world, &world.fill(text.trim(), &scope)),
-                _ => builtin_refusal(&verb, &name, state.turn),
-            });
+            return ActionResult::say(builtin_refusal(&verb, &name, state.turn));
         }
 
         let mut changes = Vec::new();
@@ -427,12 +407,9 @@ impl GameEngine {
             }
         }
 
-        // Filled after the action's changes, so the reply can show them.
-        let scope = Scope { at: At::play(state), this: Some((this_kind, &object.id)), here: None };
-        let text = match card.responses.get(&key) {
-            Some(text) if !text.trim().is_empty() => prose(world, &world.fill(text.trim(), &scope)),
-            _ => builtin_reply(&verb, &name, state.turn),
-        };
+        // Reply sections aren't built yet (`design/SECTIONS.md`), so the
+        // reply is built in.
+        let text = builtin_reply(&verb, &name, state.turn);
         let mut result = ActionResult { text, changes, note: None };
         if !notes.is_empty() {
             result.note = Some(notes.join("; "));
@@ -661,15 +638,12 @@ fn builtin_refusal(verb: &str, name: &str, turn: u64) -> String {
 }
 
 /// Prose as play shows it: Markdown rendered, links shown as their text.
+/// Prose for the player: author comments never show (`design/SECTIONS.md`
+/// › Bruce's principles).
 fn prose(world: &WorldEngine, text: &str) -> String {
-    prose_plain(text, &|n| world.link_for(n))
+    prose_plain(crate::engines::layers::strip_comments(text).trim(), &|n| world.link_for(n))
 }
 
-/// The actions and responses of whatever an action names.
-struct Card {
-    actions: std::collections::HashMap<String, crate::models::world::ObjectAction>,
-    responses: std::collections::HashMap<String, String>,
-}
 
 /// The doors on the room's exits, as things the player can name.
 fn doors_here(view: &LocationView) -> Vec<EntityRef> {
@@ -1035,7 +1009,7 @@ mod tests {
     fn with_lever(world: &mut WorldEngine, dir: &Path) {
         world.set_file(
             &dir.join("objects/lever.md"),
-            "---\nid: lever\ntitle: Iron lever\ntype: object\nobject_type: mechanism\nweight: immovable\nactions:\n  pull:\n    becomes: { castle/vault: open }\n    sets: { story.vault: open, this.pulled: yes }\n    chapter: after\n    requires: { has: lamp }\n  shove:\n    requires: { has: lamp }\n---\nA lever.\n\n<!-- thwarter:action pull -->\nGears grind somewhere below.\n\n<!-- thwarter:action pull refused -->\nIt won't move without light.\n\n<!-- thwarter:action kick -->\nOw.\n",
+            "---\nid: lever\ntitle: Iron lever\ntype: object\nobject_type: mechanism\nweight: immovable\nactions:\n  pull:\n    becomes: { castle/vault: open }\n    sets: { story.vault: open, this.pulled: yes }\n    chapter: after\n    requires: { has: lamp }\n  shove:\n    requires: { has: lamp }\n  kick:\n---\nA lever.\n",
         );
         world.set_file(
             &dir.join("castle/hall.md"),
@@ -1048,22 +1022,14 @@ mod tests {
         let (dir, mut world) = story();
         with_lever(&mut world, dir.path());
         assert!(world.current_problems(false).is_empty(), "{:?}", world.current_problems(false));
-        let warnings = world.current_warnings();
-        for expected in [
-            "object `lever`, action `kick`: has a response but no mechanics",
-            "object `lever`, action `shove`: has no response",
-            "object `lever`, action `shove`: has `requires:` but no refusal",
-        ] {
-            assert!(warnings.iter().any(|w| w.starts_with(expected)), "{}: {:?}", expected, warnings);
-        }
-        assert!(!warnings.iter().any(|w| w.contains("action `pull`: has")), "{:?}", warnings);
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/yard").unwrap();
         let pull = PlayAction::Use { verb: "pull".into(), noun: "lever".into() };
         let shove = PlayAction::Use { verb: "shove".into(), noun: "lever".into() };
 
         game.act(&world, &mut state, &PlayAction::Go("north".into()));
-        assert_eq!(game.act(&world, &mut state, &pull).text, "It won't move without light.");
+        // Replies are built in until reply sections are (design/SECTIONS.md).
+        assert_eq!(game.act(&world, &mut state, &pull).text, "You can't pull the iron lever yet.");
         assert_eq!(game.act(&world, &mut state, &shove).text, "Not yet: you can't shove the iron lever.");
         assert!(state.states.is_empty());
 
@@ -1072,7 +1038,7 @@ mod tests {
         game.act(&world, &mut state, &PlayAction::Go("north".into()));
         assert_eq!(game.act(&world, &mut state, &shove).text, "You shove the iron lever. Something changes.");
         let r = game.act(&world, &mut state, &pull);
-        assert_eq!(r.text, "Gears grind somewhere below.");
+        assert_eq!(r.text, "You pull the iron lever.");
         assert!(r.note.is_none(), "{:?}", r.note);
         assert_eq!(state.state_of("location", "castle/vault"), Some("open"));
         assert_eq!(state.values["story.vault"], "open");
@@ -1081,7 +1047,7 @@ mod tests {
         assert!(r.changes.contains(&Change::EnteredChapter { name: "after".into() }));
 
         let kick = |noun: &str| PlayAction::Use { verb: "kick".into(), noun: noun.into() };
-        assert_eq!(game.act(&world, &mut state, &kick("iron lever")).text, "Ow.");
+        assert_eq!(game.act(&world, &mut state, &kick("iron lever")).text, "You kick the iron lever. Something changes.");
         let lick = PlayAction::Use { verb: "lick".into(), noun: "lever".into() };
         assert_eq!(game.act(&world, &mut state, &lick).text, "You can't lick the iron lever.");
         assert_eq!(game.act(&world, &mut state, &kick("dragon")).text, "There's no dragon here.");
@@ -1129,7 +1095,7 @@ mod tests {
         w("passage.md", "---\nid: passage\ntitle: Passage\ntype: location\nvisibility: faint\n---\n");
         w("objects/key.md", "---\nid: key\ntitle: Brass key\ntype: object\nobject_type: key\nvisibility: faint\n---\n");
         w("objects/crate.md", "---\nid: crate\ntitle: Crate\ntype: object\nobject_type: box\n---\n");
-        w("objects/lever/index.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nstate: secret\nactions:\n  pull: { becomes: { ghost: here } }\n  turn: { requires: { has: key } }\n---\n<!-- thwarter:action pull -->\nA chill passes.\n<!-- thwarter:action turn -->\nIt turns.\n<!-- thwarter:action turn refused -->\nStuck.\n");
+        w("objects/lever/index.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nstate: secret\nactions:\n  pull: { becomes: { ghost: here } }\n  turn: { requires: { has: key } }\n---\n");
         w("objects/lever/secret.md", "---\ninherits: index\nvisibility: hidden\n---\n");
         w("objects/ghost/index.md", "---\nid: ghost\ntitle: Ghost\ntype: object\nobject_type: spirit\nstate: gone\n---\nPale.\n");
         w("objects/ghost/gone.md", "---\ninherits: index\nvisibility: absent\n---\n");
@@ -1159,7 +1125,7 @@ mod tests {
         assert_eq!(act(&mut state, pull("lev")), "There's no lev here.");
         // An action with `requires:` can't reach a hidden thing, even with the key in hand.
         assert_eq!(act(&mut state, PlayAction::Use { verb: "turn".into(), noun: "lever".into() }), "There's no lever here.");
-        assert_eq!(act(&mut state, pull("lever")), "A chill passes.");
+        assert!(act(&mut state, pull("lever")).starts_with("You pull the lever."));
         assert_eq!(act(&mut state, PlayAction::Examine("ghost".into())), "Pale.");
     }
 
@@ -1186,7 +1152,7 @@ mod tests {
     fn a_shared_template_can_say_its_own_ambiguity_reply() {
         let (dir, mut world) = world();
         let d = dir.path();
-        world.set_file(&d.join("objects/templates/sword.md"), "---\ntype: object\nobject_type: weapon\n---\n<!-- thwarter:reply ambiguous -->\nTwo blades glint. You'll have to say which.\n");
+        world.set_file(&d.join("objects/templates/sword.md"), "---\ntype: object\nobject_type: weapon\n---\n## When: #ambiguous\nTwo blades glint. You'll have to say which.\n");
         world.set_file(&d.join("objects/rusty-sword.md"), "---\nid: rusty-sword\ntitle: Rusty sword\ntype: object\ninherits: sword\n---\n");
         world.set_file(&d.join("objects/old-sword.md"), "---\nid: old-sword\ntitle: Old sword\ntype: object\ninherits: sword\n---\n");
         let game = GameEngine::new();
@@ -1237,7 +1203,7 @@ mod tests {
         w("castle/doors/vault-door/index.md", "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: door\nsides:\n  castle/hall: { direction: down }\n  castle/vault: { direction: up }\n---\n");
         w("castle/doors/vault-door/closed.md", "---\ninherits: index\n---\nAn iron door is set in the floor, shut.\n");
         w("castle/doors/grate.md", "---\nid: grate\ntitle: Iron grate\ntype: door\npassable: no\ntransparent: yes\nsides:\n  castle/hall: { direction: east }\n  castle/cell: { direction: west }\n---\n");
-        w("objects/lever.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nweight: immovable\nactions:\n  pull: { becomes: { vault-door: open } }\n---\n<!-- thwarter:action pull -->\nGears grind.\n");
+        w("objects/lever.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nweight: immovable\nactions:\n  pull: { becomes: { vault-door: open } }\n---\n");
         let mut world = WorldEngine::new();
         world.load_world(d).unwrap();
         (dir, world)
@@ -1258,14 +1224,10 @@ mod tests {
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(look.contains("Exits: east, down.\nThrough the iron grate you can see the Cell.\nAn iron door is set in the floor, shut."), "{}", look);
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text, "The iron door is closed.");
-        // A state can say it in its own words.
-        let mut world2 = world.clone();
-        world2.set_file(&_d.path().join("castle/doors/vault-door/closed.md"), "---\ninherits: index\n---\nAn iron door is set in the floor, shut.\n\n<!-- thwarter:action go refused -->\nThe {{ this.title }} won't budge.\n");
-        assert_eq!(game.act(&world2, &mut state, &PlayAction::Go("down".into())).text, "The Iron door won't budge.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("east".into())).text, "The iron grate is closed.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("iron door".into())).text, "An iron door is set in the floor, shut.");
 
-        assert_eq!(game.act(&world, &mut state, &PlayAction::Use { verb: "pull".into(), noun: "lever".into() }).text, "Gears grind.");
+        assert!(game.act(&world, &mut state, &PlayAction::Use { verb: "pull".into(), noun: "lever".into() }).text.starts_with("You pull the lever."));
         assert_eq!(state.state_of("door", "vault-door"), Some("open"));
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(!look.contains("shut"), "{}", look); // the open state has no prose, and the index none either
@@ -1278,10 +1240,10 @@ mod tests {
     #[test]
     fn a_door_can_have_its_own_actions() {
         let (dir, mut world) = door_world();
-        world.set_file(&dir.path().join("castle/doors/vault-door/index.md"), "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: door\nsides:\n  castle/hall: { direction: down }\n  castle/vault: { direction: up }\nactions:\n  open: { becomes: { vault-door: open } }\n---\n<!-- thwarter:action open -->\nIt swings up.\n");
+        world.set_file(&dir.path().join("castle/doors/vault-door/index.md"), "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: door\nsides:\n  castle/hall: { direction: down }\n  castle/vault: { direction: up }\nactions:\n  open: { becomes: { this: open } }\n---\n");
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/hall").unwrap();
-        assert_eq!(game.act(&world, &mut state, &PlayAction::Use { verb: "open".into(), noun: "door".into() }).text, "It swings up.");
+        assert!(game.act(&world, &mut state, &PlayAction::Use { verb: "open".into(), noun: "door".into() }).text.starts_with("You open the iron door."), "`this` is the door");
         assert!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text.starts_with("Vault"));
     }
 

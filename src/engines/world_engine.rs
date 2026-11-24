@@ -813,39 +813,6 @@ impl WorldEngine {
         warnings
     }
 
-    /// Authoring warnings for responses (`design/STATES.md` › Responses):
-    /// an action with mechanics but no response, a `requires:` with no
-    /// refusal, and a response with no mechanics. All three still play.
-    fn response_warnings(&self) -> Vec<String> {
-        let mut warnings = Vec::new();
-        let mut ids: Vec<&String> = self.objects.keys().collect();
-        ids.sort();
-        for id in ids {
-            let object = &self.objects[id];
-            let mut names: Vec<&String> = object.actions.keys().collect();
-            names.sort();
-            for name in names {
-                let action = &object.actions[name];
-                let at = format!("object `{}`, action `{}`", id, name);
-                if !action.mechanics {
-                    warnings.push(format!("{}: has a response but no mechanics in frontmatter", at));
-                } else if !object.responses.contains_key(name) {
-                    warnings.push(format!(
-                        "{}: has no response, so play makes one up; add it after `<!-- thwarter:action {} -->`",
-                        at, name
-                    ));
-                }
-                if !action.requires_has.is_empty() && !object.responses.contains_key(&format!("{} refused", name)) {
-                    warnings.push(format!(
-                        "{}: has `requires:` but no refusal; add one after `<!-- thwarter:action {} refused -->`",
-                        at, name
-                    ));
-                }
-            }
-        }
-        warnings
-    }
-
     /// Every thing, in no particular order.
     pub fn things_iter(&self) -> impl Iterator<Item = &Thing> {
         self.things.values()
@@ -931,7 +898,6 @@ impl WorldEngine {
         let mut warnings = self.file_warnings.clone();
         warnings.extend(self.persona_warning.clone());
         warnings.extend(self.link_warnings.iter().cloned());
-        warnings.extend(self.response_warnings());
         warnings.extend(self.variable_warnings());
         warnings.extend(self.prose_link_warnings());
         warnings.extend(self.door_warnings());

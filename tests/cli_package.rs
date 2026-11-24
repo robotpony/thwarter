@@ -46,7 +46,7 @@ fn setup() -> Setup {
     write(&w, "world/styles/terse.md", "My private style notes.\n");
     write(&w, "world.toml", "[settings]\ndefault_map_style = \"ascii\"\n");
     write(&w, "hall.md", "---\nid: hall\ntitle: Hall\ntype: location\n---\nStone. <!-- the butler did it -->\n\n<!-- spoiler: the vault is under the stairs -->\n");
-    write(&w, "objects/lever.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull: { sets: { this.pulled: yes } }\nvars: { pulled: no }\n---\nA lever.\n\n<!-- thwarter:action pull -->\nClunk.\n");
+    write(&w, "objects/lever.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull: { sets: { this.pulled: yes } }\nvars: { pulled: no }\n---\nA lever.\n\n## When: #pulled\nClunk.\n");
     write(&w, ".obsidian/workspace.json", "{}");
     std::fs::create_dir_all(d.join("out")).unwrap();
     Setup { dir }
@@ -99,14 +99,14 @@ fn a_world_packages_with_its_persona_and_installs_to_play() {
     assert!(manifest.contains("format = 1") && manifest.contains("persona = \"bruce\"") && manifest.contains("version = \"1.2\""), "{}", manifest);
     assert!(read_entry(&package, "bruce/castle/hall.md").contains("the butler did it"));
 
-    // --strip-comments drops author comments, never response markers.
+    // --strip-comments drops author comments, never sections.
     let (ok, _, err) = s.run(&["package", world, "--yes", "--strip-comments", "--output", "stripped.thwarter"]);
     assert!(ok, "{}", err);
     assert!(err.contains("Author comments are left out (2 in 1 file(s))"), "{}", err);
     let stripped = s.out().join("stripped.thwarter");
     let hall = read_entry(&stripped, "bruce/castle/hall.md");
     assert!(!hall.contains("<!--") && hall.contains("Stone."), "{:?}", hall);
-    assert!(read_entry(&stripped, "bruce/castle/objects/lever.md").contains("<!-- thwarter:action pull -->"));
+    assert!(read_entry(&stripped, "bruce/castle/objects/lever.md").contains("## When: #pulled\nClunk."));
     assert!(std::fs::read_to_string(s.world().join("hall.md")).unwrap().contains("the butler"));
 
     // Install, refuse a second time, replace, list.

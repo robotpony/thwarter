@@ -303,7 +303,7 @@ mod tests {
         write(d, "hall/index.md", "---\nid: hall\ntitle: Hall\ntype: location\nstate: dim\nobjects: [lamp]\nvars: { mood: calm }\n---\n{{ player.title }} stands in the {{ location.title }} (visit {{ location.visits }}, turn {{ game.turn }}). The king is {{ story.king }}. The lamp is {{ lamp.lit }}. {{ story.nope }}{{< figure >}}\n");
         write(d, "hall/dim.md", "---\ninherits: index\n---\n");
         write(d, "hall/bright.md", "---\ninherits: index\nvars: { mood: cheerful }\n---\nA {{ this.mood }} hall.\n");
-        write(d, "objects/lamp.md", "---\nid: lamp\ntitle: Lamp\ntype: object\nobject_type: tool\nvars: { lit: unlit }\nactions:\n  light:\n    sets: { this.lit: lit, story.king: dead, story.queen: sad }\n    becomes: { hall: bright }\n---\nA {{ this.lit }} lamp.\n\n<!-- thwarter:action light -->\nThe lamp is {{ this.lit }} now; health {{ player.health }}.\n");
+        write(d, "objects/lamp.md", "---\nid: lamp\ntitle: Lamp\ntype: object\nobject_type: tool\nvars: { lit: unlit }\nactions:\n  light:\n    sets: { this.lit: lit, story.king: dead, story.queen: sad }\n    becomes: { hall: bright }\n---\nA {{ this.lit }} lamp, and health {{ player.health }}.\n");
         let mut engine = WorldEngine::new();
         engine.load_world(d).unwrap();
         (dir, engine)
@@ -316,9 +316,9 @@ mod tests {
         let mut state = game.start(&world, "hall").unwrap();
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(look.contains("Ana stands in the Hall (visit 1, turn 1). The king is alive. The lamp is unlit. {{< figure >}}"), "{}", look);
-        assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("lamp".into())).text, "A unlit lamp.");
-        let r = game.act(&world, &mut state, &PlayAction::Use { verb: "light".into(), noun: "lamp".into() });
-        assert_eq!(r.text, "The lamp is lit now; health 100.");
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("lamp".into())).text, "A unlit lamp, and health 100.");
+        game.act(&world, &mut state, &PlayAction::Use { verb: "light".into(), noun: "lamp".into() });
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("lamp".into())).text, "A lit lamp, and health 100.");
         // Values hold once set; the room's state switched, so `this.` reads the new version.
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(look.contains("A cheerful hall."), "{}", look);

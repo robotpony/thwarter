@@ -21,7 +21,6 @@ pub struct Door {
     /// Whether the other side can be seen through it (a window, a grate).
     pub transparent: bool,
     pub actions: HashMap<String, ObjectAction>,
-    pub responses: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
