@@ -194,7 +194,7 @@ Frontmatter merges by the inheritance rules below. Prose merges block by block (
 Inheritance is never implicit (Bruce, 2026-11-23). A file inherits only if its frontmatter says `inherits:`.
 
 - Inside a bundle, a state file says `inherits: index`. The console writes this when it creates a state.
-- Across things, `inherits: objects/box` makes a thing start from another thing, as a template. A bare name (`index`) means a file in the same bundle; anything else is a path from the world root without `.md`. A template passes down its attributes and its prose, never its `id`; a bundle used as a template passes down only its `index.md`, never a state.
+- Across things, `inherits: objects/box` makes a thing start from another thing, as a template. A bare name (`index`) means a file in the same bundle; anything else is a path from the world root without `.md`. A template passes down its attributes and its prose, never its `id`; a bundle used as a template also passes down its states (see Templates and copies).
 - A file has one parent. Cycles are an error. Template chains are at most 4 levels deep (*proposed*); a bundle's own index, state and overlay layers don't count toward that.
 - A scalar or a list in the child replaces the parent's, so a state that lists `objects:` replaces the whole list; `validate` warns (never errors) each time a layer replaces an inherited list (Bruce, 2026-11-23). Maps (`connections`, `vars`) merge key by key, all the way down. `null` removes an inherited key; `validate` warns about each removal, since a bare `north:` with no value also means `null`.
 - Overlays inherit from whatever version is current, by definition, and don't need `inherits:`. Because that bends principle 2, `validate` warns about each overlay that applies by placement, for now; if that proves confusing or noisy, it gets adjusted (Bruce, 2026-11-23).
@@ -222,7 +222,8 @@ A template is never placed in the world itself. It's marked either way (Bruce, 2
 Built in 0.22.0 (9ee03ed), and confirmed by the commander:
 - A template counts as part of the thing that names it. Its layers sit between the area's layers and the thing's own `index.md`, most distant template first, so the thing's own prose replaces a template's.
 - A bare template name is looked up in `templates/` folders from the thing's own folder out to the root, then in the built-ins. A name with a slash is a path from the root. A template's own `inherits:` is resolved from the template's folder. A state file's `inherits: index` still means its bundle's `index.md`.
-- A template never passes down `id`, `template:` or `state:`. A bundle used as a template passes down only its `index.md`.
+- A template never passes down `id`, `template:` or `state:`.
+- A bundle used as a template passes down its states too, so a template can hold a thing's whole definition, as Bruce asked for global door templates (`locked-door`). Changed by the commander, 2026-11-23, when doors needed it; it reverses the earlier "index only" rule. A thing has the template's states plus its own. Where both have a state of the same name, the template's state file is a layer under the thing's, so the thing overrides only what it changes. The template's starting state applies unless the thing names one.
 - A chain of more than 4 templates is a problem.
 - Built-ins are Markdown files in `src/builtins/`, compiled in. `scenery` has `title: Scenery` and `object_type: scenery`.
 
