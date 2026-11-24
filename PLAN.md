@@ -135,6 +135,7 @@ Every sentence the engine, play and the console write comes from a text table wi
 - [ ] Console strings become `[console]` keys, the default text unchanged [console]
 - [ ] A test that fails on a new user-facing string outside the defaults [coder, console]
 - [ ] Overrides: `world.toml`'s `[engine]`, the personal config's `[console]`, and a warning for an unused key [coder, console]
+- [ ] Story overrides: a `## When:` section replaces an `[engine]` reply by exact outcome tag, reserved outcome names, `{{ turn.x }}` slots [coder] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies)
 
 ## Phase 9 · Writing helpers
 

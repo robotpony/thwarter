@@ -53,6 +53,7 @@ Not covered: author notes (`ActionResult::note`), validation warnings and `thwar
 3. **Console strings.** About 200 literals in `src/console/` become `[console]` keys, likewise unchanged. [console]
 4. **Guard.** A test fails on a new user-facing string literal outside the defaults files. [coder, console]
 5. **Overrides.** `world.toml`'s `[engine]` and the personal config's `[console]` replace defaults, and `validate` warns about a key nothing uses. [coder, console]
+6. **Story overrides.** A `## When:` section replaces an `[engine]` reply by its exact outcome tag along the reply's chain, the outcome names join `RESERVED_TAGS` with `validate`'s warning, and section prose fills `{{ turn.x }}` slots (› Story overrides of built-in replies). Its own step because it's a feature, not a move of strings. [coder]
 
 ## Open questions
 
