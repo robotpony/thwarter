@@ -401,6 +401,19 @@ mod tests {
     }
 
     #[test]
+    fn a_views_things_carry_their_state() {
+        let (_d, world) = vault();
+        let lever = |view: &crate::engines::LocationView| view.objects.iter().find(|o| o.id == "lever").and_then(|o| o.state.clone());
+        let view = world.describe_location_at("castle/hall", crate::engines::At::default()).unwrap();
+        assert_eq!(lever(&view).as_deref(), Some("up"), "its starting state, outside play");
+        assert_eq!(view.objects.iter().find(|o| o.id == "spoon").unwrap().state, None, "no states");
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        say(&game, &world, &mut state, "pull lever");
+        assert_eq!(lever(&game.view(&world, &state).unwrap()).as_deref(), Some("down"), "the game's");
+    }
+
+    #[test]
     fn the_vault_door_plays_as_the_keys_table_says() {
         let (_d, world) = vault();
         assert!(world.current_problems(false).is_empty(), "{:?}", world.current_problems(false));

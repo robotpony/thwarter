@@ -1394,6 +1394,7 @@ impl WorldEngine {
             .map(|cid| EntityRef {
                 id: cid.clone(),
                 name: self.character_at(cid, at).map(|c| c.name),
+                state: self.state_at(EntityKind::Character, cid, at),
             })
             .collect();
         let objects: Vec<EntityRef> = location
@@ -1402,6 +1403,7 @@ impl WorldEngine {
             .map(|oid| EntityRef {
                 id: oid.clone(),
                 name: self.object_at(oid, at).map(|o| o.title),
+                state: self.state_at(EntityKind::Object, oid, at),
             })
             .collect();
 
@@ -1417,7 +1419,7 @@ impl WorldEngine {
             i += 1;
             for id in self.object_at(&holder, at).map(|o| o.objects).unwrap_or_default() {
                 if seen.insert(id.clone()) {
-                    let thing = EntityRef { name: self.object_at(&id, at).map(|o| o.title), id: id.clone() };
+                    let thing = EntityRef { name: self.object_at(&id, at).map(|o| o.title), state: self.state_at(EntityKind::Object, &id, at), id: id.clone() };
                     holders.push((id, thing.display_name()));
                     held.push(crate::engines::Held { thing, holder: holder.clone(), holder_name: holder_name.clone(), word: self.holds_word(&holder, at) });
                 }
@@ -1439,6 +1441,18 @@ impl WorldEngine {
             objects,
             held,
         })
+    }
+
+    /// The state a thing is in as `at` sees it: the game's, if it's one of
+    /// the thing's states, else its starting state. `None` for a thing
+    /// with no states.
+    pub fn state_at(&self, kind: EntityKind, id: &str, at: At) -> Option<String> {
+        let thing = self.thing(kind, id)?;
+        at.play
+            .and_then(|p| p.state_of(kind.type_name(), id))
+            .filter(|s| thing.has_state(s))
+            .map(String::from)
+            .or_else(|| thing.starting_state.clone())
     }
 
     /// A thing as `at` sees it: in a game, its current state in the

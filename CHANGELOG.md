@@ -54,6 +54,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.66.0 (2026-11-24)
+
+### Added
+
+- `EntityRef::state`: each person, thing and held thing in a `LocationView` carries its state, the game's in play and its starting state outside, so the console's sidebar can show "lantern  hanging" without a lookup per thing. `WorldEngine::state_at(kind, id, at)` gives it for any thing. Asked for by the console coder.
+
 ## 0.65.0 (2026-11-24)
 
 ### Added

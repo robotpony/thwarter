@@ -67,6 +67,9 @@ pub struct DoorView {
 pub struct EntityRef {
     pub id: String,
     pub name: Option<String>,
+    /// Its state as `at` sees it (`hanging`, `lit`): the game's, else its
+    /// starting state; `None` for a thing with no states or no card.
+    pub state: Option<String>,
 }
 
 impl EntityRef {

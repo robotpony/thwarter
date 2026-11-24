@@ -95,7 +95,7 @@ impl GameEngine {
             i += 1;
             for id in self.contents(world, state, &holder) {
                 if seen.insert(id.clone()) {
-                    let thing = EntityRef { name: world.object_at(&id, At::play(state)).map(|o| o.title), id: id.clone() };
+                    let thing = EntityRef { name: world.object_at(&id, At::play(state)).map(|o| o.title), state: world.state_at(EntityKind::Object, &id, At::play(state)), id: id.clone() };
                     holders.push((id, thing.display_name()));
                     view.held.push(crate::engines::Held { thing, holder: holder.clone(), holder_name: holder_name.clone(), word: world.holds_word(&holder, At::play(state)) });
                 }
@@ -730,7 +730,7 @@ impl GameEngine {
             i += 1;
             for id in self.contents(world, state, &holder) {
                 if seen.insert(id.clone()) {
-                    out.push((EntityRef { name: world.object_at(&id, At::play(state)).map(|o| o.title), id: id.clone() }, holder.clone()));
+                    out.push((EntityRef { name: world.object_at(&id, At::play(state)).map(|o| o.title), state: world.state_at(EntityKind::Object, &id, At::play(state)), id: id.clone() }, holder.clone()));
                     todo.push(id);
                 }
             }
@@ -768,7 +768,7 @@ impl GameEngine {
         state
             .inventory
             .iter()
-            .map(|id| EntityRef { id: id.clone(), name: world.object_at(id, At::play(state)).map(|o| o.title) })
+            .map(|id| EntityRef { id: id.clone(), name: world.object_at(id, At::play(state)).map(|o| o.title), state: world.state_at(EntityKind::Object, id, At::play(state)) })
             .collect()
     }
 }
@@ -988,7 +988,7 @@ fn doors_here(view: &LocationView) -> Vec<EntityRef> {
     let mut doors: Vec<EntityRef> = Vec::new();
     for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
         if !doors.iter().any(|d| d.id == door.id) {
-            doors.push(EntityRef { id: door.id.clone(), name: Some(door.title.clone()) });
+            doors.push(EntityRef { id: door.id.clone(), name: Some(door.title.clone()), state: door.state.clone() });
         }
     }
     doors

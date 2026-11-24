@@ -801,10 +801,10 @@ mod tests {
             held: Vec::new(),
             scenery: vec!["fountain".into()],
             characters: vec![
-                EntityRef { id: "guard-captain".into(), name: Some("Captain Marcus".into()) },
-                EntityRef { id: "ghost".into(), name: None },
+                EntityRef { id: "guard-captain".into(), name: Some("Captain Marcus".into()), state: None },
+                EntityRef { id: "ghost".into(), name: None, state: None },
             ],
-            objects: vec![EntityRef { id: "fountain".into(), name: None }],
+            objects: vec![EntityRef { id: "fountain".into(), name: None, state: None }],
         }
     }
 
@@ -940,7 +940,7 @@ You can go north or down.";
         let mut v = view();
         v.title = "Court\u{1b}[1;1Hyard".into();
         v.body = "A \u{1b}]0;pwned\u{7}fountain.".into();
-        v.objects = vec![EntityRef { id: "x\u{1b}[5m".into(), name: Some("Bell\u{7}".into()) }];
+        v.objects = vec![EntityRef { id: "x\u{1b}[5m".into(), name: Some("Bell\u{7}".into()), state: None }];
         let named = crate::engines::play_text::PlayText { show_room_names: true, ..Default::default() };
         for text in [render_location(&v), play_blocks(&v, &no_links, &named).to_plain()] {
             assert!(!text.chars().any(|c| c.is_control() && c != '\n'), "{:?}", text);
