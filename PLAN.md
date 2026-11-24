@@ -116,7 +116,16 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [x] Play reads rooms and replies as the story: people right after the prose, held things on a plain look, doors named in the ways out (95ed0c9, REQ-ENG-43, 45, 46)
 - [ ] New verbs `drop`, `talk`, `ask` and `give` [coder] (`design/PLAYER_COMMANDS.md` › Open question 1; Bruce to choose)
 
-## Phase 8 · Writing helpers
+## Phase 8 · Engine text as data
+
+Every sentence the engine writes for a player comes from defaults a world can change, not from code (Bruce, 2026-11-24). Done when no player-facing string is left in the engine's source and a test keeps it that way.
+
+- [ ] Inventory every player-facing string in the engine, in `design/ENGINE_TEXT.md` [coder] (`design/ENGINE_TEXT.md` › Order of work)
+- [ ] Move them to `[play]` and a built-in `replies` bundle, the default text unchanged [coder]
+- [ ] A test that fails on a new player-facing string in engine code [coder]
+- [ ] A world's `world/replies.md` overrides a built-in reply, and `validate` warns about one that matches nothing [coder]
+
+## Phase 9 · Writing helpers
 
 AI tools for prose in edit mode. Done when an author can review and rewrite a room's prose from the console.
 
@@ -125,7 +134,7 @@ AI tools for prose in edit mode. Done when an author can review and rewrite a ro
 - [ ] Styles as files in `world/styles/` [console, coder] (REQ-CON-18)
 - [ ] Turning helpers on per world, with the service and model shown [console] (REQ-CON-19, REQ-CON-21)
 
-## Phase 9 · Authors and sharing
+## Phase 10 · Authors and sharing
 
 Done when a persona can package a world, and someone else can install it and play it.
 
@@ -135,7 +144,7 @@ Done when a persona can package a world, and someone else can install it and pla
 - [x] Packaging a world with its persona, and installing one to play [coder] (REQ-CFG-5, REQ-CFG-7)
 - [x] Play data for installed worlds kept apart from them (0.36.1) [coder, console] (REQ-CFG-6)
 
-## Phase 10 · Tooling, as needed
+## Phase 11 · Tooling, as needed
 
 
 Built when authoring or play asks for them, most likely as console commands. Until then they stay as they are.
