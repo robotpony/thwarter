@@ -57,6 +57,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.68.1 (2026-11-24)
+
+### Fixed
+
+- The `/` menu test expected the command list from before `/remove`; 497f603 was committed with it failing.
+
 ## 0.68.0 (2026-11-24)
 
 ### Added

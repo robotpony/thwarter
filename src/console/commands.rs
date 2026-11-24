@@ -312,7 +312,7 @@ mod tests {
         let mut console = tiny();
         let all = console.complete("/");
         assert_eq!(all.suggestions.len(), COMMANDS.len());
-        assert_eq!(texts(&console.complete("/re")), vec!["/recipe", "/reload", "/restart"]);
+        assert_eq!(texts(&console.complete("/re")), vec!["/recipe", "/reload", "/restart", "/remove"]);
         console.handle("/play");
         assert!(!texts(&console.complete("/")).contains(&"/set"), "edit-only commands leave play mode's list");
     }
