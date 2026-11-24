@@ -11,7 +11,6 @@ use super::world::Kind;
 use super::Mode;
 use crate::engines::load_game;
 use crate::models::game::ActionResult;
-use crate::render::{render_location_as, RenderStyle};
 
 impl Console {
     /// One line of play-mode input.
@@ -33,6 +32,12 @@ impl Console {
             return "No game is in progress. /play here starts one in the room edit mode is in.".to_string();
         };
         let result = self.game_engine.act(&self.world.engine, state, &action);
+        // On a terminal, the author note goes to the sidebar; scripts and
+        // transcripts keep it in the output.
+        if self.interactive {
+            self.notes = result.note.iter().cloned().collect();
+            return result.text;
+        }
         show(result)
     }
 
@@ -42,7 +47,12 @@ impl Console {
             return "No game is in progress. /play here starts one in the room edit mode is in.".to_string();
         };
         match self.game_engine.view(&self.world.engine, state) {
-            Some(view) => render_location_as(&view, RenderStyle::Player),
+            // The player's text, in the world's own wording (`[play]` in
+            // world.toml); ids and author detail go to the sidebar.
+            Some(view) => {
+                let engine = &self.world.engine;
+                crate::render::play_blocks(&view, &|n| engine.link_for(n), engine.play_text()).to_plain()
+            }
             None => format!(
                 "You're nowhere: `{}` isn't in the world.\nAuthor note: /edit, then /play here from a room, moves the player.",
                 state.location

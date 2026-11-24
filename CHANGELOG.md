@@ -38,6 +38,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+
+## 0.51.1 (2026-11-23)
+
+### Changed
+
+- Play mode reads as a story (Bruce, 2026-11-23): the room view is the engine's player text (`render::play_blocks`), in the world's own wording from `world.toml`'s `[play]` table, with no room name unless the world turns them on, "You see …" and "You can go …" as sentences, and a blank line after what was typed and after each reply.
+- The detail an author needs while playing moves to the sidebar: a ROOM section below GAME and MAP shows the player's room's exits and where they lead, its people, things and scenery by id with held things under their holders, and its warnings, and an "author notes" section holds the last action's notes. Scripts and transcripts still print author notes in the output.
+
 ## 0.51.0 (2026-11-23)
 
 ### Changed

@@ -228,9 +228,18 @@ impl<'a> Screen<'a> {
                 self.history.remove(0);
             }
         }
+        // Play reads as a story: a blank line after what was typed and after
+        // each reply (Bruce, 2026-11-23).
+        let playing = lock(console).mode == super::Mode::Play && !line.trim_start().starts_with('/');
+        if playing {
+            self.output.push(String::new());
+        }
         let (text, flow) = lock(console).handle(&line);
         if !text.is_empty() {
             self.push(&text);
+        }
+        if playing {
+            self.output.push(String::new());
         }
         match flow {
             Flow::Quit => self.quit = true,

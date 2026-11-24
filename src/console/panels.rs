@@ -109,6 +109,16 @@ impl Console {
         if self.mode == Mode::Edit {
             rest.push(Row::Blank);
             rest.extend(self.here_panel());
+        } else if let Some(game) = &self.game {
+            // Play's text is the player's; the detail an author needs goes
+            // here instead (Bruce, 2026-11-23).
+            rest.push(Row::Blank);
+            rest.push(Row::Heading(format!("ROOM  {}", game.location)));
+            rest.extend(self.room_rows(&game.location));
+            if !self.notes.is_empty() {
+                rest.push(Row::Heading("author notes".to_string()));
+                rest.extend(self.notes.iter().map(|n| Row::Warning(format!("  {}", n))));
+            }
         }
         Sidebar { fixed, rest }
     }
@@ -218,6 +228,17 @@ impl Console {
             }
             return rows;
         };
+        rows.extend(self.room_rows(&room));
+        rows
+    }
+
+    /// A room as a game master's notes: its exits and where they lead,
+    /// its people, things and scenery by id, held things under their
+    /// holders, and its warnings. HERE shows it for edit mode's room, and
+    /// ROOM for the player's, so play's own text can stay plain.
+    fn room_rows(&self, room: &str) -> Vec<Row> {
+        let mut rows = Vec::new();
+        let room = room.to_string();
         let Some(location) = self.world.engine.get_location(&room) else { return rows };
 
         rows.push(Row::Heading("exits".to_string()));
@@ -542,5 +563,8 @@ mod tests {
         let mut console = tiny();
         console.handle("/play");
         assert!(!texts(&console.sidebar().rest).iter().any(|r| r.starts_with("# HERE")));
+        let rest = texts(&console.sidebar().rest);
+        assert!(rest.contains(&"# ROOM  village/square".to_string()), "play's detail is in the sidebar: {:?}", rest);
+        assert!(rest.contains(&"  north  village/well".to_string()), "{:?}", rest);
     }
 }

@@ -4,21 +4,17 @@
 Playing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
 1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
 
-Village Square
-
 A small square of packed earth. An old well stands to the north.
+You see a brass lantern and a bench.
 
-Exits: north, east.
-You see: Brass Lantern, Bench.
-Here: The Elder.
+You can go north and east.
+The Elder is here.
 > look
-Village Square
-
 A small square of packed earth. An old well stands to the north.
+You see a brass lantern and a bench.
 
-Exits: north, east.
-You see: Brass Lantern, Bench.
-Here: The Elder.
+You can go north and east.
+The Elder is here.
 > /edit
 Edit mode, at village/square.
 /edit opens village/square.md in a full-screen editor, which needs a terminal.
@@ -42,13 +38,11 @@ The Well (room)
 > /play
 Play mode.
 
-Village Square
-
 A small square of packed earth. An old well stands to the north.
+You see a brass lantern and a bench.
 
-Exits: north, east.
-You see: Brass Lantern, Bench.
-Here: The Elder.
+You can go north and east.
+The Elder is here.
 > /set title Foo
 /set changes content, so it only works in edit mode. Type /edit to switch.
 > /edit
@@ -59,13 +53,11 @@ Name the new room: /new room north <id> [title]
 > /play
 Play mode.
 
-Village Square
-
 A small square of packed earth. An old well stands to the north.
+You see a brass lantern and a bench.
 
-Exits: north, east.
-You see: Brass Lantern, Bench.
-Here: The Elder.
+You can go north and east.
+The Elder is here.
 > /edit room
 Edit mode, at village/square.
 /edit opens village/square.md in a full-screen editor, which needs a terminal.

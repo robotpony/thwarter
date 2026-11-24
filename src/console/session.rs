@@ -58,6 +58,8 @@ pub struct Console {
     pub(super) trail: Vec<Place>,
     /// What `examine` showed last, for the sidebar, until edit mode moves.
     pub(super) looked_at: Option<String>,
+    /// The last play action's author notes, for the sidebar on a terminal.
+    pub(super) notes: Vec<String>,
     /// Where input the console didn't understand is logged, for reviewing
     /// what authors and players reach for. Only a terminal session sets it.
     pub(super) unknown_log: Option<std::path::PathBuf>,
@@ -94,6 +96,7 @@ impl Console {
             pending_edit: None,
             trail: Vec::new(),
             looked_at: None,
+            notes: Vec::new(),
             unknown_log: None,
         };
         if mode == Mode::Play {
@@ -812,7 +815,7 @@ mod tests {
 
         let (out, _) = console.handle("/reload");
         assert!(out.contains("the player's room `village/well` no longer exists"), "{}", out);
-        assert!(console.handle("look").0.starts_with("The Well"), "old world still loaded");
+        assert!(console.handle("look").0.starts_with("A mossy stone well."), "old world still loaded");
     }
 
     #[test]
