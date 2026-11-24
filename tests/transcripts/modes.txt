@@ -72,6 +72,7 @@ Console commands, in either mode:
   /status         the world, where you are, the game, saves and the build
   /map            the map around you (the sidebar shows the nearest rooms)
   /validate       check the world as thwart validate does, edits included
+  /remove {name}  delete a thing, room or door and what refers to it, after asking
   /inspect [name] a thing in full: its file, where it starts, states, sections, warnings
   /clear          empty the output (the session carries on)
   /restart        restart the console on the newest build, keeping your place
