@@ -306,13 +306,14 @@ Bruce, 2026-11-24: console commands should solve common problems easily, through
 *Proposed (Bruce, 2026-11-24; the author rule is the commander's REQ-WS-7 to 9, also proposed).* Today one command is written in five places (the `/` menu table, the dispatch `match`, `/help`, the transcripts' list of commands that change content, and the handler's own usage text), and they drift: 23 menu entries, 31 help lines, 34 dispatch arms. This section replaces them with one registry.
 
 - REQ-CON-50: Every console command MUST be described once, in a `type: command` Markdown file, and the `/` menu, `/help`, usage replies, argument completion, the mode guard and the test guard MUST all read that description. Nothing else lists commands.
-- REQ-CON-51: A command file's frontmatter has `name`, `aliases`, `args` (named parameters as the `/` menu shows them: `{thing} [{room}]`), `modes` (`edit`, `play`), `changes` (whether it writes to the world), and either `handler` (a built-in) or `run` (a world command, REQ-CON-54). Its body is the help prose and examples, which `/help <command>` shows.
+- REQ-CON-51: A command file's frontmatter has `name`, `aliases`, `about` (the one-line summary the `/` menu and `/help` list show), `args` (named parameters as the `/` menu shows them: `{thing} [{room}]`), `modes` (`edit`, `play`), `changes` (whether it writes to the world), and either `handler` (a built-in) or `run` (a world command, REQ-CON-54). Its body is the help prose and examples, which `/help <command>` shows.
 
   ```markdown
   ---
   type: command
   name: remove
   aliases: [rm, delete]
+  about: delete a thing, room or door and what refers to it, after asking
   args: "{thing}"
   modes: [edit]
   changes: true
