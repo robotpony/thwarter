@@ -1,6 +1,6 @@
 # Sections: content shown by game state
 
-Status: Agreed in outline by Bruce, 2026-11-23, to be tested on real content. Bruce set the principles and the model, and answered the open points through the console coder's session and directly; the commander wrote it up and filled the gaps, marked *proposed*. Nothing here is built in the engine yet (the editor draws the headings, f959c28). Once the trial confirms it, this folds into `design/CONTENT_REQUIREMENTS.md` and `design/STATES.md`, and this file goes in `CHANGELOG.md` › Removed.
+Status: Agreed in outline by Bruce, 2026-11-23, to be tested on real content. Bruce set the principles and the model, and answered the open points through the console coder's session and directly; the commander wrote it up and filled the gaps, marked *proposed*. Reading sections is built (2dad20b, 0.45.0), and the editor draws them (f959c28); matching them against the game state isn't built yet. Once the trial confirms it, this folds into `design/CONTENT_REQUIREMENTS.md` and `design/STATES.md`, and this file goes in `CHANGELOG.md` › Removed.
 
 ## Summary
 
@@ -77,6 +77,8 @@ The glass shatters. Cold air pours in.
 ````
 
 *Proposed*: this replaces the frontmatter `actions:` map. A world's verbs are the action tags its headings use, which is what the parser's REQ-PC-14 check already asks ("does any thing have this verb?"). `requires:` becomes names in the heading: `## When: #unlock @brass-key` works only while the player holds the key, and a section headed `## Unless: @brass-key` is the refusal. *Proposed*: `When:` and `Unless:` can't share one heading, so a refusal needs Open question 5's answer on combining them. The `actions:` map and `requires:` then go.
+
+Until Bruce confirms this, mechanics stay in frontmatter `actions:` (settled with the coder, 2026-11-23). A reply section supplies the words: with a matching action it replaces the built-in reply, and without one it shows its text and changes nothing. An action tag in any heading counts as a verb the world knows (REQ-PC-14).
 
 A description section's block MAY hold data that applies while it matches, such as a door's `passable:`, merging over frontmatter the way layers merge today (REQ-CF-13). *Proposed*: one block per section, first in it.
 
