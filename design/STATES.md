@@ -372,45 +372,33 @@ A variable that isn't declared at its level is a warning, not an error: edit mod
 
 ## Console
 
-In files, a bundle is separate files. In the console, it is one document with a section per file, each section starting with its frontmatter (Bruce, 2026-11-23):
+In files, a bundle is separate files. In the console, it is one document with a section per state, written the way `design/SECTIONS.md` writes states in a single file (Bruce, 2026-11-23; heading format from the same day):
 
-```
+````
 /edit room  castle/vault                         ctrl-s save · esc close
 
-  --- index
+  ---
   title: Vault
+  state: closed
   connections: { north: castle/hall }
   ---
+  A heavy iron door is set into the floor.
 
-  --- state: closed (starting)
-  inherits: index
-  ---
-  A heavy iron door is set into the floor, shut fast.
+  ─── When: #closed (starting) ··· castle/vault/closed.md
+  Shut fast.
 
-  --- state: open
-  inherits: index
+  ─── When: #open ··· castle/vault/open.md
+  ```thwarter
   connections: { down: castle/vault-stairs }
-  ---
+  ```
   The iron door stands open. Cold air rises from below.
+````
 
-  --- chapter: after-the-king
-  ---
-  The door hangs off one hinge now.
-```
-
-A section header names one file of the bundle: its kind (`index`, `state` or `chapter`), its name, tags such as `(starting)`, and its path. In the editor, headers are not text. The editor draws each one as a fixed separator, with one text area per section, and the cursor moves across them:
-
-```
-─── state: open (starting) ··· castle/vault/open.md
-```
-
-Where a bundle has to be one piece of plain text (copying it out, or a transcript test), each header is written as a Markdown comment on its own line, which renders as nothing and can't be mistaken for prose or frontmatter:
-
-```markdown
-<!-- thwarter:section state open starting -->
-```
-
-The comment is positional: kind, then name, then tags. Names are file names, so they never contain spaces, and the path is derived from them, so it isn't written. A header is never a Markdown heading (`#`), since prose uses those, and never `---`, which fences frontmatter. (Confirmed with the console coder, 2026-11-23.) So no body line ever needs escaping, and a header can't be renamed or deleted by editing. New states and overlays come only from commands (`/state new`, `/chapter overlay`), never by typing a header. Sections appear in this order: `index`, the starting state, the other states A to Z, then chapter overlays in chapter order. (Settled by the commander with the console coder, 2026-11-23.)
+- The index is the default section: its frontmatter and prose, with no heading.
+- Each state is a `## When: #name` section. A state that's its own file shows its path beside the heading; its frontmatter, apart from `inherits: index`, is shown as its `thwarter` block. In the editor, the heading is drawn as a rule in the chrome colour (`design/CONSOLE_REQUIREMENTS.md` › REQ-CON-39).
+- Where a bundle has to be one piece of plain text (copying it out, or a transcript test), the headings are written as ordinary `## When: #name` headings, so the text is the same document a one-file thing would be.
+- *Proposed*: saving writes each section back where it came from: a section from a state file to that file, and a section written in the index to the index. Typing a new `## When:` heading adds a state section to the index; `/state new` makes a state file instead.
+- Sections appear in this order: the default section, the starting state, the other states A to Z, then chapter overlays in chapter order. How a chapter overlay is headed waits on `design/SECTIONS.md` › Open question 2 (chapters as sections or files); until then it keeps its `<!-- thwarter:section chapter <name> -->` line.
 
 Saving splits the document back into its files. Every section must parse before any file is written; if one fails, nothing is saved. A file that doesn't parse still opens, since editing is how an author fixes it. A one-file thing opens as a document with one section.
 
