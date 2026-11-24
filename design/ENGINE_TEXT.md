@@ -31,6 +31,8 @@ nothing = ["Nothing happens.", "Nothing seems to happen.", "That does nothing."]
 
 Defaults are read with `include_str!`, so nothing has to be on disk. The console's text is the author's choice, not the world's, so it lives in the personal config and doesn't change with the open world.
 
+Edit mode's room view introduces exits, people and things with prose, not headings (Bruce, 2026-11-24): it uses `[play]`'s sentences ("You can go {or}.", "You see {list}."), so a world's wording shows while it's being written, and adds the author's detail (ids, doors and their state, what isn't written) from `[console]`. A list too long for a sentence MAY follow its sentence as indented lines.
+
 A world's story still answers first: a `## When:` reply section in a thing, its room or its template wins over `[engine]`, as it does today. `[engine]` replaces only the built-in fallback. Default-reply lists by chapter or area (`design/SECTIONS.md` › Default replies) are `## When: #nothing` sections, since they're story; the world-wide list is `[engine]`'s `nothing`.
 
 ### Story overrides of built-in replies
