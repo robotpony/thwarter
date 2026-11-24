@@ -39,6 +39,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.57.0 (2026-11-24)
+
+### Added
+
+- The writer's `SetMapEntry` takes a small map of strings, numbers and booleans, written on one line flow-style, and can replace such an entry: `sides.castle/shed` becomes `castle/shed: { direction: west }`. A deeper value is still refused, for full editing. Asked for by the console's `/add <room> <door>`.
+
 ## 0.56.0 (2026-11-24)
 
 ### Added

@@ -559,7 +559,10 @@ impl ContentFile {
 
     fn set_map_entry(&mut self, key: &str, subkey: &str, value: &Value) -> Result<()> {
         let sub = emit_key(subkey)?;
-        let text = emit_scalar(value, false)?;
+        let text = match value {
+            Value::Mapping(map) => emit_flow_map(map)?,
+            _ => emit_scalar(value, false)?,
+        };
         match self.find(key)? {
             Some(entry) => match self.shape(&entry) {
                 Shape::BlockMap { indent } => {
@@ -650,7 +653,10 @@ impl ContentFile {
         });
         let (value, _) = split_comment(&strip_eol(&self.lines[idx])[..]);
         let after_colon = value.split_once(':').map(|(_, v)| v.trim()).unwrap_or("");
-        if continues || after_colon.is_empty() || after_colon.starts_with(['[', '{', '|', '>', '&', '*', '!']) {
+        // A one-line flow map (`{ direction: east }`) can be replaced
+        // whole; the read-back check catches anything it gets wrong.
+        let flow_map = after_colon.starts_with('{') && after_colon.ends_with('}');
+        if continues || after_colon.is_empty() || (!flow_map && after_colon.starts_with(['[', '{', '|', '>', '&', '*', '!'])) {
             bail!("`{}` isn't a single-line entry; use full editing", subkey);
         }
         Ok(Some(idx))
@@ -875,6 +881,24 @@ pub(crate) fn emit_scalar(value: &Value, in_flow: bool) -> Result<String> {
     }
 }
 
+/// A small map of scalars as one flow-style value, `{ direction: east }`,
+/// for an entry like a door's side (`sides.<room>`). Anything deeper is
+/// for full editing.
+fn emit_flow_map(map: &Mapping) -> Result<String> {
+    if map.is_empty() {
+        return Ok("{}".into());
+    }
+    let mut parts = Vec::new();
+    for (k, v) in map {
+        let Value::String(k) = k else { bail!("a map value's keys must be text") };
+        if matches!(v, Value::Mapping(_) | Value::Sequence(_)) {
+            bail!("a map value can hold only strings, numbers and booleans; use full editing");
+        }
+        parts.push(format!("{}: {}", emit_key(k)?, emit_scalar(v, true)?));
+    }
+    Ok(format!("{{ {} }}", parts.join(", ")))
+}
+
 fn emit_key(key: &str) -> Result<String> {
     if key.is_empty() {
         bail!("a map key can't be empty");
@@ -1052,6 +1076,19 @@ Grass and stone.
         })
         .unwrap();
         assert!(g.text().contains("objects: [x, \"rope, old\"]\n"), "{}", g.text());
+    }
+
+    #[test]
+    fn a_map_entry_can_be_a_small_map_written_flow_style() {
+        let mut f = file("---\nid: shed-door\ntitle: Shed door\ntype: door\nsides:\n  castle/hall: { direction: east }\n---\nA plank door.\n");
+        let side: Value = serde_yaml::from_str("{ direction: west }").unwrap();
+        f.apply(&Edit::SetMapEntry { key: "sides".into(), subkey: "castle/shed".into(), value: side }).unwrap();
+        assert!(f.text().contains("sides:\n  castle/hall: { direction: east }\n  castle/shed: { direction: west }\n---"), "{}", f.text());
+        let side: Value = serde_yaml::from_str("{ direction: north, to: \"a, b\" }").unwrap();
+        f.apply(&Edit::SetMapEntry { key: "sides".into(), subkey: "castle/hall".into(), value: side }).unwrap();
+        assert!(f.text().contains("  castle/hall: { direction: north, to: \"a, b\" }\n"), "{}", f.text());
+        let deep: Value = serde_yaml::from_str("{ a: { b: c } }").unwrap();
+        assert!(f.apply(&Edit::SetMapEntry { key: "sides".into(), subkey: "x".into(), value: deep }).is_err());
     }
 
     #[test]
