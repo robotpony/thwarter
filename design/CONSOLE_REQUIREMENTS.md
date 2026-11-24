@@ -249,6 +249,34 @@ Decided by Bruce, 2026-11-23.
 
 - REQ-CON-39: The editor MUST highlight what it shows, in the same colours. Frontmatter: `---` fences dim, keys blue, ids that resolve cyan and ids that don't yellow. Prose wraps at words (Bruce, 2026-11-23) and is styled as Markdown: headings bold with their `#` marks dim, emphasis italic, strong bold, ~~struck~~ crossed out, links cyan and underlined, `#tags` magenta, code dim, list markers and quote marks in the chrome colour with quoted words in italics, and rules dim. Section headings (`## When: #locked`, `## Unless:`, `design/SECTIONS.md`) are drawn as rules in the chrome colour, a ```thwarter block is read like frontmatter, `@name` is cyan when any thing by that id exists (object, character or door) and yellow when not, and `{{ variables }}` are cyan when declared and yellow when not. A bundle shown as one document uses the same `## When: #state` headings for its state files. Chrome: line numbers dim with the current one bold, the heading bar reversed, and the status line coloured by what it says (green saved, red refused, yellow a warning).
 
+## Making things well
+
+Bruce, 2026-11-24: console commands should solve common problems easily, through small verbs, recipes built from them, and questions that `/add` and `/new` can ask. *Proposed* until the question file's format is in the content docs.
+
+- REQ-CON-44: Small verbs MUST cover states and actions: `/state <name> [start]` makes a state (turning a one-file thing into a bundle first), `/set <key> <value> in <state>` changes one state's file, and `/action <verb> <from> --> <to>` writes the action and opens its reply section in the editor, making the `to` state if it doesn't exist.
+- REQ-CON-45: Recipes MUST be shorthand for those verbs, and MUST print the commands they ran so an author learns them. First four, as Bruce picked: `fixed-until <verb>` (an immovable starting state and a free one), `locked-with <key>`, `switch <verbs> <states>` (two states with an action each way), and `container in|on`.
+
+  ```
+  in objects/lantern > /recipe fixed-until pull
+
+  That was:
+
+    /state hanging start
+    /set weight immovable in hanging
+    /action pull hanging --> loose
+  ```
+
+- REQ-CON-46: When there's a question file for what's being made, `/add` and `/new` MUST ask its questions in a picker like the `/` menu's, then run the answers and print the commands they stood for. Esc takes the defaults for the rest. The world's `defaults/questions/<name>.md` comes first, then the engine's `defaults/`. An answer uses one of four constructs: `set <key>`, `recipe …`, `ask thing`, or `ask value <name> <default>`.
+
+  ```
+   A lantern, from the built-in lantern questions                  2 of 4
+   Where does it start?
+   ▸ 1. Loose, it can be taken
+     2. Hanging on a wall, pulled free
+     3. On something here
+   ───────────────── ↑↓ choose · enter pick · esc use defaults for the rest
+  ```
+
 ## Open questions
 
 1. ~~What does full editing look like on screen?~~ Decided 2026-11-23 (Bruce): in the terminal, inside the console, and it may take the whole terminal; REQ-CON-6.
