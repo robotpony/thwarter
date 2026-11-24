@@ -90,6 +90,6 @@ A coder who fixes a bug or finishes a task ticks it in `PLAN.md` or moves it to 
 
 Do not mark a `PLAN.md` item done without also updating `design/ARCHITECTURE.md`'s implementation status table to match; docs drifting from the code is the problem the August 2026 audit fixed (`CHANGELOG.md` › 0.1.0). Treat `design/ARCHITECTURE.md` as authoritative on what works; this section is a summary of it, not an independent claim.
 
-**Current state** (0.50.2): builds, over 250 tests plus console transcripts. `validate`, `show`, `map` and `search` do real work; `thwart edit` and `thwart play` open the console for writing and playing. Play matches `## When:` sections against the game state, runs Rhai scripts, and has doors, keys and objects that hold objects. `debug` reports itself as not implemented.
+**Current state** (0.62): builds, over 250 tests plus console transcripts. `validate`, `show`, `map` and `search` do real work; `thwart edit` and `thwart play` open the console for writing and playing; `package` and `install` share worlds. Play matches `## When:` sections against the game state, runs Rhai scripts, and has doors, keys and objects that hold objects; the console makes doors and asks question sets. `debug` reports itself as not implemented.
 
-**Next**: `PLAN.md` › Phase 6's remaining lines, then Phase 7's sample world, which Bruce is writing from the new test world.
+**Next**: `PLAN.md` › Phase 8, text as data, while Bruce writes Phase 7's sample world from the new test world.
