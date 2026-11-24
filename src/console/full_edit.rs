@@ -59,7 +59,11 @@ pub struct EditLookup<'a> {
 impl Lookup for EditLookup<'_> {
     fn resolves(&self, id: &str) -> bool {
         let engine = &self.console.world.engine;
-        engine.get_location(id).is_some() || engine.characters.contains_key(id) || engine.objects.contains_key(id)
+        // `@name` means any thing (SECTIONS.md, e930cb5): object, character or door.
+        engine.get_location(id).is_some()
+            || engine.characters.contains_key(id)
+            || engine.objects.contains_key(id)
+            || engine.doors.contains_key(id)
     }
     fn declared(&self, name: &str) -> bool {
         let engine = &self.console.world.engine;

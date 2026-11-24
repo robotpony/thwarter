@@ -129,7 +129,8 @@ fn is_arrival(line: &str) -> bool {
 
 /// What the editor needs to know about the world to colour a file.
 pub trait Lookup {
-    /// Whether `id` names a room, character, object or door in the world.
+    /// Whether `id` names a room, character, object or door in the world:
+    /// what `@id` and frontmatter ids are coloured by.
     fn resolves(&self, id: &str) -> bool;
     /// Whether `{{ name }}` is declared where this file is.
     fn declared(&self, name: &str) -> bool;
@@ -336,7 +337,7 @@ fn prose_line(chars: &[char], roles: &mut [Option<Role>], lookup: &dyn Lookup) {
                 }
             }
         }
-        // `@guard-captain`: a character, by id.
+        // `@guard-captain`, `@lantern`: any thing, by id.
         if chars[at] == '@' && (at == 0 || chars[at - 1].is_whitespace()) && chars.get(at + 1).is_some_and(|c| c.is_alphanumeric()) {
             let start = at;
             at += 1;
