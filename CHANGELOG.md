@@ -8,6 +8,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Added
 
+- `design/ENGINE_REQUIREMENTS.md` › Forgiving verbs: REQ-ENG-51 to 54, proposed, for aliases in a `[verbs]` table, the order a typed verb resolves in, unique prefixes that never beat an exact match, and did-you-mean for verbs only.
 - `design/CONSOLE_REQUIREMENTS.md` › Command registry, REQ-CON-50 to 56, *Proposed*: one `type: command` Markdown file per command, loaded built-in, then world, then personal config; world commands as macros for the world's authors only; forgiving names.
 - `LICENSE`: the MIT licence text, matching `Cargo.toml`'s `license = "MIT"`, copyright Bruce Alderson, 2025 to 2026.
 - `design/SECTIONS.md`: agreed in outline by Bruce, to be tested; content is shown when a `## When:` heading's tags match the game state, reply sections replace actions and response markers, `@` names characters and `#` tags, and the marker comments retire.
