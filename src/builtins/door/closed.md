@@ -1,0 +1,4 @@
+---
+inherits: index
+passable: no
+---

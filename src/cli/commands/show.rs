@@ -75,8 +75,8 @@ fn load_note(problems: usize, warnings: usize) -> Option<String> {
 /// The kinds a name could mean, in the order a bare name is tried.
 fn kinds_for(engine: &WorldEngine, name: &str, kind: Option<&str>) -> Result<Vec<(EntityKind, String)>> {
     let wanted: Vec<EntityKind> = match kind {
-        None => vec![EntityKind::Location, EntityKind::Object, EntityKind::Character],
-        Some(k) => vec![EntityKind::from_type_name(k).ok_or_else(|| anyhow!("--kind is location, object or character, not `{}`", k))?],
+        None => vec![EntityKind::Location, EntityKind::Object, EntityKind::Character, EntityKind::Door],
+        Some(k) => vec![EntityKind::from_type_name(k).ok_or_else(|| anyhow!("--kind is location, object, character or door, not `{}`", k))?],
     };
     Ok(wanted
         .into_iter()
@@ -125,6 +125,7 @@ fn show_thing(engine: &WorldEngine, name: &str, req: &ShowRequest, formatter: &O
             ParsedEntity::Location(l) => formatter.print_data(l),
             ParsedEntity::Object(o) => formatter.print_data(o),
             ParsedEntity::Character(c) => formatter.print_data(c),
+            ParsedEntity::Door(d) => formatter.print_data(d),
         };
     }
 
@@ -144,6 +145,7 @@ fn show_thing(engine: &WorldEngine, name: &str, req: &ShowRequest, formatter: &O
         }
         ParsedEntity::Object(o) => render_object(o),
         ParsedEntity::Character(c) => render_character(c),
+        ParsedEntity::Door(d) => crate::render::render_door(d),
     };
     println!("{}", text);
     if let Some(thing) = engine.thing(kind, &id) {
@@ -160,25 +162,48 @@ fn show_template(engine: &WorldEngine, name: &str, formatter: &OutputFormatter) 
     let layer = engine.find_template(name, Path::new("")).ok_or_else(|| {
         anyhow!("No template `{}`. Templates here: {}", name, engine.template_names().join(", "))
     })?;
-    let builtin = layer.path.starts_with("<built-in>");
-    let text = if builtin {
-        let stem = layer.path.file_stem().and_then(|s| s.to_str()).unwrap_or(name);
-        crate::engines::builtins::BUILTINS.iter().find(|(n, _)| *n == stem).map(|(_, t)| t.to_string()).unwrap_or_default()
-    } else {
-        std::fs::read_to_string(&layer.path)?
+    let builtin = crate::engines::builtins::builtin_name(&layer.path);
+    // The template's files: its one file, or a bundle's index then states.
+    let files: Vec<(String, String)> = match builtin {
+        Some(b) => crate::engines::builtins::builtin_files(b).into_iter().map(|(p, t)| (p.display().to_string(), t.to_string())).collect(),
+        None => {
+            let mut files = vec![(layer.path.display().to_string(), std::fs::read_to_string(&layer.path)?)];
+            if layer.path.file_name().map_or(false, |n| n == "index.md") {
+                let mut states: Vec<std::path::PathBuf> = std::fs::read_dir(layer.path.parent().unwrap())?
+                    .filter_map(|e| e.ok().map(|e| e.path()))
+                    .filter(|p| p.extension().map_or(false, |e| e == "md") && p.file_name().map_or(false, |n| n != "index.md"))
+                    .collect();
+                states.sort();
+                for state in states {
+                    files.push((state.display().to_string(), std::fs::read_to_string(&state)?));
+                }
+            }
+            files
+        }
     };
     if !matches!(formatter.format, OutputFormat::Text) {
         #[derive(Serialize, Debug)]
-        struct TemplateOut<'a> {
-            name: &'a str,
+        struct FileOut {
             path: String,
-            built_in: bool,
             text: String,
         }
-        return formatter.print_data(&TemplateOut { name, path: layer.path.display().to_string(), built_in: builtin, text });
+        #[derive(Serialize, Debug)]
+        struct TemplateOut<'a> {
+            name: &'a str,
+            built_in: bool,
+            files: Vec<FileOut>,
+        }
+        let files = files.into_iter().map(|(path, text)| FileOut { path, text }).collect();
+        return formatter.print_data(&TemplateOut { name, built_in: builtin.is_some(), files });
     }
-    let source = if builtin { format!("built in, {}", layer.path.display()) } else { layer.path.display().to_string() };
-    println!("Template {} ({})\n\n{}", name, source, text.trim_end());
+    let source = if builtin.is_some() { format!("built in, {}", files[0].0) } else { files[0].0.clone() };
+    let mut out = vec![format!("Template {} ({})", name, source), String::new(), files[0].1.trim_end().to_string()];
+    for (path, text) in files.iter().skip(1) {
+        out.push(String::new());
+        out.push(format!("State file {}:", path));
+        out.push(text.trim_end().to_string());
+    }
+    println!("{}", out.join("\n"));
     Ok(())
 }
 

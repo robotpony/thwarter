@@ -1,4 +1,4 @@
-use crate::engines::location_view::{direction_rank, EntityRef, ExitView, LocationView};
+use crate::engines::location_view::{direction_rank, DoorView, EntityRef, ExitView, LocationView};
 use crate::models::character::Character;
 use crate::models::world::*;
 use crate::engines::bundles::{self, Chapter, ChapterKey, FileRecord, FileRole, Thing};
@@ -19,6 +19,7 @@ pub enum EntityKind {
     Location,
     Character,
     Object,
+    Door,
 }
 
 impl EntityKind {
@@ -28,6 +29,7 @@ impl EntityKind {
             EntityKind::Location => "location",
             EntityKind::Character => "character",
             EntityKind::Object => "object",
+            EntityKind::Door => "door",
         }
     }
 
@@ -36,6 +38,7 @@ impl EntityKind {
             "location" => Some(EntityKind::Location),
             "character" => Some(EntityKind::Character),
             "object" => Some(EntityKind::Object),
+            "door" => Some(EntityKind::Door),
             _ => None,
         }
     }
@@ -49,6 +52,8 @@ pub struct WorldEngine {
     /// Character cards by id, as loaded. A read-only catalog for lookups
     /// and validation; placement and state belong to `CharacterEngine`.
     pub characters: HashMap<String, Character>,
+    /// Door definitions by id (REQ-CF-19), each in its starting version.
+    pub doors: HashMap<String, Door>,
     /// Every file each `(kind, id)` was loaded from, in load order (a
     /// bundle's `index.md`). More than one file means a duplicate id: the
     /// last one loaded wins in the tables above, `problems` reports it,
@@ -148,6 +153,7 @@ pub struct Version {
 pub struct WorldLoadReport {
     pub locations_loaded: usize,
     pub objects_loaded: usize,
+    pub doors_loaded: usize,
     /// The characters loaded, also kept in `WorldEngine::characters`.
     /// Placement and state belong to `CharacterEngine`, per
     /// `design/ARCHITECTURE.md`.
@@ -167,6 +173,7 @@ impl WorldEngine {
             loaded_locations: HashMap::new(),
             objects: HashMap::new(),
             characters: HashMap::new(),
+            doors: HashMap::new(),
             sources: HashMap::new(),
             world_root: None,
             things: HashMap::new(),
@@ -276,6 +283,7 @@ impl WorldEngine {
                 ParsedEntity::Location(_) => report.locations_loaded += 1,
                 ParsedEntity::Object(_) => report.objects_loaded += 1,
                 ParsedEntity::Character(c) => report.characters.push(c.clone()),
+                ParsedEntity::Door(_) => report.doors_loaded += 1,
             }
         }
         report.errors = self.file_problems.clone();
@@ -291,6 +299,7 @@ impl WorldEngine {
         self.world_graph.locations.clear();
         self.objects.clear();
         self.characters.clear();
+        self.doors.clear();
         self.sources.clear();
         self.things.clear();
         self.links.clear();
@@ -325,6 +334,9 @@ impl WorldEngine {
                 }
                 ParsedEntity::Character(c) => {
                     self.characters.insert(c.id.clone(), c);
+                }
+                ParsedEntity::Door(d) => {
+                    self.doors.insert(d.id.clone(), d);
                 }
             }
         }
@@ -410,11 +422,7 @@ impl WorldEngine {
     pub fn link_for(&self, name: &str) -> Option<(EntityKind, String, String)> {
         let id = self.resolve_name(name, None);
         let thing = self.thing_by_id(&id).ok()?;
-        let title = match self.current(thing.kind, &thing.id, At::default())? {
-            ParsedEntity::Location(l) => l.name,
-            ParsedEntity::Character(c) => c.name,
-            ParsedEntity::Object(o) => o.title,
-        };
+        let title = self.current(thing.kind, &thing.id, At::default())?.title().to_string();
         Some((thing.kind, thing.id.clone(), title))
     }
 
@@ -494,7 +502,11 @@ impl WorldEngine {
         let r = |name: &mut String, kind: Option<EntityKind>| *name = self.resolve_name(name, kind);
         match entity {
             ParsedEntity::Location(l) => {
-                l.connections.values_mut().for_each(|t| r(t, Some(Location)));
+                // An exit names a room or a door.
+                for t in l.connections.values_mut() {
+                    let as_room = self.resolve_name(t, Some(Location));
+                    *t = if self.things.contains_key(&(Location, as_room.clone())) { as_room } else { self.resolve_name(t, Some(Door)) };
+                }
                 l.characters.iter_mut().for_each(|c| r(c, Some(Character)));
                 l.objects.iter_mut().for_each(|o| r(o, Some(Object)));
             }
@@ -503,6 +515,19 @@ impl WorldEngine {
                     r(at, Some(Location));
                 }
                 c.inventory.iter_mut().for_each(|o| r(o, Some(Object)));
+            }
+            ParsedEntity::Door(d) => {
+                for side in d.sides.iter_mut() {
+                    r(&mut side.room, Some(Location));
+                    if let Some(to) = side.to.as_mut() {
+                        r(to, Some(Location));
+                    }
+                }
+                for action in d.actions.values_mut() {
+                    action.requires_has.iter_mut().for_each(|h| r(h, Some(Object)));
+                    let becomes = std::mem::take(&mut action.becomes);
+                    action.becomes = becomes.into_iter().map(|(k, v)| (self.resolve_name(&k, None), v)).collect();
+                }
             }
             ParsedEntity::Object(o) => {
                 for action in o.actions.values_mut() {
@@ -634,7 +659,7 @@ impl WorldEngine {
                             Some(why) => problems.push(format!("{}: `becomes:` is ambiguous: {}", at, why)),
                             None => problems.push(format!("{}: `becomes:` {}", at, e)),
                         },
-                        Ok(thing) if !thing.states.contains_key(state) => problems.push(format!(
+                        Ok(thing) if !thing.has_state(state) => problems.push(format!(
                             "{}: `becomes:` names state `{}`, but {} `{}` has no such state file",
                             at,
                             state,
@@ -657,6 +682,73 @@ impl WorldEngine {
             }
         }
         problems
+    }
+
+    /// Problems with doors (REQ-CF-19): a door without exactly two sides
+    /// (a portal may have more, each saying `to:`), a side that isn't a
+    /// room, and an exit through a door the room isn't a side of.
+    fn door_problems(&self) -> Vec<String> {
+        let mut problems = Vec::new();
+        let mut ids: Vec<&String> = self.doors.keys().collect();
+        ids.sort();
+        for id in ids {
+            let door = &self.doors[id];
+            let at = format!("door `{}`", id);
+            if door.portal {
+                if door.sides.len() < 2 {
+                    problems.push(format!("{}: a portal joins at least two rooms", at));
+                } else if door.sides.len() > 2 {
+                    for side in door.sides.iter().filter(|s| s.to.is_none()) {
+                        problems.push(format!("{}: the side in `{}` needs `to:`, since a portal with more than two sides can't tell where it leads", at, side.room));
+                    }
+                }
+            } else if door.sides.len() != 2 {
+                problems.push(format!("{}: a door joins exactly two rooms, and this one has {} sides; a portal can join more", at, door.sides.len()));
+            }
+            for side in &door.sides {
+                if self.get_location(&side.room).is_none() {
+                    problems.push(format!("{}: side `{}` is not a known location", at, side.room));
+                }
+                if let Some(to) = side.to.as_ref().filter(|t| self.get_location(t).is_none()) {
+                    problems.push(format!("{}: the side in `{}` leads `to: {}`, which is not a known location", at, side.room, to));
+                }
+            }
+        }
+        let mut rooms: Vec<&Location> = self.world_graph.locations.values().collect();
+        rooms.sort_by(|a, b| a.id.cmp(&b.id));
+        for room in rooms {
+            for (direction, target) in &room.connections {
+                if let Some(door) = self.doors.get(target) {
+                    if door.side(&room.id).is_none() {
+                        problems.push(format!("{}: connection `{}` goes through door `{}`, which doesn't join this room", room.id, direction, target));
+                    }
+                }
+            }
+        }
+        problems
+    }
+
+    /// Warnings about doors: a side whose direction differs from the exit
+    /// that names the door, and a side whose room has no exit through it.
+    fn door_warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let mut ids: Vec<&String> = self.doors.keys().collect();
+        ids.sort();
+        for id in ids {
+            for side in &self.doors[id].sides {
+                let Some(room) = self.get_location(&side.room) else { continue };
+                let exits: Vec<&String> = room.connections.iter().filter(|(_, t)| *t == id).map(|(d, _)| d).collect();
+                match exits.as_slice() {
+                    [] => warnings.push(format!("door `{}`: {} has no exit through it", id, side.room)),
+                    dirs if !dirs.iter().any(|d| **d == side.direction) => warnings.push(format!(
+                        "door `{}`: its side in {} says `{}`, but the room's exit through it is `{}`",
+                        id, side.room, side.direction, dirs[0]
+                    )),
+                    _ => {}
+                }
+            }
+        }
+        warnings
     }
 
     /// Authoring warnings for responses (`design/STATES.md` › Responses):
@@ -710,9 +802,10 @@ impl WorldEngine {
             .thing(kind, id)
             .ok_or_else(|| anyhow::anyhow!("no {} `{}` is loaded", kind.type_name(), id))?;
         let state = match state {
-            Some(name) if thing.states.contains_key(name) => Some(name.to_string()),
+            Some(name) if thing.has_state(name) => Some(name.to_string()),
             Some(name) => {
-                let known: Vec<&str> = thing.states.keys().map(String::as_str).collect();
+                let names = thing.state_names();
+                let known: Vec<&str> = names.iter().map(String::as_str).collect();
                 if known.is_empty() {
                     anyhow::bail!("{} `{}` has no states, so it has no state `{}`", kind.type_name(), id, name);
                 }
@@ -754,6 +847,7 @@ impl WorldEngine {
         warnings.extend(self.response_warnings());
         warnings.extend(self.variable_warnings());
         warnings.extend(self.prose_link_warnings());
+        warnings.extend(self.door_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }
@@ -820,7 +914,7 @@ impl WorldEngine {
         let mut broken = Vec::new();
         for (location_id, location) in &self.world_graph.locations {
             for (direction, target) in &location.connections {
-                if !self.world_graph.locations.contains_key(target) {
+                if !self.world_graph.locations.contains_key(target) && !self.doors.contains_key(target) {
                     broken.push((location_id.clone(), direction.clone(), target.clone()));
                 }
             }
@@ -850,6 +944,7 @@ impl WorldEngine {
             ));
         }
         problems.extend(self.action_problems());
+        problems.extend(self.door_problems());
         let mut reserved: Vec<&(EntityKind, String)> = self
             .things
             .keys()
@@ -905,10 +1000,31 @@ impl WorldEngine {
         let mut exits: Vec<ExitView> = location
             .connections
             .iter()
-            .map(|(direction, target)| ExitView {
-                direction: direction.clone(),
-                target: target.clone(),
-                target_exists: self.get_location(target).is_some(),
+            .map(|(direction, target)| {
+                if self.get_location(target).is_none() {
+                    if let Some(door) = self.door_at(target, at) {
+                        let to = door.leads_to(id).map(str::to_string);
+                        let beyond = to
+                            .as_deref()
+                            .filter(|_| door.transparent)
+                            .and_then(|room| self.location_at(room, at))
+                            .map(|room| room.name);
+                        return ExitView {
+                            direction: direction.clone(),
+                            target_exists: to.as_deref().map_or(false, |t| self.get_location(t).is_some()),
+                            target: to.unwrap_or_else(|| target.clone()),
+                            door: Some(DoorView {
+                                id: door.id.clone(),
+                                title: door.title.clone(),
+                                description: door.description.clone(),
+                                passable: door.passable,
+                                transparent: door.transparent,
+                                beyond,
+                            }),
+                        };
+                    }
+                }
+                ExitView { direction: direction.clone(), target: target.clone(), target_exists: self.get_location(target).is_some(), door: None }
             })
             .collect();
         exits.sort_by_key(|e| direction_rank(&e.direction));
@@ -951,13 +1067,14 @@ impl WorldEngine {
                 EntityKind::Location => self.get_location(id).cloned().map(ParsedEntity::Location),
                 EntityKind::Object => self.objects.get(id).cloned().map(ParsedEntity::Object),
                 EntityKind::Character => self.characters.get(id).cloned().map(ParsedEntity::Character),
+                EntityKind::Door => self.doors.get(id).cloned().map(ParsedEntity::Door),
             }
         };
         let Some(play) = at.play else { return starting() };
         let Some(thing) = self.thing(kind, id) else { return starting() };
         let state = play
             .state_of(kind.type_name(), id)
-            .filter(|s| thing.states.contains_key(*s))
+            .filter(|s| thing.has_state(s))
             .map(String::from)
             .or_else(|| thing.starting_state.clone());
         let chapter = play.chapter.as_ref().and_then(|c| self.chapter_key(c));
@@ -980,7 +1097,7 @@ impl WorldEngine {
         let state = at
             .play
             .and_then(|p| p.state_of(kind.type_name(), id))
-            .filter(|s| thing.states.contains_key(*s))
+            .filter(|s| thing.has_state(s))
             .map(String::from)
             .or_else(|| thing.starting_state.clone());
         let chapter = at.play.and_then(|p| p.chapter.as_ref()).and_then(|c| self.chapter_key(c));
@@ -1001,6 +1118,13 @@ impl WorldEngine {
     pub fn object_at(&self, id: &str, at: At) -> Option<GameObject> {
         match self.current(EntityKind::Object, id, at)? {
             ParsedEntity::Object(o) => Some(o),
+            _ => None,
+        }
+    }
+
+    pub fn door_at(&self, id: &str, at: At) -> Option<Door> {
+        match self.current(EntityKind::Door, id, at)? {
+            ParsedEntity::Door(d) => Some(d),
             _ => None,
         }
     }

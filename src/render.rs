@@ -171,6 +171,18 @@ fn player_blocks(view: &LocationView, links: Resolver) -> Rendered {
         let dirs: Vec<&str> = view.exits.iter().map(|e| e.direction.as_str()).collect();
         blocks.push(Block::line(BlockKind::Exits, format!("Exits: {}.", dirs.join(", ")), true));
     }
+    // Each door's own text by the exits; the room's prose never changes
+    // for a door (`design/STATES.md` › Doors).
+    for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
+        if !door.description.trim().is_empty() {
+            for block in prose_blocks(door.description.trim(), links).blocks {
+                blocks.push(Block { kind: BlockKind::Exits, space_before: false, ..block });
+            }
+        }
+        if let Some(beyond) = &door.beyond {
+            blocks.push(Block::line(BlockKind::Exits, format!("Through the {} you can see the {}.", door.title.to_lowercase(), beyond), false));
+        }
+    }
     let names = |refs: &[crate::engines::EntityRef], kind: EntityKind, label: &str| -> Option<Block> {
         if refs.is_empty() {
             return None;
@@ -229,6 +241,12 @@ fn author_blocks(view: &LocationView) -> Rendered {
             ];
             if !exit.target_exists {
                 spans.push(Span { text: "  (missing)".into(), style: Style { missing: true, ..Default::default() } });
+            }
+            if let Some(door) = &exit.door {
+                let link = Link { name: door.id.clone(), target: Some((EntityKind::Door, door.id.clone())) };
+                spans.push(Span::plain("  (through "));
+                spans.push(Span { text: door.id.clone(), style: Style { link: Some(link), ..Default::default() } });
+                spans.push(Span::plain(if door.passable { ", passable)" } else { ", not passable)" }));
             }
             blocks.push(Block::new(BlockKind::Exits, spans, false));
         }
@@ -293,6 +311,34 @@ pub fn render_object(o: &crate::models::world::GameObject) -> String {
     out.join("\n")
 }
 
+/// A door as an author checks it (`thwart show <door>`): its sides and
+/// where each leads, whether it can be passed or seen through now, and
+/// its actions.
+pub fn render_door(d: &crate::models::world::Door) -> String {
+    let mut out = vec![format!("{} ({})", d.title, d.id), if d.portal { "portal".to_string() } else { "door".to_string() }];
+    out.push(String::new());
+    let body = d.description.trim();
+    out.push(if body.is_empty() { "(no description yet)".to_string() } else { body.to_string() });
+    out.push(String::new());
+    out.push("Sides:".to_string());
+    let width = d.sides.iter().map(|s| s.room.len()).max().unwrap_or(0);
+    for side in &d.sides {
+        let to = d.leads_to(&side.room).map(|t| format!(" to {}", t)).unwrap_or_else(|| " (leads nowhere)".to_string());
+        out.push(format!("  {:<width$}  {}{}", side.room, side.direction, to, width = width));
+    }
+    out.push(format!(
+        "{}, {}",
+        if d.passable { "Passable" } else { "Not passable" },
+        if d.transparent { "see-through" } else { "opaque" }
+    ));
+    let mut names: Vec<&String> = d.actions.keys().collect();
+    names.sort();
+    if !names.is_empty() {
+        out.push(format!("Actions: {}", names.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", ")));
+    }
+    out.join("\n")
+}
+
 /// A character as an author checks it (`thwart show <character>`).
 pub fn render_character(c: &crate::models::character::Character) -> String {
     let mut out = vec![format!("{} ({})", c.name, c.id), format!("character, {:?}", c.character_type).to_lowercase()];
@@ -319,10 +365,10 @@ pub fn render_character(c: &crate::models::character::Character) -> String {
 /// chapter versions and templates. Empty for a one-file thing with none.
 pub fn render_thing_sources(thing: &crate::engines::bundles::Thing, shown_state: Option<&str>, shown_chapter: Option<&str>) -> String {
     let mut out = Vec::new();
-    if !thing.states.is_empty() {
-        let states: Vec<String> = thing
-            .states
-            .keys()
+    let names = thing.state_names();
+    if !names.is_empty() {
+        let states: Vec<String> = names
+            .iter()
             .map(|s| {
                 let mut tags = Vec::new();
                 if thing.starting_state.as_deref() == Some(s.as_str()) {
@@ -617,8 +663,8 @@ mod tests {
             coordinates: Some(Coordinate::new(0, 1, 0)),
             body: "  A dry fountain.\n".into(),
             exits: vec![
-                ExitView { direction: "north".into(), target: "castle/great-hall".into(), target_exists: true },
-                ExitView { direction: "down".into(), target: "castle/cellar".into(), target_exists: false },
+                ExitView { direction: "north".into(), target: "castle/great-hall".into(), target_exists: true, door: None },
+                ExitView { direction: "down".into(), target: "castle/cellar".into(), target_exists: false, door: None },
             ],
             characters: vec![
                 EntityRef { id: "guard-captain".into(), name: Some("Captain Marcus".into()) },

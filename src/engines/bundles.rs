@@ -105,6 +105,10 @@ pub struct Thing {
     /// The templates it inherits from, the most distant first
     /// (`inherits:`, then that template's `inherits:`, and so on).
     pub templates: Vec<Layer>,
+    /// States its templates define, by name, each template's version the
+    /// most distant first. The thing's own state file of the same name,
+    /// if any, goes on top (`states`).
+    pub template_states: BTreeMap<String, Vec<Layer>>,
 }
 
 /// The most templates one thing may chain through (`design/STATES.md` ›
@@ -112,6 +116,19 @@ pub struct Thing {
 pub const MAX_TEMPLATE_DEPTH: usize = 4;
 
 impl Thing {
+    /// Whether it has this state, in its own files or from a template.
+    pub fn has_state(&self, name: &str) -> bool {
+        self.states.contains_key(name) || self.template_states.contains_key(name)
+    }
+
+    /// Every state it has, its own and its templates', sorted.
+    pub fn state_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.states.keys().chain(self.template_states.keys()).cloned().collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
     /// The layers for one version, bottom first: the folders' overlays
     /// above it, then its index, its state, then its own overlays. Within
     /// each level a parent chapter comes before its sub-chapter.
@@ -141,8 +158,13 @@ impl Thing {
             layers.push((template, false));
         }
         layers.push((&self.index, false));
-        if let Some(layer) = state.and_then(|s| self.states.get(s)) {
-            layers.push((layer, false));
+        if let Some(s) = state {
+            for layer in self.template_states.get(s).into_iter().flatten() {
+                layers.push((layer, false));
+            }
+            if let Some(layer) = self.states.get(s) {
+                layers.push((layer, false));
+            }
         }
         for key in &lineage {
             if let Some(layer) = self.overlays.get(key) {
@@ -539,16 +561,31 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Bu
         library.insert(key, layer.clone());
     }
 
+    // Every bundle's state files, by its index's path, so a bundle used as
+    // a template passes its states down.
+    let paths: HashSet<&Path> = files.iter().map(|f| f.path.as_path()).collect();
+    let mut bundle_states: BTreeMap<PathBuf, BTreeMap<String, Layer>> = BTreeMap::new();
+    for file in files {
+        let (Ok(layer), Some(dir), Some(stem)) = (&file.layer, file.path.parent(), file.path.file_stem().and_then(|s| s.to_str())) else { continue };
+        if stem == "index" || stem == "_index" || file.path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let index = dir.join("index.md");
+        if paths.contains(index.as_path()) {
+            bundle_states.entry(index).or_default().insert(stem.to_string(), layer.clone());
+        }
+    }
+
     for (index, bundle) in entities {
         let relative = rel(&index.path);
-        let templates = match template_chain(&index, &relative, bundle.as_deref(), &library, root) {
+        let chain = match template_chain(&index, &relative, bundle.as_deref(), &library, root) {
             Ok(chain) => chain,
             Err(why) => {
                 built.problems.push(format!("{}: {}", index.path.display(), why));
                 Vec::new()
             }
         };
-        if let Some(thing) = build_thing(index, relative, bundle, templates, &states, &overlays, &area_overlays, &built.chapters.clone(), &mut built) {
+        if let Some(thing) = build_thing(index, relative, bundle, chain, &bundle_states, &states, &overlays, &area_overlays, &built.chapters.clone(), &mut built) {
             built.things.push(thing);
         }
     }
@@ -703,8 +740,8 @@ fn template_chain(
     bundle: Option<&Path>,
     library: &BTreeMap<String, Layer>,
     root: &Path,
-) -> Result<Vec<Layer>, String> {
-    let mut chain: Vec<Layer> = Vec::new();
+) -> Result<Vec<(Layer, Option<String>)>, String> {
+    let mut chain: Vec<(Layer, Option<String>)> = Vec::new();
     let mut seen: Vec<PathBuf> = vec![index.path.clone()];
     let mut current = index.clone();
     let mut scope = bundle.map(Path::to_path_buf).unwrap_or_else(|| relative.parent().map(Path::to_path_buf).unwrap_or_default());
@@ -722,10 +759,11 @@ fn template_chain(
         }
         seen.push(template.path.clone());
         let mut passed = template.clone();
+        let starting = passed.str_key("state").map(str::to_string);
         for key in ["id", "template", "state"] {
             passed.metadata.remove(key);
         }
-        chain.push(passed);
+        chain.push((passed, starting));
         scope = template
             .path
             .strip_prefix(root)
@@ -744,7 +782,8 @@ fn build_thing(
     index: Layer,
     relative: PathBuf,
     bundle: Option<PathBuf>,
-    templates: Vec<Layer>,
+    chain: Vec<(Layer, Option<String>)>,
+    bundle_states: &BTreeMap<PathBuf, BTreeMap<String, Layer>>,
     states: &BTreeMap<PathBuf, BTreeMap<String, Layer>>,
     overlays: &BTreeMap<PathBuf, BTreeMap<ChapterKey, Layer>>,
     area_overlays: &[AreaOverlay],
@@ -759,9 +798,27 @@ fn build_thing(
         None => relative.parent().map(Path::to_path_buf).unwrap_or_default(),
     };
 
+    // States from templates, each stripped of what never passes down.
+    let mut template_states: BTreeMap<String, Vec<Layer>> = BTreeMap::new();
+    for (template, _) in &chain {
+        let from = match super::builtins::builtin_name(&template.path) {
+            Some(name) => super::builtins::builtin_states(name),
+            None => bundle_states.get(&template.path).cloned().unwrap_or_default(),
+        };
+        for (name, mut layer) in from {
+            for key in ["id", "type", "state", "template"] {
+                layer.metadata.remove(key);
+            }
+            template_states.entry(name).or_default().push(layer);
+        }
+    }
+    let has = |name: &str| own_states.contains_key(name) || template_states.contains_key(name);
+    let inherited_start = chain.iter().rev().find_map(|(_, s)| s.clone()).filter(|s| has(s));
+    let templates: Vec<Layer> = chain.into_iter().map(|(layer, _)| layer).collect();
+
     let starting_state = match index.metadata.get("state") {
-        None => None,
-        Some(Value::String(name)) if own_states.contains_key(name) => Some(name.clone()),
+        None => inherited_start,
+        Some(Value::String(name)) if has(name) => Some(name.clone()),
         Some(Value::String(name)) => {
             let place = match &bundle {
                 Some(b) => format!("no state file {}/{}.md exists", b.display(), name),
@@ -800,6 +857,7 @@ fn build_thing(
         overlays: own_overlays,
         area_overlays: above,
         templates,
+        template_states,
     };
 
     // The starting version is what the world tables hold.
@@ -812,11 +870,8 @@ fn build_thing(
         }
     };
     built.warnings.extend(merged.warnings);
-    let (kind, id) = match &entity {
-        ParsedEntity::Location(l) => (EntityKind::Location, l.id.clone()),
-        ParsedEntity::Character(c) => (EntityKind::Character, c.id.clone()),
-        ParsedEntity::Object(o) => (EntityKind::Object, o.id.clone()),
-    };
+    let kind = EntityKind::from_type_name(entity.type_name()).expect("every parsed type is a kind");
+    let id = entity.id().to_string();
     thing.kind = kind;
     thing.id = id;
 
@@ -850,7 +905,7 @@ fn build_thing(
     }
 
     // Every state against every chapter visible from the thing.
-    let mut state_options: Vec<Option<String>> = thing.states.keys().cloned().map(Some).collect();
+    let mut state_options: Vec<Option<String>> = thing.state_names().into_iter().map(Some).collect();
     if thing.starting_state.is_none() {
         state_options.insert(0, None);
     }

@@ -88,6 +88,7 @@ fn title_of(entity: &ParsedEntity) -> String {
         ParsedEntity::Location(l) => l.name.clone(),
         ParsedEntity::Character(c) => c.name.clone(),
         ParsedEntity::Object(o) => o.title.clone(),
+        ParsedEntity::Door(d) => d.title.clone(),
     }
 }
 
@@ -95,6 +96,7 @@ fn title_of(entity: &ParsedEntity) -> String {
 pub fn declared_by(thing: &Thing) -> Vec<String> {
     let mut names: Vec<String> = THING_VALUES.iter().map(|s| s.to_string()).collect();
     let layers = thing.templates.iter().chain(std::iter::once(&thing.index))
+        .chain(thing.template_states.values().flatten())
         .chain(thing.states.values())
         .chain(thing.overlays.values())
         .chain(thing.area_overlays.iter().map(|o| &o.layer));
@@ -157,7 +159,7 @@ impl WorldEngine {
                 }
                 let state = play
                     .and_then(|p| p.state_of(thing.kind.type_name(), &thing.id))
-                    .filter(|s| thing.states.contains_key(*s))
+                    .filter(|s| thing.has_state(s))
                     .map(String::from)
                     .or_else(|| thing.starting_state.clone());
                 let chapter = play.and_then(|p| p.chapter.as_ref()).and_then(|c| self.chapter_key(c));

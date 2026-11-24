@@ -719,7 +719,7 @@ fn identity(text: &str, path: &Path) -> Result<(String, String)> {
     if doc.metadata.get("inherits").is_some() {
         let get = |key: &str| doc.metadata.get(key).and_then(Value::as_str).map(str::to_string);
         let type_name = get("type").ok_or_else(|| anyhow!("missing required frontmatter field `type`"))?;
-        if !["location", "character", "object"].contains(&type_name.as_str()) {
+        if !["location", "character", "object", "door"].contains(&type_name.as_str()) {
             bail!("unknown type `{}` (expected location, character, or object)", type_name);
         }
         let id = get("id").ok_or_else(|| anyhow!("missing required frontmatter field `id`"))?;
@@ -754,6 +754,7 @@ fn entity_key(entity: &ParsedEntity) -> (String, String) {
         ParsedEntity::Location(l) => ("location".into(), l.id.clone()),
         ParsedEntity::Character(c) => ("character".into(), c.id.clone()),
         ParsedEntity::Object(o) => ("object".into(), o.id.clone()),
+        ParsedEntity::Door(d) => ("door".into(), d.id.clone()),
     }
 }
 

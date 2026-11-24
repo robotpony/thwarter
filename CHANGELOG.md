@@ -32,6 +32,20 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.33.0 (2026-11-23)
+
+### Added
+
+- Doors (REQ-CF-19, `design/STATES.md` › Doors): `type: door`, joining two rooms with one state seen from both sides. `sides:` names each room and the direction of its exit (`castle/hall: { direction: down }`), and a room's exit names the door (`connections: { down: vault-door }`). `passable:` says whether the exit can be used in the door's current state, and `transparent:` whether the room beyond can be seen. A portal (`portal: yes`) joins more rooms, each side saying where it leads with `to:`. Doors have states, actions and responses like any other thing, and `thwart show <door>` shows one.
+- In play, an exit through a door leads to its other side, and is refused while the door isn't passable ("The iron door is closed."). The room view shows each door's current text by the exits, and for a transparent door, "Through the iron grate you can see the Cell." The player can examine a door and use its actions ("open door").
+- `validate` reports a plain door without exactly two sides, a portal side without `to:` in a portal with more than two, a side that isn't a room, and an exit through a door the room isn't a side of. It warns about a side whose direction differs from the room's exit, and a side whose room has no exit through the door.
+- Built-in `door` and `portal` templates, each a bundle with `closed` (not passable, the starting state) and `open`.
+- `ExitView` gains `door: Option<DoorView>` (the door's id, title, current text, whether it's passable or transparent, and the room beyond). `WorldEngine::doors` and `door_at` hold doors.
+
+### Changed
+
+- Templates pass their states down (Bruce, 2026-11-23, REQ-ENG-19): a thing has its templates' states as well as its own, a state file of its own with the same name is layered over the template's, and a template's `state:` is the thing's starting state unless the thing names one. Built-ins can now be bundles. `thwart show --template` shows a template bundle's state files after its index.
+
 ## 0.32.1 (2026-11-23)
 
 ### Changed

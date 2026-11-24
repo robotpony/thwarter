@@ -26,6 +26,7 @@ pub fn new_entity_relative_path(kind: EntityKind, id: &str) -> PathBuf {
         EntityKind::Location => PathBuf::from(format!("{}.md", id)),
         EntityKind::Character => Path::new("npcs").join(format!("{}.md", id)),
         EntityKind::Object => Path::new("objects").join(format!("{}.md", id)),
+        EntityKind::Door => Path::new("doors").join(format!("{}.md", id)),
     }
 }
 

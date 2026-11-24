@@ -82,7 +82,10 @@ impl GameEngine {
         let mut view = self.whole_view(world, state)?;
         view.objects.retain(|o| shown(world, state, EntityKind::Object, &o.id));
         view.characters.retain(|c| shown(world, state, EntityKind::Character, &c.id));
-        view.exits.retain(|e| !e.target_exists || shown(world, state, EntityKind::Location, &e.target));
+        view.exits.retain(|e| {
+            (!e.target_exists || shown(world, state, EntityKind::Location, &e.target))
+                && e.door.as_ref().map_or(true, |d| shown(world, state, EntityKind::Door, &d.id))
+        });
         Some(view)
     }
 
@@ -170,13 +173,32 @@ impl GameEngine {
         let Some(here) = world.location_at(&state.location, At::play(state)) else {
             return ActionResult::say("You're nowhere.");
         };
-        let Some(target) = here
-            .connections
-            .get(&direction)
-            .filter(|t| world.get_location(t).is_none() || shown(world, state, EntityKind::Location, t))
-        else {
+        let Some(named) = here.connections.get(&direction) else {
             return ActionResult::say(format!("You can't go {} from here.", direction));
         };
+        // An exit names a room, or a door that says where it leads.
+        let mut target = named.clone();
+        if world.get_location(named).is_none() {
+            if let Some(door) = world.door_at(named, At::play(state)) {
+                if !shown(world, state, EntityKind::Door, &door.id) {
+                    return ActionResult::say(format!("You can't go {} from here.", direction));
+                }
+                if !door.passable {
+                    return ActionResult::say(format!("The {} is closed.", door.title.to_lowercase()));
+                }
+                match door.leads_to(&state.location) {
+                    Some(to) => target = to.to_string(),
+                    None => {
+                        return ActionResult::say(format!("You can't go {} from here.", direction))
+                            .with_note(format!("door `{}` doesn't say where it leads from `{}`", door.id, state.location))
+                    }
+                }
+            }
+        }
+        let target = &target;
+        if world.get_location(target).is_some() && !shown(world, state, EntityKind::Location, target) {
+            return ActionResult::say(format!("You can't go {} from here.", direction));
+        }
         if world.get_location(target).is_none() {
             return ActionResult::say(format!("You can't go {} from here.", direction))
                 .with_note(format!("the {} exit leads to `{}`, which doesn't exist yet", direction, target));
@@ -245,7 +267,22 @@ impl GameEngine {
         }
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
+        things.extend(doors_here(&view));
         match resolve(noun, &things, the_object) {
+            Ok(Some(object)) if world.door_at(&object.id, At::play(state)).is_some() && world.object_at(&object.id, At::play(state)).is_none() => {
+                let door = world.door_at(&object.id, At::play(state)).unwrap();
+                let scope = Scope { at: At::play(state), this: Some((EntityKind::Door, &door.id)), here: None };
+                let text = [door.description.trim(), door.responses.get("examine").map_or("", |t| t.trim())]
+                    .into_iter()
+                    .filter(|p| !p.is_empty())
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
+                return if text.is_empty() {
+                    ActionResult::say(format!("You see nothing special about {}.", the_object(&object)))
+                } else {
+                    ActionResult::say(prose(world, &world.fill(&text, &scope)))
+                };
+            }
             Ok(Some(object)) => {
                 // The description, then an `examine` response if the author wrote one.
                 return match world.object_at(&object.id, At::play(state)) {
@@ -291,6 +328,7 @@ impl GameEngine {
         };
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
+        things.extend(doors_here(&view));
         // A hidden object can't be seen, but an action may name it exactly.
         let hidden = || -> Option<EntityRef> {
             let whole = self.whole_view(world, state)?;
@@ -317,7 +355,13 @@ impl GameEngine {
             }
         };
         let cant = || ActionResult::say(format!("You can't {} {}.", verb, the_object(&object)));
-        let Some(card) = world.object_at(&object.id, At::play(state)) else { return cant() };
+        // An object's actions, or a door's (`open door`, `unlock door`).
+        let (this_kind, card_actions, card_responses) = match (world.object_at(&object.id, At::play(state)), world.door_at(&object.id, At::play(state))) {
+            (Some(o), _) => (EntityKind::Object, o.actions, o.responses),
+            (None, Some(d)) => (EntityKind::Door, d.actions, d.responses),
+            (None, None) => return cant(),
+        };
+        let card = Card { actions: card_actions, responses: card_responses };
         let key = verb.replace(' ', "-");
         let Some((found, action)) = card.actions.iter().find(|(name, _)| name.eq_ignore_ascii_case(&key)) else {
             return cant();
@@ -332,7 +376,7 @@ impl GameEngine {
 
         let name = object_name(&object);
         if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
-            let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
+            let scope = Scope { at: At::play(state), this: Some((this_kind, &object.id)), here: None };
             return ActionResult::say(match card.responses.get(&format!("{} refused", key)) {
                 Some(text) if !text.trim().is_empty() => prose(world, &world.fill(text.trim(), &scope)),
                 _ => builtin_refusal(&verb, &name, state.turn),
@@ -362,7 +406,7 @@ impl GameEngine {
             changes.push(Change::Set { name, value: value.clone() });
         }
         if let Some(chapter) = &action.chapter {
-            let scope = world.thing(EntityKind::Object, &object.id).map(|t| t.scope.clone()).unwrap_or_default();
+            let scope = world.thing(this_kind, &object.id).map(|t| t.scope.clone()).unwrap_or_default();
             match state.enter_chapter(world, &scope, chapter) {
                 Ok(()) => changes.push(Change::EnteredChapter { name: state.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_default() }),
                 Err(e) => notes.push(e.to_string()),
@@ -370,7 +414,7 @@ impl GameEngine {
         }
 
         // Filled after the action's changes, so the reply can show them.
-        let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
+        let scope = Scope { at: At::play(state), this: Some((this_kind, &object.id)), here: None };
         let text = match card.responses.get(&key) {
             Some(text) if !text.trim().is_empty() => prose(world, &world.fill(text.trim(), &scope)),
             _ => builtin_reply(&verb, &name, state.turn),
@@ -434,7 +478,7 @@ impl PlayState {
                     warnings.push(format!("{} `{}` no longer exists, so its state `{}` is dropped", type_name, id, state));
                     return false;
                 };
-                if thing.states.contains_key(state.as_str()) {
+                if thing.has_state(state.as_str()) {
                     return true;
                 }
                 let start = thing.starting_state.as_deref().map_or("its index".to_string(), |s| format!("`{}`", s));
@@ -478,7 +522,7 @@ impl PlayState {
         let thing = world
             .thing(kind, id)
             .ok_or_else(|| anyhow::anyhow!("no {} `{}` is loaded", kind.type_name(), id))?;
-        if !thing.states.contains_key(state) {
+        if !thing.has_state(state) {
             bail!("{} `{}` has no state `{}`", kind.type_name(), id, state);
         }
         self.set_state(kind.type_name(), id, state, thing.starting_state.as_deref());
@@ -589,6 +633,23 @@ fn builtin_refusal(verb: &str, name: &str, turn: u64) -> String {
 /// Prose as play shows it: Markdown rendered, links shown as their text.
 fn prose(world: &WorldEngine, text: &str) -> String {
     prose_plain(text, &|n| world.link_for(n))
+}
+
+/// The actions and responses of whatever an action names.
+struct Card {
+    actions: std::collections::HashMap<String, crate::models::world::ObjectAction>,
+    responses: std::collections::HashMap<String, String>,
+}
+
+/// The doors on the room's exits, as things the player can name.
+fn doors_here(view: &LocationView) -> Vec<EntityRef> {
+    let mut doors: Vec<EntityRef> = Vec::new();
+    for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
+        if !doors.iter().any(|d| d.id == door.id) {
+            doors.push(EntityRef { id: door.id.clone(), name: Some(door.title.clone()) });
+        }
+    }
+    doors
 }
 
 /// Whether play shows a thing: visible, or faint and already found.
@@ -1128,5 +1189,95 @@ mod tests {
 
         game.act(&world, &mut state, &PlayAction::Go("south".into()));
         assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("well".into())).text, "Deep, and very old.");
+    }
+
+    fn door_world() -> (tempfile::TempDir, WorldEngine) {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        let w = |rel: &str, text: &str| {
+            let p = d.join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(p, text).unwrap();
+        };
+        w("castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\nconnections: { down: vault-door, east: grate }\nobjects: [lever]\n---\nStone.\n");
+        w("castle/vault.md", "---\nid: castle/vault\ntitle: Vault\ntype: location\nconnections: { up: vault-door }\n---\nGold.\n");
+        w("castle/cell.md", "---\nid: castle/cell\ntitle: Cell\ntype: location\nconnections: { west: grate }\n---\nDamp.\n");
+        // A door from the built-in: closed (not passable) until opened. Its
+        // own closed state adds prose over the template's.
+        w("castle/doors/vault-door/index.md", "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: door\nsides:\n  castle/hall: { direction: down }\n  castle/vault: { direction: up }\n---\n");
+        w("castle/doors/vault-door/closed.md", "---\ninherits: index\n---\nAn iron door is set in the floor, shut.\n");
+        w("castle/doors/grate.md", "---\nid: grate\ntitle: Iron grate\ntype: door\npassable: no\ntransparent: yes\nsides:\n  castle/hall: { direction: east }\n  castle/cell: { direction: west }\n---\n");
+        w("objects/lever.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nweight: immovable\nactions:\n  pull: { becomes: { vault-door: open } }\n---\n<!-- thwarter:action pull -->\nGears grind.\n");
+        let mut world = WorldEngine::new();
+        world.load_world(d).unwrap();
+        (dir, world)
+    }
+
+    #[test]
+    fn doors_join_rooms_and_open_with_a_state_from_their_template() {
+        let (_d, world) = door_world();
+        assert!(world.current_problems(true).is_empty(), "{:?}", world.current_problems(true));
+        let thing = world.thing(EntityKind::Door, "vault-door").unwrap();
+        assert_eq!(thing.starting_state.as_deref(), Some("closed")); // from the built-in
+        assert_eq!(thing.state_names(), ["closed", "open"]);
+        assert!(!world.doors["vault-door"].passable);
+        assert_eq!(world.doors["vault-door"].description, "An iron door is set in the floor, shut.");
+
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        let look = game.act(&world, &mut state, &PlayAction::Look).text;
+        assert!(look.contains("Exits: east, down.\nThrough the iron grate you can see the Cell.\nAn iron door is set in the floor, shut."), "{}", look);
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text, "The iron door is closed.");
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Go("east".into())).text, "The iron grate is closed.");
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("iron door".into())).text, "An iron door is set in the floor, shut.");
+
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Use { verb: "pull".into(), noun: "lever".into() }).text, "Gears grind.");
+        assert_eq!(state.state_of("door", "vault-door"), Some("open"));
+        let look = game.act(&world, &mut state, &PlayAction::Look).text;
+        assert!(!look.contains("shut"), "{}", look); // the open state has no prose, and the index none either
+        let r = game.act(&world, &mut state, &PlayAction::Go("down".into()));
+        assert!(r.text.starts_with("Vault\n\nGold."), "{}", r.text);
+        game.act(&world, &mut state, &PlayAction::Go("up".into()));
+        assert_eq!(state.location, "castle/hall");
+    }
+
+    #[test]
+    fn a_door_can_have_its_own_actions() {
+        let (dir, mut world) = door_world();
+        world.set_file(&dir.path().join("castle/doors/vault-door/index.md"), "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: door\nsides:\n  castle/hall: { direction: down }\n  castle/vault: { direction: up }\nactions:\n  open: { becomes: { vault-door: open } }\n---\n<!-- thwarter:action open -->\nIt swings up.\n");
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Use { verb: "open".into(), noun: "door".into() }).text, "It swings up.");
+        assert!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text.starts_with("Vault"));
+    }
+
+    #[test]
+    fn portals_lead_where_each_side_says_and_door_rules_are_checked() {
+        let (dir, mut world) = door_world();
+        let d = dir.path();
+        world.set_file(&d.join("castle/tower.md"), "---\nid: castle/tower\ntitle: Tower\ntype: location\nconnections: { in: ring }\n---\n");
+        world.set_file(&d.join("castle/cell.md"), "---\nid: castle/cell\ntitle: Cell\ntype: location\nconnections: { west: grate, in: ring }\n---\n");
+        world.set_file(&d.join("doors/ring.md"), "---\nid: ring\ntitle: Stone ring\ntype: door\ninherits: portal\nstate: open\nsides:\n  castle/tower: { direction: in, to: castle/cell }\n  castle/cell: { direction: in, to: castle/vault }\n  castle/vault: { direction: in, to: castle/tower }\n---\n");
+        let problems = world.current_problems(false);
+        assert!(problems.is_empty(), "{:?}", problems);
+        let warnings = world.current_warnings();
+        assert!(warnings.iter().any(|w| w == "door `ring`: castle/vault has no exit through it"), "{:?}", warnings);
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/tower").unwrap();
+        game.act(&world, &mut state, &PlayAction::Go("in".into()));
+        assert_eq!(state.location, "castle/cell");
+
+        world.set_file(&d.join("doors/bad.md"), "---\nid: bad\ntitle: Bad\ntype: door\nsides:\n  castle/hall: { direction: north }\n---\n");
+        world.set_file(&d.join("doors/ring.md"), "---\nid: ring\ntitle: Ring\ntype: door\nportal: yes\nsides:\n  castle/tower: { direction: in }\n  castle/cell: { direction: in }\n  castle/nowhere: { direction: in }\n---\n");
+        world.set_file(&d.join("castle/vault.md"), "---\nid: castle/vault\ntitle: Vault\ntype: location\nconnections: { up: vault-door, east: grate }\n---\n");
+        let problems = world.current_problems(false);
+        for expected in [
+            "door `bad`: a door joins exactly two rooms, and this one has 1 sides",
+            "door `ring`: the side in `castle/tower` needs `to:`",
+            "door `ring`: side `castle/nowhere` is not a known location",
+            "castle/vault: connection `east` goes through door `grate`, which doesn't join this room",
+        ] {
+            assert!(problems.iter().any(|p| p.starts_with(expected)), "{}: {:?}", expected, problems);
+        }
     }
 }

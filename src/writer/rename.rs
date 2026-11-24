@@ -261,7 +261,7 @@ fn reference_edits(meta: &Value, kind: EntityKind, old: &[String], new: &str, en
     let lists: &[&str] = match kind {
         EntityKind::Character => &["characters"],
         EntityKind::Object => &["objects", "inventory"],
-        EntityKind::Location => &[],
+        EntityKind::Location | EntityKind::Door => &[],
     };
     for key in lists {
         if let Some(items) = meta.get(*key).and_then(Value::as_sequence) {

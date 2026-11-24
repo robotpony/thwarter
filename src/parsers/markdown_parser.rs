@@ -1,5 +1,5 @@
 use crate::models::character::Character;
-use crate::models::world::{Coordinate, GameObject, Location, ObjectAction};
+use crate::models::world::{Coordinate, Door, DoorSide, GameObject, Location, ObjectAction};
 use anyhow::{anyhow, Result};
 use serde_yaml;
 use std::fs;
@@ -43,6 +43,21 @@ pub fn known_keys(type_name: &str) -> &'static [&'static str] {
             "relationships",
             "vars",
             "can",
+        ],
+        "door" => &[
+            "id",
+            "title",
+            "type",
+            "inherits",
+            "state",
+            "visibility",
+            "sides",
+            "portal",
+            "passable",
+            "transparent",
+            "vars",
+            "can",
+            "actions",
         ],
         "object" => &[
             "id",
@@ -108,6 +123,37 @@ pub enum ParsedEntity {
     Location(Location),
     Character(Character),
     Object(GameObject),
+    Door(Door),
+}
+
+impl ParsedEntity {
+    /// The `type` it was read as.
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            ParsedEntity::Location(_) => "location",
+            ParsedEntity::Character(_) => "character",
+            ParsedEntity::Object(_) => "object",
+            ParsedEntity::Door(_) => "door",
+        }
+    }
+
+    pub fn id(&self) -> &str {
+        match self {
+            ParsedEntity::Location(l) => &l.id,
+            ParsedEntity::Character(c) => &c.id,
+            ParsedEntity::Object(o) => &o.id,
+            ParsedEntity::Door(d) => &d.id,
+        }
+    }
+
+    pub fn title(&self) -> &str {
+        match self {
+            ParsedEntity::Location(l) => &l.name,
+            ParsedEntity::Character(c) => &c.name,
+            ParsedEntity::Object(o) => &o.title,
+            ParsedEntity::Door(d) => &d.title,
+        }
+    }
 }
 
 impl MarkdownParser {
@@ -161,8 +207,9 @@ impl MarkdownParser {
             "location" => ParsedEntity::Location(self.build_location(parsed, &file_path)?),
             "character" => ParsedEntity::Character(self.build_character(parsed, &file_path)?),
             "object" => ParsedEntity::Object(self.build_object(parsed, &file_path)?),
+            "door" => ParsedEntity::Door(self.build_door(parsed, &file_path)?),
             other => return Err(anyhow!(
-                "{:?}: unknown type `{}` (expected location, character, or object)",
+                "{:?}: unknown type `{}` (expected location, character, object or door)",
                 file_path.as_ref(),
                 other
             )),
@@ -296,6 +343,97 @@ impl MarkdownParser {
         Ok(character)
     }
 
+    fn build_door<P: AsRef<Path>>(&self, parsed: &ParsedDocument, file_path: P) -> Result<Door> {
+        use serde_yaml::Value;
+        let path = file_path.as_ref();
+        let id = self.required_str(&parsed.metadata, "id", path)?;
+        let title = self.required_str(&parsed.metadata, "title", path)?;
+        let flag = |key: &str, default: bool| -> Result<bool> {
+            match parsed.metadata.get(key) {
+                None | Some(Value::Null) => Ok(default),
+                Some(Value::Bool(b)) => Ok(*b),
+                Some(Value::String(s)) => match s.to_lowercase().as_str() {
+                    "yes" | "true" => Ok(true),
+                    "no" | "false" => Ok(false),
+                    _ => Err(anyhow!("{:?}: `{}` is yes or no, not `{}`", path, key, s)),
+                },
+                Some(_) => Err(anyhow!("{:?}: `{}` is yes or no", path, key)),
+            }
+        };
+        let mut sides = Vec::new();
+        match parsed.metadata.get("sides") {
+            None | Some(Value::Null) => {}
+            Some(Value::Mapping(map)) => {
+                for (room, side) in map {
+                    let room = room.as_str().map(link_target).ok_or_else(|| anyhow!("{:?}: a side is named by its room", path))?;
+                    let (direction, to) = match side {
+                        Value::String(d) => (d.clone(), None),
+                        Value::Mapping(m) => (
+                            m.get("direction")
+                                .and_then(Value::as_str)
+                                .ok_or_else(|| anyhow!("{:?}: side `{}` needs a `direction`", path, room))?
+                                .to_string(),
+                            m.get("to").and_then(id_value),
+                        ),
+                        _ => return Err(anyhow!("{:?}: side `{}` is `{{ direction: <way> }}`", path, room)),
+                    };
+                    sides.push(DoorSide { room, direction, to });
+                }
+            }
+            Some(_) => return Err(anyhow!("{:?}: `sides` is a map of rooms to `{{ direction: <way> }}`", path)),
+        }
+        let (actions, responses, description) = self.actions_and_responses(parsed, path)?;
+        Ok(Door {
+            id,
+            title,
+            description,
+            sides,
+            portal: flag("portal", false)?,
+            passable: flag("passable", true)?,
+            transparent: flag("transparent", false)?,
+            actions,
+            responses,
+        })
+    }
+
+    /// A thing's actions (mechanics from frontmatter, plus actions that are
+    /// only a response block), its responses, and its description.
+    #[allow(clippy::type_complexity)]
+    fn actions_and_responses(
+        &self,
+        parsed: &ParsedDocument,
+        path: &Path,
+    ) -> Result<(std::collections::HashMap<String, ObjectAction>, std::collections::HashMap<String, String>, String)> {
+        let mut actions = std::collections::HashMap::new();
+        let mut responses = std::collections::HashMap::new();
+        let body = Body::parse(&parsed.body);
+        match parsed.metadata.get("actions") {
+            Some(serde_yaml::Value::Mapping(map)) => {
+                for (name, value) in map {
+                    let name = name.as_str().ok_or_else(|| anyhow!("{:?}: an action's name must be text", path))?;
+                    actions.insert(name.to_string(), parse_action(name, value, path)?);
+                }
+            }
+            Some(serde_yaml::Value::Sequence(_)) => {
+                return Err(anyhow!(
+                    "{:?}: `actions` is a map of mechanics now, and each reply goes in the body after `<!-- thwarter:action <name> -->` (design/STATES.md › Responses)",
+                    path
+                ))
+            }
+            Some(serde_yaml::Value::Null) | None => {}
+            Some(_) => return Err(anyhow!("{:?}: `actions` must be a map of action names", path)),
+        }
+        for (key, text) in &body.blocks {
+            if let Some(rest) = key.strip_prefix("action ") {
+                responses.insert(rest.to_string(), text.clone());
+                if !rest.ends_with(" refused") {
+                    actions.entry(rest.to_string()).or_insert_with(ObjectAction::reply_only);
+                }
+            }
+        }
+        Ok((actions, responses, body.description))
+    }
+
     fn build_object<P: AsRef<Path>>(
         &self,
         parsed: &ParsedDocument,
@@ -320,33 +458,10 @@ impl MarkdownParser {
             .map(|s| s.to_string());
         object.value = parsed.metadata.get("value").map(value_to_display_string);
 
-        let body = Body::parse(&parsed.body);
-        object.description = body.description.clone();
-        match parsed.metadata.get("actions") {
-            Some(serde_yaml::Value::Mapping(map)) => {
-                for (name, value) in map {
-                    let name = name.as_str().ok_or_else(|| anyhow!("{:?}: an action's name must be text", path))?;
-                    object.actions.insert(name.to_string(), parse_action(name, value, path)?);
-                }
-            }
-            Some(serde_yaml::Value::Sequence(_)) => {
-                return Err(anyhow!(
-                    "{:?}: `actions` is a map of mechanics now, and each reply goes in the body after `<!-- thwarter:action <name> -->` (design/STATES.md › Responses)",
-                    path
-                ))
-            }
-            Some(serde_yaml::Value::Null) | None => {}
-            Some(_) => return Err(anyhow!("{:?}: `actions` must be a map of action names", path)),
-        }
-        for (key, text) in &body.blocks {
-            if let Some(rest) = key.strip_prefix("action ") {
-                object.responses.insert(rest.to_string(), text.clone());
-                // A response with no mechanics is a whole action.
-                if !rest.ends_with(" refused") {
-                    object.actions.entry(rest.to_string()).or_insert_with(ObjectAction::reply_only);
-                }
-            }
-        }
+        let (actions, responses, description) = self.actions_and_responses(parsed, path)?;
+        object.actions = actions;
+        object.responses = responses;
+        object.description = description;
 
         let known_fields = known_keys("object");
         if let Some(map) = parsed.metadata.as_mapping() {

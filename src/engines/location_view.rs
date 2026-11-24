@@ -19,8 +19,25 @@ pub struct LocationView {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExitView {
     pub direction: String,
+    /// The room the exit leads to: the target named, or for an exit
+    /// through a door, the room on the door's other side.
     pub target: String,
     pub target_exists: bool,
+    /// The door the exit goes through, if it names one.
+    pub door: Option<DoorView>,
+}
+
+/// A door on an exit (REQ-CF-19), in its current version.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DoorView {
+    pub id: String,
+    pub title: String,
+    /// The door's text, which the room view shows by its exits.
+    pub description: String,
+    pub passable: bool,
+    pub transparent: bool,
+    /// For a door that can be seen through, the title of the room beyond.
+    pub beyond: Option<String>,
 }
 
 /// A character or object named by a location. `name` is `None` when no
