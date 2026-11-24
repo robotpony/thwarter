@@ -188,6 +188,11 @@ impl GameEngine {
                 if let (Some(s), false) = (found.state_file, names_outcome) {
                     key.push(format!("#{}", s));
                 }
+                // An action that shares a state's name means ending up in
+                // it, so `#open` replaces a template's open state's reply.
+                if !names_outcome && thing.has_state(&action[1..]) {
+                    key.push(action.clone());
+                }
                 key.sort();
                 key.dedup();
                 if let Some(text) = prose_of(section) {
@@ -415,7 +420,8 @@ mod tests {
         assert_eq!(s("unlock iron door with key"), "It isn't locked.");
         assert_eq!(s("unlock iron door"), "It isn't locked.");
         assert!(s("inventory").contains("a spoon") && !s("inventory").contains("brass key"));
-        assert_eq!(s("open iron door"), "It swings open. Cold air rises from the dark below.");
+        // The door's own `#open` replaces the built-in's (STATES.md).
+        assert_eq!(s("open iron door"), "Cold air rises from the dark below.");
         assert_eq!(s("open iron door"), "It's already open.");
         assert_eq!(s("take key"), "You take the brass key.");
         assert!(s("inventory").contains("a brass key"));

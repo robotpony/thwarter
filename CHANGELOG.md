@@ -39,6 +39,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.53.1 (2026-11-24)
+
+### Fixed
+
+- A thing's own `## When: #open` replaces its template's open-state reply, as STATES.md says, instead of both showing. An action that shares a state's name means ending up in it, and replies are now matched that way too. The vault door's `open` plays "Cold air rises from the dark below." alone. Found by the commander.
+
 ## 0.53.0 (2026-11-24)
 
 ### Changed
