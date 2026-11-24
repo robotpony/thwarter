@@ -2,7 +2,7 @@
 
 Every sentence thwarter writes, in play or in the console, MUST come from a text table, not from a string in the Rust source (Bruce, 2026-11-24). The defaults are compiled in, and the same shape of table is used everywhere, so the engine, play and the console each override their text the same way (Bruce: "console messages should be configurable too, even if text is compiled in. the same shape of config should be used everywhere, if possible").
 
-Owner: commander (design). The coder builds the shared type and the engine's tables; the console coder moves the console's text. Status: *proposed* (the console coder's shape, agreed by the commander), planned as `PLAN.md` › Phase 8.
+Owner: commander (design). The coder builds the shared type and the engine's tables; the console coder moves the console's text. Status: agreed; Bruce said go on 2026-11-24. Planned as `PLAN.md` › Phase 8.
 
 ## The shape
 

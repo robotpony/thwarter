@@ -118,12 +118,13 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [ ] `/map` from the world's root draws the whole world, instead of asking for a room [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] A bare console command name in edit mode (`edit`) runs it or asks "Did you mean /edit?" [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] An unknown slash command suggests the nearest one [console] (`design/CONSOLE_REQUIREMENTS.md`)
+- [ ] At the world's root, edit mode lists `objects/` and `world/` below the rooms with labels ("World settings", "Global objects: 4"), and `/edit world` opens `world/index.md` (Bruce, 2026-11-24) [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [x] Play reads rooms and replies as the story: people right after the prose, held things on a plain look, doors named in the ways out (95ed0c9, REQ-ENG-43, 45, 46)
 - [ ] New verbs `drop`, `talk`, `ask` and `give` [coder] (`design/PLAYER_COMMANDS.md` › Open question 1; Bruce to choose)
 
 ## Phase 8 · Text as data
 
-Every sentence the engine, play and the console write comes from a text table with compiled-in defaults, the same shape everywhere (Bruce, 2026-11-24). Done when no user-facing string is left in the source outside the defaults files and a test keeps it that way.
+Every sentence the engine, play and the console write comes from a text table with compiled-in defaults, the same shape everywhere (Bruce, 2026-11-24). Started 2026-11-24, at Bruce's go. Done when no user-facing string is left in the source outside the defaults files and a test keeps it that way.
 
 - [ ] One `Texts` type for `[play]`, `[engine]` and `[console]` tables, defaults from `src/builtins/text/` [coder] (`design/ENGINE_TEXT.md` › The shape)
 - [ ] Engine and play strings become `[engine]` keys, the default text unchanged [coder]
