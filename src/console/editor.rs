@@ -110,9 +110,26 @@ pub struct Editor<'a> {
 }
 
 impl<'a> Editor<'a> {
+    /// Opens with the cursor after what's written (Bruce, 2026-11-23): at
+    /// the end of the last line of prose, or on a fresh line after the
+    /// frontmatter when there's no prose yet.
     pub fn new(document: Document) -> Self {
         let text = document.combined();
-        let mut area = TextArea::new(text.lines().map(str::to_string).collect());
+        let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+        let last = lines.iter().rposition(|l| !l.trim().is_empty());
+        let only_frontmatter = last.is_some_and(|n| lines[n].trim_end() == "---" && n > 0);
+        let row = match last {
+            Some(n) if only_frontmatter => {
+                lines.truncate(n + 1);
+                lines.push(String::new());
+                n + 1
+            }
+            Some(n) => n,
+            None => 0,
+        };
+        let col = lines.get(row).map(|l| l.chars().count()).unwrap_or(0);
+        let mut area = TextArea::new(lines);
+        area.move_cursor(CursorMove::Jump(row.min(u16::MAX as usize) as u16, col.min(u16::MAX as usize) as u16));
         area.set_line_number_style(style(Role::Chrome));
         area.set_cursor_line_style(Style::default());
         Editor {
@@ -396,7 +413,7 @@ mod tests {
     fn typing_then_saving_hands_over_the_whole_file() {
         let (closed, saves, _) =
             drive("---\nid: a\n---\nOld.\n", vec![ch('X'), ctrl('s'), esc()], |_, _| Saved::Yes("Saved a.md.".into()));
-        assert_eq!(saves, vec![("X---\nid: a\n---\nOld.\n".to_string(), false)]);
+        assert_eq!(saves, vec![("---\nid: a\n---\nOld.X\n".to_string(), false)], "typed where the cursor starts: after the prose");
         assert_eq!(closed.reports, vec!["Saved a.md.".to_string()]);
     }
 
@@ -455,7 +472,7 @@ mod tests {
             vec![Some("new from git\n".into())],
             |_, _| Saved::Yes("Saved.".into()),
         );
-        assert_eq!(saves, vec![("Xnew from git\n".to_string(), false)]);
+        assert_eq!(saves, vec![("newX from git\n".to_string(), false)], "the reload keeps the cursor where it was");
         assert_eq!(closed.reports.len(), 1);
         assert!(!screen.contains("Changed on disk too"), "{}", screen);
     }
@@ -469,7 +486,7 @@ mod tests {
             |_, _| Saved::Yes("Saved.".into()),
         );
         // The author's text wins, and the save is told to overwrite.
-        assert_eq!(saves, vec![("Xold\n".to_string(), true)]);
+        assert_eq!(saves, vec![("oldX\n".to_string(), true)]);
     }
 
     #[test]
@@ -478,12 +495,23 @@ mod tests {
         editor.area.input(ch('X'));
         editor.disk_changed(vec!["new\n".into()]);
         assert!(editor.status.starts_with("Changed on disk too."), "{}", editor.status);
-        assert_eq!(editor.text(), "Xold\n");
+        assert_eq!(editor.text(), "oldX\n");
 
         let mut clean = Editor::new(Document::single("h", "old\n"));
         clean.disk_changed(vec!["new\n".into()]);
         assert_eq!((clean.text().as_str(), clean.status.as_str()), ("new\n", "Reloaded: changed on disk."));
         assert!(!clean.dirty());
+    }
+
+    #[test]
+    fn the_cursor_starts_after_whats_written() {
+        let prose = Editor::new(Document::single("h", "---\nid: a\n---\n\nSome prose.\n\n"));
+        assert_eq!(prose.area.cursor(), (4, "Some prose.".len()));
+        let card = Editor::new(Document::single("h", "---\nid: bench\ntype: object\n---\n"));
+        assert_eq!(card.area.cursor(), (4, 0), "a fresh line after the frontmatter");
+        assert!(!card.dirty(), "that line isn't an unsaved change");
+        let empty = Editor::new(Document::single("h", ""));
+        assert_eq!(empty.area.cursor(), (0, 0));
     }
 
     #[test]

@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.41.1 (2026-11-23)
+
+### Changed
+
+- The editor opens with the cursor after what's written (Bruce, 2026-11-23): at the end of the last line of prose, or, for a file that's only frontmatter such as a new scenery card, on a fresh line after the closing `---`. That line doesn't count as an unsaved change.
+
 ## 0.41.0 (2026-11-23)
 
 ### Added
