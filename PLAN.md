@@ -67,6 +67,8 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
 - [x] Removing a thing: its file or bundle deleted, and every reference to its id taken out (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, beside REQ-ENG-30)
 - [x] `/remove <thing>` deletes an object, room, character or door after the author confirms; no undo yet (Bruce, 2026-11-24) (0.68.0) [console] (`design/CONSOLE_REQUIREMENTS.md`, beside REQ-CON-5)
+- [ ] One command registry: every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (proposed, Bruce to agree) [console] (REQ-CON-50 to 56)
+- [ ] Forgiving play verbs: aliases, unique prefixes and did-you-mean for verbs, the way commands get them (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, to write)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 - [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
 - [x] Objects hold objects: loading, scope, examine lists, one place per thing, unified with `keep()` [coder] (REQ-CF-31)
