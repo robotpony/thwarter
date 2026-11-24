@@ -449,6 +449,22 @@ impl GameEngine {
         ActionResult::say(format!("You're carrying: {}.", names.join(", ")))
     }
 
+    /// Whether `noun` names anything the player can see or carries,
+    /// including the room itself (REQ-PC-10, REQ-PC-14). A noun several
+    /// things answer to names something.
+    pub(crate) fn names_anything(&self, world: &WorldEngine, state: &PlayState, noun: &str) -> bool {
+        let Some(view) = self.view(world, state) else { return false };
+        let wanted = noun.trim().to_lowercase();
+        if wanted == view.title.to_lowercase() || wanted == view.id.to_lowercase() {
+            return true;
+        }
+        let mut things = self.carried(world, state);
+        things.extend(view.objects.iter().cloned());
+        things.extend(doors_here(&view));
+        things.extend(view.characters.iter().cloned());
+        !matches!(resolve(noun, &things, the_object), Ok(None))
+    }
+
     fn carried(&self, world: &WorldEngine, state: &PlayState) -> Vec<EntityRef> {
         state
             .inventory

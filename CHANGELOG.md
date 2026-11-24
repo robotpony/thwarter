@@ -35,6 +35,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.42.0 (2026-11-23)
+
+### Added
+
+- The player command parser is the engine's, for every client (`design/PLAYER_COMMANDS.md`, REQ-ENG-32, 33): `GameEngine::parse_command(&world, line, &state)` returns `Parsed::Action`, a `Reply` asking for a noun (`Take what?`) or `Unknown` (``I don't understand `<line>`.``), with the console's verbs, aliases and tests carried over (REQ-PC-1 to 8). New: bare `search`, and any other verb with a noun as an object's named action, `PlayAction::Use` (REQ-PC-13). A verb no object or door has in any state, on a noun that names nothing in scope, isn't understood instead of "There's no wildly here" (REQ-PC-14), and `take`, `go` and the other built-in verbs are read before object actions, so they can't be shadowed (REQ-PC-15). `WorldEngine::has_action` says whether any thing has an action. The console's `verbs.rs` stays until play mode switches over.
+
 ## 0.41.4 (2026-11-23)
 
 ### Changed

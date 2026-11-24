@@ -851,6 +851,27 @@ impl WorldEngine {
         self.things.values()
     }
 
+    /// Whether any object or door has an action named `verb`, in any of
+    /// its states or chapters (REQ-PC-14). Spaces in `verb` match hyphens.
+    pub fn has_action(&self, verb: &str) -> bool {
+        let key = verb.trim().to_lowercase().replace(' ', "-");
+        let named = |actions: &HashMap<String, ObjectAction>| actions.keys().any(|a| a.eq_ignore_ascii_case(&key));
+        if self.objects.values().any(|o| named(&o.actions)) || self.doors.values().any(|d| named(&d.actions)) {
+            return true;
+        }
+        let chapters: Vec<Option<String>> = std::iter::once(None).chain(self.chapters.iter().map(|c| Some(c.name().to_string()))).collect();
+        self.things.values().filter(|t| matches!(t.kind, EntityKind::Object | EntityKind::Door)).any(|t| {
+            let states: Vec<Option<String>> = std::iter::once(None).chain(t.state_names().into_iter().map(Some)).collect();
+            states.iter().any(|s| {
+                chapters.iter().any(|c| match self.version(t.kind, &t.id, s.as_deref(), c.as_deref()).map(|v| v.entity) {
+                    Ok(ParsedEntity::Object(o)) => named(&o.actions),
+                    Ok(ParsedEntity::Door(d)) => named(&d.actions),
+                    _ => false,
+                })
+            })
+        })
+    }
+
     /// Every chapter, root ones first, each scope in chapter order.
     pub fn chapters(&self) -> &[Chapter] {
         &self.chapters
