@@ -84,13 +84,23 @@ A description section's block MAY hold data that applies while it matches, such 
 
 ### Scripts
 
-Decided by Bruce, 2026-11-23. When YAML and sections aren't enough, as for a door with a key, a bundle MAY hold a script file.
+Decided by Bruce, 2026-11-23. When YAML and sections aren't enough, as for a door with a key, a thing MAY have a script.
 - Scripts are written in [Rhai](https://rhai.rs), a scripting language made for embedding in Rust. It's sandboxed by default (no files or network), and the engine caps how long a script can run, so a world from a stranger is safe to play.
-- Each function is an action, named by the verb (`fn unlock(door, game)`). It gets the thing and the game state, read-only, and returns what changes. The engine applies the changes, so a script never writes a file (principle 6).
-- What the player reads still comes from sections. A script changes state, and the sections that match the new state are the reply. A script MAY return text, when no state change can say it.
-- Scripts sit beside the YAML mechanics, for hard cases; a lever that `becomes: pulled` needs no script.
-- *Proposed*: one script per bundle, `actions.rhai`. A template's script passes down, and a thing's function replaces the template's function of the same name.
-- *Proposed*, following from "the new state's sections are the reply": a reply matches the game state after the action, not before (a change to REQ-ENG-36).
+- A script lives in the thing's bundle, or in the thing's one file as a fenced ```rhai block (Bruce: bundles are clearer, or all in one file). *Proposed*: the bundle's file is `actions.rhai`, one per thing.
+- Each function is an action, named by the verb (`fn unlock(door, turn)`). It gets the thing and the turn, read-only, and returns what happens. The engine applies it, so a script never writes a file (principle 6).
+- A script never returns text. It returns a new state (`become("closed")`) or a reason, which is a state-like name (`"wrong-key"`). `no-action` is the common reason, and returning nothing means it. A world MAY use any reason that matters to its story.
+- A script reaches only what its thing owns (Bruce): its own state and values, and the things it holds. A door can see a key in its lock, not one in the player's pocket; a room can see its objects, but can't do much with them. The scope is the same for every kind of thing.
+- Scripts sit beside the YAML mechanics, for hard cases. A lever that `becomes: pulled` needs no script.
+- A template's script passes down. *Proposed*: a thing's own function replaces the template's function of the same name.
+
+### Outcomes and replies
+
+*Proposed*, following Bruce's answers: an action's turn has one outcome, which is the state the thing moved into, or the reason the script returned, or `no-action`. A reply section matches the action and its outcome. For an author, that comes down to one rule: write the reply where the thing ends up, and if nothing changes, name why.
+- In a state file, `## When: #unlock` means "unlock, ending up in this state".
+- Anywhere, `## When: #unlock #wrong-key` means "unlock, for that reason", and `## When: #unlock #closed` means "unlock, ending up closed".
+- With no matching reply, the default reply shows ("Nothing happens.", or the nearest list).
+
+A thing's own reply is the story's content, so it replaces any default content: a template's or a built-in's reply for the same action and outcome (Bruce).
 
 ### States
 
