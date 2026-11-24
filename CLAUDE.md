@@ -81,7 +81,7 @@ A coder who fixes a bug or finishes a task ticks it in `PLAN.md` or moves it to 
 
 **Changelog.** `CHANGELOG.md` records changes by version and is also where removed or replaced things go: a deleted file, retired format or superseded plan gets a `### Removed` entry with the `git show <sha>:<path>` that recovers it. Working docs then describe only what's true now, without notes on what their earlier versions said.
 
-**Versions.** `0.x.y` semver in `Cargo.toml`. A patch is a fix, tweak or refactor; a minor adds or removes a capability. Bump with each code change; docs-only changes go under `## Unreleased`.
+**Versions.** `0.x.y` semver in `Cargo.toml`. A patch is a fix, tweak or refactor; a minor adds or removes a capability. Bump with each code change; docs-only changes go under `## Unreleased`. A bump changes `Cargo.lock` too, so commit both together: CI builds with `--locked` and fails on a stale lock file (seen 2026-11-23, after 3234c40, 8b33bce and 64945de).
 
 **Docs.** Root working files are uppercase (`README`, `CLAUDE`, `PLAN`, `BUGS`, `CHANGELOG`, `TESTING`, `REQUIREMENTS`), as are files in `design/`. Writing follows Canadian spelling, no em-dashes, conclusions first.
 
