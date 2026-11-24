@@ -114,7 +114,7 @@ impl Console {
         }
         let target = match (kind, rest) {
             (_, []) => self.edit_target_here(kind),
-            (Some(kind), [id]) => self.edit_target_named(kind, id),
+            (Some(kind), [id]) => self.edit_target_named(kind, &super::author::id_from(id).0),
             (Some(kind), _) => Err(format!("Usage: /edit {} [id]", kind.label())),
             (None, _) => unreachable!("a kind word comes before an id"),
         };
@@ -143,7 +143,7 @@ impl Console {
         } else if target.kind == Kind::World {
             heading = format!("/edit  {}.md (world settings)", target.path);
         }
-        let text = target.opened.clone().unwrap_or_else(|| scenery_card(&target.id));
+        let text = target.opened.clone().unwrap_or_else(|| scenery_card(&target.id, &title_or_default(&[], &target.id)));
         Document::single(heading, text)
     }
 
@@ -306,8 +306,10 @@ fn same_thing(target: &EditTarget, text: &str) -> Result<(), String> {
 
 /// The card scenery starts with (REQ-CF-8): one that inherits the built-in
 /// `scenery` template (REQ-CF-21), as `/new object <id>` writes it.
-pub(super) fn scenery_card(id: &str) -> String {
-    format!("---\nid: {}\ntitle: {}\ntype: object\ninherits: scenery\n---\n", id, title_or_default(&[], id))
+pub(super) fn scenery_card(id: &str, title: &str) -> String {
+    let title = crate::writer::content_file::emit_scalar(&serde_yaml::Value::String(title.to_string()), false)
+        .unwrap_or_else(|_| title.to_string());
+    format!("---\nid: {}\ntitle: {}\ntype: object\ninherits: scenery\n---\n", id, title)
 }
 
 #[cfg(test)]

@@ -150,9 +150,9 @@ impl Console {
     }
 
     fn console_command(&mut self, command: &str) -> (String, Flow) {
-        let mut words = command.split_whitespace();
-        let name = words.next().unwrap_or("");
-        let rest: Vec<&str> = words.collect();
+        let words = split_args(command);
+        let name = words.first().map(String::as_str).unwrap_or("");
+        let rest: Vec<&str> = words.iter().skip(1).map(String::as_str).collect();
         let out = match (name, rest.as_slice()) {
             ("quit" | "q", _) => return ("Bye.".to_string(), Flow::Quit),
             ("help" | "?", _) => self.help(),
@@ -660,6 +660,40 @@ impl Console {
     }
 }
 
+/// A command's words, with `"..."` or `'...'` keeping spaces inside one
+/// word: `/add "old shirt" bedroom` is `add`, `old shirt`, `bedroom`. An
+/// unclosed quote runs to the end of the line.
+pub(super) fn split_args(command: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut quote: Option<char> = None;
+    let mut in_word = false;
+    for c in command.chars() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), c) => word.push(c),
+            (None, '"' | '\'') => {
+                quote = Some(c);
+                in_word = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if in_word {
+                    words.push(std::mem::take(&mut word));
+                    in_word = false;
+                }
+            }
+            (None, c) => {
+                word.push(c);
+                in_word = true;
+            }
+        }
+    }
+    if in_word {
+        words.push(word);
+    }
+    words
+}
+
 fn parent_of(path: &str) -> String {
     path.rsplit_once('/').map(|(parent, _)| parent.to_string()).unwrap_or_default()
 }
@@ -671,6 +705,15 @@ mod tests {
     use super::*;
     use std::fs;
     use walkdir::WalkDir;
+
+    #[test]
+    fn quotes_keep_spaces_inside_one_word() {
+        assert_eq!(split_args(r#"add "old shirt" bedroom"#), vec!["add", "old shirt", "bedroom"]);
+        assert_eq!(split_args("set title 'The Old Well'"), vec!["set", "title", "The Old Well"]);
+        assert_eq!(split_args(r#"add "unclosed thing"#), vec!["add", "unclosed thing"]);
+        assert_eq!(split_args("  move   lantern  well "), vec!["move", "lantern", "well"]);
+        assert_eq!(split_args(r#"set body """#), vec!["set", "body", ""]);
+    }
 
     #[test]
     fn unknown_input_is_logged_with_where_it_was_typed() {

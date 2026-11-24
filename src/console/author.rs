@@ -110,9 +110,14 @@ impl Console {
     }
 
     fn new_character(&mut self, args: &[&str]) -> String {
-        let [id, title @ ..] = args else {
+        let [typed, title @ ..] = args else {
             return "Usage: /new character <id> [title]".to_string();
         };
+        let (id, named) = id_from(typed);
+        let id = id.as_str();
+        let named_title = named.map(|n| vec![n]).unwrap_or_default();
+        let title: Vec<&str> = if title.is_empty() { named_title.iter().map(String::as_str).collect() } else { title.to_vec() };
+        let title = title.as_slice();
         if let Some(problem) = bare_id_problem(id) {
             return problem;
         }
@@ -127,6 +132,13 @@ impl Console {
     }
 
     fn new_object(&mut self, args: &[&str]) -> String {
+        let Some((typed, rest)) = args.split_first() else {
+            return "Usage: /new object <id> <type> [title], where type is free-form: tool, weapon, furniture, ...".to_string();
+        };
+        let (typed_id, named) = id_from(typed);
+        let owned: Vec<String> = std::iter::once(typed_id).chain(rest.iter().map(|s| s.to_string())).collect();
+        let args: Vec<&str> = owned.iter().map(String::as_str).collect();
+        let args = args.as_slice();
         // Scenery this room names, given only its id, gets the default card
         // (REQ-CF-8): one that inherits the built-in `scenery` template
         // (REQ-CF-21).
@@ -146,14 +158,17 @@ impl Console {
             return problem;
         }
         let here = self.current_room();
-        let title = title_or_default(title, id);
+        let title = match (title, &named) {
+            ([], Some(named)) => named.clone(),
+            _ => title_or_default(title, id),
+        };
         let new = NewEntity {
             kind: EntityKind::Object,
             id: id.to_string(),
             title: title.clone(),
             object_type: Some(object_type.to_string()),
         };
-        let edits = if scenery { vec![Edit::ReplaceAll(super::full_edit::scenery_card(id))] } else { Vec::new() };
+        let edits = if scenery { vec![Edit::ReplaceAll(super::full_edit::scenery_card(id, &title))] } else { Vec::new() };
         self.create_and_place(&new, &edits, "objects", here, format!("Created object {}, {}", id, title))
     }
 
@@ -275,6 +290,8 @@ impl Console {
             [thing, target] => (*thing, target.to_string()),
             _ => return "Usage: /add <thing> [room or character], for example /add chair bedroom".to_string(),
         };
+        let (thing_id, named) = id_from(thing);
+        let thing = thing_id.as_str();
         if let Some(problem) = bare_id_problem(thing) {
             return problem;
         }
@@ -303,16 +320,34 @@ impl Console {
         }
         items.push(thing.to_string());
         let card = is_character || self.world.engine.objects.contains_key(thing);
+        let mut written = Vec::new();
+        // A name typed with spaces or capitals ("old shirt") would be lost
+        // in a bare id, so it gets a scenery card holding it as the title.
+        let mut note = String::new();
+        if !card {
+            match &named {
+                Some(name) => {
+                    let new = NewEntity {
+                        kind: EntityKind::Object,
+                        id: thing.to_string(),
+                        title: name.clone(),
+                        object_type: Some("scenery".to_string()),
+                    };
+                    match self.create(&new, &[Edit::ReplaceAll(super::full_edit::scenery_card(thing, name))]) {
+                        Ok(path) => written.push(path),
+                        Err(e) => return e,
+                    }
+                    note = format!(", with a scenery card titled \"{}\"", name);
+                }
+                None => note = format!(", as scenery with no card yet (/edit object {} gives it one)", thing),
+            }
+        }
         match self.save(kind, &id, &[Edit::SetList { key: key.into(), items }]) {
             Ok(path) => {
-                let note = if card {
-                    String::new()
-                } else {
-                    format!(", as scenery with no card yet (/edit object {} gives it one)", thing)
-                };
-                self.after_writes(&[path], format!("Added {} to {}{}.", thing, place, note))
+                written.push(path);
+                self.after_writes(&written, format!("Added {} to {}{}.", thing, place, note))
             }
-            Err(e) => e,
+            Err(e) => self.after_writes(&written, e),
         }
     }
 
@@ -348,6 +383,8 @@ impl Console {
             let to = if area.is_empty() { name.to_string() } else { format!("{}/{}", area, name) };
             return self.move_room(&room, &to);
         }
+        let (thing_id, _) = id_from(thing);
+        let thing = &thing_id.as_str();
         if let Some(problem) = bare_id_problem(thing) {
             return problem;
         }
@@ -725,6 +762,14 @@ pub(super) fn title_or_default(typed: &[&str], id: &str) -> String {
         Some(first) => first.to_uppercase().chain(chars).collect(),
         None => id.to_string(),
     }
+}
+
+/// An id from what was typed, since ids can't hold spaces: `old shirt` or
+/// `Old Shirt` becomes `old-shirt`, and the name as typed comes back to
+/// use as a title. A typed id that's already plain comes back alone.
+pub(super) fn id_from(typed: &str) -> (String, Option<String>) {
+    let id = typed.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join("-");
+    if id == typed { (id, None) } else { (id, Some(typed.trim().to_string())) }
 }
 
 /// Character and object ids are bare names (`king`, not `npcs/king`).

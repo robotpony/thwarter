@@ -34,6 +34,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.41.2 (2026-11-23)
+
+### Fixed
+
+- Quotes in console commands didn't hold words together, so `/add "old shirt" bedroom` was read as three arguments (Bruce, 2026-11-23). `"..."` and `'...'` now keep spaces inside one argument, for every command.
+
+### Changed
+
+- Ids can't hold spaces, so a name typed with spaces or capitals becomes an id: `old shirt` and `Old Shirt` are `old-shirt`. The name as typed becomes the title where one is made: `/new object "Iron Key" tool` is `iron-key`, titled Iron Key, and `/add "old shirt" bedroom` gives the new scenery a card titled "old shirt", so the name isn't lost. `/move` and `/edit` take names the same way.
+
 ## 0.41.1 (2026-11-23)
 
 ### Changed

@@ -210,3 +210,22 @@ Added bench to smith's inventory.
 There's no room or character called `nowhere` to add chair to.
 > /add
 Usage: /add <thing> [room or character], for example /add chair bedroom
+> go /village/square
+Village Square (room)
+> /add "old shirt" village/square
+Added old-shirt to village/square, with a scenery card titled "old shirt".
+> /move "old shirt" village/well
+Moved old-shirt: village/square → village/well.
+> /new object "Iron Key" tool
+Created object iron-key, Iron Key, placed in village/square.
+> /new character "Old Tom"
+Created character old-tom, Old Tom, placed in village/square.
+> go old-shirt
+old shirt (object), objects/old-shirt.md
+> look
+old shirt (old-shirt)
+objects/old-shirt.md, scenery
+
+(no description yet)
+
+Actions: none
