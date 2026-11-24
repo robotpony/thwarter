@@ -408,7 +408,7 @@ Commands the console will need, *proposed*: `/state new <name>`, `/state rename 
 
 ## Keys and clocks (Phase 6)
 
-Keys are agreed with Bruce (2026-11-23), worked through as the vault door example below; it uses `design/SECTIONS.md`'s sections, scripts and outcomes. Clocks are still the commander's proposal, not yet reviewed.
+Keys are agreed with Bruce (2026-11-23) and built in f84f5d5 (0.48.0), worked through as the vault door example below; it uses `design/SECTIONS.md`'s sections, scripts and outcomes. Clocks are still the commander's proposal, not yet reviewed.
 
 ### Keys
 
@@ -430,23 +430,23 @@ locked-door/
   actions.rhai    unlock, lock, open, close
 ```
 
-`actions.rhai`, *proposed* syntax: each function returns a new state, a reason, or a list of changes.
+`actions.rhai`, as built in f84f5d5 (0.48.0, REQ-ENG-38 to 41): each function returns a new state, a reason, or a list of changes. The thing used on the door is `turn.used`, since Rhai reserves `with` (and `this`, so a parameter can't be called that).
 
 ```rust
 fn unlock(door, turn) {
     if door.state != "locked" { return "no-action"; }
     if door.key == "" { return become("closed"); }      // a deadbolt: no key
-    if turn.with == () { return "no-key"; }
-    if turn.with.id != door.key { return "wrong-key"; }
-    [keep(turn.with), become("closed")]                 // the key stays in the lock
+    if turn.used == () { return "no-key"; }
+    if turn.used.id != door.key { return "wrong-key"; }
+    [keep(turn.used), become("closed")]                 // the key stays in the lock
 }
 
 fn lock(door, turn) {
     if door.state != "closed" { return "no-action"; }
     if door.key == "" || door.holds(door.key) { return become("locked"); }
-    if turn.with == () { return "no-key"; }
-    if turn.with.id != door.key { return "wrong-key"; }
-    [keep(turn.with), become("locked")]
+    if turn.used == () { return "no-key"; }
+    if turn.used.id != door.key { return "wrong-key"; }
+    [keep(turn.used), become("locked")]
 }
 
 fn open(door, turn)  { if door.state == "closed" { become("open") } }
@@ -542,7 +542,7 @@ In play:
 
 ### One thing affecting another
 
-A lever in the hall that opens the vault door can't reach the door by ownership. A connection between the two, in the lever's (or the door's) frontmatter or body, gives it that reach (Bruce). *Proposed*: frontmatter `connects: [vault-door]`, and a script changes a connected thing by naming it:
+A lever in the hall that opens the vault door can't reach the door by ownership. A connection between the two, in the lever's (or the door's) frontmatter or body, gives it that reach (Bruce). Frontmatter `connects: [vault-door]` in either thing is enough, and a script changes a connected thing by naming it; a `change()` to an unconnected thing is refused with an author note (built in f84f5d5):
 
 ```rust
 fn pull(lever, turn) {

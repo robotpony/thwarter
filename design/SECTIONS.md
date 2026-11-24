@@ -1,6 +1,6 @@
 # Sections: content shown by game state
 
-Status: Agreed in outline by Bruce, 2026-11-23, to be tested on real content. Bruce set the principles and the model, and answered the open points through the console coder's session and directly; the commander wrote it up and filled the gaps, marked *proposed*. Reading sections and matching them against each turn's game state are built (2dad20b and ce4c62e, 0.46.0, REQ-ENG-35 and 36), and the editor draws them (f959c28). Not built: tags on other things' states and values, mechanics in `thwarter` blocks, default-reply lists, and `@name` shown as a name in prose. Once the trial confirms it, this folds into `design/CONTENT_REQUIREMENTS.md` and `design/STATES.md`, and this file goes in `CHANGELOG.md` › Removed.
+Status: Agreed in outline by Bruce, 2026-11-23, to be tested on real content. Bruce set the principles and the model, and answered the open points through the console coder's session and directly; the commander wrote it up and filled the gaps, marked *proposed*. Reading sections and matching them against each turn's game state are built (2dad20b and ce4c62e, 0.46.0, REQ-ENG-35 and 36), and the editor draws them (f959c28). Scripts, outcomes, `keep` and `connects:` are built too (f84f5d5, 0.48.0), and `@name` shows as a name in play (7437e1f). Not built: tags on other things' states and values, mechanics in `thwarter` blocks, and default-reply lists. Once the trial confirms it, this folds into `design/CONTENT_REQUIREMENTS.md` and `design/STATES.md`, and this file goes in `CHANGELOG.md` › Removed.
 
 ## Summary
 
@@ -86,17 +86,20 @@ A description section's block MAY hold data that applies while it matches, such 
 
 Decided by Bruce, 2026-11-23. When YAML and sections aren't enough, as for a door with a key, a thing MAY have a script.
 - Scripts are written in [Rhai](https://rhai.rs), a scripting language made for embedding in Rust. It's sandboxed by default (no files or network), and the engine caps how long a script can run, so a world from a stranger is safe to play.
-- A script lives in the thing's bundle, or in the thing's one file as a fenced ```rhai block (Bruce: bundles are clearer, or all in one file). *Proposed*: the bundle's file is `actions.rhai`, one per thing.
-- Each function is an action, named by the verb (`fn unlock(door, turn)`). It gets the thing and the turn, read-only, and returns what happens. The engine applies it, so a script never writes a file (principle 6).
+- A script lives in the thing's bundle, or in the thing's one file as a fenced ```rhai block (Bruce: bundles are clearer, or all in one file). The bundle's file is `actions.rhai`, one per thing; a thing with both a file and a block is a problem.
+- Each function is an action, named by the verb, with a hyphen as an underscore (`fn unlock(door, turn)`, `fn attempt_open`). It gets the thing (its `id`, `title`, `state`, values and what it holds) and the turn (`verb`, and `used` for the thing it's used with; Rhai reserves `with`), read-only, and returns what happens. The engine applies it, so a script never writes a file (principle 6).
 - A script never returns text. It returns a new state (`become("closed")`) or a reason, which is a state-like name (`"wrong-key"`). `no-action` is the common reason, and returning nothing means it. A world MAY use any reason that matters to its story.
 - A script reaches only what its thing owns (Bruce): its own state and values, and the things it holds. A door can see a key in its lock, not one in the player's pocket; a room can see its objects, but can't do much with them. The scope is the same for every kind of thing. A thing used on another (`unlock door with key`) is handed to it for the action, and stays with it if its script keeps it, until the player takes it back (Bruce). A connection between two things, in frontmatter or the body, lets one reach the other (Bruce; `design/STATES.md` › One thing affecting another).
 - The built-in verbs (`take`, `go`, `look` and the rest) stay the engine's; no script replaces them. Their turns still add tags, so a `## When: #take` reply replaces the built-in reply where one exists (Bruce).
 - Scripts sit beside the YAML mechanics, for hard cases. A lever that `becomes: pulled` needs no script.
-- A template's script passes down. *Proposed*: a thing's own function replaces the template's function of the same name.
+- A template's script passes down, and a thing's own function replaces the template's function of the same name. A script function for a verb takes priority over a frontmatter action of that name.
+- `keep()` takes only the thing the action was used with. A kept thing isn't listed in the room; the holder's text is what tells the player it's there. The player can still name it and take it back.
+- The sandbox has no files, network, modules, `eval` or printing, and caps operations at 100,000. A script that fails at run time gives an author note and the outcome `no-action`.
+- Built in f84f5d5 (0.48.0, REQ-ENG-38 to 41).
 
 ### Outcomes and replies
 
-*Proposed*, following Bruce's answers: an action's turn has one outcome, which is the state the thing moved into, or the reason the script returned, or `no-action`. A reply section matches the action and its outcome. For an author, that comes down to one rule: write the reply where the thing ends up, and if nothing changes, name why.
+Built in f84f5d5 (REQ-ENG-36), following Bruce's answers: an action's turn has one outcome, which is the state the thing moved into, or the reason the script returned, or `no-action`. Changes with no `become` count as `no-action`. A built-in verb's outcome is the target's current state, so a locked door's `## When: #go` answers a refused exit. A reply section matches the action and its outcome. For an author, that comes down to one rule: write the reply where the thing ends up, and if nothing changes, name why.
 - In a state file, `## When: #unlock` means "unlock, ending up in this state".
 - Anywhere, `## When: #unlock #wrong-key` means "unlock, for that reason", and `## When: #unlock #closed` means "unlock, ending up closed".
 - With no matching reply, the default reply shows ("Nothing happens.", or the nearest list).
