@@ -2,7 +2,7 @@
 
 Status: Agreed, with open questions (below). Reviewed decision by decision with Bruce on 2026-11-23. Nothing here is built yet. Items marked *proposed* are the commander's suggestions that Bruce hasn't confirmed yet; everything else Bruce has agreed to.
 
-`design/SECTIONS.md`, agreed in outline by Bruce and under trial, writes states as `## When:` sections and retires the `<!-- thwarter:... -->` markers. Where the two disagree, `design/SECTIONS.md` is the direction; this document is updated when the trial confirms it.
+`design/SECTIONS.md`, agreed in outline by Bruce and under trial, shows content by matching `## When:` headings against the game state, replaces actions and responses with reply sections, and retires the `<!-- thwarter:... -->` markers. Where the two disagree, `design/SECTIONS.md` is the direction; this document is updated when the trial confirms it.
 
 ## Summary
 
@@ -397,7 +397,7 @@ In files, a bundle is separate files. In the console, it is one document with a 
 - The index is the default section: its frontmatter and prose, with no heading.
 - Each state is a `## When: #name` section. A state that's its own file shows its path beside the heading; its frontmatter, apart from `inherits: index`, is shown as its `thwarter` block. In the editor, the heading is drawn as a rule in the chrome colour (`design/CONSOLE_REQUIREMENTS.md` › REQ-CON-39).
 - Where a bundle has to be one piece of plain text (copying it out, or a transcript test), the headings are written as ordinary `## When: #name` headings, so the text is the same document a one-file thing would be.
-- Saving writes each section back where it came from: a section from a state file to that file, and a section written in the index to the index. Typing a new `## When:` heading adds a state section to the index; `/state new` makes a state file instead. A file-backed state's heading can't be edited, since renaming or deleting that state moves a file: that's `/state rename` and `/state delete`. (Agreed with the console coder, 2026-11-23.)
+- Saving writes each section back where it came from: a section from a state file to that file, and a section written in the index to the index. Typing a new `## When:` heading adds a section to the index, which shows when its tags match and never creates a state (`design/SECTIONS.md` › States); `/state new` makes a state file instead. A file-backed state's heading can't be edited, since renaming or deleting that state moves a file: that's `/state rename` and `/state delete`. (Agreed with the console coder, 2026-11-23.)
 - Sections appear in this order: the default section, the starting state, the other states A to Z, then chapter overlays in chapter order. How a chapter overlay is headed waits on `design/SECTIONS.md` › Open question 2 (chapters as sections or files); until then it keeps its `<!-- thwarter:section chapter <name> -->` line.
 
 Saving splits the document back into its files. Every section must parse before any file is written; if one fails, nothing is saved. A file that doesn't parse still opens, since editing is how an author fixes it. A one-file thing opens as a document with one section.
