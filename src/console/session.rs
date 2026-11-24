@@ -224,7 +224,7 @@ impl Console {
                 "  /unlink <direction>                  remove one exit from this room".to_string(),
                 "  /move <thing> <room or character>    put a person or thing somewhere else".to_string(),
                 String::new(),
-                "Full editing, in a full-screen editor (ctrl-s saves, esc closes):".to_string(),
+                "Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):".to_string(),
                 "  /edit room [id]                      the room you're in, or the one named".to_string(),
                 "  /edit character [id]                 the character you're in, or the one named".to_string(),
                 "  /edit object [id]                    an object; scenery here gets its card".to_string(),

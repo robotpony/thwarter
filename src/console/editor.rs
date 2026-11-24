@@ -90,7 +90,9 @@ pub struct Closed {
     pub reports: Vec<String>,
 }
 
-const KEYS_HINT: &str = "ctrl-s save · esc close";
+/// What the heading bar says about keys. A Mac saves with Command-S, where
+/// the terminal passes it on (`screen::input_of`).
+const KEYS_HINT: &str = if cfg!(target_os = "macos") { "⌘s or ctrl-s save · esc close" } else { "ctrl-s save · esc close" };
 
 /// The editor's state between keys.
 pub struct Editor<'a> {

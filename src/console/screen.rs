@@ -422,16 +422,14 @@ pub fn run(console: Arc<Mutex<Console>>, notices: Receiver<String>, resumed: Opt
     use ratatui::crossterm::event::{self, Event, KeyEventKind};
     let greeting = lock(&console).greeting();
     let mut screen = Screen::new(&greeting, resumed);
-    let mut terminal = ratatui::try_init()?;
-    // After a /restart, the screen still shows the last build's frame.
-    clear_screen()?;
+    let mut terminal = enter_terminal()?;
     let result = (|| -> Result<()> {
         loop {
             draw(&mut terminal, &screen, &console)?;
             if event::poll(Duration::from_millis(200))? {
                 if let Event::Key(key) = event::read()? {
                     if key.kind != KeyEventKind::Release {
-                        screen.key(Input::from(key), &console);
+                        screen.key(input_of(key), &console);
                     }
                 }
             }
@@ -443,15 +441,14 @@ pub fn run(console: Arc<Mutex<Console>>, notices: Receiver<String>, resumed: Opt
                 screen.restart = false;
                 // The new build takes the terminal over from here; if it
                 // can't, this one takes it back.
-                ratatui::restore();
+                leave_terminal();
                 let why = restart::restart(&lock(&console), &screen.history, &screen.output);
-                terminal = ratatui::try_init()?;
-                clear_screen()?;
+                terminal = enter_terminal()?;
                 screen.push(&why);
             }
         }
     })();
-    ratatui::restore();
+    leave_terminal();
     result
 }
 
@@ -462,6 +459,38 @@ where
     let console = lock(console);
     terminal.draw(|frame| screen.draw(frame, &console))?;
     Ok(())
+}
+
+/// Takes the terminal over: raw mode and the alternate screen (ratatui),
+/// keys reported with their modifiers so a Mac's Command key reaches the
+/// console in terminals that can send it (the kitty keyboard protocol:
+/// kitty, WezTerm, Ghostty, iTerm2 3.5+; others ignore the request), and a
+/// clear screen, since after a /restart it still shows the last build's frame.
+fn enter_terminal() -> std::io::Result<ratatui::DefaultTerminal> {
+    use ratatui::crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
+    let terminal = ratatui::try_init()?;
+    let _ = ratatui::crossterm::execute!(
+        std::io::stdout(),
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+    );
+    clear_screen()?;
+    Ok(terminal)
+}
+
+/// Gives the terminal back as it was.
+fn leave_terminal() {
+    let _ = ratatui::crossterm::execute!(std::io::stdout(), ratatui::crossterm::event::PopKeyboardEnhancementFlags);
+    ratatui::restore();
+}
+
+/// A key as the console takes it. Command-S, which a Mac user saves with,
+/// is Ctrl-S; other Command keys stay with the terminal (copy, paste).
+fn input_of(key: ratatui::crossterm::event::KeyEvent) -> Input {
+    use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+    if key.modifiers.contains(KeyModifiers::SUPER) && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S')) {
+        return Input { key: Key::Char('s'), ctrl: true, ..Input::default() };
+    }
+    Input::from(key)
 }
 
 /// Clears the screen without asking the terminal where its cursor is, as
@@ -773,6 +802,15 @@ mod tests {
         // With the menu closed, Up is history again.
         press(&mut screen, &console, Key::Up);
         assert_eq!(screen.input_text(), "go n");
+    }
+
+    #[test]
+    fn command_s_saves_like_control_s() {
+        use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let command_s = input_of(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::SUPER));
+        assert_eq!((command_s.key, command_s.ctrl), (Key::Char('s'), true));
+        let command_c = input_of(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::SUPER));
+        assert!(!command_c.ctrl, "only Command-S is taken over");
     }
 
     #[test]

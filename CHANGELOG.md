@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.40.1 (2026-11-23)
+
+### Added
+
+- Command-S saves in the editor, as Ctrl-S does, for Mac users (Bruce, 2026-11-23). The console asks the terminal to report keys with their modifiers (the kitty keyboard protocol), which kitty, WezTerm, Ghostty and iTerm2 3.5 and later honour; a terminal that doesn't ignores the request, and Terminal.app keeps Command keys for its own menus. Only Command-S is taken; Command-C and Command-V stay with the terminal. On a Mac the editor's heading says `⌘s or ctrl-s save`.
+
 ## 0.40.0 (2026-11-23)
 
 ### Added

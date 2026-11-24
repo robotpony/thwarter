@@ -103,7 +103,7 @@ Changing content (each saves the file):
   /unlink <direction>                  remove one exit from this room
   /move <thing> <room or character>    put a person or thing somewhere else
 
-Full editing, in a full-screen editor (ctrl-s saves, esc closes):
+Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):
   /edit room [id]                      the room you're in, or the one named
   /edit character [id]                 the character you're in, or the one named
   /edit object [id]                    an object; scenery here gets its card
