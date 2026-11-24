@@ -302,7 +302,7 @@ Revealing is ordinary state switching: an action `becomes:` a state with a diffe
 
 When a command could mean more than one thing ("open door" with two doors), the reply is part of the story, not a fixed system message (Bruce, 2026-11-23): "Which door do you want to open?", "You stare at both doors, not sure which to open." The engine has a set of such replies and varies them. *Proposed*: an author can override them per world, and per thing for a thing with something to say.
 
-Built in 0.24.0 (79af69c): the reply is the `<!-- thwarter:reply ambiguous -->` block of the nearest template every candidate shares, with its variables filled in, as Bruce decided. Otherwise one of the built-in replies, which always name the candidates so the player can still choose ("Which sword do you want to take: the rusty sword or the old sword?"). Overrides per world or per thing aren't built; each is one more lookup if a world needs it.
+Built in 0.24.0 (79af69c): the reply is the `<!-- thwarter:reply ambiguous -->` block of the nearest template every candidate shares, with its variables filled in, as Bruce decided. Otherwise one of the built-in replies, which always name the candidates in one question so the player can still choose ("Which key do you want to take, the brass key or the iron key?"; for people, "Who do you want to examine, King Aldric or Queen Aldric?"). Overrides per world or per thing aren't built; each is one more lookup if a world needs it.
 
 ## Scope
 
@@ -481,10 +481,9 @@ That doesn't fit the lock.
 
 ## When: #open #no-action
 It's locked.
-
-## When: #go
-It's locked.
 ```
+
+A locked exit needs no section: going through a door that isn't passable gets the engine's reply naming it, "The iron door is locked."
 
 `closed.md`:
 
@@ -501,6 +500,9 @@ You pull the door shut.
 
 ## When: #unlock #no-action
 It isn't locked.
+
+## When: #close #no-action
+It's already shut.
 ```
 
 `open.md`:
@@ -511,7 +513,10 @@ inherits: index
 passable: yes
 ---
 ## When: #open
-The door stands open.
+It swings open.
+
+## When: #open #no-action
+It's already open.
 ```
 
 A specific door names its key and tells its own story. Its replies replace the built-in's for the same action and outcome:
@@ -546,9 +551,9 @@ In play:
 | `unlock door` | `no-key` | It's locked. Unlock it with what? |
 | `unlock door with spoon` | `wrong-key` | That doesn't fit the lock. |
 | `unlock door with key` | `closed`; the key stays in the lock | The padlock snaps open with a rusty clunk. The key stays in it. |
-| `open door` | `open` | The door stands open. Cold air rises from the dark below. |
+| `open door` | `open` | It swings open. Cold air rises from the dark below. |
 | `take key` | the key comes back to the player | You take the brass key. |
-| `down` | engine: `passable: yes` | The Vault |
+| `down` | engine: `passable: yes` | The vault's description |
 
 ### One thing affecting another
 

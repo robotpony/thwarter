@@ -4,7 +4,7 @@ The command language every client shares (Bruce, 2026-11-23): what a player can 
 
 The console's play mode is one such client. Its own commands (`/edit`, `/play here` and the rest) are in `design/CONSOLE_REQUIREMENTS.md`, not here.
 
-Owner: commander. Ids: REQ-PC. Each requirement says whether it's built, as of 0.47.1.
+Owner: commander. Ids: REQ-PC. Each requirement says whether it's built, as of 0.53.0.
 
 ## Summary
 
@@ -17,7 +17,7 @@ A line is a verb and maybe a noun. The engine turns it into an action (look, go,
 - REQ-PC-3: An article (`the`, `a`, `an`) MUST be dropped before a noun: `take the lantern`, `look at a well`. *Built.*
 - REQ-PC-20: A `to` or `at` straight after the verb MUST be dropped too, then any article: `listen to the chest`, `talk to the captain`. Prepositions that change the meaning (`in`, `into`, `on`, `under`) MUST NOT be dropped; `look in box` waits on Open question 5 (multi-word verbs). `go` is the exception, since an exit can be named "to the river": the engine tries the whole phrase as an exit first, then without the `to`. *Built* (7437e1f and 95a25f0, REQ-ENG-37).
 - REQ-PC-4: A known verb with no noun MUST get a reply asking for one, and change nothing: `Take what?`, `Go where?`, `Look at what?`. A verb that some object has as an action counts as known: a bare `pull` gets `What do you want to pull?`. *Built.*
-- REQ-PC-5: A line the engine can't read MUST get ``I don't understand `<line>`.``, and change nothing. It MUST NOT count as a turn (REQ-ENG-23). That includes a verb no thing has, alone (`dance`), and a built-in verb used another way (`i lamp`, `n please`), which never becomes an object action. *Built.*
+- REQ-PC-5: A line the engine can't read MUST get `I don't understand "<line>".`, with plain quotes, and change nothing. It MUST NOT count as a turn (REQ-ENG-23). That includes a verb no thing has, alone (`dance`), and a built-in verb used another way (`i lamp`, `n please`), which never becomes an object action. *Built.*
 
 ## Verbs
 
@@ -40,14 +40,14 @@ A line is a verb and maybe a noun. The engine turns it into an action (look, go,
 ## Nouns
 
 - REQ-PC-9: A noun MUST match among the things in scope, in this order: an exact id; the id with spaces for hyphens (`brass lantern` for `brass-lantern`); the name, ignoring case; then a whole word of the name or id that only one thing has (`lantern`). The first rule that matches wins. *Built* (`game_engine::resolve`).
-- REQ-PC-10: In scope means what the player can see or carries: the room itself (by name, `room`, `here` or `around`), what's listed in it, faint things already found, and the inventory. Hidden and absent things follow `design/STATES.md` › Hidden things. *Built* (REQ-ENG-25).
-- REQ-PC-11: A noun that matches several things MUST get a reply in the story's voice naming them, so the player can choose: ``Which sword do you want to take: the rusty sword or the old sword?`` The story MAY replace it (`design/STATES.md` › Ambiguity, REQ-ENG-26). *Built.*
+- REQ-PC-10: In scope means what the player can see or carries: the room itself (by name, `room`, `here` or `around`; a bare room name examines it), what's listed in it, faint things already found, and the inventory. Hidden and absent things follow `design/STATES.md` › Hidden things. *Built* (REQ-ENG-25).
+- REQ-PC-11: A noun that matches several things MUST get a reply in the story's voice naming them, so the player can choose. The built-in reply is one question: "Which key do you want to take, the brass key or the iron key?", and for people "Who do you want to examine, King Aldric or Queen Aldric?" The story MAY replace it (`design/STATES.md` › Ambiguity, REQ-ENG-26). *Built.*
 - REQ-PC-12: A noun that matches nothing MUST get ``There's no <noun> here.`` *Built.*
 
 ## Object actions
 
 - REQ-PC-13: A verb that isn't in the table, followed by a noun, MUST be tried as that object's named action (`light lantern`, `pull lever`; `design/STATES.md` › Changing state). A verb counts as an action when a thing has it in `actions:` or names it in a section heading (`## When: #hit @stick`). The engine checks `requires:`, applies the action, and replies with the matching reply sections in the target, then what it's done with, then the room (`design/SECTIONS.md` › The model). A `with` thing that matches nothing gets REQ-PC-12's reply. *Built* (`PlayAction::Use`, REQ-ENG-32, REQ-ENG-36).
-- REQ-PC-14: When the noun matches a thing but no section answers the action, the reply MUST be ``Nothing happens.``, and the turn changes nothing (Bruce; `design/SECTIONS.md` › Default replies). When no thing in the world has that verb as an action, the reply MUST be REQ-PC-5's ``I don't understand `<line>`.``, so `dance wildly` doesn't answer "There's no wildly here." "In the world" means any state or chapter of any object or door, not only the current ones, so a verb a gong gains later (`hush`) is understood now, and `hush wind` gets ``There's no wind here.`` *Built* (REQ-ENG-33, REQ-ENG-36).
+- REQ-PC-14: When the noun matches a thing but no section answers the action, the reply MUST be ``Nothing happens.``, and the turn changes nothing (Bruce; `design/SECTIONS.md` › Default replies). When no thing in the world has that verb as an action, the reply MUST be REQ-PC-5's `I don't understand "<line>".`, so `dance wildly` doesn't answer "There's no wildly here." "In the world" means any state or chapter of any object or door, not only the current ones, so a verb a gong gains later (`hush`) is understood now, and `hush wind` gets ``There's no wind here.`` *Built* (REQ-ENG-33, REQ-ENG-36).
 - REQ-PC-15: Object actions MUST NOT shadow the built-in verbs: an object with a `take` action is still taken by `take`. `search` is the exception, since a bare `search` is the built-in and `search <thing>` is the object's action. *Built* (REQ-ENG-32); whether a world may override a built-in verb for one object is Open question 3.
 
 ## Replies
@@ -73,7 +73,7 @@ From the console's unknown-input log, 2026-11-23, at Bruce's request. *Proposed*
 
 ## Open questions
 
-1. Which verbs come next? Candidates: `drop`, `wait` (`z`), `again` (`g`), `it` for the last thing named, `take all`, and talking to characters, which waits on the dialogue format (`design/CONTENT_FORMAT.md` › What's still open). Bruce to choose.
+1. Which verbs come next? Candidates: `drop`, `wait` (`z`), `again` (`g`), `it` for the last thing named, `take all`, `give`, and talking to characters (`talk`, `ask`; today `talk to` someone only says they have nothing to say), which waits on the dialogue format (`design/CONTENT_FORMAT.md` › What's still open). Bruce to choose.
 2. Should `search` and `look around` stay two verbs or become one? Both find faint things today; `search` has its own reply (`design/STATES.md` › Hidden things).
 3. May a world override a built-in verb for one object, such as a `take` action on a cursed idol that refuses? Proposed: yes, through a `take refused` response block, the same way doors use `go refused`.
 4. Which game commands beyond saving does every client need: `/quit`, `/restart`, `/help`, a list of saves?

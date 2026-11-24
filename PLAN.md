@@ -111,6 +111,8 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [ ] `/map` from the world's root draws the whole world, instead of asking for a room [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] A bare console command name in edit mode (`edit`) runs it or asks "Did you mean /edit?" [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] An unknown slash command suggests the nearest one [console] (`design/CONSOLE_REQUIREMENTS.md`)
+- [x] Play reads rooms and replies as the story: people right after the prose, held things on a plain look, doors named in the ways out (95ed0c9, REQ-ENG-43, 45, 46)
+- [ ] New verbs `drop`, `talk`, `ask` and `give` [coder] (`design/PLAYER_COMMANDS.md` › Open question 1; Bruce to choose)
 
 ## Phase 8 · Writing helpers
 

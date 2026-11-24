@@ -84,6 +84,24 @@ Object content is far more varied than location or character content (compare a 
 | `actions` | no | Map of action name to its mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`). The text a player reads is in the body, in a `## When: #wield` reply section, never here. See `design/SECTIONS.md`. |
 | anything else | no | Preserved verbatim (e.g. `properties`, `stats`, `effects`, `contents`, `security` in the sample world). Not validated. |
 
+## How play words a room: `[play]` in `world.toml`
+
+Play writes rooms and the inventory as plain sentences, each from a template in `world.toml`'s `[play]` table (REQ-ENG-43). A world MAY change any of them; the test world's `world.toml` lists every key at its default, as the reference.
+
+| Key | Default | Used for |
+|---|---|---|
+| `show_room_names` | `false` | The room's name above its description |
+| `objects` | `You see {list}.` | What's here, scenery left out |
+| `character`, `characters` | `{list} is here.`, `{list} are here.` | Who's here, right after the description |
+| `held` | `There's {list}.` | What things hold: "There's an old photo on the walls." |
+| `exits` | `You can go {or}.` | The ways out |
+| `door_exit` | `{direction} through {door}` | One way out through a door: "down through an iron door" |
+| `no_exits` | `There's no way out.` | A room with no exits |
+| `inventory`, `empty_inventory` | `You have {list}.`, `You aren't carrying anything.` | The inventory |
+| `serial_comma` | `true` | "a, b, and c" rather than "a, b and c" |
+
+`{list}` joins with "and", `{or}` with "or", and both work in any template. An unknown key, or a value of the wrong kind, is a warning.
+
 ## What the loader does today
 
 `WorldEngine::load_world` walks a world directory, parses every `.md` file, and:
