@@ -15,10 +15,6 @@ The Old Tower (village/tower)
 
 Exits:
   south  village/well
-
-Characters: none
-
-Objects: none
 > go s
 The Well (room)
 > /new room n gatehouse
@@ -34,12 +30,6 @@ Nothing called `behind` here or anywhere in the world.
 Cellar (village/cellar)
 
 (no description yet)
-
-Exits: none
-
-Characters: none
-
-Objects: none
 > /link up village/attic
 Linked village/cellar up to village/attic.
 This adds 1 problem(s):
@@ -177,8 +167,6 @@ Exits:
 
 Characters:
   The Elder (elder)
-
-Objects: none
 > /move village/well house
 Moved village/well → house/well: moved village/well.md → house/well.md, updated 3 files (npcs/elder, village/square, village/tower).
 > go back

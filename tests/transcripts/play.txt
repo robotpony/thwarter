@@ -82,10 +82,6 @@ A mossy stone well. The rope is long gone.
 
 Exits:
   south  village/square
-
-Characters: none
-
-Objects: none
 > go /village/well
 The Well (room)
 > /new object rope tool

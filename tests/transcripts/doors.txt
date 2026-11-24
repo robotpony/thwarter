@@ -34,10 +34,6 @@ Hallway (village/hallway)
 
 Exits:
   east  village/square  (through door-village-square-village-hallway-west, not passable)
-
-Characters: none
-
-Objects: none
 > /validate
 Problems (1):
   village/square: connection `east` points at unknown location `village/inn`
