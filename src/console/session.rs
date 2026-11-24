@@ -60,6 +60,8 @@ pub struct Console {
     pub(super) looked_at: Option<String>,
     /// The last play action's author notes, for the sidebar on a terminal.
     pub(super) notes: Vec<String>,
+    /// What the current command created, as (kind, id), for `/new` to open.
+    pub(super) created: Vec<(crate::engines::EntityKind, String)>,
     /// A question the console asked, which the next plain line answers.
     pub(super) asked: Option<super::doors::Asked>,
     /// Where input the console didn't understand is logged, for reviewing
@@ -100,6 +102,7 @@ impl Console {
             looked_at: None,
             notes: Vec::new(),
             asked: None,
+            created: Vec::new(),
             unknown_log: None,
         };
         if mode == Mode::Play {
@@ -190,7 +193,7 @@ impl Console {
             ("save", args) => self.save_game_as(args),
             ("load", args) => self.load_game_named(args),
             ("reload", _) => self.reload(),
-            ("new", args) if self.mode == Mode::Edit => self.new_entity(args),
+            ("new", args) if self.mode == Mode::Edit => self.new_and_edit(args),
             ("set", args) if self.mode == Mode::Edit => self.set(args),
             ("link", args) if self.mode == Mode::Edit => self.link(args),
             ("unlink", args) if self.mode == Mode::Edit => self.unlink(args),

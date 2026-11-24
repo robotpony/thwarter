@@ -43,6 +43,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.57.5 (2026-11-24)
+
+### Changed
+
+- `/new room`, `/new character` and `/new object` open the editor on what they made, on a terminal (Bruce, 2026-11-24), so a new thing goes straight to its description. Scripts and transcripts only make it. A setting to turn this off can follow.
+
 ## 0.57.4 (2026-11-24)
 
 ### Removed

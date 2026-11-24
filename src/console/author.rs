@@ -656,6 +656,7 @@ impl Console {
         let report = writer
             .create_loaded(&mut self.world.engine, new, edits, false)
             .map_err(|e| format!("Not created: {}", within(&writer, &e)))?;
+        self.created.push((new.kind, new.id.clone()));
         Ok(report.path)
     }
 

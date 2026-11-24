@@ -240,6 +240,31 @@ impl Console {
         self.target_for_file(path, kind)
     }
 
+    /// `/new ...`, then the editor on what it made (Bruce, 2026-11-24), on
+    /// a terminal. Scripts and transcripts only make it.
+    pub(super) fn new_and_edit(&mut self, args: &[&str]) -> String {
+        self.created.clear();
+        let out = self.new_entity(args);
+        let made = self.created.first().cloned();
+        if !self.interactive {
+            return out;
+        }
+        if let Some((kind, id)) = made {
+            let kind = match kind {
+                EntityKind::Location => Kind::Room,
+                EntityKind::Character => Kind::Character,
+                EntityKind::Object => Kind::Object,
+                EntityKind::Door => Kind::Door,
+            };
+            if let Some(path) = self.world.path_of(kind, &id) {
+                if let Ok(target) = self.open_target(kind, id, path) {
+                    self.pending_edit = Some(target);
+                }
+            }
+        }
+        out
+    }
+
     /// `/edit <name>`: whatever the name means, as `go <name>` finds it,
     /// without moving edit mode there. Scenery here opens as a new card.
     fn edit_target_any(&self, typed: &str) -> Result<EditTarget, String> {
@@ -558,6 +583,18 @@ mod tests {
             .collect();
         let bench = rows.iter().position(|r| r == "  bench").unwrap_or_else(|| panic!("{:?}", rows));
         assert_eq!(rows[bench + 1], "    lantern", "held under its holder");
+    }
+
+    #[test]
+    fn new_opens_the_editor_on_what_it_made() {
+        let (_dir, root) = tiny_copy();
+        let mut console = console_at(&root, "/village/square");
+        console.handle("/new room south village/garden");
+        assert_eq!(console.take_pending_edit().map(|t| t.path), Some("village/garden".to_string()));
+        console.handle("/new object rope tool");
+        assert_eq!(console.take_pending_edit().map(|t| t.path), Some("objects/rope".to_string()));
+        console.handle("/new object rope tool");
+        assert!(console.take_pending_edit().is_none(), "nothing made, nothing opened");
     }
 
     #[test]
