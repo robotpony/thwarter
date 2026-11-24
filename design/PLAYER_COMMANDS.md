@@ -62,6 +62,15 @@ Commands about the game rather than in the story start with `/`, so a world's ve
 - REQ-PC-18: Every client MUST offer saving and loading. A typing client MUST accept `/save [name]` and `/load [name]`, with `quicksave` when no name is given; a client with an interface MAY use buttons instead. The engine owns where saves go (REQ-CFG-6) and the save and load calls, so every client stores games the same way: `engines::saves` (`save_named`, `load_named`, `list_saves`, `save_path`, `DEFAULT_SAVE`). *Built* (28ff39f, REQ-ENG-34); the console's `/save` and `/load` use it.
 - REQ-PC-19: A game command MUST NOT count as a turn or change the story's state, except that `/load` replaces it.
 
+## Asked for in playtesting
+
+From the console's unknown-input log, 2026-11-23, at Bruce's request. *Proposed*, queued behind his playtest of both modes.
+
+- REQ-PC-21: `where` and `where am i` MUST name the current location, in play and in the console's edit mode. Logged: "where am i?"
+- REQ-PC-22: `enter <place>` MUST be an alias of `go <place>`. Logged: "enter closet".
+- REQ-PC-23: `look <direction>` and `what's <direction>` MUST say what's that way without going there: ``North: Closet.``, or the door's name for an exit through a door. Logged: "what's north?"
+- REQ-PC-24: An unknown verb that's one small typo from a known one (one letter added, missing, swapped or changed) MUST get ``Did you mean `look`?`` instead of REQ-PC-5's reply, and still change nothing. Logged: "lookl".
+
 ## Open questions
 
 1. Which verbs come next? Candidates: `drop`, `wait` (`z`), `again` (`g`), `it` for the last thing named, `take all`, and talking to characters, which waits on the dialogue format (`design/CONTENT_FORMAT.md` › What's still open). Bruce to choose.

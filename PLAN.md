@@ -101,6 +101,17 @@ Bruce authors it with the console coder, starting now, using what exists and gro
 - [x] The old test content removed, and the test world restarted from Bruce's rooms (0.50.2, 37a5c49) [Bruce, coder]
 - [ ] A transcript that plays it through [console] (REQ-CON-9)
 
+Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce playtests edit and play modes before any of these start.
+
+- [ ] `where` and `where am i` [coder, console] (REQ-PC-21)
+- [ ] `enter <place>` as `go` [coder] (REQ-PC-22)
+- [ ] `look <direction>` and `what's <direction>` [coder] (REQ-PC-23)
+- [ ] Typo suggestions for verbs [coder] (REQ-PC-24)
+- [ ] `/list objects|rooms|characters` in edit mode [console] (`design/CONSOLE_REQUIREMENTS.md`)
+- [ ] `/map` from the world's root draws the whole world, instead of asking for a room [console] (`design/CONSOLE_REQUIREMENTS.md`)
+- [ ] A bare console command name in edit mode (`edit`) runs it or asks "Did you mean /edit?" [console] (`design/CONSOLE_REQUIREMENTS.md`)
+- [ ] An unknown slash command suggests the nearest one [console] (`design/CONSOLE_REQUIREMENTS.md`)
+
 ## Phase 8 · Writing helpers
 
 AI tools for prose in edit mode. Done when an author can review and rewrite a room's prose from the console.
