@@ -17,7 +17,7 @@ not_understood = "I don't understand \"{line}\"."
 nothing = ["Nothing happens.", "Nothing seems to happen.", "That does nothing."]
 ```
 
-- A key's value is a string, or a list of strings that play picks from by turn, so a reply doesn't repeat word for word.
+- A key's value is a string, or a list of strings so a reply doesn't repeat word for word. A list picks entry `turn % len`, deterministically and never at random, so a replay gives the same text and a transcript pins one wording.
 - `{or}` and `{list}` join lists as they do in `[play]`. A placeholder the call doesn't supply, or a key the defaults don't have, is a warning.
 - One type, `Texts`, holds every table and answers `text(key, &args)`. It's the coder's, built from `engines::play_text`.
 
