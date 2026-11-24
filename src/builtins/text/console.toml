@@ -1,3 +1,34 @@
 # The console's own text (design/ENGINE_TEXT.md). An author changes any of
 # these in their personal config.toml's [console] table.
 [console]
+
+# Commands and their replies (session.rs).
+usage_bare = "Usage: /{command}"
+type_help = "Type /help for commands."
+unknown_command = "Unknown command `/{command}`. Type /help for commands."
+reload_failed = "Reload failed, keeping the previous world:"
+reload_failed_because = "Reload failed, keeping the previous world: {reason}"
+reloaded = "Reloaded: {rooms} room(s), {characters} character(s), {objects} object(s)."
+place_gone = "{place} is gone; now at {now}."
+shell_word_gone = "Edit mode moves as play does now: go <name>, a direction, go back, look. (`{word}` is gone.)"
+edit_unknown = "Edit mode doesn't know `{word}`. Type /help for commands."
+no_way_back = "There's nowhere to go back to yet."
+nothing_here_to_examine = "There's no `{name}` here. go {name} looks for it anywhere in the world."
+problems_heading = "Problems ({count}):"
+warnings_heading = "Warnings ({count}):"
+nothing_here = "Nothing here."
+no_exits_here = "There are no exits here: {place} isn't a room. go <name> goes anywhere."
+nothing_called = "Nothing called `{name}` here or anywhere in the world."
+which_do_you_mean = "Which do you mean: {names}?"
+door_leads_nowhere = "The {direction} exit goes through `{door}`, which doesn't say where it leads from here."
+exit_not_written = "The {direction} exit leads to `{room}`, which isn't written yet."
+
+# The world's root (session.rs, REQ-CON-47).
+root_area = "area: {count} room(s)"
+root_objects = "Global objects: {count}"
+root_characters = "Global characters: {count}"
+root_doors = "Global doors: {count}"
+root_world = "World settings"
+root_questions = "Question sets: {count}"
+root_templates = "Templates: {count}"
+root_chapters = "Chapters: {count}"

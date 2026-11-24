@@ -50,6 +50,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.63.1 (2026-11-24)
+
+### Changed
+
+- The console's wording starts moving into `[console]` (Phase 8, REQ-ENG-49): the console loads the built-in table with the author's own `[console]` from `config.toml` over it, and the replies in `session.rs` (unknown commands, reload, edit-mode navigation, `/validate`'s headings and the root listing's labels) now come from keys in `src/builtins/text/console.toml`. The wording is unchanged.
+
 ## 0.63.0 (2026-11-24)
 
 ### Added

@@ -60,6 +60,9 @@ pub struct Console {
     pub(super) looked_at: Option<String>,
     /// The last play action's author notes, for the sidebar on a terminal.
     pub(super) notes: Vec<String>,
+    /// The console's wording: the built-in `[console]` table with the
+    /// author's own over it, from their config.toml (REQ-ENG-49).
+    pub(super) texts: crate::engines::texts::Texts,
     /// Questions `/add` or `/new` left for the screen to ask.
     pub(super) pending_questions: Option<super::asking::Asking>,
     /// What `/add` just added, for it to open in the editor.
@@ -109,6 +112,7 @@ impl Console {
             created: Vec::new(),
             added: None,
             pending_questions: None,
+            texts: console_texts(),
             unknown_log: None,
         };
         if mode == Mode::Play {
@@ -188,10 +192,10 @@ impl Console {
             ("validate", ["strict"]) => self.validate(true),
             ("map", []) => self.map_command(),
             ("validate", _) => suggest("Usage:", &["/validate [strict]"]),
-            ("clear" | "status" | "map", _) => format!("Usage: /{}", name),
+            ("clear" | "status" | "map", _) => self.t("usage_bare", &[("command", name)]),
             ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
             ("restart", []) => "/restart restarts the console on the newest build, which needs a terminal.".to_string(),
-            ("restart", _) => "Usage: /restart".to_string(),
+            ("restart", _) => self.t("usage_bare", &[("command", "restart")]),
             ("edit", args) => self.full_edit(args),
             ("play", []) => self.play(),
             ("play", ["here"]) => self.play_here(),
@@ -212,10 +216,10 @@ impl Console {
             ("new" | "set" | "link" | "unlink" | "move" | "add" | "state" | "action" | "recipe", _) => {
                 format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", name)
             }
-            ("", _) => "Type /help for commands.".to_string(),
+            ("", _) => self.t("type_help", &[]),
             _ => {
                 self.log_unknown("command", &format!("/{}", command));
-                format!("Unknown command `/{}`. Type /help for commands.", name)
+                self.t("unknown_command", &[("command", name)])
             }
         };
         (out, Flow::Continue)
@@ -287,7 +291,7 @@ impl Console {
     pub(crate) fn reload(&mut self) -> String {
         let fresh = match World::load(&self.world.root) {
             Ok(world) => world,
-            Err(e) => return format!("Reload failed, keeping the previous world: {}", e),
+            Err(e) => return self.t("reload_failed_because", &[("reason", &e.to_string())]),
         };
         let mut blockers: Vec<String> = fresh.blocking_problems();
         if let Some(game) = &self.game {
@@ -299,22 +303,24 @@ impl Console {
             }
         }
         if !blockers.is_empty() {
-            let mut out = vec!["Reload failed, keeping the previous world:".to_string()];
+            let mut out = vec![self.t("reload_failed", &[])];
             out.extend(blockers.iter().map(|p| format!("  {}", p)));
             return out.join("\n");
         }
 
         self.world = fresh;
-        let mut out = vec![format!(
-            "Reloaded: {} room(s), {} character(s), {} object(s).",
-            self.world.report.locations_loaded,
-            self.world.engine.characters.len(),
-            self.world.report.objects_loaded
+        let mut out = vec![self.t(
+            "reloaded",
+            &[
+                ("rooms", &self.world.report.locations_loaded.to_string()),
+                ("characters", &self.world.engine.characters.len().to_string()),
+                ("objects", &self.world.report.objects_loaded.to_string()),
+            ],
         )];
         if !self.place_exists() {
             let gone = self.pwd();
             self.move_to_existing_folder();
-            out.push(format!("{} is gone; now at {}.", gone, self.pwd()));
+            out.push(self.t("place_gone", &[("place", &gone), ("now", &self.pwd())]));
         }
         for warning in self.reconcile_game() {
             out.push(format!("Game: {}", warning));
@@ -348,10 +354,7 @@ impl Console {
     fn edit_input(&mut self, line: &str) -> String {
         let first = line.split_whitespace().next().unwrap_or("");
         if matches!(first, "cd" | "ls" | "pwd") {
-            return format!(
-                "Edit mode moves as play does now: go <name>, a direction, go back, look. (`{}` is gone.)",
-                first
-            );
+            return self.t("shell_word_gone", &[("word", first)]);
         }
         // The same words as play (`design/PLAYER_COMMANDS.md`), read by the
         // engine's parser with no game, since edit mode only needs them.
@@ -366,7 +369,7 @@ impl Console {
             Parsed::Reply(question) => question,
             Parsed::Unknown(_) => {
                 self.log_unknown("edit", line);
-                format!("Edit mode doesn't know `{}`. Type /help for commands.", first)
+                self.t("edit_unknown", &[("word", first)])
             }
         }
     }
@@ -381,7 +384,7 @@ impl Console {
                     self.place = place;
                     self.arrival()
                 }
-                None => "There's nowhere to go back to yet.".to_string(),
+                None => self.t("no_way_back", &[]),
             };
         }
         match self.resolve(target) {
@@ -445,7 +448,7 @@ impl Console {
                 view
             }
             Some(Ok(Place::Dir(_))) | None => {
-                format!("There's no `{}` here. go {} looks for it anywhere in the world.", noun, noun)
+                self.t("nothing_here_to_examine", &[("name", noun)])
             }
             Some(Err(message)) => message,
         }
@@ -457,11 +460,11 @@ impl Console {
         let check = self.world.engine.validation(strict);
         let mut out = Vec::new();
         if !check.problems.is_empty() {
-            out.push(format!("Problems ({}):", check.problems.len()));
+            out.push(self.t("problems_heading", &[("count", &check.problems.len().to_string())]));
             out.extend(check.problems.iter().map(|p| format!("  {}", p)));
         }
         if !check.warnings.is_empty() {
-            out.push(format!("Warnings ({}):", check.warnings.len()));
+            out.push(self.t("warnings_heading", &[("count", &check.warnings.len().to_string())]));
             out.extend(check.warnings.iter().map(|w| format!("  {}", w)));
         }
         out.push(check.summary());
@@ -533,7 +536,7 @@ impl Console {
             }
         }
         if rows.is_empty() {
-            return "Nothing here.".to_string();
+            return self.t("nothing_here", &[]);
         }
         let width = rows.iter().map(|(n, _)| n.chars().count()).max().unwrap_or(0);
         rows.iter()
@@ -567,23 +570,23 @@ impl Console {
         }
         const OWN: &[&str] = &["objects", "npcs", "doors", "world", "questions", "templates", "chapters", "game"];
         for folder in folders.iter().filter(|f| !OWN.contains(&f.as_str())) {
-            rows.push((format!("{}/", folder), format!("area: {} room(s)", in_folder(folder, Some(Kind::Room)))));
+            rows.push((format!("{}/", folder), self.t("root_area", &[("count", &in_folder(folder, Some(Kind::Room)).to_string())])));
         }
         for folder in folders.iter().filter(|f| OWN.contains(&f.as_str())) {
             let label = match folder.as_str() {
-                "objects" => format!("Global objects: {}", in_folder(folder, Some(Kind::Object))),
-                "npcs" => format!("Global characters: {}", in_folder(folder, Some(Kind::Character))),
-                "doors" => format!("Global doors: {}", in_folder(folder, Some(Kind::Door))),
-                "world" => "World settings".to_string(),
-                "questions" => format!("Question sets: {}", in_folder(folder, None)),
-                "templates" => format!("Templates: {}", in_folder(folder, None)),
-                "chapters" => format!("Chapters: {}", in_folder(folder, None)),
+                "objects" => self.t("root_objects", &[("count", &in_folder(folder, Some(Kind::Object)).to_string())]),
+                "npcs" => self.t("root_characters", &[("count", &in_folder(folder, Some(Kind::Character)).to_string())]),
+                "doors" => self.t("root_doors", &[("count", &in_folder(folder, Some(Kind::Door)).to_string())]),
+                "world" => self.t("root_world", &[]),
+                "questions" => self.t("root_questions", &[("count", &in_folder(folder, None).to_string())]),
+                "templates" => self.t("root_templates", &[("count", &in_folder(folder, None).to_string())]),
+                "chapters" => self.t("root_chapters", &[("count", &in_folder(folder, None).to_string())]),
                 _ => format!("{} file(s)", in_folder(folder, None)),
             };
             rows.push((format!("{}/", folder), label));
         }
         if rows.is_empty() {
-            return "Nothing here.".to_string();
+            return self.t("nothing_here", &[]);
         }
         let width = rows.iter().map(|(n, _)| n.chars().count()).max().unwrap_or(0);
         rows.iter().map(|(name, note)| format!("{:<width$}  {}", name, note, width = width)).collect::<Vec<_>>().join("\n")
@@ -635,7 +638,7 @@ impl Console {
             return found;
         }
         if DIRECTIONS.contains(&target) && !matches!(self.current_kind(), Some(Kind::Room)) {
-            return Err(format!("There are no exits here: {} isn't a room. go <name> goes anywhere.", self.pwd()));
+            return Err(self.t("no_exits_here", &[("place", &self.pwd())]));
         }
 
         let trimmed = target.trim_end_matches('/');
@@ -672,7 +675,7 @@ impl Console {
             .collect();
         found.extend(self.world.dirs.iter().filter(|d| !d.is_empty() && last(d) == wanted).map(|d| Place::Dir(d.clone())));
         match found.len() {
-            0 => Err(format!("Nothing called `{}` here or anywhere in the world.", target)),
+            0 => Err(self.t("nothing_called", &[("name", target)])),
             1 => Ok(found.remove(0)),
             _ => {
                 let names: Vec<String> = found
@@ -682,7 +685,7 @@ impl Console {
                         Place::Dir(dir) => format!("{}/", dir),
                     })
                     .collect();
-                Err(format!("Which do you mean: {}?", names.join(", ")))
+                Err(self.t("which_do_you_mean", &[("names", &names.join(", "))]))
             }
         }
     }
@@ -700,14 +703,14 @@ impl Console {
             let to = match self.world.engine.doors.get(to) {
                 Some(door) => match door.leads_to(&entry.id) {
                     Some(room) => room.to_string(),
-                    None => return Some(Err(format!("The {} exit goes through `{}`, which doesn't say where it leads from here.", direction, to))),
+                    None => return Some(Err(self.t("door_leads_nowhere", &[("direction", direction), ("door", to)]))),
                 },
                 None => to.clone(),
             };
             let to = &to;
             return Some(match self.world.path_of(Kind::Room, to) {
                 Some(path) => Ok(Place::File(path)),
-                None => Err(format!("The {} exit leads to `{}`, which isn't written yet.", direction, to)),
+                None => Err(self.t("exit_not_written", &[("direction", direction), ("room", to)])),
             });
         }
         if location.characters.iter().any(|c| c == target) {
@@ -817,6 +820,26 @@ pub(super) fn suggest(text: &str, commands: &[&str]) -> String {
         out.push_str(&format!("\n  {}", command));
     }
     out
+}
+
+/// The `[console]` text table: the built-in defaults, with the author's
+/// `[console]` from `config.toml` laid over them. Problems in it are
+/// skipped, keeping the default for that key.
+fn console_texts() -> crate::engines::texts::Texts {
+    let mut texts = crate::engines::texts::Texts::defaults();
+    let Some(path) = crate::settings::config_dir().map(|d| d.join("config.toml")) else { return texts };
+    let Ok(text) = std::fs::read_to_string(&path) else { return texts };
+    let Ok(value) = text.parse::<toml::Value>() else { return texts };
+    let mut warnings = Vec::new();
+    texts.apply("console", value.get("console"), &path.display().to_string(), &mut warnings);
+    texts
+}
+
+impl Console {
+    /// A line of the console's own text, from `[console]` (REQ-ENG-49).
+    pub(super) fn t(&self, key: &str, args: &[(&str, &str)]) -> String {
+        self.texts.text("console", key, args)
+    }
 }
 
 fn parent_of(path: &str) -> String {
