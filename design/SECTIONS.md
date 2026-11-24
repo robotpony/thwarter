@@ -147,6 +147,6 @@ Bruce asked for more detail on three of the earlier questions (2026-11-23). They
    - **c.** Sections add, and a state file in the bundle replaces, as state files do today. Major changes replace, minor ones add.
    *Proposed*: **a** for the trial, since it matches "shown if it's true".
 4. **What form does a list of default replies take?** *Proposed*: a `nothing:` list in the settings' or section's ```thwarter block (`nothing: ["Nothing happens.", "That does nothing."]`). The lines are short and systemic, like `title`, so they can bend principle 8. The alternative is prose: a `## When: #nothing` section whose paragraphs are the list, which keeps principle 8 but adds a reserved state name.
-5. **Combining `When:` and `Unless:`.** A refusal reads "unlocking, and not holding the key". *Proposed*: a heading may say both, `## When: #unlock Unless: @brass-key`, or a `### Unless:` subsection inside a `When:` section narrows it. The first is shorter; the second reads as nested Markdown.
+5. **Combining `When:` and `Unless:`.** Settled (Bruce, 2026-11-23): no nesting, and a heading stays one keyword with its names. Harder conditions go in code: inline code, or a fenced ```thwarter block acting as a gate. *Proposed* gate keys: `requires:` and `unless:`, so two `## When: #unlock` sections can be told apart by their blocks.
 
 An action and a state sharing a name (`open`) isn't a concern (Bruce): `## When: #open` is the open door's description, and it reads as the reply to opening it too.
