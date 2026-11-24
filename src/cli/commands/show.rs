@@ -210,7 +210,10 @@ fn show_template(engine: &WorldEngine, name: &str, formatter: &OutputFormatter) 
 #[derive(Serialize, Debug)]
 struct WorldSummary {
     title: Option<String>,
+    /// The persona's id, as `world/index.md` names it.
     author: Option<String>,
+    /// The persona, if its folder was found (REQ-WS-4).
+    persona: Option<crate::engines::persona::Persona>,
     version: Option<String>,
     start: Option<String>,
     intro: String,
@@ -248,6 +251,7 @@ fn show_world(engine: &WorldEngine, world_path: &str, formatter: &OutputFormatte
     let summary = WorldSummary {
         title: w.title.clone(),
         author: w.author.clone(),
+        persona: engine.persona().cloned(),
         version: w.version.clone(),
         start: w.start.clone(),
         intro: w.intro.clone(),
@@ -273,8 +277,10 @@ fn show_world(engine: &WorldEngine, world_path: &str, formatter: &OutputFormatte
 
     let mut out = vec![summary.title.clone().unwrap_or_else(|| world_path.to_string())];
     let mut byline = Vec::new();
-    if let Some(a) = &summary.author {
-        byline.push(format!("by {}", a));
+    match (&summary.persona, &summary.author) {
+        (Some(p), _) => byline.push(format!("by {} ({})", p.title, p.id)),
+        (None, Some(a)) => byline.push(format!("by {}", a)),
+        _ => {}
     }
     if let Some(v) = &summary.version {
         byline.push(format!("version {}", v));

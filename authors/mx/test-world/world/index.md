@@ -1,7 +1,7 @@
 ---
 title: Castle Adventure - Extended World
 type: world
-author: Thwarter Testing Team
+author: mx
 version: 2.0.0
 start: castle/courtyard
 ---

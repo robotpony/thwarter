@@ -4,6 +4,7 @@ pub mod bundles;
 pub mod world_def;
 pub mod variables;
 pub mod builtins;
+pub mod persona;
 pub mod location_view;
 pub mod character_engine;
 pub mod narrative_engine;

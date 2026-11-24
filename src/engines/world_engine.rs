@@ -4,6 +4,7 @@ use crate::models::world::*;
 use crate::engines::bundles::{self, Chapter, ChapterKey, FileRecord, FileRole, Thing};
 use crate::engines::layers::{Layer, Merged};
 use crate::engines::variables;
+use crate::engines::persona::Persona;
 use crate::engines::world_def::WorldDef;
 use crate::models::game::{PlayState, SavedChapter};
 use crate::parsers::ParsedEntity;
@@ -90,6 +91,11 @@ pub struct WorldEngine {
     roles: std::collections::BTreeMap<PathBuf, FileRole>,
     /// Every file a template name can find (`bundles::Built::library`).
     library: std::collections::BTreeMap<String, Layer>,
+    /// The persona `world/index.md`'s `author:` names (REQ-WS-5), and a
+    /// problem or warning about it.
+    persona: Option<Persona>,
+    persona_problem: Option<String>,
+    persona_warning: Option<String>,
 }
 
 /// How plainly a thing is there, from its current version's
@@ -188,7 +194,16 @@ impl WorldEngine {
             links: HashMap::new(),
             roles: std::collections::BTreeMap::new(),
             library: std::collections::BTreeMap::new(),
+            persona: None,
+            persona_problem: None,
+            persona_warning: None,
         }
+    }
+
+    /// The world's author, from the persona `world/index.md`'s `author:`
+    /// names (REQ-WS-4, 5).
+    pub fn persona(&self) -> Option<&Persona> {
+        self.persona.as_ref()
     }
 
     /// The template `name` means, seen from `scope` (a folder relative to
@@ -287,6 +302,7 @@ impl WorldEngine {
             }
         }
         report.errors = self.file_problems.clone();
+        report.errors.extend(self.persona_problem.clone());
         report.warnings = self.current_warnings();
         Ok(report)
     }
@@ -347,6 +363,7 @@ impl WorldEngine {
         } else {
             WorldDef { story: built.world.story, player: built.world.player, ..self.world_toml.clone() }
         };
+        self.read_persona();
         if let Some(start) = self.world.start.take() {
             self.world.start = Some(self.resolve_name(&start, Some(EntityKind::Location)));
         }
@@ -536,6 +553,28 @@ impl WorldEngine {
                     action.becomes = becomes.into_iter().map(|(k, v)| (self.resolve_name(&k, None), v)).collect();
                 }
             }
+        }
+    }
+
+    /// Find the persona the world's `author:` names, beside the world.
+    fn read_persona(&mut self) {
+        self.persona = None;
+        self.persona_problem = None;
+        self.persona_warning = None;
+        let (Some(id), Some(root)) = (self.world.author.clone(), self.world_root.clone()) else { return };
+        let source = self.world.source.clone().unwrap_or_else(|| root.join("world/index.md"));
+        let Some(folder) = crate::engines::persona::persona_folder(&root, &id) else { return };
+        match crate::engines::persona::read_persona(&folder) {
+            Ok(Some(persona)) => self.persona = Some(persona),
+            Ok(None) => {
+                self.persona_warning = Some(format!(
+                    "{}: `author: {}` names no persona; a persona is a folder beside the world, {}",
+                    source.display(),
+                    id,
+                    folder.display()
+                ))
+            }
+            Err(e) => self.persona_problem = Some(e),
         }
     }
 
@@ -837,13 +876,16 @@ impl WorldEngine {
     /// `problems` for the world as it is now, after any in-memory changes:
     /// each file's parse error, then the same checks. No load report needed.
     pub fn current_problems(&self, strict: bool) -> Vec<String> {
-        self.problems_from(self.file_problems.clone(), strict)
+        let mut errors = self.file_problems.clone();
+        errors.extend(self.persona_problem.clone());
+        self.problems_from(errors, strict)
     }
 
     /// The warnings for the world as it is now: each file's (prefixed with
     /// its path), then ids shared between kinds.
     pub fn current_warnings(&self) -> Vec<String> {
         let mut warnings = self.file_warnings.clone();
+        warnings.extend(self.persona_warning.clone());
         warnings.extend(self.response_warnings());
         warnings.extend(self.variable_warnings());
         warnings.extend(self.prose_link_warnings());

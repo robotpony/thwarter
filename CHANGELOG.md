@@ -32,6 +32,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.34.0 (2026-11-23)
+
+### Added
+
+- Personas (REQ-WS-4, 5): `authors/<id>/index.md` with `type: author`, a `title` that is the pen name, contact details (`email`, `website`, or any other single value), an optional default `style` and `world`, and the bio as its prose. A persona folder without `index.md` still works, with its folder name as the pen name. `world/index.md`'s `author:` names a persona by id, found as the world's own parent folder or a sibling of it, and `WorldEngine::persona()` returns it. `validate` warns when `author:` names no persona, and reports a persona file that isn't `type: author`. `engines::persona::list_personas` lists the personas in an `authors/` folder.
+- Personal settings (REQ-CFG-4): `settings::PersonalConfig` reads `$XDG_CONFIG_HOME/thwarter/config.toml` (else `~/.config/thwarter/config.toml`), with the default persona (`persona = "bob"`) and the writing helpers' `[helpers]` table, and writes it back atomically, readable only by its owner, keeping every key it doesn't know. `settings::data_dir` and `state_dir` give `$XDG_DATA_HOME/thwarter` and `$XDG_STATE_HOME/thwarter`, for installed worlds and play data (REQ-CFG-5, 6).
+- `thwart show`'s summary says the persona's pen name and id ("by B. Alderson (bruce)"), and its JSON includes the persona.
+
+### Changed
+
+- The test world names its persona, `author: mx`, the folder it sits in, instead of the free-text "Thwarter Testing Team".
+
 ## 0.33.2 (2026-11-23)
 
 ### Fixed

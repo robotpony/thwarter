@@ -4,6 +4,7 @@ pub mod parsers;
 pub mod cli;
 pub mod render;
 pub mod writer;
+pub mod settings;
 pub mod console;
 
 pub use models::*;

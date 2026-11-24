@@ -10,10 +10,25 @@ fn write(dir: &Path, rel: &str, text: &str) {
     std::fs::write(path, text).unwrap();
 }
 
-fn world() -> tempfile::TempDir {
+/// A world at `authors/bruce/castle/` in a temporary folder, with the
+/// persona beside it. Returns the folder and the world's path.
+struct World {
+    _dir: tempfile::TempDir,
+    root: std::path::PathBuf,
+}
+
+impl World {
+    fn path(&self) -> &Path {
+        &self.root
+    }
+}
+
+fn world() -> World {
     let dir = tempfile::tempdir().unwrap();
-    let d = dir.path();
-    write(d, "world/index.md", "---\ntitle: Tiny Castle\ntype: world\nauthor: Bruce\nstart: vault\n---\nYou wake.\n");
+    write(dir.path(), "authors/bruce/index.md", "---\ntype: author\ntitle: B. Alderson\nwebsite: https://example.com\n---\nWrites small worlds.\n");
+    let root = dir.path().join("authors/bruce/castle");
+    let d = root.as_path();
+    write(d, "world/index.md", "---\ntitle: Tiny Castle\ntype: world\nauthor: bruce\nstart: vault\n---\nYou wake.\n");
     write(d, "world/story.md", "---\ntype: story\nvars: { king: alive }\n---\n");
     write(d, "chapters/10-before.md", "---\ntitle: Before\n---\n");
     write(d, "vault/index.md", "---\nid: vault\ntitle: Vault\ntype: location\nstate: shut\n---\n");
@@ -24,7 +39,7 @@ fn world() -> tempfile::TempDir {
     write(d, "objects/diary.md", "---\nid: diary\ntitle: Diary\ntype: object\ninherits: book\n---\n");
     write(d, "objects/vault.md", "---\nid: vault\ntitle: Vault key\ntype: object\nobject_type: key\n---\n");
     write(d, "npcs/guard.md", "---\nid: guard\ntitle: Guard\ntype: character\ndefault_location: vault\n---\nStern.\n");
-    dir
+    World { _dir: dir, root }
 }
 
 fn show(dir: &Path, args: &[&str]) -> (bool, String, String) {
@@ -43,7 +58,7 @@ fn the_summary_shows_the_world_definition_chapters_and_ids() {
     let dir = world();
     let (ok, out, _) = show(dir.path(), &[]);
     assert!(ok);
-    for expected in ["Tiny Castle\nby Bruce\nStarts in: vault\n\nYou wake.", "Story values: king = alive", "Chapters:\n  10  before  Before", "Locations (1):\n  - vault", "Objects (2):\n  - diary\n  - vault", "Characters (1):\n  - guard"] {
+    for expected in ["Tiny Castle\nby B. Alderson (bruce)\nStarts in: vault\n\nYou wake.", "Story values: king = alive", "Chapters:\n  10  before  Before", "Locations (1):\n  - vault", "Objects (2):\n  - diary\n  - vault", "Characters (1):\n  - guard"] {
         assert!(out.contains(expected), "missing {:?} in:\n{}", expected, out);
     }
 }

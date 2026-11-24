@@ -212,7 +212,10 @@ mod tests {
         write(d, "world.toml", "[metadata]\ntitle = \"Old title\"\n");
         let mut engine = WorldEngine::new();
         let report = engine.load_world(d).unwrap();
-        assert!(report.errors.is_empty() && report.warnings.is_empty(), "{:?} {:?}", report.errors, report.warnings);
+        // Its `author:` names no persona folder beside the world.
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+        assert_eq!(report.warnings.len(), 1, "{:?}", report.warnings);
+        assert!(report.warnings[0].contains("`author: Bruce` names no persona"), "{:?}", report.warnings);
         let world = engine.world();
         assert_eq!(world.title.as_deref(), Some("Castle")); // world/ wins over world.toml
         assert_eq!(world.author.as_deref(), Some("Bruce"));
