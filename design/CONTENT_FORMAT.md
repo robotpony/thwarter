@@ -79,7 +79,8 @@ Object content is far more varied than location or character content (compare a 
 | `category` | no | Free text, finer-grained than `object_type`. |
 | `weight` | no | Free text by convention (`light`, `heavy`, `immovable`), not a unit. |
 | `value` | no | Free text; sample content mixes numbers (`1000`) and descriptions (`priceless`, `unknown`). |
-| `actions` | no | Map of action name to its mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`). The text a player reads is in the body, after a `<!-- thwarter:action wield -->` marker, never here. See `design/STATES.md` › Responses. |
+| `objects` | no | List of object `id`s this object holds, such as photos on a wall (REQ-CF-31). |
+| `actions` | no | Map of action name to its mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`). The text a player reads is in the body, in a `## When: #wield` reply section, never here. See `design/SECTIONS.md`. |
 | anything else | no | Preserved verbatim (e.g. `properties`, `stats`, `effects`, `contents`, `security` in the sample world). Not validated. |
 
 ## What the loader does today
@@ -95,4 +96,5 @@ Object content is far more varied than location or character content (compare a 
 ## What's still open
 
 - **Objects without cards are scenery.** A location's `objects: [...]` or a character's `inventory: [...]` can name an object `id` with no file. That's allowed: the object is scenery with a name only, and the console creates its card the first time an author edits it (`design/CONTENT_REQUIREMENTS.md` › REQ-CF-8). Tools should label it "no card", not report it as missing. A card created this way starts with `object_type: scenery`, a `title` made from the id in sentence case (`stone-bench` → "Stone bench"), and an empty body (decided by the commander, 2026-11-23).
+- **How a holder lists what it holds.** Examining `walls` shows its description, then what it holds. Whether that list names each thing by title ("Photo 1"), groups them ("photos"), or is left to the holder's prose is for Bruce to decide (2026-11-23).
 - **Dialogue tree format is unspecified.** `dialogue_tree` is loaded as an opaque string. What it points to, and how it's structured, is undecided.
