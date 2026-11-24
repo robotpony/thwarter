@@ -8,6 +8,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Added
 
+- `design/CLI_REQUIREMENTS.md` › Packaging and installing worlds: REQ-CLI-12 to 16, for `thwart package`, `thwart install`, `thwart installed` and playing an installed world, agreed with the commander.
 - `PLAN.md`, the phased work queue, and `BUGS.md`, the defect log, both in Space Command's task format.
 - This changelog.
 - `design/ENGINE_REQUIREMENTS.md` gains REQ-ENG-10 to 29, the engine rules settled during the states design (loading, chapters, building a version, ids and values, play and saves, writing bundles), and REQ-ENG-7 the writer's rule for files that name a template.
