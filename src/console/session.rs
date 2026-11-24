@@ -166,7 +166,10 @@ impl Console {
             ("clear", []) if self.interactive => return (String::new(), Flow::Clear),
             ("clear", []) => "/clear empties the screen's output, which needs a terminal.".to_string(),
             ("status", []) => self.status_report(),
+            ("validate", []) => self.validate(false),
+            ("validate", ["strict"]) => self.validate(true),
             ("map", []) => self.map_command(),
+            ("validate", _) => "Usage: /validate [strict]".to_string(),
             ("clear" | "status" | "map", _) => format!("Usage: /{}", name),
             ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
             ("restart", []) => "/restart restarts the console on the newest build, which needs a terminal.".to_string(),
@@ -207,6 +210,7 @@ impl Console {
             "  /reload         reload the world from disk, staying where you are".to_string(),
             "  /status         the world, where you are, the game, saves and the build".to_string(),
             "  /map            the map around you (the sidebar shows the nearest rooms)".to_string(),
+            "  /validate       check the world as thwart validate does, edits included".to_string(),
             "  /clear          empty the output (the session carries on)".to_string(),
             "  /restart        restart the console on the newest build, keeping your place".to_string(),
             "  /help           this list".to_string(),
@@ -306,7 +310,7 @@ impl Console {
         }
         let warnings = self.world.warnings();
         if !warnings.is_empty() {
-            out.push(format!("{} warning(s), such as exits to rooms not written yet. `thwart validate` lists them.", warnings.len()));
+            out.push(format!("{} warning(s), such as exits to rooms not written yet. /validate lists them.", warnings.len()));
         }
         out
     }
@@ -419,6 +423,23 @@ impl Console {
             }
             Some(Err(message)) => message,
         }
+    }
+
+    /// `/validate [strict]`: the world checked as `thwart validate` checks
+    /// it, edits made in the console included (REQ-ENG-44).
+    fn validate(&self, strict: bool) -> String {
+        let check = self.world.engine.validation(strict);
+        let mut out = Vec::new();
+        if !check.problems.is_empty() {
+            out.push(format!("Problems ({}):", check.problems.len()));
+            out.extend(check.problems.iter().map(|p| format!("  {}", p)));
+        }
+        if !check.warnings.is_empty() {
+            out.push(format!("Warnings ({}):", check.warnings.len()));
+            out.extend(check.warnings.iter().map(|w| format!("  {}", w)));
+        }
+        out.push(check.summary());
+        out.join("\n")
     }
 
     /// Appends one line to the unknown-input log: when, the world, the

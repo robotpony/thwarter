@@ -106,7 +106,11 @@ pub fn line_role(line: &str) -> Option<Role> {
         Some(Role::Note)
     } else if ERRORS.iter().any(|p| line.starts_with(p)) {
         Some(Role::Error)
-    } else if line.starts_with("This adds") || line.contains("warning(s)") || line.contains("isn't written yet") {
+    } else if line.starts_with("Validation failed") || line.starts_with("Problems (") {
+        Some(Role::Error)
+    } else if line.starts_with("Validation passed") {
+        Some(Role::Message)
+    } else if line.starts_with("This adds") || line.starts_with("Warnings (") || line.contains("warning(s)") || line.contains("isn't written yet") {
         Some(Role::Warning)
     } else if line.contains("(missing)") || line.contains("(no card)") {
         Some(Role::Missing)

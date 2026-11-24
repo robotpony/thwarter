@@ -39,6 +39,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.55.0 (2026-11-24)
+
+### Added
+
+- `/validate [strict]`: the world checked as `thwart validate` checks it, through the engine's `validation()` (6abdf97, REQ-ENG-44), with the console's unsaved-to-disk edits included. It lists the problems, then the warnings, then the summary line. The greeting now points at it.
+- A problems pane at the foot of the sidebar, under a line, as in an IDE (Bruce, 2026-11-23): "PROBLEMS n · WARNINGS n", then every problem in red and every warning in yellow, taking at most a third of the sidebar, with `/validate` for the rest. HERE no longer repeats a room's warnings.
+
 ## 0.54.0 (2026-11-24)
 
 ### Added

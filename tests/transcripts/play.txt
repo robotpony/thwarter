@@ -2,7 +2,7 @@
 # mode: play
 # copy: yes
 Playing Tiny World (tests/worlds/tiny). Type /help for commands.
-1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
 
 A small square of packed earth. An old well stands to the north.
 The Elder is here.

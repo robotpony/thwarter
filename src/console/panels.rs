@@ -17,6 +17,7 @@ pub enum Row {
     /// Something not written yet: an exit's room, a thing's card.
     Missing(String),
     Warning(String),
+    Error(String),
     /// A row of the map, drawn as it is: cut at the sidebar's edge, never
     /// wrapped.
     Map(String),
@@ -29,6 +30,9 @@ pub enum Row {
 pub struct Sidebar {
     pub fixed: Vec<Row>,
     pub rest: Vec<Row>,
+    /// The world's problems and warnings, kept at the sidebar's foot under
+    /// a line, as an IDE keeps its problems pane (Bruce, 2026-11-23).
+    pub warnings: Vec<Row>,
 }
 
 /// The status bar's two ends.
@@ -120,7 +124,16 @@ impl Console {
                 rest.extend(self.notes.iter().map(|n| Row::Warning(format!("  {}", n))));
             }
         }
-        Sidebar { fixed, rest }
+        Sidebar { fixed, rest, warnings: self.warnings_panel() }
+    }
+
+    /// The foot of the sidebar: every problem, then every warning.
+    fn warnings_panel(&self) -> Vec<Row> {
+        let check = self.world.engine.validation(false);
+        let mut rows = vec![Row::Heading(format!("PROBLEMS {} · WARNINGS {}", check.problems.len(), check.warnings.len()))];
+        rows.extend(check.problems.iter().map(|p| Row::Error(format!("  {}", p))));
+        rows.extend(check.warnings.iter().map(|w| Row::Warning(format!("  {}", w))));
+        rows
     }
 
     /// The room the map is drawn around: edit mode's room, or the player's.
@@ -298,16 +311,7 @@ impl Console {
             rows.push(Row::Heading("looked at".to_string()));
             rows.extend(self.file_rows(path));
         }
-        let warnings: Vec<String> = self
-            .world
-            .warnings()
-            .into_iter()
-            .filter(|w| w.contains(&format!("`{}`", room)) || w.contains(&format!("{}.md", room)) || w.contains(&room))
-            .collect();
-        if !warnings.is_empty() {
-            rows.push(Row::Heading("warnings".to_string()));
-            rows.extend(warnings.into_iter().map(|w| Row::Warning(format!("  {}", w))));
-        }
+
         rows
     }
 
@@ -426,7 +430,7 @@ pub fn folded(sidebar: &Sidebar) -> String {
         .fixed
         .iter()
         .filter_map(|r| match r {
-            Row::Text(t) | Row::Dim(t) | Row::Missing(t) | Row::Warning(t) | Row::Map(t) => Some(t.as_str()),
+            Row::Text(t) | Row::Dim(t) | Row::Missing(t) | Row::Warning(t) | Row::Error(t) | Row::Map(t) => Some(t.as_str()),
             _ => None,
         })
         .collect();
@@ -447,7 +451,7 @@ mod tests {
             .map(|r| match r {
                 Row::Heading(t) => format!("# {}", t),
                 Row::Text(t) => t.clone(),
-                Row::Dim(t) | Row::Missing(t) | Row::Warning(t) => format!("~ {}", t),
+                Row::Dim(t) | Row::Missing(t) | Row::Warning(t) | Row::Error(t) => format!("~ {}", t),
                 Row::Map(t) => format!("| {}", t),
                 Row::Blank => String::new(),
             })
@@ -489,8 +493,6 @@ mod tests {
                 "  lantern",
                 "# scenery",
                 "~   bench",
-                "# warnings",
-                "~   village/square: connection `east` points at unknown location `village/inn`",
             ]
         );
         let status = console.status(true);
@@ -556,6 +558,16 @@ mod tests {
         assert_eq!(looked[..4], ["# looked at", "  Brass Lantern (object)", "~   objects/lantern.md", "~   tool"]);
         console.handle("n");
         assert!(!texts(&console.sidebar().rest).contains(&"# looked at".to_string()), "gone once edit mode moves");
+    }
+
+    #[test]
+    fn problems_and_warnings_sit_at_the_foot() {
+        let mut console = tiny();
+        let foot = texts(&console.sidebar().warnings);
+        assert_eq!(foot[0], "# PROBLEMS 1 · WARNINGS 0");
+        assert!(foot[1].contains("village/inn"), "{:?}", foot);
+        let (out, _) = console.handle("/validate");
+        assert!(out.ends_with("Validation failed: 1 problem(s), 0 warning(s)"), "{}", out);
     }
 
     #[test]

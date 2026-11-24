@@ -311,7 +311,7 @@ impl<'a> Screen<'a> {
         let output_area = if wide {
             let width = (body.width / 3).max(32);
             let [left, right] = Layout::horizontal([Constraint::Min(20), Constraint::Length(width)]).areas(body);
-            self.draw_sidebar(frame, right, &sidebar.fixed, &sidebar.rest);
+            self.draw_sidebar(frame, right, &sidebar.fixed, &sidebar.rest, &sidebar.warnings);
             left
         } else {
             frame.render_widget(Paragraph::new(folded(&sidebar)).style(style(Role::Note)), parts[2]);
@@ -350,10 +350,26 @@ impl<'a> Screen<'a> {
         frame.render_widget(Paragraph::new(lines), area);
     }
 
-    fn draw_sidebar(&self, frame: &mut Frame, area: Rect, fixed: &[Row], rest: &[Row]) {
+    fn draw_sidebar(&self, frame: &mut Frame, area: Rect, fixed: &[Row], rest: &[Row], warnings: &[Row]) {
         let block = Block::default().borders(Borders::LEFT).border_style(style(Role::Chrome));
         let inner = block.inner(area);
         frame.render_widget(block, area);
+        // Problems and warnings at the foot, under a line, at most a third
+        // of the height; the panels above take the rest.
+        let width = inner.width.saturating_sub(1).max(1) as usize;
+        let foot: Vec<Row> = warnings.iter().flat_map(|row| wrap_row(row, width)).collect();
+        let foot_height = ((foot.len() as u16) + 1).min(inner.height / 3).max(2.min(inner.height));
+        let [inner, bottom] = Layout::vertical([Constraint::Min(0), Constraint::Length(foot_height)]).areas(inner);
+        let foot_block = Block::default().borders(Borders::TOP).border_style(style(Role::Chrome));
+        let foot_inner = foot_block.inner(bottom);
+        frame.render_widget(foot_block, bottom);
+        let shown = foot_inner.height as usize;
+        let mut lines: Vec<Line> = foot.iter().take(shown).map(row_line).collect();
+        if foot.len() > shown && shown > 0 {
+            lines.pop();
+            lines.push(Line::styled(format!(" … {} more: /validate", foot.len() - shown + 1), style(Role::Note)));
+        }
+        frame.render_widget(Paragraph::new(lines), foot_inner);
         // Long rows wrap within the sidebar, keeping their indent.
         let width = inner.width.saturating_sub(1).max(1) as usize;
         let wrapped = |rows: &[Row]| -> Vec<Row> { rows.iter().flat_map(|row| wrap_row(row, width)).collect() };
@@ -524,6 +540,7 @@ fn wrap_row(row: &Row, width: usize) -> Vec<Row> {
         Row::Dim(t) => (t, Row::Dim),
         Row::Missing(t) => (t, Row::Missing),
         Row::Warning(t) => (t, Row::Warning),
+        Row::Error(t) => (t, Row::Error),
         // A map row keeps its shape: cut at the edge, never wrapped.
         Row::Map(t) => return vec![Row::Map(t.chars().take(width).collect())],
         Row::Blank => return vec![Row::Blank],
@@ -544,6 +561,7 @@ fn row_line(row: &Row) -> Line<'static> {
         Row::Dim(text) => styled(text, Role::Note),
         Row::Missing(text) => styled(text, Role::Missing),
         Row::Warning(text) => styled(text, Role::Warning),
+        Row::Error(text) => styled(text, Role::Error),
         Row::Map(text) => styled(text, Role::Link),
         Row::Blank => Line::from(""),
     }
