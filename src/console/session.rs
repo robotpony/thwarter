@@ -55,6 +55,8 @@ pub struct Console {
     pub(super) pending_edit: Option<super::full_edit::EditTarget>,
     /// Where edit mode has been, most recent last, for `go back`.
     pub(super) trail: Vec<Place>,
+    /// What `examine` showed last, for the sidebar, until edit mode moves.
+    pub(super) looked_at: Option<String>,
     /// Where input the console didn't understand is logged, for reviewing
     /// what authors and players reach for. Only a terminal session sets it.
     pub(super) unknown_log: Option<std::path::PathBuf>,
@@ -90,6 +92,7 @@ impl Console {
             interactive: false,
             pending_edit: None,
             trail: Vec::new(),
+            looked_at: None,
             unknown_log: None,
         };
         if mode == Mode::Play {
@@ -334,6 +337,7 @@ impl Console {
     /// `go <direction or name>`, `go back` and `go /`.
     fn go(&mut self, target: &str) -> String {
         let target = target.trim();
+        self.looked_at = None;
         if target == "back" {
             return match self.trail.pop() {
                 Some(place) => {
@@ -364,7 +368,7 @@ impl Console {
             Place::File(path) => match self.world.files.get(path) {
                 Some(entry) if entry.kind == Kind::Room => format!("{} (room)", entry.title),
                 Some(entry) if entry.kind == Kind::Broken => format!("{}.md (doesn't parse)", path),
-                Some(entry) => format!("{} ({}), {}.md", entry.title, entry.kind.label(), path),
+                Some(entry) => format!("{} ({})", entry.title, entry.kind.label()),
                 None => self.pwd(),
             },
             Place::Dir(dir) => {
@@ -395,9 +399,14 @@ impl Console {
     }
 
     /// `examine <thing>`: a person or thing here, shown without going to it.
-    fn examine(&self, noun: &str) -> String {
+    fn examine(&mut self, noun: &str) -> String {
         match self.resolve_here(noun) {
-            Some(Ok(Place::File(path))) => self.view_of(&path),
+            Some(Ok(Place::File(path))) => {
+                let view = self.view_of(&path);
+                // The sidebar shows its file until edit mode moves on.
+                self.looked_at = Some(path);
+                view
+            }
             Some(Ok(Place::Dir(_))) | None => {
                 format!("There's no `{}` here. go {} looks for it anywhere in the world.", noun, noun)
             }
@@ -493,11 +502,11 @@ impl Console {
                 None => format!("{} is not in the world.", entry.id),
             },
             Kind::Character => match self.world.engine.characters.get(&entry.id) {
-                Some(c) => view::character(c, &path),
+                Some(c) => view::character(c),
                 None => format!("{} is not in the world.", entry.id),
             },
             Kind::Object => match self.world.engine.objects.get(&entry.id) {
-                Some(o) => view::object(o, &path),
+                Some(o) => view::object(o),
                 None => format!("{} is not in the world.", entry.id),
             },
             Kind::World => view::world(self.world.engine.world(), &path),

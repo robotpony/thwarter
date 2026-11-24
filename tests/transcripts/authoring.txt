@@ -53,10 +53,9 @@ Village Square (room)
 > /new object bench
 Created object bench, Bench; village/square already lists it, and now it has a card.
 > go bench
-Bench (object), objects/bench.md
+Bench (object)
 > look
 Bench (bench)
-objects/bench.md, scenery
 
 (no description yet)
 
@@ -89,7 +88,7 @@ Objects:
   Bench (bench)
   Rope (rope)
 > go smith
-The Smith (character), npcs/smith.md
+The Smith (character)
 > /set attributes.strength 12
 Set attributes.strength on smith.
 > /set inventory rope, lantern
@@ -98,7 +97,6 @@ Set inventory on smith.
 Not saved: changing `id` isn't supported yet: renaming means moving the file and fixing references
 > look
 The Smith (smith)
-npcs/smith.md, npc
 
 (no description yet)
 
@@ -221,10 +219,9 @@ Created object iron-key, Iron Key, placed in village/square.
 > /new character "Old Tom"
 Created character old-tom, Old Tom, placed in village/square.
 > go old-shirt
-old shirt (object), objects/old-shirt.md
+old shirt (object)
 > look
 old shirt (old-shirt)
-objects/old-shirt.md, scenery
 
 (no description yet)
 

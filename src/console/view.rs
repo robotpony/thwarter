@@ -7,9 +7,10 @@ use crate::engines::world_def::WorldDef;
 use crate::models::character::Character;
 use crate::models::world::GameObject;
 
-pub fn character(c: &Character, path: &str) -> String {
-    let kind = format!("{:?}", c.character_type).to_lowercase();
-    let mut out = vec![format!("{} ({})", c.name, c.id), format!("{}.md, {}", path, kind)];
+/// A character as edit mode shows it. Its file and kind are in the
+/// sidebar, not here (Bruce, 2026-11-23).
+pub fn character(c: &Character) -> String {
+    let mut out = vec![format!("{} ({})", c.name, c.id)];
     out.push(String::new());
     out.push(description(&c.description));
     out.push(String::new());
@@ -18,12 +19,9 @@ pub fn character(c: &Character, path: &str) -> String {
     out.join("\n")
 }
 
-pub fn object(o: &GameObject, path: &str) -> String {
-    let mut kind = o.object_type.clone();
-    if let Some(category) = &o.category {
-        kind = format!("{}, {}", kind, category);
-    }
-    let mut out = vec![format!("{} ({})", o.title, o.id), format!("{}.md, {}", path, kind)];
+/// An object as edit mode shows it; its file and type are in the sidebar.
+pub fn object(o: &GameObject) -> String {
+    let mut out = vec![format!("{} ({})", o.title, o.id)];
     out.push(String::new());
     out.push(description(&o.description));
     let mut actions: Vec<&String> = o.actions.keys().collect();

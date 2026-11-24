@@ -35,12 +35,11 @@ Village Square (room)
 > go east
 The east exit leads to `village/inn`, which isn't written yet.
 > go elder
-The Elder (character), npcs/elder.md
+The Elder (character)
 > go back
 Village Square (room)
 > examine lantern
 Brass Lantern (lantern)
-objects/lantern.md, tool
 
 A dented brass lantern with a little oil left.
 
@@ -56,7 +55,7 @@ lantern  Brass Lantern  (object)
 > n
 There are no exits here: objects/ isn't a room. go <name> goes anywhere.
 > go lantern
-Brass Lantern (object), objects/lantern.md
+Brass Lantern (object)
 > go /
 /  3 items: npcs/, objects/, village/
 > go well

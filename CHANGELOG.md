@@ -35,6 +35,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.41.4 (2026-11-23)
+
+### Changed
+
+- Edit mode's views and arrival lines no longer print a file's path and type (`objects/chair.md, scenery`); the sidebar shows them (Bruce, 2026-11-23). HERE shows the file and type of the thing edit mode is at, and of what `examine` (`look <thing>`) showed last, under "looked at", until edit mode moves.
+- HERE groups a room's contents as people, things and scenery, where scenery is anything built from the built-in `scenery` template or listed with no card yet (dimmed, without a label). A thing's scope shows only when it isn't global, the default.
+- `design/CONSOLE_REQUIREMENTS.md` › REQ-CON-10 points at `design/PLAYER_COMMANDS.md` (REQ-PC) for play mode's commands instead of listing them.
+
 ## 0.41.3 (2026-11-23)
 
 ### Changed

@@ -192,11 +192,7 @@ impl Console {
         };
         let Some(room) = room else {
             match &self.place {
-                Place::File(path) => {
-                    if let Some(entry) = self.world.files.get(path) {
-                        rows.push(Row::Text(format!("{} ({})", entry.title, entry.kind.label())));
-                    }
-                }
+                Place::File(path) => rows.extend(self.file_rows(path)),
                 // A folder: what it holds, folders first.
                 Place::Dir(dir) => {
                     let prefix = if dir.is_empty() { String::new() } else { format!("{}/", dir) };
@@ -242,23 +238,35 @@ impl Console {
                 rows.push(Row::Missing(format!("  {}  {}{}  (not written)", direction, room, through)));
             }
         }
+        // People, things, then scenery: the things built from the built-in
+        // `scenery` template, or listed with no card yet (dimmed). Scope
+        // shows only when it isn't global, the default (Bruce, 2026-11-23).
+        let named = |id: &String, path: Option<String>| -> Row {
+            match path.map(|p| self.scope_of(&p)) {
+                Some(scope) if scope == "global" => Row::Text(format!("  {}", id)),
+                Some(scope) => Row::Text(format!("  {}  {}", id, scope)),
+                None => Row::Dim(format!("  {}", id)),
+            }
+        };
         if !location.characters.is_empty() {
             rows.push(Row::Heading("people".to_string()));
             for id in &location.characters {
-                rows.push(match self.world.path_of(Kind::Character, id) {
-                    Some(path) => Row::Text(format!("  {}  {}", id, self.scope_of(&path))),
-                    None => Row::Missing(format!("  {}  no card", id)),
-                });
+                rows.push(named(id, self.world.path_of(Kind::Character, id)));
             }
         }
-        if !location.objects.is_empty() {
+        let is_scenery = |id: &String| self.world.engine.objects.get(id).is_none_or(|o| o.object_type == "scenery");
+        let (scenery, things): (Vec<&String>, Vec<&String>) = location.objects.iter().partition(|id| is_scenery(id));
+        if !things.is_empty() {
             rows.push(Row::Heading("things".to_string()));
-            for id in &location.objects {
-                rows.push(match self.world.path_of(Kind::Object, id) {
-                    Some(path) => Row::Text(format!("  {}  {}", id, self.scope_of(&path))),
-                    None => Row::Missing(format!("  {}  scenery, no card", id)),
-                });
-            }
+            rows.extend(things.into_iter().map(|id| named(id, self.world.path_of(Kind::Object, id))));
+        }
+        if !scenery.is_empty() {
+            rows.push(Row::Heading("scenery".to_string()));
+            rows.extend(scenery.into_iter().map(|id| named(id, self.world.path_of(Kind::Object, id))));
+        }
+        if let Some(path) = &self.looked_at {
+            rows.push(Row::Heading("looked at".to_string()));
+            rows.extend(self.file_rows(path));
         }
         let warnings: Vec<String> = self
             .world
@@ -269,6 +277,24 @@ impl Console {
         if !warnings.is_empty() {
             rows.push(Row::Heading("warnings".to_string()));
             rows.extend(warnings.into_iter().map(|w| Row::Warning(format!("  {}", w))));
+        }
+        rows
+    }
+
+    /// What a file is, for the sidebar rather than the output: its title
+    /// and kind, its file, and an object's type.
+    fn file_rows(&self, path: &str) -> Vec<Row> {
+        let Some(entry) = self.world.files.get(path) else { return Vec::new() };
+        let mut rows = vec![Row::Text(format!("  {} ({})", entry.title, entry.kind.label()))];
+        rows.push(Row::Dim(format!("  {}.md", path)));
+        if entry.kind == Kind::Object {
+            if let Some(object) = self.world.engine.objects.get(&entry.id) {
+                let mut kind = object.object_type.clone();
+                if let Some(category) = &object.category {
+                    kind = format!("{}, {}", kind, category);
+                }
+                rows.push(Row::Dim(format!("  {}", kind)));
+            }
         }
         rows
     }
@@ -410,10 +436,11 @@ mod tests {
                 "~   east  village/inn  (not written)",
                 "  north  village/well",
                 "# people",
-                "  elder  global",
+                "  elder",
                 "# things",
-                "  lantern  global",
-                "~   bench  scenery, no card",
+                "  lantern",
+                "# scenery",
+                "~   bench",
                 "# warnings",
                 "~   village/square: connection `east` points at unknown location `village/inn`",
             ]
@@ -468,6 +495,19 @@ mod tests {
         assert!(drawn.contains("[ well  ]"), "{}", drawn);
         assert!(drawn.contains("[@square]--[ ?inn  ]"), "{}", drawn);
         assert!(console.handle("/map").0.starts_with("Map around village/square:"));
+    }
+
+    #[test]
+    fn examining_a_thing_puts_its_file_in_the_sidebar_not_the_output() {
+        let mut console = tiny();
+        console.handle("go /village/square");
+        let (out, _) = console.handle("x lantern");
+        assert!(!out.contains("objects/lantern.md"), "{}", out);
+        let rest = texts(&console.sidebar().rest);
+        let looked: Vec<&str> = rest.iter().map(String::as_str).skip_while(|r| *r != "# looked at").collect();
+        assert_eq!(looked[..4], ["# looked at", "  Brass Lantern (object)", "~   objects/lantern.md", "~   tool"]);
+        console.handle("n");
+        assert!(!texts(&console.sidebar().rest).contains(&"# looked at".to_string()), "gone once edit mode moves");
     }
 
     #[test]
