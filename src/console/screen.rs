@@ -32,6 +32,8 @@ use std::time::{Duration, Instant, SystemTime};
 const SCROLLBACK: usize = 5000;
 /// Lines of input history kept, and carried over a `/restart`.
 const HISTORY: usize = 500;
+/// How many of last session's commands a fresh start shows.
+const LAST_SHOWN: usize = 5;
 /// The narrowest terminal that gets a sidebar; narrower, it folds into one
 /// line above the input (REQ-CON-23, proposed).
 const SIDEBAR_FROM: u16 = 100;
@@ -59,6 +61,8 @@ pub struct Screen<'a> {
     /// This binary's modification time when it started, to notice a newer build.
     built: Option<SystemTime>,
     newer_build: bool,
+    /// Where this world's command history is kept between sessions.
+    history_file: Option<std::path::PathBuf>,
     last_check: Instant,
     quit: bool,
     restart: bool,
@@ -79,6 +83,7 @@ impl<'a> Screen<'a> {
             page: Cell::new(20),
             built: binary_built(),
             newer_build: false,
+            history_file: None,
             last_check: Instant::now(),
             quit: false,
             restart: false,
@@ -227,6 +232,7 @@ impl<'a> Screen<'a> {
             if self.history.len() > HISTORY {
                 self.history.remove(0);
             }
+            self.remember(&line);
         }
         // A blank line after what was typed, in every mode (Bruce,
         // 2026-11-24), and play adds one after each reply, reading as a story.
@@ -252,6 +258,48 @@ impl<'a> Screen<'a> {
         if let Some(target) = console.take_pending_edit() {
             let document = console.edit_document(&target);
             self.editing = Some((Editor::new(document), target));
+        }
+    }
+
+    /// Keeps the command history in `file` between sessions (Bruce,
+    /// 2026-11-24): what's there loads for Up, and a fresh start shows the
+    /// last few under "Last time:". After a /restart the session's own
+    /// history carries over instead.
+    pub fn keep_history(&mut self, file: std::path::PathBuf, resumed: bool) {
+        if !resumed {
+            let earlier: Vec<String> = std::fs::read_to_string(&file)
+                .unwrap_or_default()
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .map(str::to_string)
+                .collect();
+            let earlier: Vec<String> = earlier[earlier.len().saturating_sub(HISTORY)..].to_vec();
+            if !earlier.is_empty() {
+                self.output.push(String::new());
+                self.output.push("Last time:".to_string());
+                for line in &earlier[earlier.len().saturating_sub(LAST_SHOWN)..] {
+                    self.output.push(format!("  > {}", line));
+                }
+            }
+            self.history = earlier;
+        }
+        self.history_file = Some(file);
+    }
+
+    /// Adds `line` to the history file. A history that can't be written
+    /// is skipped; the session's own history still works.
+    fn remember(&self, line: &str) {
+        let Some(file) = &self.history_file else { return };
+        // Leaving isn't worth recalling, and Up would offer it first.
+        if matches!(line.trim(), "/quit" | "/q") {
+            return;
+        }
+        if let Some(dir) = file.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(file) {
+            let _ = writeln!(f, "{}", line.replace('\n', " "));
         }
     }
 
@@ -443,7 +491,11 @@ fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu) {
 pub fn run(console: Arc<Mutex<Console>>, notices: Receiver<String>, resumed: Option<Resumed>) -> Result<()> {
     use ratatui::crossterm::event::{self, Event, KeyEventKind};
     let greeting = lock(&console).greeting();
+    let was_resumed = resumed.is_some();
     let mut screen = Screen::new(&greeting, resumed);
+    if let Some(file) = lock(&console).history_file() {
+        screen.keep_history(file, was_resumed);
+    }
     let mut terminal = enter_terminal()?;
     let result = (|| -> Result<()> {
         loop {
@@ -835,6 +887,24 @@ mod tests {
         assert_eq!((command_s.key, command_s.ctrl), (Key::Char('s'), true));
         let command_c = input_of(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::SUPER));
         assert!(!command_c.ctrl, "only Command-S is taken over");
+    }
+
+    #[test]
+    fn history_is_kept_between_sessions() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("history/tiny.txt");
+        let console = tiny();
+        let mut first = Screen::new("", None);
+        first.keep_history(file.clone(), false);
+        typed(&mut first, &console, "go /village/square");
+        typed(&mut first, &console, "look");
+
+        let mut second = Screen::new("", None);
+        second.keep_history(file, false);
+        assert!(second.output.iter().any(|l| l == "Last time:"), "{:?}", second.output);
+        assert!(second.output.iter().any(|l| l == "  > look"), "{:?}", second.output);
+        press(&mut second, &console, Key::Up);
+        assert_eq!(second.input_text(), "look", "Up reaches last session");
     }
 
     #[test]

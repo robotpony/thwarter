@@ -64,6 +64,16 @@ impl Console {
         Status { left: left.join(" · "), right }
     }
 
+    /// Where this world's command history is kept: beside its saves, under
+    /// the same key (`<state>/history/<world>-<hash>.txt`, or
+    /// `<persona>/<world>.txt` for an installed world).
+    pub(super) fn history_file(&self) -> Option<std::path::PathBuf> {
+        let state = crate::settings::state_dir()?;
+        let saves = crate::engines::saves::save_dir(&self.world.root, &state);
+        let key = saves.strip_prefix(state.join("saves")).ok()?.to_path_buf();
+        Some(state.join("history").join(key).with_extension("txt"))
+    }
+
     /// `/status`: the world, where you are, the game, saves and the build.
     pub(super) fn status_report(&self) -> String {
         let mut out = vec![format!("{}, at {}", self.world.display_name(), self.world.root.display())];

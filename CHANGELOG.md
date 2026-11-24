@@ -45,6 +45,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.58.0 (2026-11-24)
+
+### Added
+
+- Command history is kept between sessions (REQ-CON-43, Bruce, 2026-11-24), one file per world in `$XDG_STATE_HOME/thwarter/history/`, keyed as its saves are (`<world>-<hash>.txt`, or `<persona>/<world>.txt` installed). Up reaches earlier sessions' commands, and a fresh start shows the last five under "Last time:". `/quit` isn't kept. After `/restart`, the session's own history carries over as before.
+
 ## 0.57.6 (2026-11-24)
 
 ### Changed
