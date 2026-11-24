@@ -40,6 +40,14 @@ pub enum Role {
     PromptPlay,
     /// Frontmatter keys.
     Key,
+    /// A Markdown link in prose: cyan and underlined.
+    Url,
+    /// Struck-through text (`~~like this~~`).
+    Struck,
+    /// A Markdown list marker or quote mark.
+    Marker,
+    /// Quoted prose, after `>`.
+    Quote,
     Tag,
     Code,
     Emphasis,
@@ -68,6 +76,11 @@ pub fn style(role: Role) -> Style {
         Role::PromptPlay => colour(Color::Magenta).add_modifier(Modifier::BOLD),
         Role::Key => colour(Color::Blue),
         Role::Tag => colour(Color::Magenta),
+        Role::Url => colour(Color::Cyan).add_modifier(Modifier::UNDERLINED),
+        Role::Struck => Style::default().add_modifier(Modifier::CROSSED_OUT),
+        Role::Marker if no_colour() => Style::default().add_modifier(Modifier::BOLD),
+        Role::Marker => colour(Color::Blue).add_modifier(Modifier::BOLD),
+        Role::Quote => Style::default().add_modifier(Modifier::ITALIC),
         Role::Emphasis => Style::default().add_modifier(Modifier::ITALIC),
     }
 }
@@ -211,12 +224,40 @@ fn prose_line(chars: &[char], roles: &mut [Option<Role>], lookup: &dyn Lookup) {
         fill(roles, 0, chars.len(), Role::Note);
         return;
     }
+    // A heading: its marks step back, its words stand out.
     let hashes = chars.iter().take_while(|c| **c == '#').count();
     if hashes > 0 && chars.get(hashes) == Some(&' ') {
-        fill(roles, 0, chars.len(), Role::Strong);
+        fill(roles, 0, hashes, Role::Note);
+        fill(roles, hashes, chars.len(), Role::Strong);
         return;
     }
-    let mut at = 0;
+    // A horizontal rule.
+    let trimmed = text.trim();
+    if trimmed.len() >= 3 && (trimmed.chars().all(|c| c == '*') || trimmed.chars().all(|c| c == '_')) {
+        fill(roles, 0, chars.len(), Role::Note);
+        return;
+    }
+    let indent = chars.iter().take_while(|c| **c == ' ').count();
+    let mut at = indent;
+    // A quote: the marks, then the quoted words in italics.
+    if chars.get(at) == Some(&'>') {
+        while chars.get(at) == Some(&'>') || chars.get(at) == Some(&' ') {
+            if chars[at] == '>' {
+                fill(roles, at, at + 1, Role::Marker);
+            }
+            at += 1;
+        }
+        fill(roles, at, chars.len(), Role::Quote);
+    }
+    // A list item's marker: `- `, `* `, `+ ` or `1. `.
+    let digits = chars[at..].iter().take_while(|c| c.is_ascii_digit()).count();
+    if matches!(chars.get(at), Some('-' | '*' | '+')) && chars.get(at + 1) == Some(&' ') {
+        fill(roles, at, at + 1, Role::Marker);
+        at += 2;
+    } else if digits > 0 && matches!(chars.get(at + digits), Some('.' | ')')) && chars.get(at + digits + 1) == Some(&' ') {
+        fill(roles, at, at + digits + 1, Role::Marker);
+        at += digits + 2;
+    }
     while at < chars.len() {
         let rest = &chars[at..];
         let starts = |s: &str| rest.iter().zip(s.chars()).filter(|(a, b)| **a == *b).count() == s.chars().count();
@@ -230,7 +271,7 @@ fn prose_line(chars: &[char], roles: &mut [Option<Role>], lookup: &dyn Lookup) {
         }
         if starts("[[") {
             if let Some(end) = find(chars, at + 2, "]]") {
-                fill(roles, at, end + 2, Role::Link);
+                fill(roles, at, end + 2, Role::Url);
                 at = end + 2;
                 continue;
             }
@@ -238,10 +279,17 @@ fn prose_line(chars: &[char], roles: &mut [Option<Role>], lookup: &dyn Lookup) {
         if chars[at] == '[' {
             if let Some(close) = find(chars, at + 1, "](") {
                 if let Some(end) = find(chars, close + 2, ")") {
-                    fill(roles, at, end + 1, Role::Link);
+                    fill(roles, at, end + 1, Role::Url);
                     at = end + 1;
                     continue;
                 }
+            }
+        }
+        if starts("~~") {
+            if let Some(end) = find(chars, at + 2, "~~") {
+                fill(roles, at, end + 2, Role::Struck);
+                at = end + 2;
+                continue;
             }
         }
         if chars[at] == '`' {
@@ -340,10 +388,15 @@ mod tests {
 
     #[test]
     fn prose_marks() {
-        assert_eq!(runs("## The old well"), vec!["Strong:## The old well"]);
+        assert_eq!(runs("## The old well"), vec!["Note:##", "Strong: The old well"]);
+        assert_eq!(runs("- a *bright* lamp"), vec!["Marker:-", "Emphasis:*bright*"]);
+        assert_eq!(runs("2. second"), vec!["Marker:2."]);
+        assert_eq!(runs("> said the elder"), vec!["Marker:>", "Quote:said the elder"]);
+        assert_eq!(runs("an ~~old~~ new well"), vec!["Struck:~~old~~"]);
+        assert_eq!(runs("***"), vec!["Note:***"]);
         assert_eq!(runs("An *old* well"), vec!["Emphasis:*old*"]);
         assert_eq!(runs("very **dark** here"), vec!["Strong:**dark**"]);
-        assert_eq!(runs("the [[elder]] sits #village"), vec!["Link:[[elder]]", "Tag:#village"]);
+        assert_eq!(runs("the [[elder]] sits #village"), vec!["Url:[[elder]]", "Tag:#village"]);
         assert_eq!(runs("lit: {{ lantern.lit }}, oil: {{ lantern.oil }}"), vec!["Link:{{ lantern.lit }}", "Missing:{{ lantern.oil }}"]);
         assert_eq!(runs("<!-- thwarter:action light -->"), vec!["Note:<!-- thwarter:action light -->"]);
         assert_eq!(runs("use `x` here"), vec!["Code:`x`"]);

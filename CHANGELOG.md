@@ -35,6 +35,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.43.1 (2026-11-23)
+
+### Added
+
+- The editor wraps long lines at words (Bruce, 2026-11-23), and its highlighting follows a line across the rows it wraps onto. A word wider than the editor wraps by character. The text widget finds words by Unicode word boundaries, which count punctuation as a word, so a comma that lands right at the edge can start the next row.
+- Fuller Markdown styling in the editor: headings bold with their `#` marks dimmed, `~~strikethrough~~` crossed out, links underlined as well as cyan, list markers (`-`, `*`, `+`, `1.`) and `>` quote marks in the chrome colour with quoted text in italics, and `***` or `___` rules dimmed.
+
 ## 0.43.0 (2026-11-23)
 
 ### Added

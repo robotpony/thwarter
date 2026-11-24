@@ -19,7 +19,7 @@ use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 #[cfg(test)]
 use ratatui::{backend::Backend, Terminal};
-use ratatui_textarea::{CursorMove, Input, Key, TextArea};
+use ratatui_textarea::{CursorMove, Input, Key, TextArea, WrapMode};
 #[cfg(test)]
 use std::io;
 
@@ -129,6 +129,8 @@ impl<'a> Editor<'a> {
         };
         let col = lines.get(row).map(|l| l.chars().count()).unwrap_or(0);
         let mut area = TextArea::new(lines);
+        // Prose wraps at words, as it reads (Bruce, 2026-11-23).
+        area.set_wrap_mode(WrapMode::WordOrGlyph);
         area.move_cursor(CursorMove::Jump(row.min(u16::MAX as usize) as u16, col.min(u16::MAX as usize) as u16));
         area.set_line_number_style(style(Role::Chrome));
         area.set_cursor_line_style(Style::default());
@@ -170,6 +172,7 @@ impl<'a> Editor<'a> {
         let cursor = self.area.cursor();
         let (row, col) = (cursor.0, cursor.1);
         let mut area = TextArea::new(text.lines().map(str::to_string).collect());
+        area.set_wrap_mode(WrapMode::WordOrGlyph);
         area.set_line_number_style(style(Role::Chrome));
         area.set_cursor_line_style(Style::default());
         area.move_cursor(CursorMove::Jump(row.min(u16::MAX as usize) as u16, col.min(u16::MAX as usize) as u16));
@@ -288,31 +291,55 @@ where
 
 /// Colours what the text area drew, from each line's roles. The text area
 /// draws each line after its number, so a row's number says which line it
-/// shows; a row it scrolled sideways, or wrapped, is left as drawn.
+/// starts; the rows after it with no number are the same line wrapped,
+/// and pick up where the row before stopped. A row that doesn't match its
+/// line's text is left as drawn.
 fn paint(buf: &mut Buffer, area: Rect, lines: &[String], roles: &[Vec<Option<Role>>], cursor_row: usize) {
     let digits = lines.len().max(1).to_string().len();
     let gutter = digits + 2;
+    // The line being drawn, and how many of its characters rows have shown.
+    let mut current: Option<(usize, usize)> = None;
     for y in area.y..area.bottom() {
         let row: String = (area.x..area.right()).map(|x| buf[(x, y)].symbol().to_string()).collect();
-        let Some(number) = row.get(..gutter).and_then(|g| g.trim().parse::<usize>().ok()) else { continue };
-        let Some(line) = number.checked_sub(1).and_then(|n| lines.get(n)) else { continue };
         let shown: String = row.chars().skip(gutter).collect();
-        let expected: String = line.chars().take(shown.chars().count()).collect();
-        if shown.trim_end() != expected.trim_end() {
+        let shown = shown.trim_end();
+        let number = row.get(..gutter).and_then(|g| g.trim().parse::<usize>().ok());
+        let (line_index, from) = match (number, current) {
+            (Some(n), _) if n >= 1 && n <= lines.len() => (n - 1, 0),
+            (None, Some((n, consumed))) => {
+                // A wrapped row starts after the spaces the wrap left behind.
+                let chars: Vec<char> = lines[n].chars().collect();
+                let mut at = consumed;
+                while at < chars.len() && chars[at] == ' ' {
+                    at += 1;
+                }
+                (n, at)
+            }
+            _ => {
+                current = None;
+                continue;
+            }
+        };
+        let chars: Vec<char> = lines[line_index].chars().collect();
+        let shown_chars: Vec<char> = shown.chars().collect();
+        let fits = chars.get(from..from + shown_chars.len()).is_some_and(|part| part == shown_chars.as_slice());
+        if !fits && !shown.is_empty() {
+            current = None;
             continue;
         }
-        if number - 1 == cursor_row {
+        current = Some((line_index, from + shown_chars.len()));
+        if line_index == cursor_row && number.is_some() {
             for x in area.x..(area.x + gutter as u16).min(area.right()) {
                 let cell = &mut buf[(x, y)];
                 cell.set_style(cell.style().remove_modifier(Modifier::DIM).add_modifier(Modifier::BOLD));
             }
         }
-        for (i, role) in roles[number - 1].iter().enumerate() {
+        for i in 0..shown_chars.len() {
             let x = area.x + (gutter + i) as u16;
             if x >= area.right() {
                 break;
             }
-            if let Some(role) = role {
+            if let Some(Some(role)) = roles[line_index].get(from + i) {
                 let cell = &mut buf[(x, y)];
                 cell.set_style(cell.style().patch(style(*role)));
             }
@@ -512,6 +539,22 @@ mod tests {
         assert!(!card.dirty(), "that line isn't an unsaved change");
         let empty = Editor::new(Document::single("h", ""));
         assert_eq!(empty.area.cursor(), (0, 0));
+    }
+
+    #[test]
+    fn long_prose_wraps_and_keeps_its_colours_on_every_row() {
+        use ratatui::style::Color;
+        let text = "---\nid: a\n---\nThe old well stands in the square, and beside it sits the [[elder]] all day.\n";
+        let editor = Editor::new(Document::single("h", text));
+        let mut terminal = Terminal::new(TestBackend::new(36, 10)).unwrap();
+        terminal.draw(|frame| editor.draw(frame, frame.area(), &NoLookup)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let rows: Vec<String> = (0..10).map(|y| (0..36).map(|x| buffer[(x, y)].symbol().to_string()).collect()).collect();
+        let (y, row) = rows.iter().enumerate().find(|(_, r)| r.contains("[[elder")).unwrap_or_else(|| panic!("{:#?}", rows));
+        assert!(!row.trim_start().starts_with('4'), "it's on a wrapped row, not line 4's first: {:?}", rows);
+        let x = row.find("[[elder").unwrap() as u16;
+        assert_eq!(buffer[(x + 2, y as u16)].fg, Color::Cyan, "{:?}", rows);
+        assert!(rows.iter().all(|r| r.chars().count() <= 36), "nothing runs off the edge");
     }
 
     #[test]

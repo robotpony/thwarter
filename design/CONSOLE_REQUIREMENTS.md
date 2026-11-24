@@ -226,7 +226,7 @@ Decided by Bruce, 2026-11-23.
   prompt ................ bold green in edit mode, bold magenta in play mode
   ```
 
-- REQ-CON-39: The editor MUST highlight what it shows, in the same colours. Frontmatter: `---` fences dim, keys blue, ids that resolve cyan and ids that don't yellow. Prose: headings bold, emphasis italic, strong bold, links cyan and underlined, `#tags` magenta, code dim. Thwarter's markers are drawn as separators, and `{{ variables }}` are cyan when declared and yellow when not. Chrome: line numbers dim with the current one bold, the heading bar reversed, and the status line coloured by what it says (green saved, red refused, yellow a warning).
+- REQ-CON-39: The editor MUST highlight what it shows, in the same colours. Frontmatter: `---` fences dim, keys blue, ids that resolve cyan and ids that don't yellow. Prose wraps at words (Bruce, 2026-11-23) and is styled as Markdown: headings bold with their `#` marks dim, emphasis italic, strong bold, ~~struck~~ crossed out, links cyan and underlined, `#tags` magenta, code dim, list markers and quote marks in the chrome colour with quoted words in italics, and rules dim. Thwarter's markers are drawn as separators, and `{{ variables }}` are cyan when declared and yellow when not. Chrome: line numbers dim with the current one bold, the heading bar reversed, and the status line coloured by what it says (green saved, red refused, yellow a warning).
 
 ## Open questions
 
