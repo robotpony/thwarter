@@ -14,6 +14,12 @@ use std::sync::OnceLock;
 pub enum Role {
     /// The status bar and the editor's heading bar.
     Bar,
+    /// The rest of the console's frame: the sidebar's border, line numbers.
+    Chrome,
+    /// The `/` that starts a console command.
+    Slash,
+    /// A console command's name, after its `/`.
+    Command,
     /// What the author typed, echoed in the output.
     Input,
     /// A room's or thing's title.
@@ -44,14 +50,20 @@ pub enum Role {
 pub fn style(role: Role) -> Style {
     let colour = |c: Color| if no_colour() { Style::default() } else { Style::default().fg(c) };
     match role {
-        Role::Bar => Style::default().add_modifier(Modifier::REVERSED),
-        Role::Input | Role::Title | Role::Strong => Style::default().add_modifier(Modifier::BOLD),
+        // Chrome is blue, so the console's frame never looks like its text.
+        Role::Bar if no_colour() => Style::default().add_modifier(Modifier::REVERSED),
+        Role::Bar => Style::default().bg(Color::Blue).fg(Color::White),
+        Role::Chrome if no_colour() => Style::default().add_modifier(Modifier::DIM),
+        Role::Chrome => colour(Color::Blue),
+        Role::Slash => colour(Color::Yellow).add_modifier(Modifier::BOLD),
+        Role::Input | Role::Title | Role::Strong | Role::Command | Role::Heading => {
+            Style::default().add_modifier(Modifier::BOLD)
+        }
         Role::Link => colour(Color::Cyan),
         Role::Missing | Role::Warning => colour(Color::Yellow),
         Role::Error => colour(Color::Red),
         Role::Note | Role::Code => Style::default().add_modifier(Modifier::DIM),
         Role::Message => colour(Color::Green),
-        Role::Heading => colour(Color::Blue).add_modifier(Modifier::BOLD),
         Role::PromptEdit => colour(Color::Green).add_modifier(Modifier::BOLD),
         Role::PromptPlay => colour(Color::Magenta).add_modifier(Modifier::BOLD),
         Role::Key => colour(Color::Blue),

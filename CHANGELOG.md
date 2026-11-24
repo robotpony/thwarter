@@ -32,6 +32,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.29.1 (2026-11-23)
+
+### Changed
+
+- The console's chrome has its own colour, blue, so it never looks like text (Bruce, 2026-11-23): the status bar and the editor's heading bar are blue with bright white text, and the sidebar's border and the editor's line numbers are blue. Sidebar headings are now bold in the text colour, leaving blue to the chrome.
+- Console commands stand out, as typed and as echoed in the output: the `/` is bold yellow and the command's name bold, with the arguments plain.
+
+### Fixed
+
+- `/move` on a room said nothing by that name was in the world. It now says the room is there, where it would go (a room as the target stands for its area, so `/move hallway bedroom` is already done when both sit at the root), and that moving a room's file waits on renaming.
+
 ## 0.29.0 (2026-11-23)
 
 ### Added

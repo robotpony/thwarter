@@ -111,7 +111,7 @@ impl<'a> Editor<'a> {
     pub fn new(document: Document) -> Self {
         let text = document.combined();
         let mut area = TextArea::new(text.lines().map(str::to_string).collect());
-        area.set_line_number_style(Style::default().add_modifier(Modifier::DIM));
+        area.set_line_number_style(style(Role::Chrome));
         area.set_cursor_line_style(Style::default());
         Editor {
             document,
@@ -151,7 +151,7 @@ impl<'a> Editor<'a> {
         let cursor = self.area.cursor();
         let (row, col) = (cursor.0, cursor.1);
         let mut area = TextArea::new(text.lines().map(str::to_string).collect());
-        area.set_line_number_style(Style::default().add_modifier(Modifier::DIM));
+        area.set_line_number_style(style(Role::Chrome));
         area.set_cursor_line_style(Style::default());
         area.move_cursor(CursorMove::Jump(row.min(u16::MAX as usize) as u16, col.min(u16::MAX as usize) as u16));
         self.area = area;

@@ -29,7 +29,7 @@ The author is a player of sorts, like a game master running a table (Bruce, 2026
   ```
 
 - REQ-CON-5: Edit mode MUST offer commands that create or change one thing at a time, for example `/new room north <id>` (a new room, linked north of the current one), `/new object`, `/new character`, `/set` (one field), `/link` (add or change one exit) and `/unlink` (remove one exit). Each MUST save the change to the file (REQ-ENG-7) and report any problems it causes (REQ-ENG-8). The author always names a new entity's `id`; the console MUST NOT make one up, since an `id` can't be renamed yet. In a room, the first word after `/new room` is a direction; outside a room, it's the new room's `id`.
-- REQ-CON-40: `/move <thing> <room or character>` MUST put a person or thing somewhere else (Bruce, 2026-11-23): a character into another room, with its `default_location` following, or an object into a room or a character's inventory. It takes the thing out of every room list and inventory that held it, and the thing's own file stays where it is. `/move <id> global|area|local` changes scope instead (REQ-CON-29).
+- REQ-CON-40: `/move <thing> <room or character>` MUST put a person or thing somewhere else (Bruce, 2026-11-23): a character into another room, with its `default_location` following, or an object into a room or a character's inventory. It takes the thing out of every room list and inventory that held it, and the thing's own file stays where it is. `/move <id> global|area|local` changes scope instead (REQ-CON-29). A room moves into an area folder: `/move hallway house` makes it `house/hallway`, with its file moved and every exit to it updated, and a room as the target stands for its own area, so `/move hallway bedroom` puts hallway beside bedroom (Bruce, 2026-11-23). Moving rooms waits on the writer moving files, with renaming.
 
   ```
   edit village/square> /move lantern village/well
@@ -203,7 +203,10 @@ Decided by Bruce, 2026-11-23.
 - REQ-CON-38: The console MUST take its colours from the terminal: the default foreground and background and the 16 named ANSI colours, with bold, dim, italic, underline and reverse. It never sets an RGB colour, so whatever theme the terminal has, light or dark, the console follows it. `NO_COLOR` turns colour off and keeps the rest. Colours go by role:
 
   ```
-  status bar ............ reverse
+  chrome ................ blue: bars are blue with bright white text;
+                          the sidebar's border and line numbers are blue
+  console commands ...... the `/` bold yellow, the name bold, arguments plain,
+                          as typed and as echoed in the output
   your input (> look) ... bold
   room and thing titles . bold
   exits, links .......... cyan
@@ -212,7 +215,7 @@ Decided by Bruce, 2026-11-23.
   errors, refusals ...... red
   author notes, Game: ... dim
   console messages ...... green  (Saved, Reloaded, Restarted)
-  sidebar headings ...... bold blue
+  sidebar headings ...... bold
   prompt ................ bold green in edit mode, bold magenta in play mode
   ```
 

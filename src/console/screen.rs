@@ -244,6 +244,7 @@ impl<'a> Screen<'a> {
         frame.render_widget(Paragraph::new(format!(" {}", prompt)).style(style(role)), left);
         if self.editing.is_none() {
             frame.render_widget(&self.input, right);
+            paint_command(frame.buffer_mut(), right, &self.input_text());
         }
     }
 
@@ -255,12 +256,12 @@ impl<'a> Screen<'a> {
         self.page.set(height);
         let bottom = rows.len().saturating_sub(self.scroll.min(rows.len().saturating_sub(height)));
         let top = bottom.saturating_sub(height);
-        let lines: Vec<Line> = rows[top..bottom].iter().map(|(text, style)| Line::styled(format!(" {}", text), *style)).collect();
+        let lines: Vec<Line> = rows[top..bottom].iter().map(|(text, style)| output_line(text, *style)).collect();
         frame.render_widget(Paragraph::new(lines), area);
     }
 
     fn draw_sidebar(&self, frame: &mut Frame, area: Rect, fixed: &[Row], rest: &[Row]) {
-        let block = Block::default().borders(Borders::LEFT);
+        let block = Block::default().borders(Borders::LEFT).border_style(style(Role::Chrome));
         let inner = block.inner(area);
         frame.render_widget(block, area);
         // Long rows wrap within the sidebar, keeping their indent.
@@ -370,6 +371,34 @@ fn row_line(row: &Row) -> Line<'static> {
         Row::Missing(text) => styled(text, Role::Missing),
         Row::Warning(text) => styled(text, Role::Warning),
         Row::Blank => Line::from(""),
+    }
+}
+
+/// One row of output. A console command echoed as `> /move ...` shows its
+/// slash and name the way the input line does.
+fn output_line(text: &str, row_style: Style) -> Line<'static> {
+    if let Some(command) = text.strip_prefix("> /") {
+        let name_end = command.find(' ').unwrap_or(command.len());
+        return Line::from(vec![
+            Span::styled(" > ", row_style),
+            Span::styled("/", style(Role::Slash)),
+            Span::styled(command[..name_end].to_string(), style(Role::Command)),
+            Span::styled(command[name_end..].to_string(), Style::default()),
+        ]);
+    }
+    Line::styled(format!(" {}", text), row_style)
+}
+
+/// Colours a console command being typed: its `/` and its name.
+fn paint_command(buf: &mut ratatui::buffer::Buffer, area: Rect, text: &str) {
+    if !text.starts_with('/') || text.chars().count() >= area.width as usize {
+        return;
+    }
+    let name_end = text.find(' ').unwrap_or(text.len());
+    for (i, _) in text[..name_end].chars().enumerate() {
+        let cell = &mut buf[(area.x + i as u16, area.y)];
+        let role = if i == 0 { Role::Slash } else { Role::Command };
+        cell.set_style(cell.style().patch(style(role)));
     }
 }
 
@@ -527,6 +556,32 @@ mod tests {
         assert_eq!(buffer[(x, y)].fg, Color::Yellow, "an exit to a room not written yet");
         let (x, y) = find("connections");
         assert_eq!(buffer[(x, y)].fg, Color::Blue, "a key");
+    }
+
+    #[test]
+    fn chrome_is_blue_and_commands_show_their_slash() {
+        use ratatui::style::Color;
+        let console = tiny();
+        let mut screen = Screen::new("", None);
+        typed(&mut screen, &console, "/status");
+        for c in "/move lantern".chars() {
+            screen.key(Input { key: Key::Char(c), ..Input::default() }, &console);
+        }
+        let mut terminal = Terminal::new(TestBackend::new(110, 12)).unwrap();
+        draw(&mut terminal, &screen, &console).unwrap();
+        let buffer = terminal.backend().buffer();
+        let row = |y: u16| (0..110).map(|x| buffer[(x, y)].symbol().to_string()).collect::<String>();
+        assert_eq!(buffer[(0, 0)].bg, Color::Blue, "the status bar");
+        let border = row(1).chars().position(|c| c == '│').unwrap() as u16;
+        assert_eq!(buffer[(border, 1)].fg, Color::Blue, "the sidebar's border");
+        // The echoed command and the one being typed.
+        let echo = (0..12).find(|&y| row(y).contains("> /status")).unwrap();
+        let slash = row(echo).find('/').unwrap() as u16;
+        assert_eq!(buffer[(slash, echo)].fg, Color::Yellow);
+        let input = row(11).find("/move").unwrap() as u16;
+        assert_eq!(buffer[(input, 11)].fg, Color::Yellow);
+        assert!(buffer[(input + 1, 11)].modifier.contains(ratatui::style::Modifier::BOLD));
+        assert_ne!(buffer[(input + 7, 11)].fg, Color::Yellow, "arguments stay plain");
     }
 
     #[test]

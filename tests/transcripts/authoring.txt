@@ -171,3 +171,5 @@ Characters:
   The Elder (elder)
 
 Objects: none
+> /move village/well house
+village/well is a room. Moving it to house/well needs the writer to move its file and update the exits to it, which comes with renaming.

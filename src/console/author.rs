@@ -273,6 +273,30 @@ impl Console {
         if matches!(*target, "global" | "area" | "local" | "here") {
             return "Changing a thing's scope with /move comes with the scope work (REQ-CON-29).".to_string();
         }
+        // A room moves into an area folder, which changes its id and its
+        // file's path (Bruce, 2026-11-23). That waits on the writer moving
+        // files and updating every exit (`PLAN.md` › renaming).
+        let room = self.room_id(thing);
+        if self.world.engine.get_location(&room).is_some() {
+            // The target is an area, or a room standing for its own area.
+            let target_room = self.room_id(target);
+            let area = if self.world.engine.get_location(&target_room).is_some() {
+                target_room.rsplit_once('/').map(|(a, _)| a.to_string()).unwrap_or_default()
+            } else {
+                target.trim_matches('/').to_string()
+            };
+            let name = room.rsplit('/').next().unwrap_or(&room);
+            let current = room.rsplit_once('/').map(|(a, _)| a).unwrap_or("");
+            if current == area {
+                let shown = if area.is_empty() { "the world's root".to_string() } else { format!("{}/", area) };
+                return format!("{} is already in {}, as {} is.", room, shown, target);
+            }
+            let to = if area.is_empty() { name.to_string() } else { format!("{}/{}", area, name) };
+            return format!(
+                "{} is a room. Moving it to {} needs the writer to move its file and update the exits to it, which comes with renaming.",
+                room, to
+            );
+        }
         if let Some(problem) = bare_id_problem(thing) {
             return problem;
         }
@@ -333,7 +357,7 @@ impl Console {
         }
 
         let mut written = Vec::new();
-        let mut fail = |console: &mut Console, written: &Vec<PathBuf>, e: String| {
+        let fail = |console: &mut Console, written: &Vec<PathBuf>, e: String| {
             let report = console.after_writes(written, format!("Moving {} stopped partway.", thing));
             format!("{}\n{}", report, e)
         };
