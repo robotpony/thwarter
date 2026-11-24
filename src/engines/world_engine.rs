@@ -323,6 +323,11 @@ impl WorldEngine {
 
     /// Every file read, in path order, each with its role. Paths are in
     /// the engine's form, as in `sources`.
+    /// Every `actions.rhai` the world has, by its full path.
+    pub fn script_paths(&self) -> impl Iterator<Item = &Path> {
+        self.scripts.keys().map(PathBuf::as_path)
+    }
+
     pub fn file_roles(&self) -> impl Iterator<Item = (&Path, &FileRole)> {
         self.roles.iter().map(|(p, r)| (p.as_path(), r))
     }

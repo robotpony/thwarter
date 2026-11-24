@@ -65,7 +65,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [x] Renaming an id with every reference updated: file or bundle moved, exits, lists, `default_location`, `start:`, prose links and variables (0.30.0, 318144e) [coder] (REQ-ENG-30)
 - [x] Renaming also rewrites references inside actions (`becomes:`, `requires:`), which are reported for now [coder] (REQ-ENG-30)
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
-- [ ] Removing a thing: its file or bundle deleted, and every reference to its id taken out (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, beside REQ-ENG-30)
+- [x] Removing a thing: its file or bundle deleted, and every reference to its id taken out (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, beside REQ-ENG-30)
 - [ ] `/remove <thing>` deletes an object, room, character or door after the author confirms; no undo yet (Bruce, 2026-11-24) [console] (`design/CONSOLE_REQUIREMENTS.md`, beside REQ-CON-5)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 - [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)

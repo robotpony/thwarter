@@ -7,10 +7,12 @@
 
 pub mod content_file;
 pub mod rename;
+pub mod remove;
 pub mod bundle;
 
 pub use content_file::{ContentFile, Edit};
 pub use rename::RenameReport;
+pub use remove::{RemovePlan, RemoveReport};
 pub use bundle::{BundleReport, Section};
 
 use crate::engines::{EntityKind, WorldEngine};

@@ -56,6 +56,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.67.0 (2026-11-24)
+
+### Added
+
+- Removing a thing, for the console's `/remove` (REQ-ENG-50). `WorldWriter::plan_remove` says what will go and what will change, writing nothing: the thing's file or whole bundle, each file whose references change ("objects: drops lamp", "connections.down removed"), and what's left for the author. `remove_loaded` does exactly that. An object or character leaves every list; a door takes the exits through it; a room takes the exits into it and every door with it on a side. A room that still holds people or things, and the world's start room, are refused with what to do first. Prose links, actions' `becomes:` and `requires:`, and a door's `key` are reported, not rewritten.
+- `WorldEngine::script_paths()` lists the world's `actions.rhai` files.
+
 ## 0.66.3 (2026-11-24)
 
 ### Fixed
