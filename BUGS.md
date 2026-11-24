@@ -6,7 +6,8 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 
 ## Open
 
-- [ ] **`/add` puts a placed thing in a second room**, against one place per thing (REQ-CF-31): adding the existing `desk` in the hallway left it in the bedroom too. REQ-CON-41 said so; Bruce now wants `/add` to ask "desk is in bedroom: move it here? (y/n)" and move it on yes (2026-11-24) [console]
+- [ ] **A new object lands in two rooms**: creating `desk` in the hallway also listed it in the bedroom, so validate warns it starts in more than one place (REQ-CF-31). The first suspect is the object questions' `location in room` answer placing it again after `/add` did, which isn't confirmed yet (Bruce, 2026-11-24) [console]
+- [ ] **`/add` of a thing already placed doesn't move it** (REQ-CON-41 says not to take it from anywhere else); Bruce wants it to ask "desk is in bedroom: move it here? (y/n)" and move it on yes (2026-11-24) [console]
 - [ ] **One compiler warning left**, `narrative_engine`'s unused `conditions` in a stub; it goes when narrative state uses that code. The two in `world_graph::find_path` went with the map in 0.37.0. Down from 11 in 0.7.0 (2026-08-23)
 
 ## Fixed
