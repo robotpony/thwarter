@@ -70,4 +70,4 @@ thwart validate --world /tmp/empty-world
 
 It doesn't run `thwart validate` against the test world, since the world still has five broken exits (`BUGS.md`). Add that step, with `--strict`, once they're fixed.
 
-The workflow's actions are pinned by version tag (`actions/checkout@v4` and the rest), not by commit; pinning by commit is the stricter choice if supply-chain risk ever matters more.
+The workflow's actions are pinned by version tag (`actions/checkout@v5` and the rest), not by commit; pinning by commit is the stricter choice if supply-chain risk ever matters more.

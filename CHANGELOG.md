@@ -37,6 +37,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.47.2 (2026-11-23)
+
+### Changed
+
+- CI uses `actions/checkout@v5`, which runs on Node 24; v4 targeted Node 20, which GitHub has deprecated and warned about on every run. The other actions gave no warning.
+
 ## 0.47.1 (2026-11-23)
 
 ### Changed
