@@ -33,6 +33,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.35.1 (2026-11-23)
+
+### Changed
+
+- The `zip` crate moves from 2.6.1 to 9.8.2, its current major line, since it parses untrusted archives. Two adjustments: entry names are now read fallibly, and an absolute entry name (`/etc/x`, `C:x`) is refused explicitly, because zip 9 quietly makes such names relative where 2.x refused them. No advisory scan was run: `cargo-audit` isn't installed, and installing a tool system-wide waits on Bruce.
+
 ## 0.35.0 (2026-11-23)
 
 ### Added

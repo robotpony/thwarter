@@ -264,13 +264,16 @@ fn check_archive(archive: &mut zip::ZipArchive<std::fs::File>) -> Result<(Manife
     let mut entries = Vec::new();
     for i in 0..archive.len() {
         let entry = archive.by_index_raw(i)?;
-        let raw = entry.name().to_string();
+        let raw = entry.name().map_err(|e| anyhow!("an entry's name can't be read: {}", e))?.to_string();
         let shown = raw.escape_debug().to_string();
         if entry.is_symlink() {
             bail!("{} is a link, which a package may not hold", shown);
         }
         let path = entry.enclosed_name().ok_or_else(|| anyhow!("{} points outside the package", shown))?;
-        if raw.contains('\\') || path.components().any(|c| !matches!(c, Component::Normal(_))) {
+        // Checked on the raw name too: an absolute name (`/etc/x`, `C:x`)
+        // is refused, not quietly made relative.
+        let absolute = raw.starts_with('/') || raw.as_bytes().get(1) == Some(&b':');
+        if absolute || raw.contains('\\') || path.components().any(|c| !matches!(c, Component::Normal(_))) {
             bail!("{} points outside the package", shown);
         }
         total += entry.size();

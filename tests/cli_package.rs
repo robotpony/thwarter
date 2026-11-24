@@ -54,7 +54,7 @@ fn setup() -> Setup {
 
 fn entries(package: &Path) -> Vec<String> {
     let mut zip = zip::ZipArchive::new(std::fs::File::open(package).unwrap()).unwrap();
-    let mut names: Vec<String> = (0..zip.len()).map(|i| zip.by_index(i).unwrap().name().to_string()).collect();
+    let mut names: Vec<String> = (0..zip.len()).map(|i| zip.by_index(i).unwrap().name().unwrap().to_string()).collect();
     names.sort();
     names
 }
