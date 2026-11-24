@@ -12,6 +12,23 @@ use serde_yaml::{Mapping, Value};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+/// The largest content file the loader reads (REQ-CFG-10): far more than
+/// any room or card needs, small enough that a hostile file can't
+/// exhaust memory.
+pub const MAX_FILE_BYTES: usize = 1024 * 1024;
+
+/// The deepest frontmatter nesting the loader accepts (REQ-CFG-10).
+pub const MAX_DEPTH: usize = 32;
+
+fn depth(value: &Value) -> usize {
+    match value {
+        Value::Mapping(m) => 1 + m.iter().map(|(k, v)| depth(k).max(depth(v))).max().unwrap_or(0),
+        Value::Sequence(s) => 1 + s.iter().map(depth).max().unwrap_or(0),
+        Value::Tagged(t) => 1 + depth(&t.value),
+        _ => 0,
+    }
+}
+
 /// One file's frontmatter and prose, untyped.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Layer {
@@ -24,7 +41,13 @@ impl Layer {
     /// Split `text`, the file at `path`. The error is the reason it can't
     /// be split, without the path.
     pub fn parse(path: &Path, text: &str) -> Result<Layer, String> {
+        if text.len() > MAX_FILE_BYTES {
+            return Err(format!("is {} KB, over the {} KB a content file may be, so it isn't read", text.len() / 1024, MAX_FILE_BYTES / 1024));
+        }
         let doc = MarkdownParser::new().split_document(text).map_err(|e| e.to_string())?;
+        if depth(&doc.metadata) > MAX_DEPTH {
+            return Err(format!("frontmatter nests more than {} levels deep, so it isn't read", MAX_DEPTH));
+        }
         let metadata = match doc.metadata {
             Value::Null => Mapping::new(),
             Value::Mapping(map) => map,

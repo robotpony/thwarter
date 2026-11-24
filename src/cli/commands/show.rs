@@ -147,7 +147,7 @@ fn show_thing(engine: &WorldEngine, name: &str, req: &ShowRequest, formatter: &O
         ParsedEntity::Character(c) => render_character(c),
         ParsedEntity::Door(d) => crate::render::render_door(d),
     };
-    println!("{}", text);
+    println!("{}", crate::render::clean_text(&text));
     if let Some(thing) = engine.thing(kind, &id) {
         let chapter = version.chapter.as_ref().map(|k| k.path.join("/"));
         let sources = render_thing_sources(thing, req.state.as_deref(), chapter.as_deref());
@@ -203,7 +203,7 @@ fn show_template(engine: &WorldEngine, name: &str, formatter: &OutputFormatter) 
         out.push(format!("State file {}:", path));
         out.push(text.trim_end().to_string());
     }
-    println!("{}", out.join("\n"));
+    println!("{}", crate::render::clean_text(&out.join("\n")));
     Ok(())
 }
 
@@ -322,6 +322,6 @@ fn show_world(engine: &WorldEngine, world_path: &str, formatter: &OutputFormatte
             out.push(format!("  - {}", id));
         }
     }
-    println!("{}", out.join("\n"));
+    println!("{}", crate::render::clean_text(&out.join("\n")));
     Ok(())
 }

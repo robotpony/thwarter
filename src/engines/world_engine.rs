@@ -96,6 +96,8 @@ pub struct WorldEngine {
     persona: Option<Persona>,
     persona_problem: Option<String>,
     persona_warning: Option<String>,
+    /// Links out of the world that the last load skipped (REQ-CFG-10).
+    link_warnings: Vec<String>,
 }
 
 /// How plainly a thing is there, from its current version's
@@ -197,6 +199,7 @@ impl WorldEngine {
             persona: None,
             persona_problem: None,
             persona_warning: None,
+            link_warnings: Vec::new(),
         }
     }
 
@@ -268,6 +271,7 @@ impl WorldEngine {
         let root = world_path.as_ref().to_path_buf();
         self.world_root = Some(root.clone());
         self.files.clear();
+        self.link_warnings.clear();
         self.read_world_toml(&root);
         let ignore = self.ignore.clone();
         let mut paths: Vec<PathBuf> = WalkDir::new(&world_path)
@@ -283,10 +287,28 @@ impl WorldEngine {
             .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("md"))
             .collect();
         paths.sort();
+        // A link may point inside the world, never out of it (REQ-CFG-10).
+        let real_root = std::fs::canonicalize(&root).unwrap_or_else(|_| root.clone());
         for path in paths {
-            let layer = match std::fs::read_to_string(&path) {
-                Ok(text) => Layer::parse(&path, &text),
-                Err(e) => Err(format!("Failed to read file {:?}: {}", path, e)),
+            if std::fs::symlink_metadata(&path).map_or(false, |m| m.file_type().is_symlink()) {
+                let inside = std::fs::canonicalize(&path).map_or(false, |target| target.starts_with(&real_root));
+                if !inside {
+                    self.link_warnings.push(format!("{}: is a link to outside the world, so it isn't read", path.display()));
+                    continue;
+                }
+            }
+            let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            let layer = if size > crate::engines::layers::MAX_FILE_BYTES as u64 {
+                Err(format!(
+                    "is {} KB, over the {} KB a content file may be, so it isn't read",
+                    size / 1024,
+                    crate::engines::layers::MAX_FILE_BYTES / 1024
+                ))
+            } else {
+                match std::fs::read_to_string(&path) {
+                    Ok(text) => Layer::parse(&path, &text),
+                    Err(e) => Err(format!("Failed to read file {:?}: {}", path, e)),
+                }
             };
             self.files.push(FileRecord { path, layer });
         }
@@ -886,6 +908,7 @@ impl WorldEngine {
     pub fn current_warnings(&self) -> Vec<String> {
         let mut warnings = self.file_warnings.clone();
         warnings.extend(self.persona_warning.clone());
+        warnings.extend(self.link_warnings.iter().cloned());
         warnings.extend(self.response_warnings());
         warnings.extend(self.variable_warnings());
         warnings.extend(self.prose_link_warnings());
@@ -1524,5 +1547,37 @@ mod tests {
         assert_eq!(engine.file_roles().count(), 9);
         assert!(engine.is_ignored(Path::new("drafts/a.md")) && engine.is_ignored(Path::new(".git/x")));
         assert!(!engine.is_ignored(Path::new("castle/hall.md")));
+    }
+
+    #[test]
+    fn hostile_files_are_refused_at_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        write(d, "hall.md", "---\nid: hall\ntitle: Hall\ntype: location\n---\n");
+        write(d, "big.md", &format!("---\nid: big\ntitle: Big\ntype: location\n---\n{}", "x".repeat(crate::engines::layers::MAX_FILE_BYTES + 1)));
+        write(d, "deep.md", &format!("---\nid: deep\ntitle: Deep\ntype: location\nvars: {}{}\n---\n", "[".repeat(40), "]".repeat(40)));
+        let bomb = "---\nid: bomb\ntitle: Bomb\ntype: location\na: &a [x, x, x, x, x, x, x, x, x, x]\nb: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]\nc: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b, *b]\nd: &d [*c, *c, *c, *c, *c, *c, *c, *c, *c, *c]\ne: &e [*d, *d, *d, *d, *d, *d, *d, *d, *d, *d]\nf: &f [*e, *e, *e, *e, *e, *e, *e, *e, *e, *e]\ng: &g [*f, *f, *f, *f, *f, *f, *f, *f, *f, *f]\nh: [*g, *g, *g, *g, *g, *g, *g, *g, *g, *g]\n---\n";
+        write(d, "bomb.md", bomb);
+        let outside = tempfile::tempdir().unwrap();
+        write(outside.path(), "secret.md", "---\nid: secret\ntitle: Secret\ntype: location\n---\n");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(outside.path().join("secret.md"), d.join("secret.md")).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(d.join("hall.md"), d.join("hall-link.md")).unwrap();
+
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
+        let problems = engine.current_problems(false);
+        assert!(problems.iter().any(|p| p.contains("big.md") && p.contains("over the 1024 KB")), "{:?}", problems);
+        assert!(problems.iter().any(|p| p.contains("deep.md") && p.contains("more than 32 levels")), "{:?}", problems);
+        assert!(problems.iter().any(|p| p.contains("bomb.md")), "{:?}", problems);
+        assert!(engine.get_location("bomb").is_none());
+        #[cfg(unix)]
+        {
+            assert!(engine.get_location("secret").is_none());
+            assert!(engine.current_warnings().iter().any(|w| w.contains("secret.md: is a link to outside the world")));
+            // A link inside the world is read (here, a duplicate of the hall).
+            assert!(engine.current_problems(false).iter().any(|p| p.contains("location `hall` is defined in 2 files")));
+        }
     }
 }

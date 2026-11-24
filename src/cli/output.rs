@@ -47,6 +47,8 @@ impl OutputFormatter {
     }
     
     pub fn print_success(&self, message: &str) {
+        // A world's names and text can't drive the terminal (REQ-CFG-9).
+        let message = &crate::render::clean_text(message);
         match self.format {
             OutputFormat::Text => {
                 if self.colored_output {
@@ -73,6 +75,8 @@ impl OutputFormatter {
     }
     
     pub fn print_error(&self, message: &str) {
+        // A world's names and text can't drive the terminal (REQ-CFG-9).
+        let message = &crate::render::clean_text(message);
         match self.format {
             OutputFormat::Text => {
                 if self.colored_output {
@@ -99,6 +103,8 @@ impl OutputFormatter {
     }
     
     pub fn print_warning(&self, message: &str) {
+        // A world's names and text can't drive the terminal (REQ-CFG-9).
+        let message = &crate::render::clean_text(message);
         match self.format {
             OutputFormat::Text => {
                 if self.colored_output {
@@ -125,6 +131,8 @@ impl OutputFormatter {
     }
     
     pub fn print_info(&self, message: &str) {
+        // A world's names and text can't drive the terminal (REQ-CFG-9).
+        let message = &crate::render::clean_text(message);
         if self.verbose || matches!(self.format, OutputFormat::Json | OutputFormat::Yaml) {
             match self.format {
                 OutputFormat::Text => {

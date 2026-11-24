@@ -7,6 +7,68 @@ use crate::engines::{EntityKind, LocationView};
 use crate::parsers::link_target;
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
+/// `text` without terminal control characters or escape sequences
+/// (REQ-CFG-9), so a world's prose and titles can't move the cursor,
+/// change colours, rewrite the screen or set the terminal's title. Line
+/// breaks and tabs stay; carriage returns, which can overwrite a line,
+/// don't. CSI (`ESC [ ...`) and OSC (`ESC ] ... BEL` or `ESC \\`)
+/// sequences go whole, so no stray `[31m` is left behind.
+pub fn clean_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\u{1b}' => match chars.peek() {
+                Some('[') => {
+                    chars.next();
+                    // Parameters and intermediates, then one final byte.
+                    while let Some(&n) = chars.peek() {
+                        chars.next();
+                        if ('\u{40}'..='\u{7e}').contains(&n) {
+                            break;
+                        }
+                    }
+                }
+                Some(']') | Some('P') | Some('_') | Some('^') => {
+                    chars.next();
+                    while let Some(n) = chars.next() {
+                        if n == '\u{7}' {
+                            break;
+                        }
+                        if n == '\u{1b}' && chars.peek() == Some(&'\\') {
+                            chars.next();
+                            break;
+                        }
+                    }
+                }
+                Some(_) => {
+                    chars.next();
+                }
+                None => {}
+            },
+            '\n' | '\t' => out.push(c),
+            c if c.is_control() => {}
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+impl Rendered {
+    /// The same blocks with every span's text cleaned (REQ-CFG-9).
+    fn cleaned(mut self) -> Self {
+        for block in &mut self.blocks {
+            for span in &mut block.spans {
+                span.text = clean_text(&span.text);
+                if let Some(link) = span.style.link.as_mut() {
+                    link.name = clean_text(&link.name);
+                }
+            }
+        }
+        self
+    }
+}
+
 /// Who a room view is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenderStyle {
@@ -149,6 +211,7 @@ pub fn location_blocks(view: &LocationView, style: RenderStyle, links: Resolver)
         RenderStyle::Author => author_blocks(view),
         RenderStyle::Player => player_blocks(view, links),
     }
+    .cleaned()
 }
 
 /// A room as the player sees it: title, description, the ways out, then
@@ -308,7 +371,7 @@ pub fn render_object(o: &crate::models::world::GameObject) -> String {
             out.push(format!("  {}{}{}", name, detail, reply));
         }
     }
-    out.join("\n")
+    clean_text(&out.join("\n"))
 }
 
 /// A door as an author checks it (`thwart show <door>`): its sides and
@@ -336,7 +399,7 @@ pub fn render_door(d: &crate::models::world::Door) -> String {
     if !names.is_empty() {
         out.push(format!("Actions: {}", names.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", ")));
     }
-    out.join("\n")
+    clean_text(&out.join("\n"))
 }
 
 /// A character as an author checks it (`thwart show <character>`).
@@ -358,7 +421,7 @@ pub fn render_character(c: &crate::models::character::Character) -> String {
         rels.sort();
         out.push(format!("Relationships: {}", rels.join(", ")));
     }
-    out.join("\n")
+    clean_text(&out.join("\n"))
 }
 
 /// Where a thing's version comes from, for `thwart show`: its states,
@@ -394,12 +457,12 @@ pub fn render_thing_sources(thing: &crate::engines::bundles::Thing, shown_state:
         let names: Vec<String> = thing.templates.iter().rev().map(|t| t.path.display().to_string()).collect();
         out.push(format!("Templates: {}", names.join(", then ")));
     }
-    out.join("\n")
+    clean_text(&out.join("\n"))
 }
 
 /// `author_blocks` as text: what `thwart show` prints.
 pub fn render_location(view: &LocationView) -> String {
-    author_blocks(view).to_plain()
+    author_blocks(view).cleaned().to_plain()
 }
 
 fn push_refs(blocks: &mut Vec<Block>, heading: &str, refs: &[crate::engines::EntityRef], missing_label: &str, kind: EntityKind) {
@@ -547,7 +610,7 @@ pub fn prose_blocks(text: &str, links: Resolver) -> Rendered {
     if let Some(first) = blocks.first_mut() {
         first.space_before = false;
     }
-    Rendered { blocks }
+    Rendered { blocks }.cleaned()
 }
 
 /// Prose as plain text, as play shows it.
@@ -802,5 +865,21 @@ Here: Captain Marcus, Ghost.";
         assert_eq!(prose_tags(text), ["secret"]);
         assert_eq!(prose_links(text), ["lever", "objects/lever", "gone"]);
         assert_eq!(prose_links("See [the site](https://example.com)."), Vec::<String>::new());
+    }
+
+    #[test]
+    fn terminal_control_sequences_are_stripped_from_everything_shown() {
+        let nasty = "Hall\u{1b}[2J\u{1b}[31m red\u{1b}[0m\u{1b}]0;owned\u{7} and\u{1b}]2;x\u{1b}\\ more\r\u{8}\u{9b}31m\tend\nnext";
+        assert_eq!(clean_text(nasty), "Hall red and more31m\tend\nnext");
+        let mut v = view();
+        v.title = "Court\u{1b}[1;1Hyard".into();
+        v.body = "A \u{1b}]0;pwned\u{7}fountain.".into();
+        v.objects = vec![EntityRef { id: "x\u{1b}[5m".into(), name: Some("Bell\u{7}".into()) }];
+        for text in [render_location(&v), render_location_as(&v, RenderStyle::Player)] {
+            assert!(!text.chars().any(|c| c.is_control() && c != '\n'), "{:?}", text);
+            assert!(text.contains("Courtyard") && text.contains("A fountain."), "{}", text);
+        }
+        let blocks = prose_blocks("**Bold\u{1b}[8m** [[x\u{1b}[1m]]", &no_links);
+        assert!(blocks.blocks.iter().flat_map(|b| &b.spans).all(|s| !s.text.contains('\u{1b}')));
     }
 }

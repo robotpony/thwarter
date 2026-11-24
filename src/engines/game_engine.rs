@@ -59,6 +59,15 @@ impl GameEngine {
     /// Apply one action. Only a success changes `state`, and its
     /// `changes` say how; every other reply leaves `state` as it was.
     pub fn act(&self, world: &WorldEngine, state: &mut PlayState, action: &PlayAction) -> ActionResult {
+        // Every reply is cleaned of terminal control sequences (REQ-CFG-9):
+        // built-in replies quote titles, which come from the world.
+        let mut result = self.act_raw(world, state, action);
+        result.text = crate::render::clean_text(&result.text);
+        result.note = result.note.map(|n| crate::render::clean_text(&n));
+        result
+    }
+
+    fn act_raw(&self, world: &WorldEngine, state: &mut PlayState, action: &PlayAction) -> ActionResult {
         state.turn += 1;
         if world.get_location(&state.location).is_none() {
             return ActionResult::say("You're nowhere: this place no longer exists.")

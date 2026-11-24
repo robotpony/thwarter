@@ -33,6 +33,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.34.1 (2026-11-23)
+
+### Fixed
+
+- A world's text can no longer drive the terminal (REQ-CFG-9). `render::clean_text` removes control characters, carriage returns and escape sequences (CSI and OSC whole, so no `[31m` is left behind), keeping line breaks and tabs. It applies to every block the renderer builds and its plain text, the author views of objects, characters and doors, every play reply (built-in replies quote titles), `thwart show`'s output and every warning, error and notice the command line prints. This holds for every world, not only installed ones.
+- Loading refuses a content file over 1 MB and frontmatter nested more than 32 levels deep, each reported as a problem, and skips a link that points outside the world, with a warning (REQ-CFG-10). A link to a file inside the world is still read. YAML alias bombs were already refused by the parser; a test now checks it.
+
 ## 0.34.0 (2026-11-23)
 
 ### Added
