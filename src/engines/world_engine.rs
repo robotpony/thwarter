@@ -9,7 +9,7 @@ use crate::engines::world_def::WorldDef;
 use crate::models::game::{PlayState, SavedChapter};
 use crate::parsers::ParsedEntity;
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -131,6 +131,25 @@ impl Visibility {
             "absent" => Visibility::Absent,
             _ => return None,
         })
+    }
+}
+
+/// Where a thing starts: in a room, a character's inventory, or an
+/// object (REQ-CF-31).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Holder {
+    Room(String),
+    Character(String),
+    Object(String),
+}
+
+impl std::fmt::Display for Holder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Holder::Room(id) => write!(f, "room `{}`", id),
+            Holder::Character(id) => write!(f, "character `{}`'s inventory", id),
+            Holder::Object(id) => write!(f, "object `{}`", id),
+        }
     }
 }
 
@@ -533,6 +552,83 @@ impl WorldEngine {
             }
         }
         warnings
+    }
+
+    /// Where a thing starts (REQ-CF-31): every room, character and object
+    /// that lists it, in the starting versions, sorted. More than one is a
+    /// problem `validate` reports.
+    pub fn placement(&self, id: &str) -> Vec<Holder> {
+        let mut out = Vec::new();
+        for l in self.loaded_locations.values() {
+            if l.objects.iter().any(|o| o == id) || l.characters.iter().any(|c| c == id) {
+                out.push(Holder::Room(l.id.clone()));
+            }
+        }
+        for c in self.characters.values() {
+            if c.inventory.iter().any(|o| o == id) {
+                out.push(Holder::Character(c.id.clone()));
+            }
+        }
+        for o in self.objects.values() {
+            if o.objects.iter().any(|x| x == id) {
+                out.push(Holder::Object(o.id.clone()));
+            }
+        }
+        out.sort();
+        out
+    }
+
+    /// Things placed in more than one place (REQ-CF-31). Scenery, with or
+    /// without a card, may stand in several rooms (a bench in two
+    /// gardens), so it isn't counted.
+    fn placement_warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let mut ids: BTreeSet<&String> = BTreeSet::new();
+        for l in self.loaded_locations.values() {
+            ids.extend(l.objects.iter().chain(l.characters.iter()));
+        }
+        for c in self.characters.values() {
+            ids.extend(c.inventory.iter());
+        }
+        for o in self.objects.values() {
+            ids.extend(o.objects.iter());
+        }
+        for id in ids {
+            let scenery = !self.characters.contains_key(id.as_str()) && self.objects.get(id.as_str()).map_or(true, |o| o.object_type == "scenery");
+            if scenery {
+                continue;
+            }
+            let places = self.placement(id);
+            if places.len() > 1 {
+                let named: Vec<String> = places.iter().map(Holder::to_string).collect();
+                warnings.push(format!("`{}` starts in more than one place: {}; play shows it in each", id, named.join(", ")));
+            }
+        }
+        warnings
+    }
+
+    /// Objects that hold themselves through what they hold (REQ-CF-31).
+    fn cycle_problems(&self) -> Vec<String> {
+        let mut problems = Vec::new();
+        let mut objects: Vec<&String> = self.objects.keys().collect();
+        objects.sort();
+        for id in objects {
+            // Follow what it holds; reaching itself again is a cycle.
+            let mut seen: BTreeSet<&str> = BTreeSet::new();
+            let mut todo: Vec<&str> = self.objects[id].objects.iter().map(String::as_str).collect();
+            while let Some(next) = todo.pop() {
+                if next == id {
+                    problems.push(format!("object `{}` holds itself, through what it holds", id));
+                    break;
+                }
+                if seen.insert(next) {
+                    if let Some(o) = self.objects.get(next) {
+                        todo.extend(o.objects.iter().map(String::as_str));
+                    }
+                }
+            }
+        }
+        problems
     }
 
     /// A door's `key` and a thing's `connects:` that name nothing
@@ -975,6 +1071,7 @@ impl WorldEngine {
         warnings.extend(self.variable_warnings());
         warnings.extend(self.prose_link_warnings());
         warnings.extend(self.script_warnings());
+        warnings.extend(self.placement_warnings());
         warnings.extend(self.door_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
@@ -1069,6 +1166,7 @@ impl WorldEngine {
         }
         problems.extend(self.action_problems());
         problems.extend(self.door_problems());
+        problems.extend(self.cycle_problems());
         let mut reserved: Vec<&(EntityKind, String)> = self
             .things
             .keys()

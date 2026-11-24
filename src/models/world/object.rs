@@ -27,6 +27,9 @@ pub struct GameObject {
     /// Named actions (`design/STATES.md` › Changing state), e.g. `pull`
     /// and what it changes.
     pub actions: HashMap<String, ObjectAction>,
+    /// The objects it holds (REQ-CF-31): photos on a wall, a key in a
+    /// lock. In play, a thing keeps more (`PlayState.held`).
+    pub objects: Vec<String>,
     /// Everything else an author attaches: properties, effects, stats,
     /// contents, security, or any future section. Validated loosely (must
     /// be a YAML mapping); interpreted by whatever engine code cares.
@@ -44,6 +47,7 @@ impl GameObject {
             weight: None,
             value: None,
             actions: HashMap::new(),
+            objects: Vec::new(),
             extra: HashMap::new(),
         }
     }

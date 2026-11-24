@@ -266,17 +266,12 @@ impl GameEngine {
         if let Some(carried) = resolve(noun, &self.carried(world, state), the_object).ok().flatten() {
             return ActionResult::say(format!("You already have {}.", the_object(&carried)));
         }
-        // Taking back what a thing holds (a key from its lock).
-        if let Ok(Some(held)) = resolve(noun, &self.held_here(world, state, &view), the_object) {
-            for list in state.held.values_mut() {
-                list.retain(|id| *id != held.id);
-            }
-            state.held.retain(|_, l| !l.is_empty());
-            state.inventory.push(held.id.clone());
-            let text = self.take_reply(world, state, &held.id).unwrap_or_else(|| format!("You take {}.", the_object(&held)));
-            return ActionResult { text, changes: vec![Change::Took { object: held.id.clone(), from: state.location.clone() }], note: None };
-        }
-        let object = match resolve(noun, &view.objects, the_object) {
+        // What's in the room, and what the things here hold (photos on a
+        // wall, a key in its lock), each with its holder.
+        let mut candidates: Vec<EntityRef> = view.objects.clone();
+        let inside = self.inside_here(world, state, &view);
+        candidates.extend(inside.iter().map(|(t, _)| t.clone()));
+        let object = match resolve(noun, &candidates, the_object) {
             Ok(Some(o)) => o,
             Ok(None) => {
                 if resolve(noun, &view.characters, person).ok().flatten().is_some() {
@@ -294,11 +289,11 @@ impl GameEngine {
         if card.weight.as_deref().map_or(false, |w| w.eq_ignore_ascii_case("immovable")) {
             return ActionResult::say(format!("The {} won't budge.", name));
         }
+        let from = self.detach(world, state, &object.id);
         state.inventory.push(object.id.clone());
-        state.taken.entry(state.location.clone()).or_default().push(object.id.clone());
         ActionResult {
             text: self.take_reply(world, state, &object.id).unwrap_or_else(|| format!("You take the {}.", name)),
-            changes: vec![Change::Took { object: object.id.clone(), from: state.location.clone() }],
+            changes: vec![Change::Took { object: object.id.clone(), from }],
             note: None,
         }
     }
@@ -323,12 +318,13 @@ impl GameEngine {
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
         things.extend(doors_here(&view));
-        things.extend(self.held_here(world, state, &view));
+        things.extend(self.inside_here(world, state, &view).into_iter().map(|(t, _)| t).collect::<Vec<_>>());
         match resolve(noun, &things, the_object) {
             Ok(Some(object)) if world.door_at(&object.id, At::play(state)).is_some() && world.object_at(&object.id, At::play(state)).is_none() => {
                 let door = world.door_at(&object.id, At::play(state)).unwrap();
                 let scope = Scope { at: At::play(state), this: Some((EntityKind::Door, &door.id)), here: None };
                 let text = self.describe(world, state, EntityKind::Door, &door.id, &door.description);
+                let text = self.with_contents(world, state, &door.id, &text);
                 let text = text.trim();
                 return if text.is_empty() {
                     ActionResult::say(format!("You see nothing special about {}.", the_object(&object)))
@@ -338,7 +334,10 @@ impl GameEngine {
             }
             Ok(Some(object)) => {
                 // The description, with what its state adds.
-                let text = world.object_at(&object.id, At::play(state)).map(|card| self.describe(world, state, EntityKind::Object, &object.id, &card.description));
+                let text = world
+                    .object_at(&object.id, At::play(state))
+                    .map(|card| self.describe(world, state, EntityKind::Object, &object.id, &card.description))
+                    .map(|text| self.with_contents(world, state, &object.id, &text));
                 return match text {
                     Some(text) if !text.trim().is_empty() => {
                         let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
@@ -379,7 +378,7 @@ impl GameEngine {
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
         things.extend(doors_here(&view));
-        things.extend(self.held_here(world, state, &view));
+        things.extend(self.inside_here(world, state, &view).into_iter().map(|(t, _)| t).collect::<Vec<_>>());
         // A hidden object can't be seen, but an action may name it exactly.
         let hidden = || -> Option<EntityRef> {
             let whole = self.whole_view(world, state)?;
@@ -597,14 +596,7 @@ impl GameEngine {
                     if used.map(|(_, u)| u.as_str()) != Some(id.as_str()) {
                         return Err(format!("keep(`{}`): a thing keeps only what it's used with", id));
                     }
-                    if let Some(i) = state.inventory.iter().position(|c| *c == id) {
-                        state.inventory.remove(i);
-                    } else {
-                        let taken = state.taken.entry(state.location.clone()).or_default();
-                        if !taken.contains(&id) {
-                            taken.push(id.clone());
-                        }
-                    }
+                    self.detach(world, state, &id);
                     state.held.entry(thing.id.clone()).or_default().push(id.clone());
                     changes.push(Change::Kept { object: id, by: thing.id.clone() });
                 }
@@ -644,21 +636,94 @@ impl GameEngine {
         things.extend(view.objects.iter().cloned());
         things.extend(doors_here(&view));
         things.extend(view.characters.iter().cloned());
-        things.extend(self.held_here(world, state, &view));
+        things.extend(self.inside_here(world, state, &view).into_iter().map(|(t, _)| t).collect::<Vec<_>>());
         !matches!(resolve(noun, &things, the_object), Ok(None))
     }
 
-    /// What the things here hold (a key left in a lock), which the player
-    /// can see and take back.
-    fn held_here(&self, world: &WorldEngine, state: &PlayState, view: &LocationView) -> Vec<EntityRef> {
-        let mut holders: Vec<String> = state.inventory.clone();
-        holders.extend(view.objects.iter().map(|o| o.id.clone()));
-        holders.extend(doors_here(view).into_iter().map(|d| d.id));
-        holders
+    /// What an object holds now (REQ-CF-31): what its file lists, less
+    /// what's been taken from it or kept elsewhere, plus what it has kept
+    /// in play (`keep()`), each as play shows it.
+    pub(crate) fn contents(&self, world: &WorldEngine, state: &PlayState, holder: &str) -> Vec<String> {
+        let kept_elsewhere = |id: &str| state.held.iter().any(|(h, l)| h != holder && l.iter().any(|x| x == id));
+        let mut out: Vec<String> = world
+            .object_at(holder, At::play(state))
+            .map(|o| o.objects)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|id| !state.was_taken(holder, id) && !state.inventory.contains(id) && !kept_elsewhere(id))
+            .collect();
+        for id in state.held.get(holder).into_iter().flatten() {
+            if !out.contains(id) {
+                out.push(id.clone());
+            }
+        }
+        out.retain(|id| shown(world, state, EntityKind::Object, id));
+        out
+    }
+
+    /// `text`, then what `holder` holds. How a holder's contents read is
+    /// still Bruce's to choose (titles, grouping, or prose alone), so it's
+    /// made here and nowhere else (REQ-CF-31).
+    fn with_contents(&self, world: &WorldEngine, state: &PlayState, holder: &str, text: &str) -> String {
+        let names: Vec<String> = self
+            .contents(world, state, holder)
             .iter()
-            .flat_map(|h| state.held.get(h).cloned().unwrap_or_default())
-            .map(|id| EntityRef { name: world.object_at(&id, At::play(state)).map(|o| o.title), id })
-            .collect()
+            .map(|id| world.object_at(id, At::play(state)).map(|o| o.title).unwrap_or_else(|| id.clone()))
+            .collect();
+        match (names.is_empty(), text.trim().is_empty()) {
+            (true, _) => text.to_string(),
+            (false, true) => format!("You see: {}.", names.join(", ")),
+            (false, false) => format!("{}\n\nYou see: {}.", text.trim(), names.join(", ")),
+        }
+    }
+
+    /// Everything the things here hold, however deep, each with its
+    /// holder: what the room's objects, its doors and the player's things
+    /// hold, and what those hold. A cycle is followed once.
+    fn inside_here(&self, world: &WorldEngine, state: &PlayState, view: &LocationView) -> Vec<(EntityRef, String)> {
+        let mut todo: Vec<String> = state.inventory.clone();
+        todo.extend(view.objects.iter().map(|o| o.id.clone()));
+        todo.extend(doors_here(view).into_iter().map(|d| d.id));
+        let mut seen: std::collections::BTreeSet<String> = todo.iter().cloned().collect();
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < todo.len() {
+            let holder = todo[i].clone();
+            i += 1;
+            for id in self.contents(world, state, &holder) {
+                if seen.insert(id.clone()) {
+                    out.push((EntityRef { name: world.object_at(&id, At::play(state)).map(|o| o.title), id: id.clone() }, holder.clone()));
+                    todo.push(id);
+                }
+            }
+        }
+        out
+    }
+
+    /// Take a thing out of wherever it is now, ready to move: the
+    /// player's hands, a thing that kept it, an object that holds it, or
+    /// the room. Returns where it was.
+    fn detach(&self, world: &WorldEngine, state: &mut PlayState, id: &str) -> String {
+        if let Some(i) = state.inventory.iter().position(|c| c == id) {
+            state.inventory.remove(i);
+            return "player".to_string();
+        }
+        if let Some(holder) = state.held.iter().find(|(_, l)| l.iter().any(|x| x == id)).map(|(h, _)| h.clone()) {
+            if let Some(list) = state.held.get_mut(&holder) {
+                list.retain(|x| x != id);
+            }
+            state.held.retain(|_, l| !l.is_empty());
+            return holder;
+        }
+        let holder = self
+            .view(world, state)
+            .and_then(|view| self.inside_here(world, state, &view).into_iter().find(|(t, _)| t.id == id).map(|(_, h)| h))
+            .unwrap_or_else(|| state.location.clone());
+        let taken = state.taken.entry(holder.clone()).or_default();
+        if !taken.iter().any(|x| x == id) {
+            taken.push(id.to_string());
+        }
+        holder
     }
 
     fn carried(&self, world: &WorldEngine, state: &PlayState) -> Vec<EntityRef> {

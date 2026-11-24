@@ -448,4 +448,59 @@ mod tests {
         assert_eq!(state.reconcile(&world).len(), 1);
         assert!(state.held.is_empty());
     }
+
+    fn hallway() -> (tempfile::TempDir, WorldEngine) {
+        let dir = tempfile::tempdir().unwrap();
+        let write = |rel: &str, text: &str| {
+            let p = dir.path().join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        };
+        write("hallway.md", "---\nid: hallway\ntitle: Hallway\ntype: location\nobjects: [walls]\n---\nA long hallway.\n");
+        write("objects/walls.md", "---\nid: walls\ntitle: Walls\ntype: object\nobject_type: scenery\nweight: immovable\nobjects: [photo-1, shelf]\n---\nPapered walls.\n");
+        write("objects/photo-1.md", "---\nid: photo-1\ntitle: Old photo\ntype: object\nobject_type: picture\n---\nA family, unsmiling.\n");
+        write("objects/shelf.md", "---\nid: shelf\ntitle: Shelf\ntype: object\nobject_type: furniture\nweight: immovable\nobjects: [vase]\n---\nA narrow shelf.\n");
+        write("objects/vase.md", "---\nid: vase\ntitle: Vase\ntype: object\nobject_type: x\n---\nBlue glass.\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(dir.path()).unwrap();
+        (dir, engine)
+    }
+
+    #[test]
+    fn objects_hold_objects_as_deep_as_written() {
+        use crate::engines::Holder;
+        let (dir, mut world) = hallway();
+        assert!(world.current_problems(false).is_empty(), "{:?}", world.current_problems(false));
+        assert!(world.current_warnings().is_empty(), "{:?}", world.current_warnings());
+        assert_eq!(world.placement("photo-1"), [Holder::Object("walls".into())]);
+        assert_eq!(world.placement("walls"), [Holder::Room("hallway".into())]);
+        assert!(world.placement("nowhere").is_empty());
+
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "hallway").unwrap();
+        let mut s = |line: &str| say(&game, &world, &mut state, line);
+        // The room lists only what's directly in it.
+        let look = s("look");
+        assert!(look.contains("You see: Walls.") && !look.contains("photo"), "{}", look);
+        // A holder lists what it holds; what that holds is in scope too.
+        assert_eq!(s("x walls"), "Papered walls.\n\nYou see: Old photo, Shelf.");
+        assert_eq!(s("look at photo"), "A family, unsmiling.");
+        assert_eq!(s("x vase"), "Blue glass.");
+        assert_eq!(s("take vase"), "You take the vase.");
+        assert_eq!(s("x shelf"), "A narrow shelf.");
+        assert_eq!(s("take photo"), "You take the old photo.");
+        assert_eq!(s("x walls"), "Papered walls.\n\nYou see: Shelf.");
+        assert!(s("inventory").contains("Old photo"));
+
+        // Placed twice is a warning; a cycle is a problem.
+        let d = dir.path();
+        world.set_file(&d.join("hallway.md"), "---\nid: hallway\ntitle: Hallway\ntype: location\nobjects: [walls, vase]\n---\n");
+        assert!(world.current_warnings().iter().any(|w| w.contains("`vase` starts in more than one place: room `hallway`, object `shelf`")), "{:?}", world.current_warnings());
+        world.set_file(&d.join("objects/vase.md"), "---\nid: vase\ntitle: Vase\ntype: object\nobject_type: x\nobjects: [walls]\n---\n");
+        assert!(world.current_problems(false).iter().any(|p| p.contains("object `walls` holds itself")), "{:?}", world.current_problems(false));
+        // Play still follows a cycle only once.
+        let mut state = game.start(&world, "hallway").unwrap();
+        assert_eq!(say(&game, &world, &mut state, "x vase"), "You see: Walls.");
+        assert_eq!(say(&game, &world, &mut state, "x photo"), "A family, unsmiling.");
+    }
 }

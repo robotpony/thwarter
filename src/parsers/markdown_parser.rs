@@ -70,6 +70,7 @@ pub fn known_keys(type_name: &str) -> &'static [&'static str] {
             "category",
             "weight",
             "value",
+            "objects",
             "vars",
             "can",
             "actions",
@@ -447,6 +448,7 @@ impl MarkdownParser {
         object.value = parsed.metadata.get("value").map(value_to_display_string);
 
         object.actions = self.actions(parsed, &object.id, path)?;
+        object.objects = string_sequence(&parsed.metadata, "objects");
 
         let known_fields = known_keys("object");
         if let Some(map) = parsed.metadata.as_mapping() {

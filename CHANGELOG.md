@@ -37,6 +37,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.49.0 (2026-11-23)
+
+### Added
+
+- Objects hold objects (REQ-CF-31, REQ-ENG-42): an object's `objects:` lists what it holds, as a location's does, so photos hang on the walls. `WorldEngine::placement(id)` gives every room, character and object a thing starts in (`Holder::Room`, `Character`, `Object`), for the console's `/move`. In play, what an object holds is in scope whenever the object is, however deep, for look at, take, examine and object actions; the room view lists only what's directly in it, and examining a holder adds "You see: …" for what it holds. A key kept in a lock is the same relation, made in play, and saves are unchanged.
+- `validate` warns about a thing that starts in more than one place, skipping scenery (the test world has benches in two rooms), and reports an object that holds itself through what it holds.
+
 ## 0.48.0 (2026-11-23)
 
 ### Added
