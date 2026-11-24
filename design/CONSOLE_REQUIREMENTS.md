@@ -36,6 +36,16 @@ The author is a player of sorts, like a game master running a table (Bruce, 2026
   Added chair to bedroom, as scenery with no card yet (/edit object chair gives it one).
   ```
 
+- REQ-CON-42: `/add door` MUST make a door from the room edit mode is in, with its exits, so authors don't write door files by hand (Bruce, 2026-11-23; `design/STATES.md` › Adding a door from the console). The far side faces the opposite way unless given, a far room that doesn't exist yet is made, the id is the engine's `door_id`, and a state hint in the door word picks another template (`door(locked)` is `locked-door`). Without a direction it asks, and the next line answers. `/add <room> <door>` gives a one-sided door its other side.
+
+  ```
+  in village/square > /add door west village/hallway
+  Added door-village-square-village-hallway-west: west of village/square, east of village/hallway.
+  in village/square > /add door(locked) --(south)--> village/cellar
+  in village/square > /add door up
+  in village/square > /add village/loft door-village-square-up
+  ```
+
 - REQ-CON-40: `/move <thing> <room or character>` MUST put a person or thing somewhere else (Bruce, 2026-11-23): a character into another room, with its `default_location` following, or an object into a room, a character's inventory or another object (REQ-CF-31), scenery included, which gets its card first if it has none. It takes the thing out of every room list and inventory that held it, and the thing's own file stays where it is. `/move <id> global|area|local` changes scope instead (REQ-CON-29). A room moves into an area folder: `/move hallway house` makes it `house/hallway`, with its file moved and every exit to it updated, and a room as the target stands for its own area, so `/move hallway bedroom` puts hallway beside bedroom (Bruce, 2026-11-23). The writer's rename does the move, and the report lists every file it updated and any reference left to fix by hand.
 
   ```

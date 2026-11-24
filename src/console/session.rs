@@ -60,6 +60,8 @@ pub struct Console {
     pub(super) looked_at: Option<String>,
     /// The last play action's author notes, for the sidebar on a terminal.
     pub(super) notes: Vec<String>,
+    /// A question the console asked, which the next plain line answers.
+    pub(super) asked: Option<super::doors::Asked>,
     /// Where input the console didn't understand is logged, for reviewing
     /// what authors and players reach for. Only a terminal session sets it.
     pub(super) unknown_log: Option<std::path::PathBuf>,
@@ -97,6 +99,7 @@ impl Console {
             trail: Vec::new(),
             looked_at: None,
             notes: Vec::new(),
+            asked: None,
             unknown_log: None,
         };
         if mode == Mode::Play {
@@ -145,6 +148,12 @@ impl Console {
         let line = line.trim();
         if line.is_empty() {
             return (String::new(), Flow::Continue);
+        }
+        // A plain line answers the question just asked; a command drops it.
+        if let Some(asked) = self.asked.take() {
+            if !line.starts_with('/') {
+                return (self.answer(asked, line), Flow::Continue);
+            }
         }
         if let Some(command) = line.strip_prefix('/') {
             return self.console_command(command);

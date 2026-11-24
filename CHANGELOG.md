@@ -39,6 +39,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.56.0 (2026-11-24)
+
+### Added
+
+- `/add door` (REQ-CON-42, Bruce, 2026-11-23): `/add door west hallway` or `/add door --(west)--> hallway` makes a door west of this room and east of the hallway, with an exit through it on each side; `/add door west` makes one side, a validate warning until `/add hallway <door>` gives it the other; `/add door` alone asks which way, and the next line answers. The far side faces the opposite way unless a direction is given after the room. A far room that doesn't exist is made. The id is the engine's `door_id` (28692c1), as in `door-bedroom-hallway-west`. A state hint picks the template: `door(locked)` inherits `locked-door`, and plain `door` and `portal` their own.
+
 ## 0.55.0 (2026-11-24)
 
 ### Added

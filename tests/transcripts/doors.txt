@@ -1,0 +1,42 @@
+# world: tests/worlds/tiny
+# mode: edit
+# copy: yes
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
+> go /village/square
+Village Square (room)
+> /add door west village/hallway
+Added door-village-square-village-hallway-west: west of village/square, east of village/hallway.
+> /add door(locked) --(south)--> village/cellar-steps
+Added door-village-square-village-cellar-steps-south: south of village/square, north of village/cellar-steps.
+> /add door up
+Added door-village-square-up, up from village/square (one side so far: /add <room> door-village-square-up gives it another).
+This adds 1 problem(s):
+  door `door-village-square-up`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
+> /add village/loft door-village-square-up
+door-village-square-up now has a side down from village/loft too.
+> /add door
+Which way is the door from village/square? north, east, south, west, up, down, or any word.
+> northwest
+Added door-village-square-northwest, northwest of village/square (one side so far: /add <room> door-village-square-northwest gives it another).
+This adds 1 problem(s):
+  door `door-village-square-northwest`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
+> go west
+Hallway (room)
+> look
+Hallway (village/hallway)
+
+(no description yet)
+
+Exits:
+  east  village/square  (through door-village-square-village-hallway-west, not passable)
+
+Characters: none
+
+Objects: none
+> /validate
+Problems (1):
+  village/square: connection `east` points at unknown location `village/inn`
+Warnings (1):
+  door `door-village-square-northwest`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
+Validation failed: 1 problem(s), 1 warning(s)

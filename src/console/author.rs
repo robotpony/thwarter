@@ -282,6 +282,18 @@ impl Console {
     /// inventory, without taking it from anywhere else (Bruce, 2026-11-23).
     /// A name with no card becomes scenery the room lists (REQ-CF-8).
     pub(super) fn add_thing(&mut self, args: &[&str]) -> String {
+        // `/add door ...` makes a door; `/add hallway <door>` gives a door
+        // its other side (Bruce, 2026-11-23; doors.rs).
+        if args.first().is_some_and(|w| Console::is_door_word(w)) {
+            return self.add_door(args);
+        }
+        match args {
+            [room, door] if self.world.engine.doors.contains_key(*door) => return self.add_door_side(room, door, None),
+            [room, door, direction] if self.world.engine.doors.contains_key(*door) => {
+                return self.add_door_side(room, door, Some(direction))
+            }
+            _ => {}
+        }
         let (thing, target) = match args {
             [thing] => match self.current_room() {
                 Some(here) => (*thing, here),
@@ -718,11 +730,12 @@ pub(super) fn entity_kind(kind: Kind) -> Option<EntityKind> {
         Kind::Room => Some(EntityKind::Location),
         Kind::Character => Some(EntityKind::Character),
         Kind::Object => Some(EntityKind::Object),
+        Kind::Door => Some(EntityKind::Door),
         _ => None,
     }
 }
 
-fn expand_direction(typed: &str) -> String {
+pub(super) fn expand_direction(typed: &str) -> String {
     COMPASS_ALIASES
         .iter()
         .find(|(short, _)| *short == typed)
@@ -730,7 +743,7 @@ fn expand_direction(typed: &str) -> String {
         .unwrap_or_else(|| typed.to_string())
 }
 
-fn opposite(direction: &str) -> Option<&'static str> {
+pub(super) fn opposite(direction: &str) -> Option<&'static str> {
     OPPOSITES.iter().find_map(|(a, b)| {
         if *a == direction {
             Some(*b)

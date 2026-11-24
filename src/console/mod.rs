@@ -8,6 +8,7 @@
 
 mod author;
 mod commands;
+mod doors;
 mod editor;
 mod full_edit;
 mod panels;
