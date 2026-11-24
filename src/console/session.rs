@@ -537,6 +537,16 @@ impl Console {
         let location = self.world.engine.get_location(&entry.id)?;
         let direction = COMPASS_ALIASES.iter().find(|(short, _)| *short == target).map(|(_, long)| *long).unwrap_or(target);
         if let Some(to) = location.connections.get(direction) {
+            // An exit through a door names the door; it leads to the room
+            // on the door's far side.
+            let to = match self.world.engine.doors.get(to) {
+                Some(door) => match door.leads_to(&entry.id) {
+                    Some(room) => room.to_string(),
+                    None => return Some(Err(format!("The {} exit goes through `{}`, which doesn't say where it leads from here.", direction, to))),
+                },
+                None => to.clone(),
+            };
+            let to = &to;
             return Some(match self.world.path_of(Kind::Room, to) {
                 Some(path) => Ok(Place::File(path)),
                 None => Err(format!("The {} exit leads to `{}`, which isn't written yet.", direction, to)),

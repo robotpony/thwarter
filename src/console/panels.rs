@@ -160,10 +160,15 @@ impl Console {
         let mut exits: Vec<(&String, &String)> = location.connections.iter().collect();
         exits.sort();
         for (direction, to) in exits {
-            if self.world.engine.get_location(to).is_some() {
-                rows.push(Row::Text(format!("  {}  {}", direction, to)));
+            // Through a door: the room beyond, and the door by name.
+            let (room, through) = match self.world.engine.doors.get(to) {
+                Some(door) => (door.leads_to(&location.id).unwrap_or("?").to_string(), format!("  through {}", to)),
+                None => (to.clone(), String::new()),
+            };
+            if self.world.engine.get_location(&room).is_some() {
+                rows.push(Row::Text(format!("  {}  {}{}", direction, room, through)));
             } else {
-                rows.push(Row::Missing(format!("  {}  {}  (not written)", direction, to)));
+                rows.push(Row::Missing(format!("  {}  {}{}  (not written)", direction, room, through)));
             }
         }
         if !location.characters.is_empty() {
@@ -296,6 +301,26 @@ mod tests {
         let status = console.status(true);
         assert!(status.left.ends_with("chapter none · turn 1"), "{}", status.left);
         assert!(status.right.starts_with("newer build: /restart"));
+    }
+
+    #[test]
+    fn an_exit_through_a_door_shows_the_room_beyond_and_the_door() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("doors")).unwrap();
+        std::fs::write(root.join("hall.md"), "---\nid: hall\ntitle: Hall\ntype: location\nconnections: { down: vault-door }\n---\n").unwrap();
+        std::fs::write(root.join("vault.md"), "---\nid: vault\ntitle: Vault\ntype: location\nconnections: { up: vault-door }\n---\n").unwrap();
+        std::fs::write(
+            root.join("doors/vault-door.md"),
+            "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: door\nsides:\n  hall: { direction: down }\n  vault: { direction: up }\n---\n",
+        )
+        .unwrap();
+        let mut console = Console::open(root, Mode::Edit).unwrap();
+        console.handle("go hall");
+        let rest = texts(&console.sidebar().rest);
+        assert!(rest.contains(&"  down  vault  through vault-door".to_string()), "{:?}", rest);
+        assert_eq!(console.handle("down").0, "Vault (room)");
+        assert_eq!(console.world.files["doors/vault-door"].kind, Kind::Door);
     }
 
     #[test]

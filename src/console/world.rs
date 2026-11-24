@@ -199,9 +199,9 @@ fn entry_for_role(engine: &WorldEngine, role: Option<&FileRole>, key: &str) -> F
         Some(FileRole::Thing { kind: EntityKind::Object, id }) => {
             entry_for(Kind::Object, id, engine.objects.get(id).map(|o| &o.title))
         }
-        // Any other kind of thing: doors, which the engine is adding.
-        #[allow(unreachable_patterns)]
-        Some(FileRole::Thing { id, .. }) => part(Kind::Door, id, id.clone()),
+        Some(FileRole::Thing { kind: EntityKind::Door, id }) => {
+            entry_for(Kind::Door, id, engine.doors.get(id).map(|d| &d.title))
+        }
         Some(FileRole::State { id, name, .. }) => part(Kind::State, id, format!("State `{}` of {}", name, id)),
         Some(FileRole::Overlay { id, chapter, .. }) => {
             part(Kind::Overlay, id, format!("{} in chapter {}", id, chapter.name()))
