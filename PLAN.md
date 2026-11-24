@@ -79,9 +79,11 @@ Done when a locked-door puzzle plays from both sides.
 - [x] Rewrite the `door` and `portal` built-ins and the test world's marker files as sections [coder] (`design/SECTIONS.md` › What changes)
 - [x] The editor draws keyword headings and colours `@`, `#` and `thwarter` blocks (0.44.0) [console] (`design/SECTIONS.md`)
 - [ ] Try sections on real content with Bruce, then fold `design/SECTIONS.md` into the content requirements [commander, Bruce]
-- [ ] The `locked-door` built-in, once the key design and the sections trial are settled [coder] (REQ-CF-21)
+- [ ] Rhai scripts: `actions.rhai` and ```rhai blocks, functions as actions, outcomes, keep and the owned scope [coder] (`design/SECTIONS.md` › Scripts, Outcomes and replies)
+- [ ] The `locked-door` built-in as the vault door example shows [coder] (REQ-CF-21, `design/STATES.md` › Keys)
+- [ ] Connections between things for scripts (`connects:`) [coder] (`design/STATES.md` › One thing affecting another)
 - [ ] Linking two rooms through a door template from the console [console] (`design/STATES.md` › Doors)
-- [ ] Keys for locked doors: a variable inside `requires:` [commander, coder] (`design/STATES.md` › Open questions)
+- [x] Keys for locked doors: designed with Bruce as a scripted built-in [commander] (`design/STATES.md` › Keys)
 - [ ] Clocks and game values: time, weather, randomness [commander, coder] (`design/STATES.md` › Open questions)
 - [x] The player command parser moves into the engine as `parse_command` [coder] (REQ-PC-1)
 - [x] An unknown verb with a noun no thing answers to says it doesn't understand [coder] (REQ-PC-14)

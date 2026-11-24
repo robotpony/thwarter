@@ -406,30 +406,156 @@ Full editing is a full-screen editor in the terminal (Bruce, 2026-11-23; `design
 
 Commands the console will need, *proposed*: `/state new <name>`, `/state rename <old> <new>`, `/state delete <name>`, `/state set <name>` (the starting state), `/chapter new <number> <name>` at the root, and `/chapter overlay` inside a thing. Turning a one-file thing into a bundle (`lantern.md` → `lantern/index.md`) is a file move, which the writer refuses today; these commands are where it gets built.
 
-## Keys and clocks (proposed, Phase 6)
+## Keys and clocks (Phase 6)
 
-The commander's proposals for Phase 6, not yet reviewed with Bruce.
+Keys are agreed with Bruce (2026-11-23), worked through as the vault door example below; it uses `design/SECTIONS.md`'s sections, scripts and outcomes. Clocks are still the commander's proposal, not yet reviewed.
 
 ### Keys
 
-A built-in `locked-door` has to say which key opens each door, without each door restating the unlock action. The template names the key as a value, and each door sets it:
+A lock is a reason a door won't open, and the reason varies: a key, a deadbolt, a stiff handle. So a key may or may not be needed (Bruce). The built-in `locked-door` has a script that decides; each door says which key, if any, opens it.
 
-```yaml
-# built-in: locked-door
-vars: { key: "" }
-actions:
-  unlock: { requires: { has: this.key }, becomes: { this: closed } }
+- `unlock door` works only if the player provides the key: `unlock door with key`. The engine never searches the player's pocket. The door's reply MAY ask or suggest ("Unlock it with what?"). *Proposed*: after a reply that asks, a bare noun on the next line is taken as the `with`.
+- A key used on a door stays in the lock until the player takes it back (Bruce). Then the door holds it, and can see it: a script reaches only what its thing owns.
+- `vars: { key: "" }` means no key is needed, for a deadbolt or a latch.
+- `validate` warns about a locked door whose `key` names nothing.
+
+The built-in, as a bundle:
+
+```
+locked-door/
+  index.md        state: locked, vars: { key: "" }
+  locked.md       passable: no, and replies for ending up or staying locked
+  closed.md       passable: no, and replies for ending up closed
+  open.md         passable: yes, and the open door's text
+  actions.rhai    unlock, lock, open, close
 ```
 
-```yaml
-# castle/doors/vault-door.md
+`actions.rhai`, *proposed* syntax: each function returns a new state, a reason, or a list of changes.
+
+```rust
+fn unlock(door, turn) {
+    if door.state != "locked" { return "no-action"; }
+    if door.key == "" { return become("closed"); }      // a deadbolt: no key
+    if turn.with == () { return "no-key"; }
+    if turn.with.id != door.key { return "wrong-key"; }
+    [keep(turn.with), become("closed")]                 // the key stays in the lock
+}
+
+fn lock(door, turn) {
+    if door.state != "closed" { return "no-action"; }
+    if door.key == "" || door.holds(door.key) { return become("locked"); }
+    if turn.with == () { return "no-key"; }
+    if turn.with.id != door.key { return "wrong-key"; }
+    [keep(turn.with), become("locked")]
+}
+
+fn open(door, turn)  { if door.state == "closed" { become("open") } }
+fn close(door, turn) { if door.state == "open" { become("closed") } }
+```
+
+`locked.md`:
+
+```markdown
+---
+inherits: index
+passable: no
+---
+## When: #lock
+The lock clicks shut.
+
+## When: #unlock #no-key
+It's locked. Unlock it with what?
+
+## When: #unlock #wrong-key
+That doesn't fit the lock.
+
+## When: #open #no-action
+It's locked.
+
+## When: #go
+It's locked.
+```
+
+`closed.md`:
+
+```markdown
+---
+inherits: index
+passable: no
+---
+## When: #unlock
+The lock falls open.
+
+## When: #close
+You pull the door shut.
+
+## When: #unlock #no-action
+It isn't locked.
+```
+
+`open.md`:
+
+```markdown
+---
+inherits: index
+passable: yes
+---
+## When: #open
+The door stands open.
+```
+
+A specific door names its key and tells its own story. Its replies replace the built-in's for the same action and outcome:
+
+```markdown
+---
+id: vault-door
+title: Iron door
+type: door
 inherits: locked-door
 vars: { key: brass-key }
+sides:
+  castle/hall:  { direction: down }
+  castle/vault: { direction: up }
+---
+A heavy iron door, set into the floor.
+
+## When: #locked
+A padlock hangs from the hasp.
+
+## When: #unlock #closed
+The padlock snaps open with a rusty clunk. The key stays in it.
+
+## When: #open
+Cold air rises from the dark below.
 ```
 
-- `has:` takes an `id`, or a variable whose value is an `id` (`this.key`, `vault-door.key`). That's the only change to `requires:`. It still has one key, so principle 7 holds.
-- `becomes: { this: closed }` lets a template switch the thing that uses it.
-- `validate` warns about a locked door whose `key` is empty or names nothing.
+In play:
+
+| Typed | Outcome | Reply |
+|---|---|---|
+| `unlock door` | `no-key` | It's locked. Unlock it with what? |
+| `unlock door with spoon` | `wrong-key` | That doesn't fit the lock. |
+| `unlock door with key` | `closed`; the key stays in the lock | The padlock snaps open with a rusty clunk. The key stays in it. |
+| `open door` | `open` | The door stands open. Cold air rises from the dark below. |
+| `take key` | the key comes back to the player | You take the brass key. |
+| `down` | engine: `passable: yes` | The Vault |
+
+### One thing affecting another
+
+A lever in the hall that opens the vault door can't reach the door by ownership. A connection between the two, in the lever's (or the door's) frontmatter or body, gives it that reach (Bruce). *Proposed*: frontmatter `connects: [vault-door]`, and a script changes a connected thing by naming it:
+
+```rust
+fn pull(lever, turn) {
+    if lever.state == "up" { [become("down"), change("vault-door", "open")] }
+}
+```
+
+Whether a mention in the body (`@vault-door`) also connects is still open (`design/SECTIONS.md` › Open questions).
+
+### Built-in verbs
+
+`take`, `go`, `look` and the other built-in verbs stay the engine's, and no script replaces them (Bruce). Every action, built-in or not, adds its tags to the turn, and each turn shows all the content that matches the request, the location, what the player holds and the rest (Bruce). So `take key` MAY have a `## When: #take` reply in the key's file; where one exists, it replaces the built-in reply. Where none exists, the built-in reply stands.
+
 
 ### Clocks
 
@@ -471,4 +597,4 @@ The sky is clear.
 
 1. **Clocks and game values**: proposed above (Keys and clocks), to review with Bruce. Phase 6.
 2. **Showing play state**: it MUST be visible in a sidebar in the console and be queryable (Bruce, 2026-11-23). The layout and the query commands are console work for `design/CONSOLE_REQUIREMENTS.md`. Phase 5.
-3. **Keys for built-in locked doors**: proposed above (Keys and clocks), to review with Bruce. Phase 6.
+3. **Keys for built-in locked doors**: settled with Bruce, 2026-11-23 (Keys and clocks › Keys).
