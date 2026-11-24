@@ -69,6 +69,9 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
 - [x] Objects hold objects: loading, scope, examine lists, one place per thing, unified with `keep()` [coder] (REQ-CF-31)
 - [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
+- [ ] Question sets: the loader reads `questions/` folders and built-ins, and `validate` checks them [coder] (REQ-CF-32, `design/CONTENT_FORMAT.md` › `type: questions`)
+- [ ] `/new` and `/add` ask a set's questions, run the answers and print the commands they stood for, with the four recipes [console] (REQ-CF-32)
+- [ ] Review the built-in question content with Bruce, once the mechanics work [commander, Bruce]
 
 ## Phase 6 · Doors and play
 
