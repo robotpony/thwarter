@@ -116,7 +116,7 @@ Built when authoring or play asks for them, most likely as console commands. Unt
 - [ ] `CharacterEngine` wired into `show` and `validate --strict` [coder] (`design/ARCHITECTURE.md` › Character Engine)
 - [ ] Read `thwart.toml` through `ConfigManager` [coder] (REQ-CFG-1)
 - [ ] `validate` checks a location's `id` against its file path [coder] (`design/CONTENT_FORMAT.md` › What's still open)
-- [ ] Minimal CI: `cargo build` and `cargo test` on push [coder] (`TESTING.md` › CI)
+- [x] Minimal CI: `cargo build` and `cargo test` on push [coder] (`TESTING.md` › CI)
 
 ## Open questions
 
