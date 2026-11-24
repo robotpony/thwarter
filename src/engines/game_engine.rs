@@ -96,7 +96,9 @@ impl GameEngine {
             (!e.target_exists || shown(world, state, EntityKind::Location, &e.target))
                 && e.door.as_ref().map_or(true, |d| shown(world, state, EntityKind::Door, &d.id))
         });
-        // What the room's objects and doors hold, however deep (REQ-CF-31).
+        // What the room's objects and doors hold, however deep, in this
+        // game (REQ-CF-31).
+        view.held.clear();
         let mut holders: Vec<(String, String)> = view.objects.iter().map(|o| (o.id.clone(), o.display_name())).collect();
         holders.extend(doors_here(&view).into_iter().map(|d| (d.id.clone(), d.display_name())));
         let mut seen: std::collections::BTreeSet<String> = holders.iter().map(|(id, _)| id.clone()).collect();
@@ -108,7 +110,7 @@ impl GameEngine {
                 if seen.insert(id.clone()) {
                     let thing = EntityRef { name: world.object_at(&id, At::play(state)).map(|o| o.title), id: id.clone() };
                     holders.push((id, thing.display_name()));
-                    view.held.push(crate::engines::Held { thing, holder: holder.clone(), holder_name: holder_name.clone() });
+                    view.held.push(crate::engines::Held { thing, holder: holder.clone(), holder_name: holder_name.clone(), word: world.holds_word(&holder, At::play(state)) });
                 }
             }
         }

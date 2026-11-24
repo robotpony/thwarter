@@ -26,6 +26,9 @@ pub struct Held {
     /// The holder's id and its name as play shows it.
     pub holder: String,
     pub holder_name: String,
+    /// How the holder holds it: `on` (the default), `in`, or the
+    /// holder's own word (`holds:`).
+    pub word: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -37,6 +37,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.50.1 (2026-11-23)
+
+### Added
+
+- `holds:` on an object or door says how it holds things: `on` (the default), `in`, or any word (Bruce; REQ-CF-31). Looking reads "Coins (in the chest)", and the built-in `locked-door` says `holds: in`, so a key reads "Brass key (in the iron door)". An empty `holds:` is a `validate` warning.
+
+### Changed
+
+- Edit mode's room view lists what objects hold, each under its holder and indented a step per level, with what doors hold after the objects. `WorldEngine::describe_location_at` now fills `LocationView.held` from the authored lists; play refills it from the game.
+
 ## 0.50.0 (2026-11-23)
 
 ### Added

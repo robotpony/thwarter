@@ -270,13 +270,13 @@ fn player_blocks(view: &LocationView, links: Resolver) -> Rendered {
 /// right after what holds it, "Old photo (on the walls)" (REQ-CF-31), and
 /// what the doors hold last.
 fn seen(view: &LocationView) -> Option<Block> {
-    let mut entries: Vec<(&crate::engines::EntityRef, Option<&str>)> = Vec::new();
-    fn add<'a>(view: &'a LocationView, holder: &str, entries: &mut Vec<(&'a crate::engines::EntityRef, Option<&'a str>)>) {
+    let mut entries: Vec<(&crate::engines::EntityRef, Option<&crate::engines::Held>)> = Vec::new();
+    fn add<'a>(view: &'a LocationView, holder: &str, entries: &mut Vec<(&'a crate::engines::EntityRef, Option<&'a crate::engines::Held>)>) {
         for held in view.held.iter().filter(|h| h.holder == holder) {
             if entries.iter().any(|(r, _)| r.id == held.thing.id) {
                 continue;
             }
-            entries.push((&held.thing, Some(held.holder_name.as_str())));
+            entries.push((&held.thing, Some(held)));
             add(view, &held.thing.id, entries);
         }
     }
@@ -297,8 +297,8 @@ fn seen(view: &LocationView) -> Option<Block> {
         }
         let link = Link { name: r.id.clone(), target: r.name.as_ref().map(|_| (EntityKind::Object, r.id.clone())) };
         spans.push(Span { text: r.display_name(), style: Style { link: Some(link), ..Default::default() } });
-        if let Some(holder) = holder {
-            spans.push(Span::plain(format!(" (on the {})", holder.to_lowercase())));
+        if let Some(held) = holder {
+            spans.push(Span::plain(format!(" ({} the {})", held.word, held.holder_name.to_lowercase())));
         }
     }
     spans.push(Span::plain("."));
@@ -356,6 +356,7 @@ fn author_blocks(view: &LocationView) -> Rendered {
 
     push_refs(&mut blocks, "Characters", &view.characters, "not found", EntityKind::Character);
     push_refs(&mut blocks, "Objects", &view.objects, "no card", EntityKind::Object);
+    push_held(&mut blocks, view);
     Rendered { blocks }
 }
 
@@ -569,6 +570,62 @@ pub fn render_thing_sources(thing: &crate::engines::bundles::Thing, shown_state:
 /// `author_blocks` as text: what `thwart show` prints.
 pub fn render_location(view: &LocationView) -> String {
     author_blocks(view).cleaned().to_plain()
+}
+
+/// What the room's objects hold, each under its holder and indented one
+/// step further, as `push_refs` lists the objects (REQ-CF-31). Lines go
+/// right after their holder's.
+fn push_held(blocks: &mut Vec<Block>, view: &LocationView) {
+    if view.held.is_empty() {
+        return;
+    }
+    fn line(r: &crate::engines::EntityRef, depth: usize) -> Block {
+        let pad = "  ".repeat(depth + 1);
+        let link = |missing: bool| Style { link: Some(Link { name: r.id.clone(), target: (!missing).then(|| (EntityKind::Object, r.id.clone())) }), missing, ..Default::default() };
+        let spans = match &r.name {
+            Some(name) => vec![Span::plain(format!("{}{} (", pad, name)), Span { text: r.id.clone(), style: link(false) }, Span::plain(")")],
+            None => vec![Span::plain(pad), Span { text: r.id.clone(), style: link(true) }, Span { text: "  (no card)".into(), style: Style { missing: true, ..Default::default() } }],
+        };
+        Block::new(BlockKind::Here, spans, false)
+    }
+    fn under(view: &LocationView, holder: &str, depth: usize, out: &mut Vec<(String, Block)>, seen: &mut Vec<String>) {
+        for h in view.held.iter().filter(|h| h.holder == holder) {
+            if seen.contains(&h.thing.id) {
+                continue;
+            }
+            seen.push(h.thing.id.clone());
+            out.push((holder.to_string(), line(&h.thing, depth)));
+            under(view, &h.thing.id, depth + 1, out, seen);
+        }
+    }
+    // Each object's lines, then what doors hold under a heading of their own.
+    let mut seen = Vec::new();
+    let mut result: Vec<Block> = Vec::new();
+    let objects: Vec<&crate::engines::EntityRef> = view.objects.iter().collect();
+    let start = blocks.len() - objects.len();
+    let (head, rows) = blocks.split_at(start);
+    let mut rebuilt: Vec<Block> = head.to_vec();
+    for (object, row) in objects.iter().zip(rows.iter()) {
+        rebuilt.push(row.clone());
+        let mut lines = Vec::new();
+        under(view, &object.id, 1, &mut lines, &mut seen);
+        rebuilt.extend(lines.into_iter().map(|(_, b)| b));
+    }
+    for door in view.exits.iter().filter_map(|e| e.door.as_ref()) {
+        let mut lines = Vec::new();
+        under(view, &door.id, 1, &mut lines, &mut seen);
+        if !lines.is_empty() {
+            result.push(Block::line(BlockKind::Here, format!("{} the {}:", capitalize(&view.held.iter().find(|h| h.holder == door.id).map_or("on".to_string(), |h| h.word.clone())), door.title.to_lowercase()), false));
+            result.extend(lines.into_iter().map(|(_, b)| b));
+        }
+    }
+    *blocks = rebuilt;
+    blocks.extend(result);
+}
+
+fn capitalize(word: &str) -> String {
+    let mut chars = word.chars();
+    chars.next().map(|c| c.to_uppercase().collect::<String>() + chars.as_str()).unwrap_or_default()
 }
 
 fn push_refs(blocks: &mut Vec<Block>, heading: &str, refs: &[crate::engines::EntityRef], missing_label: &str, kind: EntityKind) {

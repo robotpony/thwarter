@@ -554,6 +554,15 @@ impl WorldEngine {
         warnings
     }
 
+    /// How a holder holds things (`holds:`), `on` when it doesn't say.
+    pub fn holds_word(&self, holder: &str, at: At) -> String {
+        let word = match self.object_at(holder, at) {
+            Some(o) => o.holds,
+            None => self.door_at(holder, at).and_then(|d| d.holds),
+        };
+        word.filter(|w| !w.is_empty()).unwrap_or_else(|| "on".to_string())
+    }
+
     /// Where a thing starts (REQ-CF-31): every room, character and object
     /// that lists it, in the starting versions, sorted. More than one is a
     /// problem `validate` reports.
@@ -605,6 +614,17 @@ impl WorldEngine {
             }
         }
         warnings
+    }
+
+    /// A `holds:` with no word (REQ-CF-31).
+    fn holds_warnings(&self) -> Vec<String> {
+        let mut ids: Vec<&String> = self.objects.keys().collect();
+        ids.sort();
+        let objects = ids.into_iter().filter(|id| self.objects[*id].holds.as_deref() == Some("")).map(|id| format!("object `{}`: `holds:` is empty; say how it holds things, like `holds: in`", id));
+        let mut doors: Vec<&String> = self.doors.keys().collect();
+        doors.sort();
+        let doors = doors.into_iter().filter(|id| self.doors[*id].holds.as_deref() == Some("")).map(|id| format!("door `{}`: `holds:` is empty; say how it holds things, like `holds: in`", id));
+        objects.chain(doors).collect()
     }
 
     /// Objects that hold themselves through what they hold (REQ-CF-31).
@@ -1072,6 +1092,7 @@ impl WorldEngine {
         warnings.extend(self.prose_link_warnings());
         warnings.extend(self.script_warnings());
         warnings.extend(self.placement_warnings());
+        warnings.extend(self.holds_warnings());
         warnings.extend(self.door_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
@@ -1259,7 +1280,7 @@ impl WorldEngine {
                 name: self.character_at(cid, at).map(|c| c.name),
             })
             .collect();
-        let objects = location
+        let objects: Vec<EntityRef> = location
             .objects
             .iter()
             .map(|oid| EntityRef {
@@ -1267,6 +1288,25 @@ impl WorldEngine {
                 name: self.object_at(oid, at).map(|o| o.title),
             })
             .collect();
+
+        // What the room's objects and doors hold, as written (REQ-CF-31);
+        // play fills this from the game instead.
+        let mut held = Vec::new();
+        let mut holders: Vec<(String, String)> = objects.iter().map(|o| (o.id.clone(), o.display_name())).collect();
+        holders.extend(exits.iter().filter_map(|e| e.door.as_ref()).map(|d| (d.id.clone(), d.title.clone())));
+        let mut seen: BTreeSet<String> = holders.iter().map(|(id, _)| id.clone()).collect();
+        let mut i = 0;
+        while i < holders.len() {
+            let (holder, holder_name): (String, String) = holders[i].clone();
+            i += 1;
+            for id in self.object_at(&holder, at).map(|o| o.objects).unwrap_or_default() {
+                if seen.insert(id.clone()) {
+                    let thing = EntityRef { name: self.object_at(&id, at).map(|o| o.title), id: id.clone() };
+                    holders.push((id, thing.display_name()));
+                    held.push(crate::engines::Held { thing, holder: holder.clone(), holder_name: holder_name.clone(), word: self.holds_word(&holder, at) });
+                }
+            }
+        }
 
         Some(LocationView {
             id: location.id.clone(),
@@ -1276,7 +1316,7 @@ impl WorldEngine {
             exits,
             characters,
             objects,
-            held: Vec::new(),
+            held,
         })
     }
 

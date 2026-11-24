@@ -30,6 +30,9 @@ pub struct GameObject {
     /// The objects it holds (REQ-CF-31): photos on a wall, a key in a
     /// lock. In play, a thing keeps more (`PlayState.held`).
     pub objects: Vec<String>,
+    /// How it holds them: `in` or `on` (the default), or any word
+    /// (`under`), for "Coins (in the chest)".
+    pub holds: Option<String>,
     /// Everything else an author attaches: properties, effects, stats,
     /// contents, security, or any future section. Validated loosely (must
     /// be a YAML mapping); interpreted by whatever engine code cares.
@@ -48,6 +51,7 @@ impl GameObject {
             value: None,
             actions: HashMap::new(),
             objects: Vec::new(),
+            holds: None,
             extra: HashMap::new(),
         }
     }

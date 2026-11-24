@@ -505,4 +505,38 @@ mod tests {
         assert_eq!(say(&game, &world, &mut state, "x vase"), "You see: Walls.");
         assert_eq!(say(&game, &world, &mut state, "x photo"), "A family, unsmiling.");
     }
+
+    #[test]
+    fn edit_modes_room_view_lists_held_things_under_their_holder() {
+        use crate::engines::At;
+        use crate::render::{render_location_as, RenderStyle};
+        let (_d, world) = hallway();
+        let view = world.describe_location_at("hallway", At::default()).unwrap();
+        assert_eq!(view.held.len(), 3);
+        let text = render_location_as(&view, RenderStyle::Author);
+        assert!(text.contains("Objects:\n  Walls (walls)\n    Old photo (photo-1)\n    Shelf (shelf)\n      Vase (vase)"), "{}", text);
+    }
+
+    #[test]
+    fn a_holder_says_how_it_holds_things() {
+        let (dir, mut world) = hallway();
+        let d = dir.path();
+        world.set_file(&d.join("hallway.md"), "---\nid: hallway\ntitle: Hallway\ntype: location\nobjects: [walls, chest]\n---\n");
+        world.set_file(&d.join("objects/chest.md"), "---\nid: chest\ntitle: Chest\ntype: object\nobject_type: box\nholds: in\nobjects: [coins]\n---\n");
+        world.set_file(&d.join("objects/coins.md"), "---\nid: coins\ntitle: Coins\ntype: object\nobject_type: x\n---\n");
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "hallway").unwrap();
+        let look = say(&game, &world, &mut state, "look");
+        assert!(look.contains("Old photo (on the walls)") && look.contains("Coins (in the chest)"), "{}", look);
+        world.set_file(&d.join("objects/chest.md"), "---\nid: chest\ntitle: Chest\ntype: object\nobject_type: box\nholds:\nobjects: [coins]\n---\n");
+        assert!(world.current_warnings().iter().any(|w| w.contains("object `chest`: `holds:` is empty")), "{:?}", world.current_warnings());
+
+        // The built-in locked door holds its key in the lock.
+        let (_v, world) = vault();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        say(&game, &world, &mut state, "take key");
+        say(&game, &world, &mut state, "unlock iron door with key");
+        assert!(say(&game, &world, &mut state, "look").contains("Brass key (in the iron door)"));
+    }
 }

@@ -55,6 +55,7 @@ pub fn known_keys(type_name: &str) -> &'static [&'static str] {
             "portal",
             "passable",
             "transparent",
+            "holds",
             "vars",
             "can",
             "actions",
@@ -71,6 +72,7 @@ pub fn known_keys(type_name: &str) -> &'static [&'static str] {
             "weight",
             "value",
             "objects",
+            "holds",
             "vars",
             "can",
             "actions",
@@ -393,6 +395,7 @@ impl MarkdownParser {
             passable: flag("passable", true)?,
             transparent: flag("transparent", false)?,
             actions,
+            holds: holds_word(&parsed.metadata),
         })
     }
 
@@ -449,6 +452,7 @@ impl MarkdownParser {
 
         object.actions = self.actions(parsed, &object.id, path)?;
         object.objects = string_sequence(&parsed.metadata, "objects");
+        object.holds = holds_word(&parsed.metadata);
 
         let known_fields = known_keys("object");
         if let Some(map) = parsed.metadata.as_mapping() {
@@ -579,6 +583,17 @@ fn parse_action(name: &str, value: &serde_yaml::Value, path: &Path) -> Result<Ob
         }
     }
     Ok(action)
+}
+
+/// How a holder holds things (`holds: in`), for "Coins (in the chest)";
+/// `None` when it doesn't say. An empty value is `Some("")`, which
+/// `validate` warns about (REQ-CF-31).
+fn holds_word(metadata: &serde_yaml::Value) -> Option<String> {
+    match metadata.get("holds")? {
+        serde_yaml::Value::Null => Some(String::new()),
+        serde_yaml::Value::String(s) => Some(s.trim().to_string()),
+        other => Some(serde_yaml::to_string(other).unwrap_or_default().trim().to_string()),
+    }
 }
 
 fn string_sequence(metadata: &serde_yaml::Value, field: &str) -> Vec<String> {

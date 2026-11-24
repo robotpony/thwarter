@@ -21,6 +21,8 @@ pub struct Door {
     /// Whether the other side can be seen through it (a window, a grate).
     pub transparent: bool,
     pub actions: HashMap<String, ObjectAction>,
+    /// How it holds things (`holds: in` for a key in a lock).
+    pub holds: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
