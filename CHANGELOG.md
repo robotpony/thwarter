@@ -39,6 +39,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.54.0 (2026-11-24)
+
+### Added
+
+- `engines::door_id(from_room, to_room, direction)` names a new door the same way in every client, `door-bedroom-hallway-west`, as a safe file name, for the console's `/add door` (REQ-ENG-47).
+
 ## 0.53.1 (2026-11-24)
 
 ### Fixed
