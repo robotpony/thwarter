@@ -13,7 +13,7 @@
 //! `and` ("a chair, a bed, and an old shirt"); `{or}` joins them with `or`
 //! ("north, east, or down").
 
-use std::collections::BTreeMap;
+use super::texts::Texts;
 
 /// The play text settings and their defaults.
 #[derive(Debug, Clone, PartialEq)]
@@ -46,20 +46,9 @@ pub struct PlayText {
 }
 
 impl Default for PlayText {
+    /// The compiled-in defaults, `src/builtins/text/play.toml`.
     fn default() -> Self {
-        Self {
-            show_room_names: false,
-            objects: "You see {list}.".into(),
-            character: "{list} is here.".into(),
-            characters: "{list} are here.".into(),
-            held: "There's {list}.".into(),
-            exits: "You can go {or}.".into(),
-            door_exit: "{direction} through {door}".into(),
-            no_exits: "There's no way out.".into(),
-            inventory: "You have {list}.".into(),
-            empty_inventory: "You aren't carrying anything.".into(),
-            serial_comma: true,
-        }
+        Self::from_texts(&Texts::defaults())
     }
 }
 
@@ -68,42 +57,31 @@ impl Default for PlayText {
 pub const KEYS: &[&str] = &["show_room_names", "objects", "character", "characters", "held", "exits", "door_exit", "no_exits", "inventory", "empty_inventory", "serial_comma"];
 
 impl PlayText {
+    /// The `[play]` table of `texts`, as typed settings. A key given as a
+    /// list of wordings uses its first here.
+    pub fn from_texts(texts: &Texts) -> Self {
+        let t = |key: &str| texts.template("play", key, 0).unwrap_or_default().to_string();
+        Self {
+            show_room_names: texts.flag("play", "show_room_names"),
+            objects: t("objects"),
+            character: t("character"),
+            characters: t("characters"),
+            held: t("held"),
+            exits: t("exits"),
+            door_exit: t("door_exit"),
+            no_exits: t("no_exits"),
+            inventory: t("inventory"),
+            empty_inventory: t("empty_inventory"),
+            serial_comma: texts.flag("play", "serial_comma"),
+        }
+    }
+
     /// The defaults with `[play]`'s values over them. A key it doesn't
     /// know, or a value of the wrong kind, is a warning.
     pub fn from_toml(table: Option<&toml::Value>, warnings: &mut Vec<String>) -> Self {
-        let mut text = Self::default();
-        let Some(table) = table else { return text };
-        let Some(table) = table.as_table() else {
-            warnings.push("world.toml: `[play]` must be a table of settings".into());
-            return text;
-        };
-        let mut strings: BTreeMap<&str, &mut String> = BTreeMap::new();
-        strings.insert("objects", &mut text.objects);
-        strings.insert("character", &mut text.character);
-        strings.insert("characters", &mut text.characters);
-        strings.insert("held", &mut text.held);
-        strings.insert("exits", &mut text.exits);
-        strings.insert("door_exit", &mut text.door_exit);
-        strings.insert("no_exits", &mut text.no_exits);
-        strings.insert("inventory", &mut text.inventory);
-        strings.insert("empty_inventory", &mut text.empty_inventory);
-        let mut flags: Vec<(&str, bool)> = Vec::new();
-        for (key, value) in table {
-            match (key.as_str(), value) {
-                ("show_room_names" | "serial_comma", toml::Value::Boolean(b)) => flags.push((key.as_str(), *b)),
-                ("show_room_names" | "serial_comma", _) => warnings.push(format!("world.toml: `[play] {}` is true or false", key)),
-                (k, toml::Value::String(s)) if strings.contains_key(k) => **strings.get_mut(k).unwrap() = s.clone(),
-                (k, _) if strings.contains_key(k) => warnings.push(format!("world.toml: `[play] {}` is text", k)),
-                (k, _) => warnings.push(format!("world.toml: `[play] {}` isn't a play setting; they are {}", k, KEYS.join(", "))),
-            }
-        }
-        for (key, b) in flags {
-            match key {
-                "show_room_names" => text.show_room_names = b,
-                _ => text.serial_comma = b,
-            }
-        }
-        text
+        let mut texts = Texts::defaults();
+        texts.apply("play", table, "world.toml", warnings);
+        Self::from_texts(&texts)
     }
 
     /// `items` joined for a sentence: "a", "a and b", "a, b, and c".
@@ -171,6 +149,13 @@ mod tests {
         assert_eq!(with_article("old shirt"), "an old shirt");
         assert_eq!(with_article("Walls"), "some walls");
         assert_eq!(with_article("Glass"), "a glass");
+    }
+
+    #[test]
+    fn keys_are_the_default_tables_keys() {
+        let mut keys = KEYS.to_vec();
+        keys.sort();
+        assert_eq!(Texts::defaults().keys("play"), keys);
     }
 
     #[test]

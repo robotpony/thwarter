@@ -1,0 +1,15 @@
+# How play words a room and the inventory (REQ-ENG-43). A world changes
+# any of these in its world.toml's [play] table. {list} joins with "and",
+# {or} with "or".
+[play]
+show_room_names = false                   # show the room's name above its description
+objects = "You see {list}."               # what's here, scenery left out
+character = "{list} is here."             # one person here
+characters = "{list} are here."           # more than one
+held = "There's {list}."                  # what things hold: "an old photo on the walls"
+exits = "You can go {or}."                # the ways out
+door_exit = "{direction} through {door}"  # one way out through a door: "down through an iron door"
+no_exits = "There's no way out."
+inventory = "You have {list}."
+empty_inventory = "You aren't carrying anything."
+serial_comma = true                       # "a, b, and c" rather than "a, b and c"

@@ -1,0 +1,4 @@
+# The engine's built-in replies (design/ENGINE_TEXT.md). A world changes
+# any of these in its world.toml's [engine] table; a story's own
+# `## When:` sections answer before them. A list picks by turn.
+[engine]

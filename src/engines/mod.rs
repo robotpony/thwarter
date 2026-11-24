@@ -15,6 +15,7 @@ pub mod player_commands;
 pub mod saves;
 pub mod turn;
 pub mod play_text;
+pub mod texts;
 pub mod scripts;
 pub mod questions;
 

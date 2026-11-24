@@ -1,0 +1,3 @@
+# The console's own text (design/ENGINE_TEXT.md). An author changes any of
+# these in their personal config.toml's [console] table.
+[console]

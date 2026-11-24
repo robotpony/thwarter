@@ -50,6 +50,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.63.0 (2026-11-24)
+
+### Added
+
+- Text as data, step 1 (`design/ENGINE_TEXT.md`, REQ-ENG-49): `engines::texts::Texts` holds the `[play]`, `[engine]` and `[console]` tables, with compiled-in defaults from `src/builtins/text/*.toml`. `text(table, key, &args)` fills `{name}` slots (`{Name}` capitalizes), `text_at(.., turn)` picks a list's entry `turn % len`, and `apply(table, value, source, &mut warnings)` puts a table such as `world.toml`'s over the defaults, warning about unknown keys and wrong kinds. `WorldEngine::texts()` gives the world's.
+- `[play]`'s defaults move to `src/builtins/text/play.toml`, unchanged; `PlayText` is now a typed view of that table. `[engine]` and `[console]` are empty until steps 2 and 3 fill them.
+
 ## 0.62.1 (2026-11-24)
 
 ### Added

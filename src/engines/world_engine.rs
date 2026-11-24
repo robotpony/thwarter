@@ -79,6 +79,9 @@ pub struct WorldEngine {
     /// How play words rooms and the inventory (`world.toml`'s `[play]`).
     play_text: super::play_text::PlayText,
     play_text_warnings: Vec<String>,
+    /// Every text table, `world.toml`'s `[play]` and `[engine]` over the
+    /// compiled-in defaults (`design/ENGINE_TEXT.md`).
+    texts: super::texts::Texts,
     /// Problems and warnings from the last rebuild, each prefixed with its file.
     file_problems: Vec<String>,
     file_warnings: Vec<String>,
@@ -241,6 +244,7 @@ impl WorldEngine {
             scripts: Default::default(),
             play_text: Default::default(),
             play_text_warnings: Vec::new(),
+            texts: Default::default(),
             file_problems: Vec::new(),
             file_warnings: Vec::new(),
             world: WorldDef::default(),
@@ -841,6 +845,7 @@ impl WorldEngine {
         self.ignore.clear();
         self.play_text = Default::default();
         self.play_text_warnings.clear();
+        self.texts = Default::default();
         self.world_toml = WorldDef::default();
         self.world_toml_warning = None;
         let path = root.join("world.toml");
@@ -856,7 +861,17 @@ impl WorldEngine {
             self.ignore = list.iter().filter_map(|v| v.as_str()).map(PathBuf::from).collect();
         }
         self.world_toml = WorldDef::from_world_toml(root, &value);
-        self.play_text = super::play_text::PlayText::from_toml(value.get("play"), &mut self.play_text_warnings);
+        for table in ["play", "engine"] {
+            self.texts.apply(table, value.get(table), "world.toml", &mut self.play_text_warnings);
+        }
+        self.play_text = super::play_text::PlayText::from_texts(&self.texts);
+    }
+
+    /// Every text table, with this world's `[play]` and `[engine]` over
+    /// the defaults. `[console]` is the author's, not the world's, so the
+    /// console applies it from the personal config.
+    pub fn texts(&self) -> &super::texts::Texts {
+        &self.texts
     }
 
     /// How play words rooms and the inventory, from `world.toml`'s
