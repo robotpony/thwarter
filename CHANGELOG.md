@@ -44,6 +44,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.57.6 (2026-11-24)
+
+### Changed
+
+- `/add` opens the editor on what it added, on a terminal, as `/new` does (Bruce, 2026-11-24): the door for `/add door ...` or `/add <room> <door>`, otherwise the thing; scenery with no card opens as a new card, written on the first save. Nothing opens after a refusal, or in scripts and transcripts.
+
 ## 0.57.5 (2026-11-24)
 
 ### Changed

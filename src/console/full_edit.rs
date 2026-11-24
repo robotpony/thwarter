@@ -265,6 +265,28 @@ impl Console {
         out
     }
 
+    /// `/add ...`, then the editor on what it added (Bruce, 2026-11-24): the
+    /// door for `/add door`, or the thing; scenery with no card opens as a
+    /// new card. On a terminal only, and not after a refusal.
+    pub(super) fn add_and_edit(&mut self, args: &[&str]) -> String {
+        self.added = None;
+        let out = self.add_thing(args);
+        if let (true, Some((kind, id))) = (self.interactive, self.added.take()) {
+            let cardless = kind == Kind::Object && self.world.path_of(Kind::Object, &id).is_none();
+            let target = if cardless {
+                let relative = crate::writer::new_entity_relative_path(EntityKind::Object, &id);
+                let path = relative.to_string_lossy().trim_end_matches(".md").replace('\\', "/");
+                Ok(EditTarget { kind, id, path, opened: None, file: self.world.root.join(&relative) })
+            } else {
+                self.edit_target_named(kind, &id)
+            };
+            if let Ok(target) = target {
+                self.pending_edit = Some(target);
+            }
+        }
+        out
+    }
+
     /// `/edit <name>`: whatever the name means, as `go <name>` finds it,
     /// without moving edit mode there. Scenery here opens as a new card.
     fn edit_target_any(&self, typed: &str) -> Result<EditTarget, String> {
@@ -595,6 +617,19 @@ mod tests {
         assert_eq!(console.take_pending_edit().map(|t| t.path), Some("objects/rope".to_string()));
         console.handle("/new object rope tool");
         assert!(console.take_pending_edit().is_none(), "nothing made, nothing opened");
+    }
+
+    #[test]
+    fn add_opens_the_editor_on_what_it_added() {
+        let (_dir, root) = tiny_copy();
+        let mut console = console_at(&root, "/village/square");
+        console.handle("/add door west village/hallway");
+        assert_eq!(console.take_pending_edit().map(|t| t.path), Some("doors/door-village-square-village-hallway-west".to_string()));
+        console.handle("/add chair village/well");
+        let target = console.take_pending_edit().expect("scenery opens as a new card");
+        assert_eq!(target.path, "objects/chair");
+        console.handle("/add chair nowhere");
+        assert!(console.take_pending_edit().is_none(), "a refusal opens nothing");
     }
 
     #[test]

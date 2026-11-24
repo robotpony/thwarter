@@ -60,6 +60,8 @@ pub struct Console {
     pub(super) looked_at: Option<String>,
     /// The last play action's author notes, for the sidebar on a terminal.
     pub(super) notes: Vec<String>,
+    /// What `/add` just added, for it to open in the editor.
+    pub(super) added: Option<(Kind, String)>,
     /// What the current command created, as (kind, id), for `/new` to open.
     pub(super) created: Vec<(crate::engines::EntityKind, String)>,
     /// A question the console asked, which the next plain line answers.
@@ -103,6 +105,7 @@ impl Console {
             notes: Vec::new(),
             asked: None,
             created: Vec::new(),
+            added: None,
             unknown_log: None,
         };
         if mode == Mode::Play {
@@ -198,7 +201,7 @@ impl Console {
             ("link", args) if self.mode == Mode::Edit => self.link(args),
             ("unlink", args) if self.mode == Mode::Edit => self.unlink(args),
             ("move", args) if self.mode == Mode::Edit => self.move_thing(args),
-            ("add", args) if self.mode == Mode::Edit => self.add_thing(args),
+            ("add", args) if self.mode == Mode::Edit => self.add_and_edit(args),
             ("new" | "set" | "link" | "unlink" | "move" | "add", _) => {
                 format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", name)
             }

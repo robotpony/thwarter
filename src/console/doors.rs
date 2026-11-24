@@ -106,6 +106,7 @@ impl Console {
         if let Err(e) = self.link_side(door, &room, &back, &mut written) {
             return self.after_writes(&written, e);
         }
+        self.added = Some((Kind::Door, door.to_string()));
         self.after_writes(&written, format!("{} now has a side {} too.", door, side_of(&back, &room)))
     }
 
@@ -160,6 +161,7 @@ impl Console {
             (Some(to), Some(back)) => format!("Added {}: {}, {}.", id, side_of(direction, here), side_of(back, to)),
             _ => super::session::suggest(&format!("Added {}, {}. It has one side so far; to give it another:", id, side_of(direction, here)), &[&format!("/add {{room}} {}", id)]),
         };
+        self.added = Some((Kind::Door, id.clone()));
         self.after_writes(&written, summary)
     }
 

@@ -357,6 +357,7 @@ impl Console {
         match self.save_list(&holder, key, items) {
             Ok(path) => {
                 written.push(path);
+                self.added = Some((if is_character { Kind::Character } else { Kind::Object }, thing.to_string()));
                 self.after_writes(&written, format!("Added {} to {}{}.", thing, place, note))
             }
             Err(e) => self.after_writes(&written, e),
