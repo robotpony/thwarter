@@ -336,9 +336,8 @@ fn author_blocks(view: &LocationView) -> Rendered {
         Block::line(BlockKind::Paragraph, body, true)
     });
 
-    if view.exits.is_empty() {
-        blocks.push(Block::line(BlockKind::Exits, "Exits: none", true));
-    } else {
+    // An empty list isn't shown (Bruce, 2026-11-24).
+    if !view.exits.is_empty() {
         blocks.push(Block::line(BlockKind::Exits, "Exits:", true));
         let width = view.exits.iter().map(|e| e.direction.len()).max().unwrap_or(0);
         for exit in &view.exits {
@@ -465,12 +464,11 @@ pub fn render_object(o: &crate::models::world::GameObject) -> String {
         out.push(String::new());
         out.extend(fields);
     }
-    out.push(String::new());
     let mut names: Vec<&String> = o.actions.keys().collect();
     names.sort();
-    if names.is_empty() {
-        out.push("Actions: none".to_string());
-    } else {
+    // No actions, no heading (Bruce, 2026-11-24).
+    if !names.is_empty() {
+        out.push(String::new());
         out.push("Actions:".to_string());
         for name in names {
             let a = &o.actions[name];
@@ -643,7 +641,6 @@ fn capitalize(word: &str) -> String {
 
 fn push_refs(blocks: &mut Vec<Block>, heading: &str, refs: &[crate::engines::EntityRef], missing_label: &str, kind: EntityKind) {
     if refs.is_empty() {
-        blocks.push(Block::line(BlockKind::Here, format!("{}: none", heading), true));
         return;
     }
     blocks.push(Block::line(BlockKind::Here, format!("{}:", heading), true));
@@ -945,9 +942,8 @@ Objects:
         v.objects.clear();
         let text = render_location(&v);
         assert!(!text.contains("at ("));
-        assert!(text.contains("Exits: none"));
-        assert!(text.contains("Characters: none"));
-        assert!(text.ends_with("Objects: none"));
+        // Empty lists are left out.
+        assert!(!text.contains("Exits") && !text.contains("Characters") && !text.contains("Objects"), "{}", text);
     }
 
     #[test]

@@ -297,16 +297,16 @@ fn show_world(engine: &WorldEngine, world_path: &str, formatter: &OutputFormatte
         vars.iter().map(|(k, v)| format!("{} = {}", k, v)).collect::<Vec<_>>().join(", ")
     };
     out.push(String::new());
-    out.push(if summary.story.is_empty() { "Story values: none".to_string() } else { format!("Story values: {}", values(&summary.story)) });
+    if !summary.story.is_empty() {
+        out.push(format!("Story values: {}", values(&summary.story)));
+    }
     out.push(match &summary.player {
         None => "Player: not defined (world/player.md)".to_string(),
         Some(p) if p.vars.is_empty() => format!("Player: {}", p.title),
         Some(p) => format!("Player: {} ({})", p.title, values(&p.vars)),
     });
-    out.push(String::new());
-    if summary.chapters.is_empty() {
-        out.push("Chapters: none".to_string());
-    } else {
+    if !summary.chapters.is_empty() {
+        out.push(String::new());
         out.push("Chapters:".to_string());
         for c in &summary.chapters {
             let order: Vec<String> = c.order.iter().map(u64::to_string).collect();
@@ -316,6 +316,9 @@ fn show_world(engine: &WorldEngine, world_path: &str, formatter: &OutputFormatte
         }
     }
     for (label, ids) in [("Locations", &summary.locations), ("Objects", &summary.objects), ("Characters", &summary.characters)] {
+        if ids.is_empty() {
+            continue;
+        }
         out.push(String::new());
         out.push(format!("{} ({}):", label, ids.len()));
         for id in ids {

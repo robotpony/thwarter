@@ -47,6 +47,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.58.2 (2026-11-24)
+
+### Changed
+
+- An empty list isn't shown (Bruce): the author's room view leaves out "Exits: none", "Characters: none" and "Objects: none", `thwart show <object>` leaves out "Actions: none", and the world summary leaves out "Story values: none", "Chapters: none" and empty id lists.
+
 ## 0.58.1 (2026-11-24)
 
 ### Changed
