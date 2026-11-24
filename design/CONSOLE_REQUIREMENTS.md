@@ -300,6 +300,36 @@ Bruce, 2026-11-24: console commands should solve common problems easily, through
    ───────────────── ↑↓ choose · enter pick · esc use defaults for the rest
   ```
 
+
+## Command registry
+
+*Proposed (Bruce, 2026-11-24; the author rule is the commander's REQ-WS-7 to 9, also proposed).* Today one command is written in five places (the `/` menu table, the dispatch `match`, `/help`, the transcripts' list of commands that change content, and the handler's own usage text), and they drift: 23 menu entries, 31 help lines, 34 dispatch arms. This section replaces them with one registry.
+
+- REQ-CON-50: Every console command MUST be described once, in a `type: command` Markdown file, and the `/` menu, `/help`, usage replies, argument completion, the mode guard and the test guard MUST all read that description. Nothing else lists commands.
+- REQ-CON-51: A command file's frontmatter has `name`, `aliases`, `args` (named parameters as the `/` menu shows them: `{thing} [{room}]`), `modes` (`edit`, `play`), `changes` (whether it writes to the world), and either `handler` (a built-in) or `run` (a world command, REQ-CON-54). Its body is the help prose and examples, which `/help <command>` shows.
+
+  ```markdown
+  ---
+  type: command
+  name: remove
+  aliases: [rm, delete]
+  args: "{thing}"
+  modes: [edit]
+  changes: true
+  handler: remove
+  ---
+  Deletes a thing, room or door, and every reference the writer can
+  rewrite. It shows what goes and asks first, since there's no undo.
+
+      /remove lantern
+  ```
+
+- REQ-CON-52: Commands load in layers, later ones adding or changing: built-in `src/builtins/commands/<name>.md`; then the world's `world/commands/<name>.md`; then the person's `config.toml` `[console.commands.<name>]`, which MAY add aliases, reword `about` or hide a command, and MUST NOT add one. Per-reply message text stays in `[console]` (REQ-ENG-49).
+- REQ-CON-53: Built-in handlers stay in Rust, registered by the `handler` name. Every built-in file MUST have a handler and every handler a file; a test fails on either gap. The console checks a command's arguments against `args` before its handler runs, and a wrong count answers with the usage built from `args`.
+- REQ-CON-54: A world command MUST be a `run:` list of existing console commands with `{param}` slots, run as if typed, so each one's own confirmation still asks (REQ-WS-9: no more than the author could type). It MUST NOT run `/author`, personal config, packaging or install, the writing helpers, or another world command. No Rhai for now. It MUST NOT shadow a built-in: the built-in wins, with a load warning. `/help` lists world commands under the world's title.
+- REQ-CON-55: World commands work only in edit mode, and only when the current persona is the world's `author:` and the world is in an `authors/` workspace (REQ-WS-7, 8). Otherwise they're off, and naming one says why, with the `/set author` hint when the world has no `author:`.
+- REQ-CON-56: Commands SHOULD be forgiving (Bruce, 2026-11-24). Built-in aliases ship (`/rm`, `/ls`). A unique prefix runs its command. A mistyped name answers "did you mean". A bare command name with no slash in edit mode runs it when it isn't also a play verb, else asks.
+
 ## Open questions
 
 1. ~~What does full editing look like on screen?~~ Decided 2026-11-23 (Bruce): in the terminal, inside the console, and it may take the whole terminal; REQ-CON-6.

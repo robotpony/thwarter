@@ -8,6 +8,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Added
 
+- `design/CONSOLE_REQUIREMENTS.md` › Command registry, REQ-CON-50 to 56, *Proposed*: one `type: command` Markdown file per command, loaded built-in, then world, then personal config; world commands as macros for the world's authors only; forgiving names.
 - `LICENSE`: the MIT licence text, matching `Cargo.toml`'s `license = "MIT"`, copyright Bruce Alderson, 2025 to 2026.
 - `design/SECTIONS.md`: agreed in outline by Bruce, to be tested; content is shown when a `## When:` heading's tags match the game state, reply sections replace actions and response markers, `@` names characters and `#` tags, and the marker comments retire.
 - `design/ENGINE_TEXT.md`: every sentence the engine, play and the console write moves out of code into TOML text tables (`[play]`, `[engine]`, `[console]`) with compiled-in defaults, the same shape everywhere, at Bruce's request; planned as `PLAN.md` › Phase 8, which shifts the later phases up by one.
