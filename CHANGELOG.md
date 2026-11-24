@@ -32,6 +32,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.33.2 (2026-11-23)
+
+### Fixed
+
+- Edit mode treated an exit through a door (`connections: { down: vault-door }`) as an exit to a room called `vault-door`, so `down` said it wasn't written yet and HERE marked it missing. It now goes to the room on the door's far side, and HERE shows `down  vault  through vault-door`. Door files list by their title, from the coder's doors (bbd1e64).
+
+## 0.33.1 (2026-11-23)
+
+### Added
+
+- A door that isn't passable answers with its current state's `<!-- thwarter:action go refused -->` block, with variables filled, so a closed door and a locked one can say different things (`design/STATES.md` › Doors). Without one, play says "The iron door is closed." as before.
+
 ## 0.33.0 (2026-11-23)
 
 ### Added

@@ -184,7 +184,12 @@ impl GameEngine {
                     return ActionResult::say(format!("You can't go {} from here.", direction));
                 }
                 if !door.passable {
-                    return ActionResult::say(format!("The {} is closed.", door.title.to_lowercase()));
+                    // The door's own words for it, from its current state
+                    // (`<!-- thwarter:action go refused -->`), else built in.
+                    return ActionResult::say(match door.responses.get("go refused").map(|t| t.trim()).filter(|t| !t.is_empty()) {
+                        Some(text) => prose(world, &world.fill(text, &Scope { at: At::play(state), this: Some((EntityKind::Door, &door.id)), here: None })),
+                        None => format!("The {} is closed.", door.title.to_lowercase()),
+                    });
                 }
                 match door.leads_to(&state.location) {
                     Some(to) => target = to.to_string(),
@@ -1228,6 +1233,10 @@ mod tests {
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(look.contains("Exits: east, down.\nThrough the iron grate you can see the Cell.\nAn iron door is set in the floor, shut."), "{}", look);
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text, "The iron door is closed.");
+        // A state can say it in its own words.
+        let mut world2 = world.clone();
+        world2.set_file(&_d.path().join("castle/doors/vault-door/closed.md"), "---\ninherits: index\n---\nAn iron door is set in the floor, shut.\n\n<!-- thwarter:action go refused -->\nThe {{ this.title }} won't budge.\n");
+        assert_eq!(game.act(&world2, &mut state, &PlayAction::Go("down".into())).text, "The Iron door won't budge.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("east".into())).text, "The iron grate is closed.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("iron door".into())).text, "An iron door is set in the floor, shut.");
 
