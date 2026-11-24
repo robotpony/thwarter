@@ -996,7 +996,7 @@ Captain Marcus and Ghost are here.";
     #[test]
     fn plain_text_is_unchanged_for_every_room_in_the_sample_worlds() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        for world in ["tests/worlds/sample", "tests/transcripts/worlds/tiny"] {
+        for world in ["tests/worlds/sample", "tests/worlds/tiny"] {
             let mut engine = crate::engines::WorldEngine::new();
             engine.load_world(root.join(world)).unwrap();
             let mut ids: Vec<&String> = engine.loaded_locations.keys().collect();

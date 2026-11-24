@@ -39,6 +39,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.51.2 (2026-11-23)
+
+### Changed
+
+- The transcript fixture world moved from `tests/transcripts/worlds/tiny` to `tests/worlds/tiny`, beside `tests/worlds/sample`, so every fixture world sits under `tests/worlds/` (Bruce, 2026-11-23). A transcript's `# world:` header is now relative to the repository root (`# world: tests/worlds/tiny`). The two engine tests that named the old path follow it, with the coder's agreement.
+
 ## 0.51.1 (2026-11-23)
 
 ### Changed

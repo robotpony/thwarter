@@ -960,7 +960,7 @@ Grass and stone.
     #[test]
     fn every_content_file_round_trips_byte_for_byte() {
         let mut checked = 0;
-        for root in ["authors", "tests/worlds", "tests/transcripts/worlds"] {
+        for root in ["authors", "tests/worlds"] {
             for entry in walkdir::WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
                 let path = entry.path();
                 if path.extension().and_then(|e| e.to_str()) != Some("md") {

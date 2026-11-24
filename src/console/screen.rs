@@ -629,7 +629,7 @@ mod tests {
 
     fn tiny() -> Mutex<Console> {
         let mut console =
-            Console::open(&Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/transcripts/worlds/tiny"), super::super::Mode::Edit)
+            Console::open(&Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny"), super::super::Mode::Edit)
                 .unwrap();
         console.interactive = true;
         Mutex::new(console)

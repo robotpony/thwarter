@@ -735,7 +735,7 @@ mod tests {
     fn unknown_input_is_logged_with_where_it_was_typed() {
         let dir = tempfile::tempdir().unwrap();
         let log = dir.path().join("state/thwarter/unknown-commands.log");
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/transcripts/worlds/tiny");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny");
         let mut console = Console::open(&root, Mode::Edit).unwrap();
         console.unknown_log = Some(log.clone());
         console.handle("go /village/square");
@@ -758,7 +758,7 @@ mod tests {
         );
     }
 
-    const FIXTURE: &str = "tests/transcripts/worlds/tiny";
+    const FIXTURE: &str = "tests/worlds/tiny";
 
     fn copy_fixture() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();

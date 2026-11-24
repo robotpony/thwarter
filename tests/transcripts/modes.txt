@@ -1,7 +1,7 @@
-# world: worlds/tiny
+# world: tests/worlds/tiny
 # mode: play
 # copy: yes
-Playing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
+Playing Tiny World (tests/worlds/tiny). Type /help for commands.
 1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
 
 A small square of packed earth. An old well stands to the north.
@@ -101,7 +101,7 @@ Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):
   /edit character [id]                 the character you're in, or the one named
   /edit object [id]                    an object; scenery here gets its card
 > /status
-Tiny World, at tests/transcripts/worlds/tiny
+Tiny World, at tests/worlds/tiny
 Mode: edit; edit mode is at village/square
 Game: at village/square, chapter none, turn 1, carrying 0 things
 Saves: none

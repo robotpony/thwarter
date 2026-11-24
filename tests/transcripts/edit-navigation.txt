@@ -1,6 +1,6 @@
-# world: worlds/tiny
+# world: tests/worlds/tiny
 # mode: edit
-Editing Tiny World (tests/transcripts/worlds/tiny). Type /help for commands.
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
 1 warning(s), such as exits to rooms not written yet. `thwart validate` lists them.
 > look
 npcs/     1 file(s)

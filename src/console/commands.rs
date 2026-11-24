@@ -294,7 +294,7 @@ mod tests {
     use std::path::Path;
 
     fn tiny() -> Console {
-        Console::open(&Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/transcripts/worlds/tiny"), Mode::Edit).unwrap()
+        Console::open(&Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny"), Mode::Edit).unwrap()
     }
 
     fn texts(c: &Completion) -> Vec<&str> {

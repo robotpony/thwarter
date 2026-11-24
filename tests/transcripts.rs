@@ -5,7 +5,7 @@
 //! A transcript starts with a header of `# key: value` lines:
 //!
 //! ```text
-//! # world: worlds/tiny     (relative to tests/transcripts/)
+//! # world: tests/worlds/tiny  (relative to the repository root)
 //! # mode: edit             (or play)
 //! # copy: yes              (optional: run on a throwaway copy of the world)
 //! ```
@@ -53,7 +53,7 @@ fn parse(path: &Path) -> Result<Transcript, String> {
         let Some(directive) = line.strip_prefix("# ") else { break };
         let (key, value) = directive.split_once(':').ok_or(format!("bad header line: {}", line.trim()))?;
         match (key.trim(), value.trim()) {
-            ("world", value) => world = Some(Path::new(DIR).join(value)),
+            ("world", value) => world = Some(PathBuf::from(value)),
             ("mode", "edit") => mode = Mode::Edit,
             ("mode", "play") => mode = Mode::Play,
             ("copy", "yes") => copy = true,

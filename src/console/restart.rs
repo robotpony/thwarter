@@ -201,7 +201,7 @@ mod tests {
     use std::fs;
 
     fn tiny_copy() -> (tempfile::TempDir, PathBuf) {
-        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/transcripts/worlds/tiny");
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny");
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("tiny");
         for entry in walkdir::WalkDir::new(&fixture) {
