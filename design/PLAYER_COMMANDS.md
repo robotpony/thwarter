@@ -33,7 +33,7 @@ A line is a verb and maybe a noun. The engine turns it into an action (look, go,
 | `inventory` | `i`, `inv` | List what the player carries | yes |
 | `<verb> <thing>` | | An object's own named action (`pull lever`) | yes |
 
-- REQ-PC-6: The verbs and aliases above MUST be accepted by every client. The verb is the line's first word, apart from `look at` and `pick up`; multi-word verbs such as `turn on` aren't parsed (Open question 5). A client MUST NOT add story verbs of its own; a world adds them as object actions (REQ-PC-13).
+- REQ-PC-6: The verbs and aliases above MUST be accepted by every client. *Proposed*: the aliases move to a table, `src/builtins/verbs.toml`, which a world's `[verbs]` in `world.toml` adds to (`design/ENGINE_REQUIREMENTS.md` › Forgiving verbs, REQ-ENG-51). The verb is the line's first word, apart from `look at` and `pick up`; multi-word verbs such as `turn on` aren't parsed (Open question 5). A client MUST NOT add story verbs of its own; a world adds them as object actions (REQ-PC-13).
 - REQ-PC-7: Bare directions MUST move the player: `north`/`n`, `northeast`/`ne`, `east`/`e`, `southeast`/`se`, `south`/`s`, `southwest`/`sw`, `west`/`w`, `northwest`/`nw`, `up`/`u`, `down`/`d`, `in`, `out`. A bare direction followed by more words (`n please`) is not understood. *Built.*
 - REQ-PC-8: `go` MUST also take an exit's free-text name, since direction names are free text (`design/CONTENT_FORMAT.md` › `connections`): `go behind`, `go through the hedge`. *Built.*
 
@@ -69,7 +69,7 @@ From the console's unknown-input log, 2026-11-23, at Bruce's request. *Proposed*
 - REQ-PC-21: `where` and `where am i` MUST name the current location, in play and in the console's edit mode. Logged: "where am i?"
 - REQ-PC-22: `enter <place>` MUST be an alias of `go <place>`. Logged: "enter closet".
 - REQ-PC-23: `look <direction>` and `what's <direction>` MUST say what's that way without going there: ``North: Closet.``, or the door's name for an exit through a door. Logged: "what's north?"
-- REQ-PC-24: An unknown verb that's one small typo from a known one (one letter added, missing, swapped or changed) MUST get ``Did you mean `look`?`` instead of REQ-PC-5's reply, and still change nothing. Logged: "lookl".
+- REQ-PC-24: An unknown verb that's one small typo from a known one (one letter added, missing, swapped or changed) MUST get `Did you mean "look"?` (plain quotes, since players see no code) instead of REQ-PC-5's reply, and still change nothing. Logged: "lookl".
 
 ## Open questions
 

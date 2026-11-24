@@ -124,6 +124,7 @@ type: questions
 type: command
 name: stock
 aliases: [st]
+about: put a thing in a room and open its card
 args: "{thing} {room}"
 modes: [edit]
 changes: true
@@ -136,8 +137,8 @@ Puts a thing in a room and opens its card to write.
     /stock desk bedroom
 ```
 
-- **Fields.** `name` is what follows the `/`, and the file is named after it (`world/commands/stock.md`). `aliases` are other names for it. `args` names its parameters the way the `/` menu shows them, `{required}` and `[{optional}]`. `modes` lists `edit`, `play` or both. `changes` says whether it writes to the world. A built-in has `handler` (its Rust handler's name), and a world command has `run`. The body is the help that `/help <name>` shows.
-- **Where commands live.** Built-ins are compiled in from `src/builtins/commands/`. A world's are in `world/commands/`, which is reserved like `questions/`, so its files are never read as things. The person's `config.toml` can add aliases to a command or hide one, but it can't add a command.
+- **Fields.** `name` is what follows the `/`, and the file is named after it (`world/commands/stock.md`). `aliases` are other names for it. `about` is the one-line summary the `/` menu and `/help`'s list show. `args` names its parameters the way the `/` menu shows them, `{required}` and `[{optional}]`. `modes` lists `edit`, `play` or both. `changes` says whether it writes to the world. A built-in has `handler` (its Rust handler's name), and a world command has `run`. The body is the help that `/help <name>` shows.
+- **Where commands live.** Built-ins are compiled in from `src/builtins/commands/`. A world's are in `world/commands/`, which is reserved like `questions/`, so its files are never read as things. The person's `config.toml` can add aliases to a command, reword its `about` or hide it, but it can't add a command.
 - **World commands.** `run` is a list of console commands with the `{param}` slots from `args`, run in order as if the author typed them. A world command works only in edit mode, for the world's authors (`design/CONTENT_REQUIREMENTS.md` › REQ-WS-7 to 9), and it can't do more than they could by typing. The console's REQ-CON-54 lists the commands it may not run. A world command named like a built-in is a load warning, and the built-in wins.
 - `validate` warns about a world command whose `run` names an unknown command, uses a slot `args` doesn't have, or has a `handler`.
 
