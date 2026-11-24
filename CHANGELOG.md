@@ -37,6 +37,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.50.0 (2026-11-23)
+
+### Added
+
+- Objects hold objects in the console (REQ-CF-31, the coder's placement in 5c5a8a2): `/move photo-1 walls` and `/add photo-1 walls` put a thing into another object's `objects:`. Any object can hold things, scenery included; scenery a room lists with no card gets its card first (REQ-CF-8). `/move` now finds every place a thing starts through `placement()`, a room, an inventory or another object, and takes it from each. An object can't hold itself. The `/` menu offers objects as destinations, and HERE shows held things indented under their holder.
+
 ## 0.49.1 (2026-11-23)
 
 ### Changed

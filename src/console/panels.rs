@@ -256,13 +256,22 @@ impl Console {
         }
         let is_scenery = |id: &String| self.world.engine.objects.get(id).is_none_or(|o| o.object_type == "scenery");
         let (scenery, things): (Vec<&String>, Vec<&String>) = location.objects.iter().partition(|id| is_scenery(id));
+        // What an object holds sits under it, indented (REQ-CF-31).
+        let with_held = |ids: Vec<&String>| -> Vec<Row> {
+            let mut out = Vec::new();
+            for id in ids {
+                out.push(named(id, self.world.path_of(Kind::Object, id)));
+                self.held_rows(id, 2, &mut out, &mut vec![id.clone()]);
+            }
+            out
+        };
         if !things.is_empty() {
             rows.push(Row::Heading("things".to_string()));
-            rows.extend(things.into_iter().map(|id| named(id, self.world.path_of(Kind::Object, id))));
+            rows.extend(with_held(things));
         }
         if !scenery.is_empty() {
             rows.push(Row::Heading("scenery".to_string()));
-            rows.extend(scenery.into_iter().map(|id| named(id, self.world.path_of(Kind::Object, id))));
+            rows.extend(with_held(scenery));
         }
         if let Some(path) = &self.looked_at {
             rows.push(Row::Heading("looked at".to_string()));
@@ -279,6 +288,24 @@ impl Console {
             rows.extend(warnings.into_iter().map(|w| Row::Warning(format!("  {}", w))));
         }
         rows
+    }
+
+    /// The things `id` holds, each indented under it, and theirs in turn.
+    /// `seen` stops a loop of holders, which `validate` reports.
+    fn held_rows(&self, id: &str, depth: usize, out: &mut Vec<Row>, seen: &mut Vec<String>) {
+        let Some(object) = self.world.engine.objects.get(id) else { return };
+        for held in &object.objects {
+            if seen.contains(held) {
+                continue;
+            }
+            let pad = "  ".repeat(depth);
+            out.push(match self.world.path_of(Kind::Object, held) {
+                Some(_) => Row::Text(format!("{}{}", pad, held)),
+                None => Row::Dim(format!("{}{}", pad, held)),
+            });
+            seen.push(held.clone());
+            self.held_rows(held, depth + 1, out, seen);
+        }
     }
 
     /// What a file is, for the sidebar rather than the output: its title

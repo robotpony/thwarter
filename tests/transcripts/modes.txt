@@ -101,8 +101,8 @@ Changing content (each saves the file):
   /set <key> <value>                   one field; attributes.health 80 sets one entry
   /link <direction> <room>             add or change one exit from this room
   /unlink <direction>                  remove one exit from this room
-  /add <thing> [room or character]     put a person or thing here too (scenery if no card)
-  /move <thing> <room or character>    put a person or thing somewhere else
+  /add <thing> [room, character, thing] put a person or thing here too (scenery if no card)
+  /move <thing> <room, character, thing> put a person or thing somewhere else
 
 Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):
   /edit room [id]                      the room you're in, or the one named

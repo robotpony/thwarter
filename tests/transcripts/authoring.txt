@@ -151,7 +151,7 @@ Objects:
 > /move elder village/well
 Moved elder: village/square → village/well (and its default_location).
 > /move elder lantern
-There's no room or character called `lantern` to move elder to.
+elder is a character; characters go to rooms, not into things or other characters.
 > /move ghost village/well
 Nothing called `ghost` is in the world to move.
 > /move lantern global
@@ -212,7 +212,7 @@ elder is already in village/well.
 > /add bench smith
 Added bench to smith's inventory.
 > /add chair nowhere
-There's no room or character called `nowhere` to add chair to.
+There's no room, character or object called `nowhere` to add chair to.
 > /add
 Usage: /add <thing> [room or character], for example /add chair bedroom
 > go /village/square
@@ -233,3 +233,28 @@ old shirt (old-shirt)
 (no description yet)
 
 Actions: none
+> go /village/square
+Village Square (room)
+> /move rope chair
+Moved rope: village/square, village/well, carried by smith → chair.
+> /move lantern bench
+Moved lantern: carried by elder → bench.
+> /move bench bench
+bench can't hold itself.
+> look
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  village/well
+  east   village/inn  (missing)
+
+Characters:
+  The Smith (smith)
+  Old Tom (old-tom)
+
+Objects:
+  Bench (bench)
+  Chair (chair)
+  Iron Key (iron-key)

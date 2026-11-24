@@ -538,6 +538,29 @@ mod tests {
     }
 
     #[test]
+    fn a_thing_moves_into_scenery_which_gets_a_card_and_shows_it_held() {
+        let (_dir, root) = tiny_copy();
+        let mut console = console_at(&root, "/village/square");
+        let (out, _) = console.handle("/move lantern bench");
+        assert_eq!(out.lines().next().unwrap(), "Moved lantern: village/square → bench.");
+        let card = fs::read_to_string(root.join("objects/bench.md")).unwrap();
+        assert!(card.contains("inherits: scenery") && card.contains("lantern"), "{}", card);
+        let square = fs::read_to_string(root.join("village/square.md")).unwrap();
+        assert!(!square.contains("lantern"), "{}", square);
+        let rows: Vec<String> = console
+            .sidebar()
+            .rest
+            .iter()
+            .filter_map(|r| match r {
+                crate::console::panels::Row::Text(t) | crate::console::panels::Row::Dim(t) => Some(t.clone()),
+                _ => None,
+            })
+            .collect();
+        let bench = rows.iter().position(|r| r == "  bench").unwrap_or_else(|| panic!("{:?}", rows));
+        assert_eq!(rows[bench + 1], "    lantern", "held under its holder");
+    }
+
+    #[test]
     fn named_things_open_from_anywhere() {
         let (_dir, root) = tiny_copy();
         let mut console = console_at(&root, "/");

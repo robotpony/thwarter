@@ -5,7 +5,7 @@
 
 use super::session::{Console, Place, COMPASS_ALIASES};
 use super::world::Kind;
-use crate::engines::EntityKind;
+use crate::engines::{EntityKind, Holder};
 use crate::writer::{Edit, NewEntity, WorldWriter};
 use serde_yaml::Value;
 use std::path::PathBuf;
@@ -295,32 +295,29 @@ impl Console {
         if let Some(problem) = bare_id_problem(thing) {
             return problem;
         }
-        let engine = &self.world.engine;
-        let is_character = engine.characters.contains_key(thing);
-        let room = self.room_id(&target);
-        let (kind, id, key) = if engine.get_location(&room).is_some() {
-            (Kind::Room, room, if is_character { "characters" } else { "objects" })
-        } else if engine.characters.contains_key(target.as_str()) && !is_character {
-            (Kind::Character, target.clone(), "inventory")
-        } else if engine.characters.contains_key(target.as_str()) {
-            return format!("{} is a character; characters go in rooms, not with other characters.", thing);
-        } else {
-            return format!("There's no room or character called `{}` to add {} to.", target, thing);
-        };
-        let mut items: Vec<String> = match kind {
-            Kind::Room => {
-                let location = self.world.engine.get_location(&id).expect("checked above");
-                if is_character { location.characters.clone() } else { location.objects.clone() }
+        let is_character = self.world.engine.characters.contains_key(thing);
+        let mut written = Vec::new();
+        let holder = match self.holder_for(&target, &mut written) {
+            Ok(Some(Holder::Room(room))) => Holder::Room(room),
+            Ok(Some(_)) if is_character => {
+                return format!("{} is a character; characters go in rooms, not into things or other characters.", thing)
             }
-            _ => self.world.engine.characters[&id].inventory.clone(),
+            Ok(Some(Holder::Object(id))) if id == thing => return format!("{} can't hold itself.", thing),
+            Ok(Some(holder)) => holder,
+            Ok(None) => return format!("There's no room, character or object called `{}` to add {} to.", target, thing),
+            Err(e) => return e,
         };
-        let place = if kind == Kind::Room { id.clone() } else { format!("{}'s inventory", id) };
+        let key = if is_character { "characters" } else { "objects" };
+        let mut items = self.held_by(&holder, key);
+        let place = match &holder {
+            Holder::Character(who) => format!("{}'s inventory", who),
+            Holder::Room(id) | Holder::Object(id) => id.clone(),
+        };
         if items.iter().any(|i| i == thing) {
             return format!("{} is already in {}.", thing, place);
         }
         items.push(thing.to_string());
         let card = is_character || self.world.engine.objects.contains_key(thing);
-        let mut written = Vec::new();
         // A name typed with spaces or capitals ("old shirt") would be lost
         // in a bare id, so it gets a scenery card holding it as the title.
         let mut note = String::new();
@@ -342,7 +339,7 @@ impl Console {
                 None => note = format!(", as scenery with no card yet (/edit object {} gives it one)", thing),
             }
         }
-        match self.save(kind, &id, &[Edit::SetList { key: key.into(), items }]) {
+        match self.save_list(&holder, key, items) {
             Ok(path) => {
                 written.push(path);
                 self.after_writes(&written, format!("Added {} to {}{}.", thing, place, note))
@@ -384,117 +381,57 @@ impl Console {
             return self.move_room(&room, &to);
         }
         let (thing_id, _) = id_from(thing);
-        let thing = &thing_id.as_str();
+        let thing = thing_id.as_str();
         if let Some(problem) = bare_id_problem(thing) {
             return problem;
         }
         let engine = &self.world.engine;
-        let is_character = engine.characters.contains_key(*thing)
+        let is_character = engine.characters.contains_key(thing)
             || engine.loaded_locations.values().any(|l| l.characters.iter().any(|c| c == thing));
-        let is_object = engine.objects.contains_key(*thing)
-            || engine.loaded_locations.values().any(|l| l.objects.iter().any(|o| o == thing))
-            || engine.characters.values().any(|c| c.inventory.iter().any(|o| o == thing));
-        if !is_character && !is_object {
+        let from = engine.placement(thing);
+        if !is_character && from.is_empty() && !engine.objects.contains_key(thing) {
             return format!("Nothing called `{}` is in the world to move.", thing);
         }
-
-        // Where it goes: a room by id (as /link takes it), else a character.
-        let room = self.room_id(target);
-        let to_room = self.world.engine.get_location(&room).is_some().then_some(room);
-        let to_character = (to_room.is_none() && self.world.engine.characters.contains_key(*target)).then(|| target.to_string());
+        let mut written = Vec::new();
+        let to = match self.holder_for(target, &mut written) {
+            Ok(Some(Holder::Room(room))) => Holder::Room(room),
+            Ok(Some(_)) if is_character => {
+                return format!("{} is a character; characters go to rooms, not into things or other characters.", thing)
+            }
+            Ok(Some(Holder::Object(id))) if id == thing => return format!("{} can't hold itself.", thing),
+            Ok(Some(holder)) => holder,
+            Ok(None) => return format!("There's no room, character or object called `{}` to move {} to.", target, thing),
+            Err(e) => return e,
+        };
         let list_key = if is_character { "characters" } else { "objects" };
-        let destination = match (&to_room, &to_character, is_character) {
-            (Some(room), _, _) => room.clone(),
-            (None, Some(_), true) => return format!("{} is a character; characters go to rooms, not to other characters.", thing),
-            (None, Some(who), false) => who.clone(),
-            (None, None, _) => return format!("There's no room or character called `{}` to move {} to.", target, thing),
-        };
-
-        // Every list that holds it now, apart from the destination.
-        let mut from_rooms: Vec<String> = self
-            .world
-            .engine
-            .loaded_locations
-            .values()
-            .filter(|l| Some(&l.id) != to_room.as_ref())
-            .filter(|l| if is_character { l.characters.iter().any(|c| c == thing) } else { l.objects.iter().any(|o| o == thing) })
-            .map(|l| l.id.clone())
-            .collect();
-        from_rooms.sort();
-        let mut from_carriers: Vec<String> = if is_object {
-            self.world
-                .engine
-                .characters
-                .values()
-                .filter(|c| Some(&c.id) != to_character.as_ref() && c.inventory.iter().any(|o| o == thing))
-                .map(|c| c.id.clone())
-                .collect()
-        } else {
-            Vec::new()
-        };
-        from_carriers.sort();
-        let already = match (&to_room, &to_character) {
-            (Some(room), _) => self.world.engine.get_location(room).is_some_and(|l| {
-                if is_character { l.characters.iter().any(|c| c == thing) } else { l.objects.iter().any(|o| o == thing) }
-            }),
-            (None, Some(who)) => self.world.engine.characters.get(who).is_some_and(|c| c.inventory.iter().any(|o| o == thing)),
-            _ => false,
-        };
-        if already && from_rooms.is_empty() && from_carriers.is_empty() {
-            return format!("{} is already {}.", thing, where_to(&destination, to_character.is_some()));
+        let leaving: Vec<Holder> = from.iter().filter(|h| **h != to).cloned().collect();
+        let already = from.contains(&to);
+        if already && leaving.is_empty() {
+            return format!("{} is already {}.", thing, where_to(&to));
         }
 
-        let mut written = Vec::new();
         let fail = |console: &mut Console, written: &Vec<PathBuf>, e: String| {
             let report = console.after_writes(written, format!("Moving {} stopped partway.", thing));
             format!("{}\n{}", report, e)
         };
-        for room in &from_rooms {
-            let items: Vec<String> = self
-                .world
-                .engine
-                .get_location(room)
-                .map(|l| if is_character { l.characters.clone() } else { l.objects.clone() })
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|i| i != thing)
-                .collect();
-            match self.save(Kind::Room, room, &[Edit::SetList { key: list_key.into(), items }]) {
-                Ok(path) => written.push(path),
-                Err(e) => return fail(self, &written, e),
-            }
-        }
-        for who in &from_carriers {
-            let items: Vec<String> = self.world.engine.characters[who].inventory.iter().filter(|i| i != thing).cloned().collect();
-            match self.save(Kind::Character, who, &[Edit::SetList { key: "inventory".into(), items }]) {
+        for holder in &leaving {
+            let items: Vec<String> = self.held_by(holder, list_key).into_iter().filter(|i| i != thing).collect();
+            match self.save_list(holder, list_key, items) {
                 Ok(path) => written.push(path),
                 Err(e) => return fail(self, &written, e),
             }
         }
         if !already {
-            let (kind, id, key) = match (&to_room, &to_character) {
-                (Some(room), _) => (Kind::Room, room.clone(), list_key),
-                (None, Some(who)) => (Kind::Character, who.clone(), "inventory"),
-                _ => unreachable!("the destination is a room or a character"),
-            };
-            let mut items: Vec<String> = match kind {
-                Kind::Room => self
-                    .world
-                    .engine
-                    .get_location(&id)
-                    .map(|l| if is_character { l.characters.clone() } else { l.objects.clone() })
-                    .unwrap_or_default(),
-                _ => self.world.engine.characters[&id].inventory.clone(),
-            };
+            let mut items = self.held_by(&to, list_key);
             items.push(thing.to_string());
-            match self.save(kind, &id, &[Edit::SetList { key: key.into(), items }]) {
+            match self.save_list(&to, list_key, items) {
                 Ok(path) => written.push(path),
                 Err(e) => return fail(self, &written, e),
             }
         }
         let mut followed = "";
-        if is_character && self.world.engine.characters.contains_key(*thing) {
-            let edit = Edit::SetScalar { key: "default_location".into(), value: Value::String(destination.clone()) };
+        if let (true, Holder::Room(room)) = (is_character && self.world.engine.characters.contains_key(thing), &to) {
+            let edit = Edit::SetScalar { key: "default_location".into(), value: Value::String(room.clone()) };
             match self.save(Kind::Character, thing, &[edit]) {
                 Ok(path) => {
                     written.push(path);
@@ -503,17 +440,72 @@ impl Console {
                 Err(e) => return fail(self, &written, e),
             }
         }
-        let mut from: Vec<String> = from_rooms;
-        from.extend(from_carriers.iter().map(|c| format!("carried by {}", c)));
-        let from = if from.is_empty() { "nowhere".to_string() } else { from.join(", ") };
-        let summary = format!(
-            "Moved {}: {} → {}{}.",
-            thing,
-            from,
-            if to_character.is_some() { format!("carried by {}", destination) } else { destination.clone() },
-            followed
-        );
+        let from_text = if leaving.is_empty() { "nowhere".to_string() } else { leaving.iter().map(short_holder).collect::<Vec<_>>().join(", ") };
+        let summary = format!("Moved {}: {} → {}{}.", thing, from_text, short_holder(&to), followed);
         self.after_writes(&written, summary)
+    }
+
+    /// The room, character or object `typed` names, as a place to put
+    /// something: a room first (from this folder, as /link takes it), then
+    /// a character, then an object (REQ-CF-31).
+    fn holder_named(&self, typed: &str) -> Option<Holder> {
+        let engine = &self.world.engine;
+        let room = self.room_id(typed);
+        if engine.get_location(&room).is_some() {
+            return Some(Holder::Room(room));
+        }
+        let (id, _) = id_from(typed);
+        if engine.characters.contains_key(&id) {
+            return Some(Holder::Character(id));
+        }
+        if engine.objects.contains_key(&id) {
+            return Some(Holder::Object(id));
+        }
+        None
+    }
+
+    /// `holder_named`, and when `typed` is scenery some room lists with no
+    /// card yet, its card first (REQ-CF-8), so it can hold things: any
+    /// object can, scenery included (Bruce, 2026-11-23). The card written
+    /// is added to `written`.
+    fn holder_for(&mut self, typed: &str, written: &mut Vec<PathBuf>) -> Result<Option<Holder>, String> {
+        if let Some(holder) = self.holder_named(typed) {
+            return Ok(Some(holder));
+        }
+        let (id, named) = id_from(typed);
+        let listed = self.world.engine.loaded_locations.values().any(|l| l.objects.iter().any(|o| *o == id));
+        if !listed || bare_id_problem(&id).is_some() {
+            return Ok(None);
+        }
+        let title = named.unwrap_or_else(|| title_or_default(&[], &id));
+        let new = NewEntity { kind: EntityKind::Object, id: id.clone(), title: title.clone(), object_type: Some("scenery".to_string()) };
+        let path = self.create(&new, &[Edit::ReplaceAll(super::full_edit::scenery_card(&id, &title))])?;
+        written.push(path);
+        Ok(Some(Holder::Object(id)))
+    }
+
+    /// What `holder` holds now, in the list a thing of `list_key` goes in.
+    fn held_by(&self, holder: &Holder, list_key: &str) -> Vec<String> {
+        let engine = &self.world.engine;
+        match holder {
+            Holder::Room(room) => engine
+                .get_location(room)
+                .map(|l| if list_key == "characters" { l.characters.clone() } else { l.objects.clone() })
+                .unwrap_or_default(),
+            Holder::Character(who) => engine.characters.get(who).map(|c| c.inventory.clone()).unwrap_or_default(),
+            Holder::Object(id) => engine.objects.get(id).map(|o| o.objects.clone()).unwrap_or_default(),
+        }
+    }
+
+    /// Writes `items` as `holder`'s list: a room's `characters:` or
+    /// `objects:`, a character's `inventory:`, an object's `objects:`.
+    fn save_list(&mut self, holder: &Holder, list_key: &str, items: Vec<String>) -> Result<PathBuf, String> {
+        let (kind, id, key) = match holder {
+            Holder::Room(room) => (Kind::Room, room.clone(), list_key),
+            Holder::Character(who) => (Kind::Character, who.clone(), "inventory"),
+            Holder::Object(id) => (Kind::Object, id.clone(), "objects"),
+        };
+        self.save(kind, &id, &[Edit::SetList { key: key.into(), items }])
     }
 
     /// Moves room `old` to the id `new`: its file (or bundle folder) moves to
@@ -800,12 +792,19 @@ fn plural(n: usize, noun: &str) -> String {
     format!("{} {}{}", n, noun, if n == 1 { "" } else { "s" })
 }
 
-/// "in village/well" or "carried by elder".
-fn where_to(destination: &str, carried: bool) -> String {
-    if carried {
-        format!("carried by {}", destination)
-    } else {
-        format!("in {}", destination)
+/// "in village/well", "carried by elder" or "in walls".
+fn where_to(holder: &Holder) -> String {
+    match holder {
+        Holder::Character(who) => format!("carried by {}", who),
+        Holder::Room(id) | Holder::Object(id) => format!("in {}", id),
+    }
+}
+
+/// "village/well", "carried by elder" or "walls", for a move's report.
+fn short_holder(holder: &Holder) -> String {
+    match holder {
+        Holder::Character(who) => format!("carried by {}", who),
+        Holder::Room(id) | Holder::Object(id) => id.clone(),
     }
 }
 

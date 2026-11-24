@@ -160,6 +160,9 @@ impl Console {
             ("move" | "add", [_]) => {
                 let mut places = self.rooms();
                 places.extend(self.things_of(Kind::Character));
+                // Any object can hold things, scenery included (REQ-CF-31).
+                places.extend(self.things_here());
+                places.extend(self.things_of(Kind::Object));
                 dedupe(places)
             }
             _ => Vec::new(),
