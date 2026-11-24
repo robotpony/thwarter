@@ -71,6 +71,6 @@ Edit mode doesn't know `dance`. Type /help for commands.
 > cd village
 Edit mode moves as play does now: go <name>, a direction, go back, look. (`cd` is gone.)
 > take lantern
-That's a play-mode verb. Here, /new and /set change what's in a room; /play here tries it.
+That's a play-mode command. Here, /new and /set change what's in a room; /play here tries it.
 > /quit
 Bye.

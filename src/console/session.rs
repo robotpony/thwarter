@@ -3,7 +3,8 @@
 //! `/reload` (REQ-CON-7). Play mode is in `play.rs`, authoring in
 //! `author.rs`.
 
-use super::verbs::{parse, Verb, DIRECTIONS};
+use crate::engines::{Parsed, DIRECTIONS};
+use crate::models::game::PlayAction;
 use super::view;
 use super::world::{Kind, World};
 use super::Mode;
@@ -319,15 +320,18 @@ impl Console {
                 first
             );
         }
-        match parse(line) {
-            Verb::Look => self.look(),
-            Verb::Examine(noun) => self.examine(&noun),
-            Verb::Go(target) => self.go(&target),
-            Verb::Incomplete(question) => question,
-            Verb::Take(_) | Verb::Inventory => {
-                "That's a play-mode verb. Here, /new and /set change what's in a room; /play here tries it.".to_string()
+        // The same words as play (`design/PLAYER_COMMANDS.md`), read by the
+        // engine's parser with no game, since edit mode only needs them.
+        let parsed = self.game_engine.parse_command(&self.world.engine, line, &PlayState::default());
+        match parsed {
+            Parsed::Action(PlayAction::Look) => self.look(),
+            Parsed::Action(PlayAction::Examine(noun)) => self.examine(&noun),
+            Parsed::Action(PlayAction::Go(target)) => self.go(&target),
+            Parsed::Action(_) => {
+                "That's a play-mode command. Here, /new and /set change what's in a room; /play here tries it.".to_string()
             }
-            Verb::Unknown(_) => {
+            Parsed::Reply(question) => question,
+            Parsed::Unknown(_) => {
                 self.log_unknown("edit", line);
                 format!("Edit mode doesn't know `{}`. Type /help for commands.", first)
             }
@@ -735,7 +739,9 @@ mod tests {
         console.handle("/bogus thing");
         console.handle("dance");
         console.handle("/play");
-        console.handle("light the lantern");
+        // An object's action is understood, so it isn't logged.
+        assert!(!console.handle("light the lantern").0.starts_with("I don't understand"));
+        console.handle("dance wildly");
         console.handle("look");
         let text = fs::read_to_string(&log).unwrap();
         let rows: Vec<Vec<&str>> = text.lines().map(|l| l.split('\t').skip(2).collect()).collect();
@@ -744,7 +750,7 @@ mod tests {
             vec![
                 vec!["edit", "village/square", "command", "/bogus thing"],
                 vec!["edit", "village/square", "edit", "dance"],
-                vec!["play", "village/square", "play", "light the lantern"],
+                vec!["play", "village/square", "play", "dance wildly"],
             ]
         );
     }

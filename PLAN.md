@@ -80,7 +80,7 @@ Done when a locked-door puzzle plays from both sides.
 - [ ] Clocks and game values: time, weather, randomness [commander, coder] (`design/STATES.md` › Open questions)
 - [x] The player command parser moves into the engine as `parse_command` [coder] (REQ-PC-1)
 - [x] An unknown verb with a noun no thing answers to says it doesn't understand [coder] (REQ-PC-14)
-- [ ] Play mode parses through the engine and runs object actions [console] (REQ-PC-1, REQ-PC-13)
+- [x] Play mode parses through the engine and runs object actions (0.42.1) [console] (REQ-PC-1, REQ-PC-13)
 - [ ] Save paths and the save and load calls move into the engine [coder, console] (REQ-PC-18)
 - [ ] Settle the player command open questions with Bruce [commander] (`design/PLAYER_COMMANDS.md` › Open questions)
 

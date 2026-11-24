@@ -35,6 +35,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.42.1 (2026-11-23)
+
+### Changed
+
+- Play mode reads input through the engine's player command parser (`GameEngine::parse_command`, 0fe9754, REQ-PC-1), the one every player client shares, so objects' named actions ("light lantern", "pull lever", REQ-PC-13) and `search` now work in the console. Edit mode reads its words (go, look, examine and directions) through the same parser. Unknown input is still logged.
+
+### Removed
+
+- `src/console/verbs.rs`, the console's own parser, now in the engine as `src/engines/player_commands.rs` with its tests. Recover with `git show 858974e:src/console/verbs.rs`.
+
 ## 0.42.0 (2026-11-23)
 
 ### Added

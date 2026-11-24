@@ -5,26 +5,28 @@
 
 use super::saves::{list_saves, save_path, DEFAULT_SAVE};
 use super::session::{Console, Place};
-use super::verbs::{parse, Verb};
+use crate::engines::Parsed;
+use crate::models::game::PlayState;
 use super::world::Kind;
 use super::Mode;
 use crate::engines::{load_game, save_game};
-use crate::models::game::{ActionResult, PlayAction};
+use crate::models::game::ActionResult;
 use crate::render::{render_location_as, RenderStyle};
 
 impl Console {
     /// One line of play-mode input.
+    /// One line of play-mode input, read by the engine's parser, which
+    /// every player client shares (`design/PLAYER_COMMANDS.md`, REQ-PC-1).
+    /// Object actions ("light lantern") and `search` come through it too.
     pub(super) fn play_input(&mut self, line: &str) -> String {
-        let action = match parse(line) {
-            Verb::Look => PlayAction::Look,
-            Verb::Go(direction) => PlayAction::Go(direction),
-            Verb::Take(noun) => PlayAction::Take(noun),
-            Verb::Examine(noun) => PlayAction::Examine(noun),
-            Verb::Inventory => PlayAction::Inventory,
-            Verb::Incomplete(question) => return question,
-            Verb::Unknown(typed) => {
+        let empty = PlayState::default();
+        let state = self.game.as_ref().unwrap_or(&empty);
+        let action = match self.game_engine.parse_command(&self.world.engine, line, state) {
+            Parsed::Action(action) => action,
+            Parsed::Reply(reply) => return reply,
+            Parsed::Unknown(reply) => {
                 self.log_unknown("play", line);
-                return format!("I don't understand `{}`.", typed);
+                return reply;
             }
         };
         let Some(state) = self.game.as_mut() else {

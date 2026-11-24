@@ -144,5 +144,11 @@ The Well
 A mossy stone well. The rope is long gone.
 
 Exits: south.
+> light lantern
+The wick catches and the square grows warm
+> search
+You search carefully, but find nothing new.
+> dance wildly
+I don't understand `dance wildly`.
 > /quit
 Bye.
