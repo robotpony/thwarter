@@ -45,7 +45,9 @@ A dented brass lantern with a little oil left.
 
 Actions: light
 > x bench
-`bench` is scenery, with no card yet. /new object bench gives it one.
+`bench` is scenery, with no card yet. To give it one:
+
+  /edit object bench
 > examine nothing
 There's no `nothing` here. go nothing looks for it anywhere in the world.
 > go objects
@@ -71,6 +73,10 @@ Edit mode doesn't know `dance`. Type /help for commands.
 > cd village
 Edit mode moves as play does now: go <name>, a direction, go back, look. (`cd` is gone.)
 > take lantern
-That's a play-mode command. Here, /new and /set change what's in a room; /play here tries it.
+That's a play-mode command. In edit mode, change what's in a room, or try it in play:
+
+  /new {kind} {id}
+  /set {key} {value}
+  /play here
 > /quit
 Bye.

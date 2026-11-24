@@ -42,7 +42,7 @@ impl Console {
         let Some((word, rest)) = args.split_first() else { return usage() };
         let template = template_for(word);
         let Some(here) = self.current_room() else {
-            return "A door starts in a room: go to one, then /add door <direction> [room].".to_string();
+            return super::session::suggest("A door starts in a room. Go to one, then:", &["/add door {direction} [{room}]"]);
         };
         // `--(west)-->` is the direction drawn as an arrow; a bare `-->`
         // leaves it to be asked.
@@ -76,7 +76,7 @@ impl Console {
     pub(super) fn answer(&mut self, asked: Asked, line: &str) -> String {
         match asked {
             Asked::DoorDirection { template, to } => {
-                let Some(here) = self.current_room() else { return "Edit mode left the room; /add door again from one.".to_string() };
+                let Some(here) = self.current_room() else { return super::session::suggest("Edit mode left the room. From one, try again:", &["/add door {direction} [{room}]"]) };
                 let direction = super::author::expand_direction(line.trim());
                 self.make_door(&here, &direction, to.as_deref(), None, &template)
             }
@@ -97,7 +97,7 @@ impl Console {
         let near = existing.sides.first().map(|s| s.direction.clone());
         let back = match direction.map(str::to_string).or_else(|| near.as_deref().and_then(opposite).map(str::to_string)) {
             Some(back) => back,
-            None => return format!("Which way is {} from {}? /add {} {} <direction>", door, room, room_typed, door),
+            None => return super::session::suggest(&format!("Which way is {} from {}?", door, room), &[&format!("/add {} {} {{direction}}", room_typed, door)]),
         };
         let mut written = Vec::new();
         if let Err(e) = self.ensure_room(&room, &mut written) {
@@ -117,9 +117,9 @@ impl Console {
             (Some(to), None) => match opposite(direction) {
                 Some(b) => Some(b.to_string()),
                 None => {
-                    return format!(
-                        "`{}` has no opposite, so say which way the door is from {}: /add door {} {} <direction>",
-                        direction, to, direction, to
+                    return super::session::suggest(
+                        &format!("`{}` has no opposite, so say which way the door is from {}:", direction, to),
+                        &[&format!("/add door {} {} {{direction}}", direction, to)],
                     )
                 }
             },
@@ -127,7 +127,7 @@ impl Console {
         };
         let id = door_id(here, to.as_deref().unwrap_or(""), direction);
         if self.world.engine.doors.contains_key(&id) {
-            return format!("There's a door called {} already: /edit {} changes it.", id, id);
+            return super::session::suggest(&format!("There's a door called {} already. To change it:", id), &[&format!("/edit {}", id)]);
         }
         let mut written: Vec<PathBuf> = Vec::new();
         if let Some(to) = &to {
@@ -158,7 +158,7 @@ impl Console {
         }
         let summary = match (&to, &back) {
             (Some(to), Some(back)) => format!("Added {}: {}, {}.", id, side_of(direction, here), side_of(back, to)),
-            _ => format!("Added {}, {} (one side so far: /add <room> {} gives it another).", id, side_of(direction, here), id),
+            _ => super::session::suggest(&format!("Added {}, {}. It has one side so far; to give it another:", id, side_of(direction, here)), &[&format!("/add {{room}} {}", id)]),
         };
         self.after_writes(&written, summary)
     }
@@ -218,5 +218,5 @@ fn side_of(direction: &str, room: &str) -> String {
 }
 
 fn usage() -> String {
-    "Usage: /add door <direction> [room] [its direction], or /add door --(west)--> hallway".to_string()
+    super::session::suggest("Usage:", &["/add door {direction} [{room}] [{its direction}]", "/add door --({direction})--> {room}"])
 }

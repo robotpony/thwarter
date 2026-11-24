@@ -29,7 +29,7 @@ impl Console {
             }
         };
         let Some(state) = self.game.as_mut() else {
-            return "No game is in progress. /play here starts one in the room edit mode is in.".to_string();
+            return super::session::suggest("No game is in progress. To start one in the room edit mode is in:", &["/play here"]);
         };
         let result = self.game_engine.act(&self.world.engine, state, &action);
         // On a terminal, the author note goes to the sidebar; scripts and
@@ -44,7 +44,7 @@ impl Console {
     /// The player's room, as the player sees it.
     pub(super) fn play_look(&self) -> String {
         let Some(state) = &self.game else {
-            return "No game is in progress. /play here starts one in the room edit mode is in.".to_string();
+            return super::session::suggest("No game is in progress. To start one in the room edit mode is in:", &["/play here"]);
         };
         match self.game_engine.view(&self.world.engine, state) {
             // The player's text, in the world's own wording (`[play]` in
@@ -89,7 +89,7 @@ impl Console {
     /// edit mode is in, keeping what they carry (REQ-CON-12).
     pub(super) fn play_here(&mut self) -> String {
         let Some(room) = self.edit_room() else {
-            return "/play here needs edit mode to be in a room. /edit, go to one, then /play here.".to_string();
+            return super::session::suggest("/play here needs edit mode to be in a room. Go to one, then:", &["/play here"]);
         };
         match self.game.as_mut() {
             Some(state) => state.location = room,
@@ -111,7 +111,7 @@ impl Console {
         let name = match args {
             [] => DEFAULT_SAVE,
             [name] => name,
-            _ => return "Usage: /save [name]".to_string(),
+            _ => return super::session::suggest("Usage:", &["/save [{name}]"]),
         };
         // Saves are the engine's, so every player client keeps them alike (REQ-PC-18).
         match save_named(&self.world.root, name, state) {
@@ -125,7 +125,7 @@ impl Console {
         let name = match args {
             [] => DEFAULT_SAVE,
             [name] => name,
-            _ => return "Usage: /load [name]".to_string(),
+            _ => return super::session::suggest("Usage:", &["/load [{name}]"]),
         };
         let path = match save_path(&self.world.root, name) {
             Ok(path) => path,

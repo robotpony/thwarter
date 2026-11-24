@@ -22,7 +22,9 @@ Objects: none
 > go s
 The Well (room)
 > /new room n gatehouse
-village/well already has a north exit, to village/tower. Use /link north <room> to change it.
+village/well already has a north exit, to village/tower. To change it:
+
+  /link north {room}
 > /new room behind cellar
 Created village/cellar, Cellar, through the behind exit of village/well.
 Now at village/cellar.
@@ -49,7 +51,9 @@ Not saved: `connections` has no entry `up`
 > go /village/square
 Village Square (room)
 > go bench
-`bench` is scenery, with no card yet. /new object bench gives it one.
+`bench` is scenery, with no card yet. To give it one:
+
+  /edit object bench
 > /new object bench
 Created object bench, Bench; village/square already lists it, and now it has a card.
 > go bench
@@ -157,7 +161,10 @@ Nothing called `ghost` is in the world to move.
 > /move lantern global
 Changing a thing's scope with /move comes with the scope work (REQ-CON-29).
 > /move lantern
-Usage: /move <thing> <room or character>, for example /move lantern village/well
+Usage, for example:
+
+  /move {thing} {room|character|thing}
+  /move lantern village/well
 > go /village/well
 The Well (room)
 > look
@@ -214,7 +221,10 @@ Added bench to smith's inventory.
 > /add chair nowhere
 There's no room, character or object called `nowhere` to add chair to.
 > /add
-Usage: /add <thing> [room or character], for example /add chair bedroom
+Usage, for example:
+
+  /add {thing} [{room|character|thing}]
+  /add chair bedroom
 > go /village/square
 Village Square (room)
 > /add "old shirt" village/square

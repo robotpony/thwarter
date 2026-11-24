@@ -52,7 +52,9 @@ You can go north or east.
 Edit mode, at village/square.
 /edit opens village/square.md in a full-screen editor, which needs a terminal.
 > /new room north
-Name the new room: /new room north <id> [title]
+Name the new room:
+
+  /new room north {id} [{title}]
 > /play
 Play mode.
 

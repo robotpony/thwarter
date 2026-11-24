@@ -10,6 +10,16 @@ The console is the interactive terminal client for writing and playing a world. 
 
 The author is a player of sorts, like a game master running a table (Bruce, 2026-11-23). Editing SHOULD feel like being in the world and running it: standing in a room, adding things to it, checking how it plays, and nudging the game's state. It should not feel like filling in forms. New commands are judged against that, and each requirement below gives an example of how it reads at the prompt.
 
+Output reads with air around it (Bruce, 2026-11-24): a blank line follows what was typed, and a reply that suggests a command puts each command on its own indented line after a blank line, with parameters named as in the `/` menu (`{id}`, `[{title}]`), never inside the sentence.
+
+```
+in bedroom > /new room west hallway
+
+bedroom already has a west exit, to door-bedroom-west. To change it:
+
+  /link west {room}
+```
+
 - REQ-CON-1: `thwart edit <world>` MUST open the console in edit mode and `thwart play <world>` in play mode. Both are subcommands of the one `thwart` binary.
 - REQ-CON-2: Commands to the console itself MUST start with `/`; anything else is input to the current mode. `/edit` MUST open where edit mode is in full editing (REQ-CON-6), whatever it is, with no kind word needed; from play mode it switches to edit mode at the player's room and opens that (Bruce, 2026-11-23). `/edit room`, `/edit object` and `/edit character`, with or without an id, name something else to open, and `/edit <name>` opens whatever the name means, as `go <name>` finds it, without moving edit mode (Bruce, 2026-11-23). `/play` MUST switch to play mode, and `/help` and `/quit` MUST work in both.
 - REQ-CON-3: Edit mode MUST be able to see everything in the world, including hidden state, and change content. Play mode MUST NOT change content files; it MAY write game saves. (Play mode's limits beyond that are proposed, not decided: Open question 2 below.)

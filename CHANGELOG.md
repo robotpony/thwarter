@@ -41,6 +41,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.57.3 (2026-11-24)
+
+### Changed
+
+- Output has air around it (Bruce, 2026-11-24): a blank line follows what was typed in every mode, and every reply that suggests a command, usage lines included, puts each command on its own indented line after a blank line, with named parameters (`/link west {room}`), instead of inside the sentence. Recorded as a principle in `design/CONSOLE_REQUIREMENTS.md`.
+
 ## 0.57.2 (2026-11-24)
 
 ### Changed

@@ -10,7 +10,9 @@ Added door-village-square-village-hallway-west: west of village/square, east of 
 > /add door(locked) --(south)--> village/cellar-steps
 Added door-village-square-village-cellar-steps-south: south of village/square, north of village/cellar-steps.
 > /add door up
-Added door-village-square-up, up from village/square (one side so far: /add <room> door-village-square-up gives it another).
+Added door-village-square-up, up from village/square. It has one side so far; to give it another:
+
+  /add {room} door-village-square-up
 This adds 1 problem(s):
   door `door-village-square-up`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
 > /add village/loft door-village-square-up
@@ -18,7 +20,9 @@ door-village-square-up now has a side down from village/loft too.
 > /add door
 Which way is the door from village/square? north, east, south, west, up, down, or any word.
 > northwest
-Added door-village-square-northwest, northwest of village/square (one side so far: /add <room> door-village-square-northwest gives it another).
+Added door-village-square-northwest, northwest of village/square. It has one side so far; to give it another:
+
+  /add {room} door-village-square-northwest
 This adds 1 problem(s):
   door `door-village-square-northwest`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
 > go west

@@ -120,7 +120,7 @@ impl Console {
         let target = match (kind, rest) {
             (_, []) => self.edit_target_here(kind),
             (Some(kind), [id]) => self.edit_target_named(kind, &super::author::id_from(id).0),
-            (Some(kind), _) => Err(format!("Usage: /edit {} [id]", kind.label())),
+            (Some(kind), _) => Err(super::session::suggest("Usage:", &[&format!("/edit {} [{{id}}]", kind.label())])),
             (None, words) => self.edit_target_any(&words.join(" ")),
         };
         match target {
@@ -229,11 +229,11 @@ impl Console {
             return Err(match kind {
                 Some(kind) => {
                     let label = kind.label();
-                    format!("/edit {} edits the {} you're in. Go to one, or /edit {} <id>.", label, label, label)
+                    super::session::suggest(&format!("/edit {} edits the {} you're in. Go to one, or name it:", label, label), &[&format!("/edit {} {{id}}", label)])
                 }
-                None => format!(
-                    "{} is a folder, with nothing to edit. Go to a room or thing, or /edit room|object|character <id>.",
-                    self.pwd()
+                None => super::session::suggest(
+                    &format!("{} is a folder, with nothing to edit. Go to a room or thing, or name one:", self.pwd()),
+                    &["/edit {name}"],
                 ),
             });
         };
@@ -281,7 +281,7 @@ impl Console {
     fn edit_target_named(&self, kind: Kind, typed: &str) -> Result<EditTarget, String> {
         if kind == Kind::Room {
             let id = self.room_id(typed);
-            let path = self.world.path_of(Kind::Room, &id).ok_or_else(|| format!("No room `{}`. /new room makes one.", id))?;
+            let path = self.world.path_of(Kind::Room, &id).ok_or_else(|| super::session::suggest(&format!("No room `{}`. To make one:", id), &[&format!("/new room {}", id)]))?;
             return self.open_target(kind, id, path);
         }
         if let Some(problem) = bare_id_problem(typed) {
@@ -297,8 +297,8 @@ impl Console {
             return Ok(EditTarget { kind, id: typed.to_string(), path, opened: None, file });
         }
         Err(match kind {
-            Kind::Character => format!("No character `{}`. /new character {} makes one.", typed, typed),
-            _ => format!("No object `{}` here or in the world. /new object {} <type> makes one.", typed, typed),
+            Kind::Character => super::session::suggest(&format!("No character `{}`. To make one:", typed), &[&format!("/new character {}", typed)]),
+            _ => super::session::suggest(&format!("No object `{}` here or in the world. To make one:", typed), &[&format!("/new object {} {{type}}", typed)]),
         })
     }
 
@@ -438,8 +438,8 @@ mod tests {
         let mut console = console_at(&root, "village/square");
         assert_eq!(console.handle("/edit character").0, "village/square is a room, not a character: /edit opens it.");
         console.handle("go /");
-        assert_eq!(console.handle("/edit room").0, "/edit room edits the room you're in. Go to one, or /edit room <id>.");
-        assert_eq!(console.handle("/edit object rope").0, "No object `rope` here or in the world. /new object rope <type> makes one.");
+        assert_eq!(console.handle("/edit room").0, "/edit room edits the room you're in. Go to one, or name it:\n\n  /edit room {id}");
+        assert_eq!(console.handle("/edit object rope").0, "No object `rope` here or in the world. To make one:\n\n  /new object rope {type}");
         assert!(console.take_pending_edit().is_none());
     }
 

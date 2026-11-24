@@ -178,7 +178,7 @@ impl Console {
             ("validate", []) => self.validate(false),
             ("validate", ["strict"]) => self.validate(true),
             ("map", []) => self.map_command(),
-            ("validate", _) => "Usage: /validate [strict]".to_string(),
+            ("validate", _) => suggest("Usage:", &["/validate [strict]"]),
             ("clear" | "status" | "map", _) => format!("Usage: /{}", name),
             ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
             ("restart", []) => "/restart restarts the console on the newest build, which needs a terminal.".to_string(),
@@ -186,7 +186,7 @@ impl Console {
             ("edit", args) => self.full_edit(args),
             ("play", []) => self.play(),
             ("play", ["here"]) => self.play_here(),
-            ("play", _) => "Usage: /play, or /play here".to_string(),
+            ("play", _) => suggest("Usage:", &["/play", "/play here"]),
             ("save", args) => self.save_game_as(args),
             ("load", args) => self.load_game_named(args),
             ("reload", _) => self.reload(),
@@ -344,7 +344,7 @@ impl Console {
             Parsed::Action(PlayAction::Examine(noun)) => self.examine(&noun),
             Parsed::Action(PlayAction::Go(target)) => self.go(&target),
             Parsed::Action(_) => {
-                "That's a play-mode command. Here, /new and /set change what's in a room; /play here tries it.".to_string()
+                suggest("That's a play-mode command. In edit mode, change what's in a room, or try it in play:", &["/new {kind} {id}", "/set {key} {value}", "/play here"])
             }
             Parsed::Reply(question) => question,
             Parsed::Unknown(_) => {
@@ -653,7 +653,7 @@ impl Console {
         }
         if location.objects.iter().any(|o| o == target) {
             return Some(self.world.path_of(Kind::Object, target).map(Place::File).ok_or_else(|| {
-                format!("`{}` is scenery, with no card yet. /new object {} gives it one.", target, target)
+                suggest(&format!("`{}` is scenery, with no card yet. To give it one:", target), &[&format!("/edit object {}", target)])
             }));
         }
         None
@@ -738,6 +738,18 @@ pub(super) fn split_args(command: &str) -> Vec<String> {
         words.push(word);
     }
     words
+}
+
+/// A reply that suggests what to type: the sentence, a blank line, then
+/// each command on its own indented line (Bruce, 2026-11-24: examples go
+/// on a new line with space above).
+pub(super) fn suggest(text: &str, commands: &[&str]) -> String {
+    let mut out = text.to_string();
+    out.push_str("\n");
+    for command in commands {
+        out.push_str(&format!("\n  {}", command));
+    }
+    out
 }
 
 fn parent_of(path: &str) -> String {

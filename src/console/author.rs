@@ -37,7 +37,7 @@ impl Console {
             ["room", rest @ ..] => self.new_room(rest),
             ["character", rest @ ..] => self.new_character(rest),
             ["object", rest @ ..] => self.new_object(rest),
-            _ => "Usage: /new room|character|object ... (/help has the details)".to_string(),
+            _ => super::session::suggest("Usage (/help has the details):", &["/new room|character|object {id} [{title}]"]),
         }
     }
 
@@ -46,11 +46,14 @@ impl Console {
         let (direction, id, title) = match (&here, args) {
             (Some(_), [direction, id, title @ ..]) => (Some(expand_direction(direction)), *id, title),
             (Some(_), [direction]) => {
-                return format!("Name the new room: /new room {} <id> [title]", direction);
+                return super::session::suggest("Name the new room:", &[&format!("/new room {} {{id}} [{{title}}]", direction)]);
             }
             (None, [id, title @ ..]) => (None, *id, title),
             _ => {
-                return "Usage: /new room <direction> <id> [title] in a room, /new room <id> [title] elsewhere".to_string()
+                return super::session::suggest(
+                    "Usage, in a room and elsewhere:",
+                    &["/new room {direction} {id} [{title}]", "/new room {id} [{title}]"],
+                )
             }
         };
         let id = self.room_id(id);
@@ -58,9 +61,9 @@ impl Console {
 
         if let (Some(here), Some(direction)) = (&here, &direction) {
             if let Some(existing) = self.world.engine.get_location(here).and_then(|l| l.connections.get(direction)) {
-                return format!(
-                    "{} already has a {} exit, to {}. Use /link {} <room> to change it.",
-                    here, direction, existing, direction
+                return super::session::suggest(
+                    &format!("{} already has a {} exit, to {}. To change it:", here, direction, existing),
+                    &[&format!("/link {} {{room}}", direction)],
                 );
             }
         }
@@ -111,7 +114,7 @@ impl Console {
 
     fn new_character(&mut self, args: &[&str]) -> String {
         let [typed, title @ ..] = args else {
-            return "Usage: /new character <id> [title]".to_string();
+            return super::session::suggest("Usage:", &["/new character {id} [{title}]"]);
         };
         let (id, named) = id_from(typed);
         let id = id.as_str();
@@ -221,10 +224,10 @@ impl Console {
             return "/set changes the room, character or object you're in; go to one first.".to_string();
         };
         let [key, value @ ..] = args else {
-            return "Usage: /set <key> <value>, for example /set title The Old Well".to_string();
+            return super::session::suggest("Usage, for example:", &["/set {key} {value}", "/set title The Old Well"]);
         };
         if value.is_empty() {
-            return format!("Give `{}` a value: /set {} <value>", key, key);
+            return super::session::suggest(&format!("Give `{}` a value:", key), &[&format!("/set {} {{value}}", key)]);
         }
         let value = value.join(" ");
         let edit = if *key == "body" {
@@ -247,7 +250,7 @@ impl Console {
             return "/link changes an exit of the room you're in; go to a room first.".to_string();
         };
         let [direction, target] = args else {
-            return "Usage: /link <direction> <room>, for example /link north castle/great-hall".to_string();
+            return super::session::suggest("Usage, for example:", &["/link {direction} {room}", "/link north castle/great-hall"]);
         };
         let direction = expand_direction(direction);
         let target = self.room_id(target);
@@ -267,7 +270,7 @@ impl Console {
             return "/unlink removes an exit of the room you're in; go to a room first.".to_string();
         };
         let [direction] = args else {
-            return "Usage: /unlink <direction>".to_string();
+            return super::session::suggest("Usage:", &["/unlink {direction}"]);
         };
         let direction = expand_direction(direction);
         let edit = Edit::RemoveMapEntry { key: "connections".into(), subkey: direction.clone() };
@@ -297,10 +300,10 @@ impl Console {
         let (thing, target) = match args {
             [thing] => match self.current_room() {
                 Some(here) => (*thing, here),
-                None => return format!("/add {} needs a room: go to one, or /add {} <room>.", thing, thing),
+                None => return super::session::suggest(&format!("/add {} needs a room. Go to one, or name it:", thing), &[&format!("/add {} {{room}}", thing)]),
             },
             [thing, target] => (*thing, target.to_string()),
-            _ => return "Usage: /add <thing> [room or character], for example /add chair bedroom".to_string(),
+            _ => return super::session::suggest("Usage, for example:", &["/add {thing} [{room|character|thing}]", "/add chair bedroom"]),
         };
         let (thing_id, named) = id_from(thing);
         let thing = thing_id.as_str();
@@ -366,7 +369,7 @@ impl Console {
     /// character's inventory. The thing's own file stays where it is.
     pub(super) fn move_thing(&mut self, args: &[&str]) -> String {
         let [thing, target] = args else {
-            return "Usage: /move <thing> <room or character>, for example /move lantern village/well".to_string();
+            return super::session::suggest("Usage, for example:", &["/move {thing} {room|character|thing}", "/move lantern village/well"]);
         };
         if matches!(*target, "global" | "area" | "local" | "here") {
             return "Changing a thing's scope with /move comes with the scope work (REQ-CON-29).".to_string();
