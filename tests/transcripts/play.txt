@@ -145,7 +145,7 @@ A mossy stone well. The rope is long gone.
 
 Exits: south.
 > light lantern
-The wick catches and the square grows warm
+You light the brass lantern.
 > search
 You search carefully, but find nothing new.
 > dance wildly
