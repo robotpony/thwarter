@@ -5,6 +5,7 @@ use crate::engines::location_view::{expand_direction, EntityRef, LocationView};
 use crate::engines::variables::Scope;
 use crate::engines::{At, EntityKind, Visibility, WorldEngine};
 use crate::models::game::{ActionResult, Change, PlayAction, PlayState};
+use crate::engines::turn::Outcome;
 use crate::render::{location_blocks, prose_plain, RenderStyle};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -221,9 +222,13 @@ impl GameEngine {
                 }
                 if !door.passable {
                     // The door's `## When: #go` section says why, else built in.
-                    return ActionResult::say(match self.reply(world, state, "go", (EntityKind::Door, &door.id), None) {
-                        Some((kind, id, text)) => prose(world, &world.fill(&text, &Scope { at: At::play(state), this: Some((kind, &id)), here: None })),
-                        None => format!("The {} is closed.", door.title.to_lowercase()),
+                    // A built-in verb leaves the door where it is: that's its
+                    // outcome, so a state file's `## When: #go` answers.
+                    let stays = Outcome(self.current_state(world, state, EntityKind::Door, &door.id).unwrap_or_else(|| "no-action".into()));
+                    let replies = self.replies(world, state, "go", (EntityKind::Door, &door.id), None, &stays);
+                    return ActionResult::say(match replies.is_empty() {
+                        true => format!("The {} is closed.", door.title.to_lowercase()),
+                        false => self.say_replies(world, state, &replies),
                     });
                 }
                 match door.leads_to(&state.location) {
@@ -261,6 +266,16 @@ impl GameEngine {
         if let Some(carried) = resolve(noun, &self.carried(world, state), the_object).ok().flatten() {
             return ActionResult::say(format!("You already have {}.", the_object(&carried)));
         }
+        // Taking back what a thing holds (a key from its lock).
+        if let Ok(Some(held)) = resolve(noun, &self.held_here(world, state, &view), the_object) {
+            for list in state.held.values_mut() {
+                list.retain(|id| *id != held.id);
+            }
+            state.held.retain(|_, l| !l.is_empty());
+            state.inventory.push(held.id.clone());
+            let text = self.take_reply(world, state, &held.id).unwrap_or_else(|| format!("You take {}.", the_object(&held)));
+            return ActionResult { text, changes: vec![Change::Took { object: held.id.clone(), from: state.location.clone() }], note: None };
+        }
         let object = match resolve(noun, &view.objects, the_object) {
             Ok(Some(o)) => o,
             Ok(None) => {
@@ -282,7 +297,7 @@ impl GameEngine {
         state.inventory.push(object.id.clone());
         state.taken.entry(state.location.clone()).or_default().push(object.id.clone());
         ActionResult {
-            text: format!("You take the {}.", name),
+            text: self.take_reply(world, state, &object.id).unwrap_or_else(|| format!("You take the {}.", name)),
             changes: vec![Change::Took { object: object.id.clone(), from: state.location.clone() }],
             note: None,
         }
@@ -308,6 +323,7 @@ impl GameEngine {
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
         things.extend(doors_here(&view));
+        things.extend(self.held_here(world, state, &view));
         match resolve(noun, &things, the_object) {
             Ok(Some(object)) if world.door_at(&object.id, At::play(state)).is_some() && world.object_at(&object.id, At::play(state)).is_none() => {
                 let door = world.door_at(&object.id, At::play(state)).unwrap();
@@ -363,6 +379,7 @@ impl GameEngine {
         let mut things = self.carried(world, state);
         things.extend(view.objects.iter().cloned());
         things.extend(doors_here(&view));
+        things.extend(self.held_here(world, state, &view));
         // A hidden object can't be seen, but an action may name it exactly.
         let hidden = || -> Option<EntityRef> {
             let whole = self.whole_view(world, state)?;
@@ -406,77 +423,203 @@ impl GameEngine {
             },
         };
         let used_kind = used.as_ref().map(|u| kind_of(&u.id));
-        // The reply sections for this turn, read before the action changes
-        // anything (`design/SECTIONS.md`).
-        let reply = self.reply(world, state, &verb, (this_kind, &object.id), used.as_ref().zip(used_kind).map(|(u, k)| (k, u.id.as_str())));
-        let key = verb.replace(' ', "-");
-        let Some(action) = actions.iter().find(|(name, _)| name.eq_ignore_ascii_case(&key)).map(|(_, a)| a.clone()) else {
-            // No mechanics: a reply section is the whole action, and with
-            // none, nothing happens.
-            return match reply {
-                Some((kind, id, text)) => {
-                    let scope = Scope { at: At::play(state), this: Some((kind, &id)), here: None };
-                    ActionResult::say(prose(world, &world.fill(&text, &scope)))
-                }
-                None => ActionResult::say("Nothing happens."),
-            };
-        };
-        // A hidden thing answers to its exact name only for an action with
-        // no `requires:`; otherwise it is as good as absent (Bruce,
-        // 2026-11-23).
-        if named_hidden && !action.requires_has.is_empty() {
-            return ActionResult::say(format!("There's no {} here.", noun.trim()));
-        }
-
+        let used_ref = used.as_ref().zip(used_kind).map(|(u, k)| (k, u.id.clone()));
         let name = object_name(&object);
-        if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
-            return ActionResult::say(builtin_refusal(&verb, &name, state.turn));
-        }
-
+        let key = verb.replace(' ', "-");
         let mut changes = Vec::new();
         let mut notes = Vec::new();
-        for (target, to) in &action.becomes {
-            match world.thing_by_id(target) {
-                Ok(thing) => {
-                    let (kind, id) = (thing.kind, thing.id.clone());
-                    match state.switch_state(world, kind, &id, to) {
-                        Ok(()) => changes.push(Change::Became { type_name: kind.type_name().to_string(), id, state: to.clone() }),
-                        Err(e) => notes.push(e.to_string()),
-                    }
-                }
-                Err(e) => notes.push(format!("`becomes:` {}", e)),
-            }
-        }
-        for (name, value) in &action.sets {
-            let name = match name.strip_prefix("this.") {
-                Some(rest) => format!("{}.{}", object.id, rest),
-                None => name.clone(),
-            };
-            state.values.insert(name.clone(), value.clone());
-            changes.push(Change::Set { name, value: value.clone() });
-        }
-        if let Some(chapter) = &action.chapter {
-            let scope = world.thing(this_kind, &object.id).map(|t| t.scope.clone()).unwrap_or_default();
-            match state.enter_chapter(world, &scope, chapter) {
-                Ok(()) => changes.push(Change::EnteredChapter { name: state.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_default() }),
-                Err(e) => notes.push(e.to_string()),
-            }
-        }
 
-        // A reply section replaces the built-in reply; it's filled after
-        // the changes, so it can show them.
-        let text = match reply {
-            Some((kind, id, text)) => {
-                let scope = Scope { at: At::play(state), this: Some((kind, &id)), here: None };
-                prose(world, &world.fill(&text, &scope))
+        // What happens: the thing's script for this verb, else its
+        // frontmatter action, else nothing (`design/SECTIONS.md` ›
+        // Scripts). The outcome is the state the thing moved into, or why
+        // it didn't move.
+        let script = world.thing(this_kind, &object.id).filter(|t| t.script_actions.contains(&super::scripts::function_name(&verb)));
+        // Whether an action ran: then, with no reply, the reply is built in.
+        let mut acted = false;
+        let outcome = if let Some(thing) = script {
+            match self.run_script(world, state, thing, &verb, used_ref.as_ref(), &mut changes) {
+                Ok(outcome) => outcome,
+                Err(e) => {
+                    notes.push(format!("{}'s `{}` script: {}", object.id, verb, e));
+                    Outcome("no-action".into())
+                }
             }
-            None => builtin_reply(&verb, &name, state.turn),
+        } else if let Some(action) = actions.iter().find(|(name, _)| name.eq_ignore_ascii_case(&key)).map(|(_, a)| a.clone()) {
+            // A hidden thing answers to its exact name only for an action
+            // with no `requires:`; otherwise it is as good as absent
+            // (Bruce, 2026-11-23).
+            if named_hidden && !action.requires_has.is_empty() {
+                return ActionResult::say(format!("There's no {} here.", noun.trim()));
+            }
+            if action.requires_has.iter().any(|id| !state.inventory.contains(id)) {
+                return ActionResult::say(builtin_refusal(&verb, &name, state.turn));
+            }
+            acted = true;
+            let before = self.current_state(world, state, this_kind, &object.id);
+            for (target, to) in &action.becomes {
+                match world.thing_by_id(target) {
+                    Ok(thing) => {
+                        let (kind, id) = (thing.kind, thing.id.clone());
+                        match state.switch_state(world, kind, &id, to) {
+                            Ok(()) => changes.push(Change::Became { type_name: kind.type_name().to_string(), id, state: to.clone() }),
+                            Err(e) => notes.push(e.to_string()),
+                        }
+                    }
+                    Err(e) => notes.push(format!("`becomes:` {}", e)),
+                }
+            }
+            for (name, value) in &action.sets {
+                let name = match name.strip_prefix("this.") {
+                    Some(rest) => format!("{}.{}", object.id, rest),
+                    None => name.clone(),
+                };
+                state.values.insert(name.clone(), value.clone());
+                changes.push(Change::Set { name, value: value.clone() });
+            }
+            if let Some(chapter) = &action.chapter {
+                let scope = world.thing(this_kind, &object.id).map(|t| t.scope.clone()).unwrap_or_default();
+                match state.enter_chapter(world, &scope, chapter) {
+                    Ok(()) => changes.push(Change::EnteredChapter { name: state.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_default() }),
+                    Err(e) => notes.push(e.to_string()),
+                }
+            }
+            let after = self.current_state(world, state, this_kind, &object.id);
+            match after.filter(|a| Some(a) != before.as_ref()) {
+                Some(moved) => Outcome(moved),
+                None => Outcome("no-action".into()),
+            }
+        } else {
+            Outcome("no-action".into())
+        };
+
+        // The replies match after the action, so they can show it; a
+        // thing's own replace its template's. With none, a built-in reply
+        // if something changed, else nothing happened.
+        let replies = self.replies(world, state, &verb, (this_kind, &object.id), used_ref.as_ref().map(|(k, id)| (*k, id.as_str())), &outcome);
+        let text = if replies.is_empty() {
+            if changes.is_empty() && !acted {
+                "Nothing happens.".to_string()
+            } else {
+                builtin_reply(&verb, &name, state.turn)
+            }
+        } else {
+            self.say_replies(world, state, &replies)
         };
         let mut result = ActionResult { text, changes, note: None };
         if !notes.is_empty() {
             result.note = Some(notes.join("; "));
         }
         result
+    }
+
+    /// A `## When: #take` reply, which replaces the built-in one where it
+    /// exists (`design/STATES.md` › Built-in verbs).
+    fn take_reply(&self, world: &WorldEngine, state: &PlayState, id: &str) -> Option<String> {
+        let stays = Outcome(self.current_state(world, state, EntityKind::Object, id).unwrap_or_else(|| "no-action".into()));
+        let replies = self.replies(world, state, "take", (EntityKind::Object, id), None, &stays);
+        (!replies.is_empty()).then(|| self.say_replies(world, state, &replies))
+    }
+
+    /// Replies as the player reads them, each filled from its own thing.
+    fn say_replies(&self, world: &WorldEngine, state: &PlayState, replies: &[(EntityKind, String, String)]) -> String {
+        replies
+            .iter()
+            .map(|(kind, id, text)| prose(world, &world.fill(text, &Scope { at: At::play(state), this: Some((*kind, id)), here: None })))
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
+    /// A thing as its script sees it: id, title, state, values, and what
+    /// it holds.
+    fn script_view(&self, world: &WorldEngine, state: &PlayState, kind: EntityKind, id: &str) -> rhai::Map {
+        let current = self.current_state(world, state, kind, id);
+        let title = world.current(kind, id, At::play(state)).map(|e| e.title().to_string()).unwrap_or_else(|| id.to_string());
+        let mut vars: Vec<(String, String)> = Vec::new();
+        if let Some(thing) = world.thing(kind, id) {
+            let chapter = state.chapter.as_ref().and_then(|c| world.chapter_key(c));
+            if let Ok((_, merged)) = thing.build(current.as_deref(), chapter.as_ref()) {
+                if let Some(serde_yaml::Value::Mapping(map)) = merged.metadata.get("vars") {
+                    for (k, v) in map {
+                        if let Some(k) = k.as_str() {
+                            vars.push((k.to_string(), crate::engines::world_def::value_text(v).unwrap_or_default()));
+                        }
+                    }
+                }
+            }
+        }
+        for (k, v) in vars.iter_mut() {
+            if let Some(set) = state.values.get(&format!("{}.{}", id, k)) {
+                *v = set.clone();
+            }
+        }
+        let held = state
+            .held
+            .get(id)
+            .into_iter()
+            .flatten()
+            .map(|h| self.script_view(world, state, EntityKind::Object, h))
+            .collect();
+        super::scripts::thing_map(id, &title, current.as_deref(), &vars, held)
+    }
+
+    /// Run a thing's script for `verb` and apply what it returns. The
+    /// outcome is the state it moved into, else the reason it gave.
+    fn run_script(
+        &self,
+        world: &WorldEngine,
+        state: &mut PlayState,
+        thing: &crate::engines::bundles::Thing,
+        verb: &str,
+        used: Option<&(EntityKind, String)>,
+        changes: &mut Vec<Change>,
+    ) -> std::result::Result<Outcome, String> {
+        use super::scripts::{ScriptChange, ScriptResult};
+        let ast = super::scripts::compile(&thing.scripts)?.ok_or("it has no script")?;
+        let this = self.script_view(world, state, thing.kind, &thing.id);
+        let mut turn = rhai::Map::new();
+        turn.insert("verb".into(), verb.into());
+        turn.insert("used".into(), used.map_or(rhai::Dynamic::UNIT, |(k, id)| rhai::Dynamic::from_map(self.script_view(world, state, *k, id))));
+        let result = super::scripts::run(&ast, verb, this, turn)?;
+        let list = match result {
+            ScriptResult::Reason(why) => return Ok(Outcome(why)),
+            ScriptResult::Changes(list) => list,
+        };
+        let mut outcome = Outcome("no-action".into());
+        for change in list {
+            match change {
+                ScriptChange::Become(to) => {
+                    state.switch_state(world, thing.kind, &thing.id, &to).map_err(|e| e.to_string())?;
+                    changes.push(Change::Became { type_name: thing.kind.type_name().to_string(), id: thing.id.clone(), state: to.clone() });
+                    outcome = Outcome(to);
+                }
+                ScriptChange::Keep(id) => {
+                    // Only what it was used with can be kept.
+                    if used.map(|(_, u)| u.as_str()) != Some(id.as_str()) {
+                        return Err(format!("keep(`{}`): a thing keeps only what it's used with", id));
+                    }
+                    if let Some(i) = state.inventory.iter().position(|c| *c == id) {
+                        state.inventory.remove(i);
+                    } else {
+                        let taken = state.taken.entry(state.location.clone()).or_default();
+                        if !taken.contains(&id) {
+                            taken.push(id.clone());
+                        }
+                    }
+                    state.held.entry(thing.id.clone()).or_default().push(id.clone());
+                    changes.push(Change::Kept { object: id, by: thing.id.clone() });
+                }
+                ScriptChange::Change { id, state: to } => {
+                    if !connected(world, thing, &id) {
+                        return Err(format!("change(`{}`): it isn't connected; add `connects: [{}]`", id, id));
+                    }
+                    let other = world.thing_by_id(&id).map_err(|e| e.to_string())?;
+                    let kind = other.kind;
+                    state.switch_state(world, kind, &id, &to).map_err(|e| e.to_string())?;
+                    changes.push(Change::Became { type_name: kind.type_name().to_string(), id, state: to });
+                }
+            }
+        }
+        Ok(outcome)
     }
 
     fn inventory(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
@@ -501,7 +644,21 @@ impl GameEngine {
         things.extend(view.objects.iter().cloned());
         things.extend(doors_here(&view));
         things.extend(view.characters.iter().cloned());
+        things.extend(self.held_here(world, state, &view));
         !matches!(resolve(noun, &things, the_object), Ok(None))
+    }
+
+    /// What the things here hold (a key left in a lock), which the player
+    /// can see and take back.
+    fn held_here(&self, world: &WorldEngine, state: &PlayState, view: &LocationView) -> Vec<EntityRef> {
+        let mut holders: Vec<String> = state.inventory.clone();
+        holders.extend(view.objects.iter().map(|o| o.id.clone()));
+        holders.extend(doors_here(view).into_iter().map(|d| d.id));
+        holders
+            .iter()
+            .flat_map(|h| state.held.get(h).cloned().unwrap_or_default())
+            .map(|id| EntityRef { name: world.object_at(&id, At::play(state)).map(|o| o.title), id })
+            .collect()
     }
 
     fn carried(&self, world: &WorldEngine, state: &PlayState) -> Vec<EntityRef> {
@@ -531,6 +688,18 @@ impl PlayState {
             }
             keep
         });
+        // What things held, if the holder or the held thing is gone.
+        for (holder, list) in self.held.iter_mut() {
+            let holder_gone = world.thing_by_id(holder).is_err();
+            list.retain(|id| {
+                let keep = !holder_gone && world.objects.contains_key(id);
+                if !keep {
+                    warnings.push(format!("`{}` was held by `{}`, but one of them no longer exists, so it's gone", id, holder));
+                }
+                keep
+            });
+        }
+        self.held.retain(|_, l| !l.is_empty());
         if self.inventory.len() != before {
             for taken in self.taken.values_mut() {
                 taken.retain(|id| world.objects.contains_key(id));
@@ -706,6 +875,16 @@ fn prose(world: &WorldEngine, text: &str) -> String {
     prose_plain(crate::engines::layers::strip_comments(text).trim(), &|n| world.link_for(n))
 }
 
+
+/// Whether a thing's script may change `other`: either one names the
+/// other in frontmatter `connects:` (`design/STATES.md` › One thing
+/// affecting another).
+fn connected(world: &WorldEngine, thing: &crate::engines::bundles::Thing, other: &str) -> bool {
+    let names = |t: &crate::engines::bundles::Thing, id: &str| {
+        t.index.metadata.get("connects").and_then(|v| v.as_sequence()).map_or(false, |list| list.iter().any(|v| v.as_str() == Some(id)))
+    };
+    names(thing, other) || world.thing_by_id(other).map_or(false, |o| names(o, &thing.id))
+}
 
 /// The doors on the room's exits, as things the player can name.
 fn doors_here(view: &LocationView) -> Vec<EntityRef> {

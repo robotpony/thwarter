@@ -37,6 +37,21 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.48.0 (2026-11-23)
+
+### Added
+
+- Rhai scripts (`design/SECTIONS.md` › Scripts, REQ-ENG-38; `engines/scripts.rs`, the `rhai` crate). A bundle's `actions.rhai` or a ```rhai block in a thing's file holds a function per action, `fn unlock(door, turn)`, given the thing (`id`, `title`, `state`, its values, `held`) and the turn (`verb`, `used`) read-only. It returns `become("closed")`, a reason (`"wrong-key"`), nothing, or a list of changes. A template's script passes down, and a thing's own function replaces the template's. Scripts are sandboxed: no files, network, modules, `eval` or printing, and capped at 100,000 operations. A script that doesn't compile is a problem.
+- Outcomes (REQ-ENG-39): replies now match after the action, against the state the target moved into or the reason it didn't. A reply in a state file that names no outcome means "ended up here", and a thing's own reply replaces its template's for the same action and outcome. `take` looks for a `## When: #take` reply.
+- `keep(turn.used)` leaves what an action was used with in the thing (`PlayState.held`, saved), and the player takes it back with `take` (REQ-ENG-40).
+- The built-in `locked-door`, as `design/STATES.md` › Keys shows: `index`, `locked`, `closed` and `open`, plus `actions.rhai` with `unlock`, `lock`, `open` and `close`. `vars: { key: "" }` means no key is needed; `validate` warns about a `key` that names nothing. The Keys table plays as written (`engines/turn.rs` tests).
+- `connects: [vault-door]` lets a thing's script `change("vault-door", "open")`; without it the change is refused with an author note, and `validate` warns about a `connects:` entry that names nothing (REQ-ENG-41).
+
+### Changed
+
+- Rhai reserves `with` and `this`, so a script reads the used thing as `turn.used` (not `turn.with`) and can't name a parameter `this`.
+- Every matching reply shows, in order: the target's, then what's used, then the room's.
+
 ## 0.47.2 (2026-11-23)
 
 ### Changed

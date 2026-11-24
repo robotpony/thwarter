@@ -5,12 +5,15 @@
 //!
 //! The set holds `@` for each thing the player holds and the room they're
 //! in, `#` for the chapter, and `#` for the current state of the thing
-//! being shown. On an action's turn it also holds `#<verb>`, `@<target>`
-//! and `@<what it's used with>`. Tags on other things' states and on
-//! values wait on Bruce.
+//! being shown. Tags on other things' states and on values wait on Bruce.
 //!
-//! A section is description when it matches without the action's tags,
-//! and a reply when it names the turn's `#<verb>`.
+//! A section is description when it matches without an action's tags,
+//! and a reply when it names the turn's `#<verb>`. Replies match after
+//! the action, against its outcome (`design/SECTIONS.md` › Outcomes and
+//! replies): the state the target moved into, or the reason it didn't
+//! (`no-action`, `wrong-key`). A section in a state file that names no
+//! outcome means "ended up here". A thing's own reply replaces its
+//! template's for the same action and outcome.
 
 use crate::engines::bundles::Thing;
 use crate::engines::layers::{strip_comments, Section};
@@ -21,16 +24,50 @@ use std::collections::BTreeSet;
 /// The tags of one turn.
 pub type Tags = BTreeSet<String>;
 
-/// A thing's sections, its templates' first (the most distant first),
-/// then its own, skipping the reserved replies.
-fn sections(thing: &Thing) -> impl Iterator<Item = &Section> {
-    thing.templates.iter().chain(std::iter::once(&thing.index)).flat_map(|l| l.sections.iter()).filter(|s| s.reserved().is_none())
+/// A section with where it came from: the state file it's in, if any,
+/// and whether it's the thing's own or its template's.
+struct Found<'a> {
+    section: &'a Section,
+    state_file: Option<&'a str>,
+    own: bool,
+}
+
+/// A thing's sections for its state `current`: its templates' (the most
+/// distant first) and their files for that state, then its own index and
+/// its own file for that state. Reserved replies are left out.
+fn sections<'a>(thing: &'a Thing, current: Option<&'a str>) -> Vec<Found<'a>> {
+    let mut out = Vec::new();
+    let mut push = |layer: &'a crate::engines::layers::Layer, state_file: Option<&'a str>, own: bool| {
+        for section in layer.sections.iter().filter(|s| s.reserved().is_none()) {
+            out.push(Found { section, state_file, own });
+        }
+    };
+    for template in &thing.templates {
+        push(template, None, false);
+    }
+    if let Some(s) = current {
+        for layer in thing.template_states.get(s).into_iter().flatten() {
+            push(layer, Some(s), false);
+        }
+    }
+    push(&thing.index, None, true);
+    if let Some(s) = current {
+        if let Some(layer) = thing.states.get(s) {
+            push(layer, Some(s), true);
+        }
+    }
+    out
 }
 
 fn prose_of(section: &Section) -> Option<String> {
     let text = section.layer.body.trim();
     (!strip_comments(text).trim().is_empty()).then(|| text.to_string())
 }
+
+/// What an action turn did to its target: the state it moved into, or
+/// the reason it didn't move (`no-action`, `wrong-key`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Outcome(pub String);
 
 impl GameEngine {
     /// The tags every part of this turn shares: what the player holds,
@@ -49,47 +86,49 @@ impl GameEngine {
         tags
     }
 
-    /// `tags` plus the current state of one thing, as `#<state>`.
-    fn with_state(&self, world: &WorldEngine, state: &PlayState, kind: EntityKind, id: &str, tags: &Tags) -> Tags {
-        let mut tags = tags.clone();
-        if let Some(thing) = world.thing(kind, id) {
-            let current = state
-                .state_of(kind.type_name(), id)
-                .filter(|s| thing.has_state(s))
-                .map(String::from)
-                .or_else(|| thing.starting_state.clone());
-            if let Some(s) = current {
-                tags.insert(format!("#{}", s));
-            }
-        }
-        tags
+    /// A thing's current state in play.
+    pub(crate) fn current_state(&self, world: &WorldEngine, state: &PlayState, kind: EntityKind, id: &str) -> Option<String> {
+        let thing = world.thing(kind, id)?;
+        state
+            .state_of(kind.type_name(), id)
+            .filter(|s| thing.has_state(s))
+            .map(String::from)
+            .or_else(|| thing.starting_state.clone())
     }
 
     /// A thing's description for this turn: `base` (its prose) and then
-    /// each of its sections that matches, in file order.
+    /// each of its sections that matches, in file order. A section in a
+    /// state file applies only while the thing is in that state.
     pub(crate) fn describe(&self, world: &WorldEngine, state: &PlayState, kind: EntityKind, id: &str, base: &str) -> String {
         let Some(thing) = world.thing(kind, id) else { return base.to_string() };
-        let tags = self.with_state(world, state, kind, id, &self.turn_tags(state));
+        let current = self.current_state(world, state, kind, id);
+        let mut tags = self.turn_tags(state);
+        if let Some(s) = &current {
+            tags.insert(format!("#{}", s));
+        }
         let mut parts: Vec<String> = Vec::new();
         if !base.trim().is_empty() {
             parts.push(base.trim().to_string());
         }
-        parts.extend(sections(thing).filter(|s| s.matches(|t| tags.contains(t))).filter_map(prose_of));
+        parts.extend(sections(thing, current.as_deref()).into_iter().filter(|f| f.section.matches(|t| tags.contains(t))).filter_map(|f| prose_of(f.section)));
         parts.join("\n\n")
     }
 
-    /// The reply to `verb` on `target`, used with `with`: the sections
-    /// naming `#<verb>` that match the turn, in the target, then in what's
-    /// used, then in the room. `None` if none matches.
-    pub(crate) fn reply(
+    /// The replies to `verb` on `target`, used with `with`, after the
+    /// action, given its outcome: the matching sections naming `#<verb>`
+    /// in the target, then in what's used, then in the room, every match
+    /// in that order. Each is the thing it came from and its text.
+    pub(crate) fn replies(
         &self,
         world: &WorldEngine,
         state: &PlayState,
         verb: &str,
         target: (EntityKind, &str),
         with: Option<(EntityKind, &str)>,
-    ) -> Option<(EntityKind, String, String)> {
+        outcome: &Outcome,
+    ) -> Vec<(EntityKind, String, String)> {
         let action = format!("#{}", verb.trim().to_lowercase().replace(' ', "-"));
+        let outcome_tag = format!("#{}", outcome.0);
         let mut tags = self.turn_tags(state);
         tags.insert(action.clone());
         tags.insert(format!("@{}", target.1));
@@ -97,24 +136,84 @@ impl GameEngine {
             tags.insert(format!("@{}", id));
         }
         let room = (EntityKind::Location, state.location.as_str());
+        let mut out = Vec::new();
+        let mut seen: Vec<(EntityKind, &str)> = Vec::new();
         for (kind, id) in std::iter::once(target).chain(with).chain(std::iter::once(room)) {
+            if seen.contains(&(kind, id)) {
+                continue;
+            }
+            seen.push((kind, id));
             let Some(thing) = world.thing(kind, id) else { continue };
-            let tags = self.with_state(world, state, kind, id, &tags);
-            let parts: Vec<String> = sections(thing)
-                .filter(|s| !s.unless && s.tags.iter().any(|t| *t == action) && s.matches(|t| tags.contains(t)))
-                .filter_map(prose_of)
-                .collect();
-            if !parts.is_empty() {
-                return Some((kind, id.to_string(), parts.join("\n\n")));
+            let is_target = (kind, id) == target;
+            let current = self.current_state(world, state, kind, id);
+            // A `#` tag: this thing's state (for the target, the state it
+            // ended up in by this action), the outcome, or the chapter.
+            let state_tag = |t: &str| -> bool {
+                let name = &t[1..];
+                if thing.has_state(name) {
+                    return if is_target { outcome.0 == name } else { current.as_deref() == Some(name) };
+                }
+                t == outcome_tag || tags.contains(t)
+            };
+            let mut matched: Vec<(Vec<String>, bool, String)> = Vec::new();
+            for found in sections(thing, current.as_deref()) {
+                let section = found.section;
+                if section.unless || !section.tags.iter().any(|t| *t == action) {
+                    continue;
+                }
+                // Whether it names an outcome: any `#` tag besides the action.
+                let names_outcome = section.tags.iter().any(|t| t.starts_with('#') && *t != action);
+                let holds = section.tags.iter().all(|t| {
+                    if t.starts_with('@') {
+                        return tags.contains(t);
+                    }
+                    if *t == action {
+                        // An action that shares a state's name (`#open`) also
+                        // means ending up in it, unless the outcome is named.
+                        return names_outcome || !is_target || !thing.has_state(&t[1..]) || outcome.0 == t[1..];
+                    }
+                    state_tag(t)
+                });
+                // A state file's reply that names no outcome: ended up here.
+                let here = match (found.state_file, names_outcome) {
+                    (Some(s), false) => !is_target || outcome.0 == s,
+                    _ => true,
+                };
+                if !(holds && here) {
+                    continue;
+                }
+                // Its action and outcome: the tags besides the action, and
+                // for a state file's reply that names none, that state.
+                let mut key: Vec<String> = section.tags.iter().filter(|t| **t != action).cloned().collect();
+                if let (Some(s), false) = (found.state_file, names_outcome) {
+                    key.push(format!("#{}", s));
+                }
+                key.sort();
+                key.dedup();
+                if let Some(text) = prose_of(section) {
+                    matched.push((key, found.own, text));
+                }
+            }
+            // A thing's own reply replaces its template's for the same
+            // action and outcome.
+            let own_keys: Vec<Vec<String>> = matched.iter().filter(|m| m.1).map(|m| m.0.clone()).collect();
+            for (key, own, text) in matched {
+                if !own && own_keys.contains(&key) {
+                    continue;
+                }
+                out.push((kind, id.to_string(), text));
             }
         }
-        None
+        out
     }
 
     /// The room's `## When: #searched` section, if it has one that matches.
     pub(crate) fn searched(&self, world: &WorldEngine, state: &PlayState) -> Option<String> {
         let thing = world.thing(EntityKind::Location, &state.location)?;
-        let mut tags = self.with_state(world, state, EntityKind::Location, &state.location, &self.turn_tags(state));
+        let mut tags = self.turn_tags(state);
+        if let Some(s) = self.current_state(world, state, EntityKind::Location, &state.location) {
+            tags.insert(format!("#{}", s));
+        }
         tags.insert("#searched".to_string());
         std::iter::once(&thing.index)
             .chain(thing.templates.iter().rev())
@@ -201,12 +300,12 @@ mod tests {
         state.location = "bedroom".into();
         let mut s = |line: &str| say(&game, &world, &mut state, line);
         assert_eq!(s("search"), "You look under the bed.");
-        // The target answers first; the hall's section is only its own room's.
         assert_eq!(s("hit window with stick"), "The glass cracks.");
         let mut state = PlayState::new("hall");
         state.inventory.push("stick".into());
         state.inventory.push("window".into());
-        assert_eq!(say(&game, &world, &mut state, "hit window with stick"), "The glass cracks.");
+        // Every match shows: the target's first, then the room's.
+        assert_eq!(say(&game, &world, &mut state, "hit window with stick"), "The glass cracks.\n\nThe hall echoes with the crack.");
         // A thing with no section for it falls back to the room's.
         let mut state = PlayState::new("hall");
         state.inventory.push("stick".into());
@@ -256,5 +355,97 @@ mod tests {
         }
         let mut state = game.start(&world, "yard").unwrap();
         assert_eq!(say(&game, &world, &mut state, "go to the sea"), "You can't go to the sea from here.");
+    }
+
+    fn vault() -> (tempfile::TempDir, WorldEngine) {
+        let dir = tempfile::tempdir().unwrap();
+        let write = |rel: &str, text: &str| {
+            let p = dir.path().join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        };
+        write("castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\nconnections: { down: vault-door, east: shed-door }\nobjects: [brass-key, spoon, lever]\n---\nA hall.\n");
+        write("castle/vault.md", "---\nid: castle/vault\ntitle: The Vault\ntype: location\nconnections: { up: vault-door }\n---\nGold.\n");
+        write("castle/shed.md", "---\nid: castle/shed\ntitle: Shed\ntype: location\nconnections: { west: shed-door }\n---\nTools.\n");
+        write("objects/brass-key.md", "---\nid: brass-key\ntitle: Brass key\ntype: object\nobject_type: key\n---\nA brass key.\n");
+        write("objects/spoon.md", "---\nid: spoon\ntitle: Spoon\ntype: object\nobject_type: x\n---\n");
+        // design/STATES.md › Keys, as written.
+        write("castle/doors/vault-door.md", "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: locked-door\nvars: { key: brass-key }\nsides:\n  castle/hall:  { direction: down }\n  castle/vault: { direction: up }\n---\nA heavy iron door, set into the floor.\n\n## When: #locked\nA padlock hangs from the hasp.\n\n## When: #unlock #closed\nThe padlock snaps open with a rusty clunk. The key stays in it.\n\n## When: #open\nCold air rises from the dark below.\n");
+        // A deadbolt: no key needed.
+        write("castle/doors/shed-door.md", "---\nid: shed-door\ntitle: Shed door\ntype: door\ninherits: locked-door\nsides:\n  castle/hall: { direction: east }\n  castle/shed: { direction: west }\n---\nA plank door.\n");
+        // A lever whose script reaches the shed door through `connects:`.
+        write("objects/lever/index.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nweight: immovable\nstate: up\nconnects: [shed-door]\n---\nA lever.\n");
+        write("objects/lever/up.md", "---\ninherits: index\n---\n");
+        write("objects/lever/down.md", "---\ninherits: index\n---\n## When: #pull\nSomething clanks to the east.\n");
+        write("objects/lever/actions.rhai", "fn pull(lever, turn) {\n    if lever.state == \"up\" { [become(\"down\"), change(\"shed-door\", \"open\")] }\n}\nfn kick(lever, turn) { change(\"vault-door\", \"open\") }\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(dir.path()).unwrap();
+        (dir, engine)
+    }
+
+    #[test]
+    fn the_vault_door_plays_as_the_keys_table_says() {
+        let (_d, world) = vault();
+        assert!(world.current_problems(false).is_empty(), "{:?}", world.current_problems(false));
+        assert!(world.current_warnings().is_empty(), "{:?}", world.current_warnings());
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        let mut s = |line: &str| say(&game, &world, &mut state, line);
+        s("take key");
+        s("take spoon");
+        assert!(s("x iron door").contains("A padlock hangs from the hasp."));
+        assert_eq!(s("down"), "It's locked.");
+        assert_eq!(s("open iron door"), "It's locked.");
+        assert_eq!(s("unlock iron door"), "It's locked. Unlock it with what?");
+        assert_eq!(s("unlock iron door with spoon"), "That doesn't fit the lock.");
+        assert_eq!(s("unlock iron door with key"), "The padlock snaps open with a rusty clunk. The key stays in it.");
+        // The key is in the lock now; unlocking again does nothing.
+        assert_eq!(s("unlock iron door with key"), "It isn't locked.");
+        assert_eq!(s("unlock iron door"), "It isn't locked.");
+        assert!(s("inventory").contains("Spoon") && !s("inventory").contains("Brass key"));
+        assert_eq!(s("open iron door"), "The door stands open.\n\nCold air rises from the dark below.");
+        assert_eq!(s("take key"), "You take the brass key.");
+        assert!(s("inventory").contains("Brass key"));
+        assert!(s("down").starts_with("The Vault"));
+    }
+
+    #[test]
+    fn a_deadbolt_needs_no_key_and_scripts_reach_only_what_they_connect() {
+        let (_d, world) = vault();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        let mut s = |line: &str| say(&game, &world, &mut state, line);
+        assert_eq!(s("east"), "It's locked.");
+        assert_eq!(s("unlock shed door"), "The lock falls open.");
+        assert_eq!(s("lock shed door"), "The lock clicks shut.");
+        // The lever opens the shed door through `connects:`.
+        assert_eq!(s("pull lever"), "Something clanks to the east.");
+        assert!(s("east").starts_with("Shed"));
+        // But it can't reach the vault door, which it doesn't connect to.
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        let r = game.act(&world, &mut state, &crate::models::game::PlayAction::Use { verb: "kick".into(), noun: "lever".into(), with: None });
+        assert_eq!(r.text, "Nothing happens.");
+        assert!(r.note.unwrap().contains("isn't connected"));
+        assert_eq!(state.state_of("door", "vault-door"), None);
+    }
+
+    #[test]
+    fn a_key_or_connection_that_names_nothing_is_warned_about() {
+        let (dir, mut world) = vault();
+        let d = dir.path();
+        world.set_file(&d.join("castle/doors/shed-door.md"), "---\nid: shed-door\ntitle: Shed door\ntype: door\ninherits: locked-door\nvars: { key: iron-key }\nsides:\n  castle/hall: { direction: east }\n  castle/shed: { direction: west }\n---\n");
+        world.set_file(&d.join("objects/lever/index.md"), "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nstate: up\nconnects: [trapdoor]\n---\n");
+        let warnings = world.current_warnings();
+        assert!(warnings.iter().any(|w| w.contains("`key: iron-key` names nothing")), "{:?}", warnings);
+        assert!(warnings.iter().any(|w| w.contains("`connects:` names `trapdoor`")), "{:?}", warnings);
+        // A script that doesn't compile is a problem, naming its file.
+        world.set_file(&d.join("objects/lever/actions.rhai"), "fn pull(lever, turn) {");
+        assert!(world.current_problems(false).iter().any(|p| p.contains("actions.rhai: the script doesn't compile")), "{:?}", world.current_problems(false));
+        // A held thing that's gone is dropped on reload.
+        let mut state = PlayState::new("castle/hall");
+        state.held.insert("vault-door".into(), vec!["brass-key".into()]);
+        world.remove_file(&d.join("objects/brass-key.md"));
+        assert_eq!(state.reconcile(&world).len(), 1);
+        assert!(state.held.is_empty());
     }
 }

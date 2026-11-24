@@ -109,6 +109,11 @@ pub struct Thing {
     /// most distant first. The thing's own state file of the same name,
     /// if any, goes on top (`states`).
     pub template_states: BTreeMap<String, Vec<Layer>>,
+    /// Its scripts, its templates' first (`design/SECTIONS.md` ›
+    /// Scripts): a bundle's `actions.rhai` or a ```rhai block.
+    pub scripts: Vec<super::scripts::Script>,
+    /// The actions its scripts define, by function name.
+    pub script_actions: Vec<String>,
 }
 
 /// The most templates one thing may chain through (`design/STATES.md` ›
@@ -274,6 +279,8 @@ pub(crate) struct Built {
     pub library: BTreeMap<String, Layer>,
     pub problems: Vec<String>,
     pub warnings: Vec<String>,
+    /// Every `actions.rhai` in the world, by its full path.
+    pub scripts: BTreeMap<PathBuf, String>,
 }
 
 enum Role {
@@ -394,8 +401,8 @@ struct PendingOverlay {
     layer: Layer,
 }
 
-pub(crate) fn build(root: &Path, files: &[FileRecord], ignore: &[PathBuf]) -> Built {
-    let mut built = Built::default();
+pub(crate) fn build(root: &Path, files: &[FileRecord], scripts: &BTreeMap<PathBuf, String>, ignore: &[PathBuf]) -> Built {
+    let mut built = Built { scripts: scripts.clone(), ..Default::default() };
     let rel = |p: &Path| p.strip_prefix(root).unwrap_or(p).to_path_buf();
 
     let is_template = |f: &FileRecord| {
@@ -821,6 +828,42 @@ fn build_thing(
             template_states.entry(name).or_default().push(layer);
         }
     }
+    // Scripts: each template's, then the thing's own.
+    let script_of = |layer: &Layer, folder: Option<PathBuf>, built: &mut Built| -> Vec<super::scripts::Script> {
+        let mut out = Vec::new();
+        let file = folder.map(|f| f.join("actions.rhai"));
+        if let Some(path) = file.as_ref().filter(|p| built.scripts.contains_key(*p)) {
+            out.push(super::scripts::Script { path: path.clone(), source: built.scripts[path].clone() });
+        }
+        if let Some(source) = &layer.script {
+            if !out.is_empty() {
+                built.problems.push(format!("{}: a thing has one script, in actions.rhai or a ```rhai block, and this one has both", layer.path.display()));
+            }
+            out.push(super::scripts::Script { path: layer.path.clone(), source: source.clone() });
+        }
+        out
+    };
+    let mut scripts = Vec::new();
+    for (template, _) in &chain {
+        match super::builtins::builtin_name(&template.path) {
+            Some(name) => scripts.extend(super::builtins::builtin_script(name)),
+            None => {
+                let folder = template.path.file_name().map_or(false, |n| n == "index.md").then(|| template.path.parent().map(Path::to_path_buf)).flatten();
+                scripts.extend(script_of(template, folder, built));
+            }
+        }
+    }
+    let own_folder = bundle.as_ref().and_then(|_| index.path.parent().map(Path::to_path_buf));
+    scripts.extend(script_of(&index, own_folder, built));
+    let script_actions = match super::scripts::compile(&scripts) {
+        Ok(ast) => ast.map(|a| super::scripts::functions(&a)).unwrap_or_default(),
+        Err(e) => {
+            built.problems.push(e);
+            scripts.clear();
+            Vec::new()
+        }
+    };
+
     let has = |name: &str| own_states.contains_key(name) || template_states.contains_key(name);
     let inherited_start = chain.iter().rev().find_map(|(_, s)| s.clone()).filter(|s| has(s));
     let templates: Vec<Layer> = chain.into_iter().map(|(layer, _)| layer).collect();
@@ -867,6 +910,8 @@ fn build_thing(
         area_overlays: above,
         templates,
         template_states,
+        scripts,
+        script_actions,
     };
 
     // The starting version is what the world tables hold.

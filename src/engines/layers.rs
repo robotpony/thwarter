@@ -51,6 +51,9 @@ pub struct Layer {
     /// What's odd about the file but still read, such as a `thwarter`
     /// block outside a section.
     pub warnings: Vec<String>,
+    /// A ```rhai block in its prose: the thing's script, kept out of the
+    /// description (`design/SECTIONS.md` › Scripts).
+    pub script: Option<String>,
 }
 
 /// A `## When:` or `## Unless:` section.
@@ -178,6 +181,40 @@ fn split_sections(path: &Path, body: &str) -> Result<(String, Vec<Section>, Vec<
     Ok((default, out, warnings))
 }
 
+/// The prose without its ```rhai block, and the block. More than one is
+/// a problem, since a thing has one script.
+fn take_script(path: &Path, body: &str, warnings: &mut Vec<String>) -> Result<(String, Option<String>), String> {
+    let mut prose: Vec<&str> = Vec::new();
+    let mut script: Option<Vec<&str>> = None;
+    let mut inside = false;
+    let mut found = 0;
+    for line in body.lines() {
+        if inside {
+            if line.trim() == "```" {
+                inside = false;
+            } else if let Some(s) = script.as_mut() {
+                s.push(line);
+            }
+            continue;
+        }
+        if line.trim().strip_prefix("```").map(str::trim) == Some("rhai") {
+            found += 1;
+            inside = true;
+            script.get_or_insert_with(Vec::new);
+            continue;
+        }
+        prose.push(line);
+    }
+    if inside {
+        return Err("the ```rhai block is never closed".to_string());
+    }
+    if found > 1 {
+        return Err("a thing has one script, and this file has more than one ```rhai block".to_string());
+    }
+    let _ = (path, warnings);
+    Ok((prose.join("\n").trim().to_string(), script.map(|s| s.join("\n"))))
+}
+
 fn is_block_fence(line: &str) -> bool {
     line.trim().strip_prefix("```").map(str::trim) == Some("thwarter")
 }
@@ -198,8 +235,9 @@ impl Layer {
             Value::Mapping(map) => map,
             _ => return Err("frontmatter must be a map of keys and values".to_string()),
         };
-        let (body, sections, warnings) = split_sections(path, &doc.body)?;
-        Ok(Layer { path: path.to_path_buf(), metadata, body, sections, warnings })
+        let (body, sections, mut warnings) = split_sections(path, &doc.body)?;
+        let (body, script) = take_script(path, &body, &mut warnings)?;
+        Ok(Layer { path: path.to_path_buf(), metadata, body, sections, warnings, script })
     }
 
     /// The value of a top-level key, if it is a string.

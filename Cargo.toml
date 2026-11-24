@@ -1,6 +1,6 @@
 [package]
 name = "thwarter"
-version = "0.47.2"
+version = "0.48.0"
 edition = "2021"
 description = "A Hugo-style engine for interactive fiction"
 authors = ["Thwarter Project"]
@@ -31,6 +31,7 @@ ratatui = { version = "0.30.2", default-features = false, features = ["crossterm
 ratatui-textarea = { version = "0.9.4", default-features = false, features = ["crossterm"] }
 zip = { version = "9", default-features = false, features = ["deflate"] }
 regex = "1"
+rhai = { version = "1.27", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tempfile = "3.8"

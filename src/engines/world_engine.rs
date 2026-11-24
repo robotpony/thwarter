@@ -73,6 +73,9 @@ pub struct WorldEngine {
     /// these, so an in-memory change (REQ-ENG-8) resolves duplicates,
     /// bundles and errors exactly as a fresh load would.
     files: Vec<FileRecord>,
+    /// Every `actions.rhai`, by its full path (`design/SECTIONS.md` ›
+    /// Scripts).
+    scripts: std::collections::BTreeMap<PathBuf, String>,
     /// Problems and warnings from the last rebuild, each prefixed with its file.
     file_problems: Vec<String>,
     file_warnings: Vec<String>,
@@ -188,6 +191,7 @@ impl WorldEngine {
             things: HashMap::new(),
             chapters: Vec::new(),
             files: Vec::new(),
+            scripts: Default::default(),
             file_problems: Vec::new(),
             file_warnings: Vec::new(),
             world: WorldDef::default(),
@@ -272,6 +276,7 @@ impl WorldEngine {
         let root = world_path.as_ref().to_path_buf();
         self.world_root = Some(root.clone());
         self.files.clear();
+        self.scripts.clear();
         self.link_warnings.clear();
         self.read_world_toml(&root);
         let ignore = self.ignore.clone();
@@ -285,7 +290,7 @@ impl WorldEngine {
             })
             .filter_map(|e| e.ok())
             .map(|e| e.into_path())
-            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("md"))
+            .filter(|p| matches!(p.extension().and_then(|e| e.to_str()), Some("md")) || p.file_name().map_or(false, |n| n == "actions.rhai"))
             .collect();
         paths.sort();
         // A link may point inside the world, never out of it (REQ-CFG-10).
@@ -299,6 +304,16 @@ impl WorldEngine {
                 }
             }
             let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            if path.extension().and_then(|e| e.to_str()) == Some("rhai") {
+                match std::fs::read_to_string(&path) {
+                    Ok(text) if text.len() <= crate::engines::layers::MAX_FILE_BYTES => {
+                        self.scripts.insert(path, text);
+                    }
+                    Ok(_) => self.link_warnings.push(format!("{}: is over the {} KB a script may be, so it isn't read", path.display(), crate::engines::layers::MAX_FILE_BYTES / 1024)),
+                    Err(e) => self.link_warnings.push(format!("{}: can't be read: {}", path.display(), e)),
+                }
+                continue;
+            }
             let layer = if size > crate::engines::layers::MAX_FILE_BYTES as u64 {
                 Err(format!(
                     "is {} KB, over the {} KB a content file may be, so it isn't read",
@@ -334,7 +349,7 @@ impl WorldEngine {
     /// whose starting version typed, in load order.
     fn rebuild(&mut self) -> Vec<(Thing, ParsedEntity)> {
         let root = self.world_root.clone().unwrap_or_default();
-        let mut built = bundles::build(&root, &self.files, &self.ignore);
+        let mut built = bundles::build(&root, &self.files, &self.scripts, &self.ignore);
         self.world_graph.locations.clear();
         self.objects.clear();
         self.characters.clear();
@@ -520,6 +535,38 @@ impl WorldEngine {
         warnings
     }
 
+    /// A door's `key` and a thing's `connects:` that name nothing
+    /// (`design/STATES.md` › Keys, One thing affecting another).
+    fn script_warnings(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let mut things: Vec<&Thing> = self.things.values().collect();
+        things.sort_by(|a, b| a.index.path.cmp(&b.index.path));
+        for thing in things {
+            let shown = thing.index.path.display();
+            if let Ok((_, merged)) = thing.build(thing.starting_state.as_deref(), None) {
+                if let Some(key) = merged.metadata.get("vars").and_then(|v| v.get("key")).and_then(|v| v.as_str()) {
+                    if !key.is_empty() && self.thing_by_id(key).is_err() {
+                        warnings.push(format!("{}: `key: {}` names nothing in the world, so the lock can't be opened", shown, key));
+                    }
+                }
+            }
+            match thing.index.metadata.get("connects") {
+                None => {}
+                Some(serde_yaml::Value::Sequence(list)) => {
+                    for id in list {
+                        match id.as_str() {
+                            Some(id) if self.thing_by_id(id).is_ok() => {}
+                            Some(id) => warnings.push(format!("{}: `connects:` names `{}`, which is nothing in the world", shown, id)),
+                            None => warnings.push(format!("{}: `connects:` is a list of ids", shown)),
+                        }
+                    }
+                }
+                Some(_) => warnings.push(format!("{}: `connects:` is a list of ids, like `connects: [vault-door]`", shown)),
+            }
+        }
+        warnings
+    }
+
     /// Why `name` names no one thing, if it's a file name more than one
     /// file has: "it matches more than one file: a.md, b.md".
     pub fn link_ambiguity(&self, name: &str, kind: Option<EntityKind>) -> Option<String> {
@@ -665,6 +712,11 @@ impl WorldEngine {
     /// the same form as `sources`. A state or overlay file changes its
     /// thing; an `index.md` can turn its folder into a bundle.
     pub fn set_file(&mut self, path: &Path, text: &str) {
+        if path.extension().and_then(|e| e.to_str()) == Some("rhai") {
+            self.scripts.insert(path.to_path_buf(), text.to_string());
+            self.rebuild();
+            return;
+        }
         let record = FileRecord { path: path.to_path_buf(), layer: Layer::parse(path, text) };
         match self.files.iter_mut().find(|r| r.path == path) {
             Some(existing) => *existing = record,
@@ -675,6 +727,10 @@ impl WorldEngine {
 
     /// Forget a file and everything it defined, in memory only.
     pub fn remove_file(&mut self, path: &Path) {
+        if self.scripts.remove(path).is_some() {
+            self.rebuild();
+            return;
+        }
         if let Some(i) = self.files.iter().position(|r| r.path == path) {
             self.files.remove(i);
             self.rebuild();
@@ -832,6 +888,11 @@ impl WorldEngine {
         if self.objects.values().any(|o| named(&o.actions)) || self.doors.values().any(|d| named(&d.actions)) {
             return true;
         }
+        // A script's action is one too.
+        let function = super::scripts::function_name(&key);
+        if self.things.values().any(|t| t.script_actions.contains(&function)) {
+            return true;
+        }
         // A `#verb` in any section's heading is a verb the world knows
         // (`## When: #hit @stick`).
         let tag = format!("#{}", key);
@@ -913,6 +974,7 @@ impl WorldEngine {
         warnings.extend(self.link_warnings.iter().cloned());
         warnings.extend(self.variable_warnings());
         warnings.extend(self.prose_link_warnings());
+        warnings.extend(self.script_warnings());
         warnings.extend(self.door_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings

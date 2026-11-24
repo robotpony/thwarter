@@ -21,6 +21,16 @@ pub const BUILTINS: &[(&str, &[(&str, &str)])] = &[
         ],
     ),
     (
+        "locked-door",
+        &[
+            ("locked-door/index.md", include_str!("../builtins/locked-door/index.md")),
+            ("locked-door/locked.md", include_str!("../builtins/locked-door/locked.md")),
+            ("locked-door/closed.md", include_str!("../builtins/locked-door/closed.md")),
+            ("locked-door/open.md", include_str!("../builtins/locked-door/open.md")),
+            ("locked-door/actions.rhai", include_str!("../builtins/locked-door/actions.rhai")),
+        ],
+    ),
+    (
         "portal",
         &[
             ("portal/index.md", include_str!("../builtins/portal/index.md")),
@@ -48,13 +58,18 @@ pub fn builtin(name: &str) -> Option<Layer> {
 /// The states a built-in bundle has, by name.
 pub fn builtin_states(name: &str) -> BTreeMap<String, Layer> {
     let mut states = BTreeMap::new();
-    for (file, text) in files(name).unwrap_or_default().iter().skip(1) {
+    for (file, text) in files(name).unwrap_or_default().iter().skip(1).filter(|(f, _)| f.ends_with(".md")) {
         let state = Path::new(file).file_stem().and_then(|s| s.to_str()).unwrap_or_default().to_string();
         if let Ok(layer) = Layer::parse(&path(file), text) {
             states.insert(state, layer);
         }
     }
     states
+}
+
+/// A built-in's script (`actions.rhai`), if it has one.
+pub fn builtin_script(name: &str) -> Option<super::scripts::Script> {
+    files(name)?.iter().find(|(f, _)| f.ends_with(".rhai")).map(|(f, t)| super::scripts::Script { path: path(f), source: t.to_string() })
 }
 
 /// A built-in's files as written, for showing it: each file's path and
@@ -75,7 +90,11 @@ mod tests {
         for (name, files) in super::BUILTINS {
             let index = super::builtin(name).unwrap_or_else(|| panic!("{} doesn't parse", name));
             assert!(index.metadata.get("type").is_some(), "{}", name);
-            assert_eq!(super::builtin_states(name).len(), files.len() - 1, "{}", name);
+            let states = files.iter().skip(1).filter(|(f, _)| f.ends_with(".md")).count();
+            assert_eq!(super::builtin_states(name).len(), states, "{}", name);
+            if let Some(script) = super::builtin_script(name) {
+                assert!(crate::engines::scripts::compile(&[script]).is_ok(), "{}", name);
+            }
             assert_eq!(super::builtin_name(&index.path), Some(*name));
         }
         assert!(super::builtin_states("door").contains_key("open"));

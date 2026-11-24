@@ -39,6 +39,10 @@ pub struct PlayState {
     /// room, by kind and id. Once found, a faint thing stays found.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub noticed: BTreeMap<String, std::collections::BTreeSet<String>>,
+    /// What things hold, by the holder's id: a key left in a lock
+    /// (`keep(turn.used)`), until the player takes it back.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub held: BTreeMap<String, Vec<String>>,
 }
 
 /// A chapter as a save names it: the folder that defines it (empty for
@@ -157,6 +161,8 @@ pub enum Change {
     /// A thing switched state; `type_name` is `location`, `object` or `character`.
     Became { type_name: String, id: String, state: String },
     EnteredChapter { name: String },
+    /// A thing kept what it was used with (a key left in its lock).
+    Kept { object: String, by: String },
     /// A faint thing was found.
     Noticed { type_name: String, id: String },
     Set { name: String, value: String },

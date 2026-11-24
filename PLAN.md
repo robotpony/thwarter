@@ -79,9 +79,9 @@ Done when a locked-door puzzle plays from both sides.
 - [x] Rewrite the `door` and `portal` built-ins and the test world's marker files as sections [coder] (`design/SECTIONS.md` › What changes)
 - [x] The editor draws keyword headings and colours `@`, `#` and `thwarter` blocks (0.44.0) [console] (`design/SECTIONS.md`)
 - [ ] Try sections on real content with Bruce, then fold `design/SECTIONS.md` into the content requirements [commander, Bruce]
-- [ ] Rhai scripts: `actions.rhai` and ```rhai blocks, functions as actions, outcomes, keep and the owned scope [coder] (`design/SECTIONS.md` › Scripts, Outcomes and replies)
-- [ ] The `locked-door` built-in as the vault door example shows [coder] (REQ-CF-21, `design/STATES.md` › Keys)
-- [ ] Connections between things for scripts (`connects:`) [coder] (`design/STATES.md` › One thing affecting another)
+- [x] Rhai scripts: `actions.rhai` and ```rhai blocks, functions as actions, outcomes, keep and the owned scope [coder] (`design/SECTIONS.md` › Scripts, Outcomes and replies)
+- [x] The `locked-door` built-in as the vault door example shows [coder] (REQ-CF-21, `design/STATES.md` › Keys)
+- [x] Connections between things for scripts (`connects:`) [coder] (`design/STATES.md` › One thing affecting another)
 - [ ] Linking two rooms through a door template from the console [console] (`design/STATES.md` › Doors)
 - [x] Keys for locked doors: designed with Bruce as a scripted built-in [commander] (`design/STATES.md` › Keys)
 - [ ] Clocks and game values: time, weather, randomness [commander, coder] (`design/STATES.md` › Open questions)
