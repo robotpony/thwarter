@@ -48,6 +48,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.59.0 (2026-11-24)
+
+### Added
+
+- Question sets (REQ-CF-32, REQ-ENG-48): the loader reads every `questions/<name>.md` (`type: questions`) as a set, never as a thing. Each `##` heading is a question, prose under it a hint, each list item an option with `(default)` and `->` or `→` before `set`, `recipe`, `ask thing` or `ask value`. `WorldEngine::questions_for(folder, template, kind)` gives the set to ask: the template's, else the kind's, each the nearest from the thing's folder out to the root, then the built-in. One built-in set, `object`, is the CONTENT_FORMAT example until Bruce reviews the content.
+- `validate` reports a file in `questions/` without `type: questions` as a problem, and warns about a set named for no template or kind, an option with an unknown construct, more than one `(default)` under a question, and a question with no options.
+
 ## 0.58.3 (2026-11-24)
 
 ### Changed

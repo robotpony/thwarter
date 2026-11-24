@@ -98,6 +98,8 @@ pub struct WorldEngine {
     roles: std::collections::BTreeMap<PathBuf, FileRole>,
     /// Every file a template name can find (`bundles::Built::library`).
     library: std::collections::BTreeMap<String, Layer>,
+    /// The world's question sets, from its `questions/` folders (REQ-CF-32).
+    question_sets: Vec<crate::engines::questions::QuestionSet>,
     /// The persona `world/index.md`'s `author:` names (REQ-WS-5), and a
     /// problem or warning about it.
     persona: Option<Persona>,
@@ -248,6 +250,7 @@ impl WorldEngine {
             links: HashMap::new(),
             roles: std::collections::BTreeMap::new(),
             library: std::collections::BTreeMap::new(),
+            question_sets: Vec::new(),
             persona: None,
             persona_problem: None,
             persona_warning: None,
@@ -269,6 +272,26 @@ impl WorldEngine {
         bundles::find_template(&crate::parsers::link_target(name), scope, &self.library)
     }
 
+    /// The questions `/new` and `/add` ask for a thing made in `folder`
+    /// (relative to the world root) from `template`, if any, of `kind`
+    /// (REQ-CF-32): the template's set, else the kind's, each the nearest
+    /// from `folder` out to the root, then built in. The whole set, never
+    /// merged.
+    pub fn questions_for(&self, folder: &Path, template: Option<&str>, kind: &str) -> Option<crate::engines::questions::QuestionSet> {
+        crate::engines::questions::find(&self.question_sets, folder, template, kind)
+    }
+
+    /// A question set named for no template or kind is never asked.
+    fn question_warnings(&self) -> Vec<String> {
+        let kinds = ["location", "room", "object", "character", "door"];
+        let templates: Vec<String> = self.template_names().iter().map(|t| t.rsplit('/').next().unwrap_or(t).to_string()).collect();
+        self.question_sets
+            .iter()
+            .filter(|set| !kinds.contains(&set.name.as_str()) && !templates.contains(&set.name))
+            .map(|set| format!("{}: no template or kind is named `{}`, so these questions are never asked", set.path.display(), set.name))
+            .collect()
+    }
+
     /// Every template the world defines, by path from the root, then the
     /// built-ins by name.
     pub fn template_names(&self) -> Vec<String> {
@@ -278,6 +301,10 @@ impl WorldEngine {
             .iter()
             .filter(|(_, role)| **role == FileRole::Template)
             .filter_map(|(path, _)| {
+                // Question sets share the role for now, but aren't templates.
+                if crate::engines::questions::question_file(path.strip_prefix(&root).ok()?).is_some() {
+                    return None;
+                }
                 let rel = path.strip_prefix(&root).ok()?.with_extension("");
                 Some(rel.to_string_lossy().replace('\\', "/"))
             })
@@ -488,6 +515,7 @@ impl WorldEngine {
             self.roles.insert(file.path.clone(), FileRole::Problem(why));
         }
         self.library = std::mem::take(&mut built.library);
+        self.question_sets = std::mem::take(&mut built.questions);
         self.file_problems = built.problems;
         self.file_warnings = built.warnings;
         if let Some(w) = &self.world_toml_warning {
@@ -1153,6 +1181,7 @@ impl WorldEngine {
         warnings.extend(self.holds_warnings());
         warnings.extend(self.play_text_warnings.iter().cloned());
         warnings.extend(self.door_warnings());
+        warnings.extend(self.question_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }
@@ -1643,6 +1672,29 @@ mod tests {
         write(dir.path(), "hall.md", "---\nid: hall\ntitle: Hall\ntype: location\ncharacters: [cook]\n---\n");
         engine.load_world(dir.path()).unwrap();
         assert!(engine.current_warnings().is_empty(), "{:?}", engine.current_warnings());
+    }
+
+    #[test]
+    fn question_sets_load_from_questions_folders_and_never_as_things() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\n---\n");
+        write(dir.path(), "objects/templates/lantern.md", "---\ntype: object\nobject_type: light\n---\n");
+        write(dir.path(), "questions/lantern.md", "---\ntype: questions\n---\n## How bright?\n- Dim (default)\n- Bright -> set brightness\n");
+        write(dir.path(), "castle/questions/object.md", "---\ntype: questions\n---\n## Is it castle-made?\n- Yes\n- No\n");
+        write(dir.path(), "questions/teapot.md", "---\ntype: questions\n---\n## Hot?\n- Yes\n");
+        write(dir.path(), "questions/index.md", "---\ntitle: Not a set\n---\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(dir.path()).unwrap();
+        assert_eq!(engine.objects.len(), 0, "a set is never a thing");
+        let q = |folder: &str, template: Option<&str>| engine.questions_for(Path::new(folder), template, "object").map(|s| s.questions[0].text.clone());
+        assert_eq!(q("castle", Some("lantern")).as_deref(), Some("How bright?"));
+        assert_eq!(q("castle/keep", None).as_deref(), Some("Is it castle-made?"));
+        assert_eq!(q("forest", None).as_deref(), Some("Where does it start?"), "the built-in");
+        let problems = engine.current_problems(false);
+        assert!(problems.iter().any(|p| p.contains("questions/index.md: a file in questions/ is a question set, so it needs `type: questions`")), "{:?}", problems);
+        let warnings = engine.current_warnings();
+        assert!(warnings.iter().any(|w| w.contains("no template or kind is named `teapot`")), "{:?}", warnings);
+        assert_eq!(warnings.len(), 1, "{:?}", warnings);
     }
 
     #[test]

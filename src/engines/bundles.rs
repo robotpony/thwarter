@@ -283,6 +283,8 @@ pub(crate) struct Built {
     pub warnings: Vec<String>,
     /// Every `actions.rhai` in the world, by its full path.
     pub scripts: BTreeMap<PathBuf, String>,
+    /// Every question set in a `questions/` folder (REQ-CF-32).
+    pub questions: Vec<crate::engines::questions::QuestionSet>,
 }
 
 enum Role {
@@ -323,7 +325,7 @@ pub(crate) fn ignored(parts: &[String], extra: &[PathBuf]) -> bool {
 fn excluded(parts: &[String]) -> bool {
     (parts.first().map(String::as_str) == Some("game") && parts.len() > 1)
         || world_file(parts).is_some()
-        || parts[..parts.len().saturating_sub(1)].iter().any(|p| p == "templates")
+        || parts[..parts.len().saturating_sub(1)].iter().any(|p| p == "templates" || p == "questions")
 }
 
 fn classify(rel: &Path, bundles: &BTreeSet<PathBuf>) -> Role {
@@ -458,6 +460,23 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], scripts: &BTreeMap<PathBu
                 WorldFile::Story => built.world.read_story(layer, problems, warnings),
                 WorldFile::Player => built.world.read_player(layer, problems, warnings),
                 WorldFile::Styles | WorldFile::Other => {}
+            }
+            continue;
+        }
+        // A question set, never a thing (REQ-CF-32).
+        if let Some((scope, name)) = crate::engines::questions::question_file(&rel(&file.path)) {
+            built.roles.push((file.path.clone(), FileRole::Template));
+            match &file.layer {
+                Ok(layer) => {
+                    if layer.metadata.get("type").and_then(Value::as_str) != Some("questions") {
+                        built.problems.push(format!("{}: a file in questions/ is a question set, so it needs `type: questions`", shown));
+                        continue;
+                    }
+                    let (set, warnings) = crate::engines::questions::parse(&name, Some(scope), &file.path, &layer.body, &shown.to_string());
+                    built.warnings.extend(warnings);
+                    built.questions.push(set);
+                }
+                Err(e) => built.problems.push(format!("{}: {}", shown, e)),
             }
             continue;
         }
