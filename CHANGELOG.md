@@ -32,6 +32,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.29.0 (2026-11-23)
+
+### Added
+
+- `/move <thing> <room or character>` (REQ-CON-40, Bruce, 2026-11-23): puts a character into another room, with its `default_location` following, or an object into a room or into a character's inventory. It takes the thing out of every room list and inventory that held it, saves each file it changes and reports the problems the move adds, as `/link` does. The thing's own file doesn't move.
+
 ## 0.28.0 (2026-11-23)
 
 ### Added

@@ -29,6 +29,17 @@ The author is a player of sorts, like a game master running a table (Bruce, 2026
   ```
 
 - REQ-CON-5: Edit mode MUST offer commands that create or change one thing at a time, for example `/new room north <id>` (a new room, linked north of the current one), `/new object`, `/new character`, `/set` (one field), `/link` (add or change one exit) and `/unlink` (remove one exit). Each MUST save the change to the file (REQ-ENG-7) and report any problems it causes (REQ-ENG-8). The author always names a new entity's `id`; the console MUST NOT make one up, since an `id` can't be renamed yet. In a room, the first word after `/new room` is a direction; outside a room, it's the new room's `id`.
+- REQ-CON-40: `/move <thing> <room or character>` MUST put a person or thing somewhere else (Bruce, 2026-11-23): a character into another room, with its `default_location` following, or an object into a room or a character's inventory. It takes the thing out of every room list and inventory that held it, and the thing's own file stays where it is. `/move <id> global|area|local` changes scope instead (REQ-CON-29).
+
+  ```
+  edit village/square> /move lantern village/well
+  Moved lantern: village/square → village/well.
+  edit village/square> /move lantern elder
+  Moved lantern: village/well → carried by elder.
+  edit village/square> /move elder village/well
+  Moved elder: village/square → village/well (and its default_location).
+  ```
+
 - REQ-CON-6: Edit mode MUST offer full editing of a whole entity, frontmatter and body, inside the console: `/edit room`, `/edit object`, `/edit character`. It MUST NOT hand off to an external `$EDITOR`. Editing an object without a card creates its card (REQ-CF-8). Full editing happens in the terminal, inside the console, and MAY take the whole terminal; it opens the file as it is (Bruce, 2026-11-23). A thing stored as several files (a bundle, `design/STATES.md`) opens as one document with a section per file; saving writes every file only if every section parses.
 - REQ-CON-7: `/reload` MUST reload the world from disk, keeping the current location, inventory and flags. If a file fails to parse, or the current room no longer exists, the console MUST keep the previous world and show the problems. Broken references (exits to unwritten rooms, objects without cards) are normal while a world is being written: they MUST be shown as warnings and MUST NOT block the reload. The console SHOULD also reload when a world file changes on disk (after `/reload` works).
 - REQ-CON-8: The console's room view SHOULD come from the same renderer as `thwart show`'s text output, so they can't drift apart.

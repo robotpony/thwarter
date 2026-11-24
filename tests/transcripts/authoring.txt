@@ -121,3 +121,53 @@ Not created: village/garden.md already exists
 Reloaded: 5 room(s), 2 character(s), 3 object(s).
 1 warning(s):
   village/square: connection `east` points at unknown location `village/inn`
+> go /village/square
+Village Square (room)
+> /move lantern village/well
+Moved lantern: village/square, carried by smith → village/well.
+> /move lantern village/well
+lantern is already in village/well.
+> /move lantern elder
+Moved lantern: village/well → carried by elder.
+> look
+Village Square (village/square)
+
+A small square of packed earth. An old well stands to the north.
+
+Exits:
+  north  village/well
+  east   village/inn  (missing)
+
+Characters:
+  The Elder (elder)
+  The Smith (smith)
+
+Objects:
+  Bench (bench)
+  Rope (rope)
+> /move elder village/well
+Moved elder: village/square → village/well (and its default_location).
+> /move elder lantern
+There's no room or character called `lantern` to move elder to.
+> /move ghost village/well
+Nothing called `ghost` is in the world to move.
+> /move lantern global
+Changing a thing's scope with /move comes with the scope work (REQ-CON-29).
+> /move lantern
+Usage: /move <thing> <room or character>, for example /move lantern village/well
+> go /village/well
+The Well (room)
+> look
+The Well (village/well)
+
+A mossy stone well. The rope is long gone.
+
+Exits:
+  north   village/tower
+  south   village/square
+  behind  village/cellar
+
+Characters:
+  The Elder (elder)
+
+Objects: none

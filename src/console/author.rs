@@ -262,6 +262,148 @@ impl Console {
         }
     }
 
+    /// `/move <thing> <room or character>`: puts a person or thing somewhere
+    /// else (Bruce, 2026-11-23). A character goes to a room, and its
+    /// `default_location` follows; an object goes to a room or into a
+    /// character's inventory. The thing's own file stays where it is.
+    pub(super) fn move_thing(&mut self, args: &[&str]) -> String {
+        let [thing, target] = args else {
+            return "Usage: /move <thing> <room or character>, for example /move lantern village/well".to_string();
+        };
+        if matches!(*target, "global" | "area" | "local" | "here") {
+            return "Changing a thing's scope with /move comes with the scope work (REQ-CON-29).".to_string();
+        }
+        if let Some(problem) = bare_id_problem(thing) {
+            return problem;
+        }
+        let engine = &self.world.engine;
+        let is_character = engine.characters.contains_key(*thing)
+            || engine.loaded_locations.values().any(|l| l.characters.iter().any(|c| c == thing));
+        let is_object = engine.objects.contains_key(*thing)
+            || engine.loaded_locations.values().any(|l| l.objects.iter().any(|o| o == thing))
+            || engine.characters.values().any(|c| c.inventory.iter().any(|o| o == thing));
+        if !is_character && !is_object {
+            return format!("Nothing called `{}` is in the world to move.", thing);
+        }
+
+        // Where it goes: a room by id (as /link takes it), else a character.
+        let room = self.room_id(target);
+        let to_room = self.world.engine.get_location(&room).is_some().then_some(room);
+        let to_character = (to_room.is_none() && self.world.engine.characters.contains_key(*target)).then(|| target.to_string());
+        let list_key = if is_character { "characters" } else { "objects" };
+        let destination = match (&to_room, &to_character, is_character) {
+            (Some(room), _, _) => room.clone(),
+            (None, Some(_), true) => return format!("{} is a character; characters go to rooms, not to other characters.", thing),
+            (None, Some(who), false) => who.clone(),
+            (None, None, _) => return format!("There's no room or character called `{}` to move {} to.", target, thing),
+        };
+
+        // Every list that holds it now, apart from the destination.
+        let mut from_rooms: Vec<String> = self
+            .world
+            .engine
+            .loaded_locations
+            .values()
+            .filter(|l| Some(&l.id) != to_room.as_ref())
+            .filter(|l| if is_character { l.characters.iter().any(|c| c == thing) } else { l.objects.iter().any(|o| o == thing) })
+            .map(|l| l.id.clone())
+            .collect();
+        from_rooms.sort();
+        let mut from_carriers: Vec<String> = if is_object {
+            self.world
+                .engine
+                .characters
+                .values()
+                .filter(|c| Some(&c.id) != to_character.as_ref() && c.inventory.iter().any(|o| o == thing))
+                .map(|c| c.id.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        from_carriers.sort();
+        let already = match (&to_room, &to_character) {
+            (Some(room), _) => self.world.engine.get_location(room).is_some_and(|l| {
+                if is_character { l.characters.iter().any(|c| c == thing) } else { l.objects.iter().any(|o| o == thing) }
+            }),
+            (None, Some(who)) => self.world.engine.characters.get(who).is_some_and(|c| c.inventory.iter().any(|o| o == thing)),
+            _ => false,
+        };
+        if already && from_rooms.is_empty() && from_carriers.is_empty() {
+            return format!("{} is already {}.", thing, where_to(&destination, to_character.is_some()));
+        }
+
+        let mut written = Vec::new();
+        let mut fail = |console: &mut Console, written: &Vec<PathBuf>, e: String| {
+            let report = console.after_writes(written, format!("Moving {} stopped partway.", thing));
+            format!("{}\n{}", report, e)
+        };
+        for room in &from_rooms {
+            let items: Vec<String> = self
+                .world
+                .engine
+                .get_location(room)
+                .map(|l| if is_character { l.characters.clone() } else { l.objects.clone() })
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|i| i != thing)
+                .collect();
+            match self.save(Kind::Room, room, &[Edit::SetList { key: list_key.into(), items }]) {
+                Ok(path) => written.push(path),
+                Err(e) => return fail(self, &written, e),
+            }
+        }
+        for who in &from_carriers {
+            let items: Vec<String> = self.world.engine.characters[who].inventory.iter().filter(|i| i != thing).cloned().collect();
+            match self.save(Kind::Character, who, &[Edit::SetList { key: "inventory".into(), items }]) {
+                Ok(path) => written.push(path),
+                Err(e) => return fail(self, &written, e),
+            }
+        }
+        if !already {
+            let (kind, id, key) = match (&to_room, &to_character) {
+                (Some(room), _) => (Kind::Room, room.clone(), list_key),
+                (None, Some(who)) => (Kind::Character, who.clone(), "inventory"),
+                _ => unreachable!("the destination is a room or a character"),
+            };
+            let mut items: Vec<String> = match kind {
+                Kind::Room => self
+                    .world
+                    .engine
+                    .get_location(&id)
+                    .map(|l| if is_character { l.characters.clone() } else { l.objects.clone() })
+                    .unwrap_or_default(),
+                _ => self.world.engine.characters[&id].inventory.clone(),
+            };
+            items.push(thing.to_string());
+            match self.save(kind, &id, &[Edit::SetList { key: key.into(), items }]) {
+                Ok(path) => written.push(path),
+                Err(e) => return fail(self, &written, e),
+            }
+        }
+        let mut followed = "";
+        if is_character && self.world.engine.characters.contains_key(*thing) {
+            let edit = Edit::SetScalar { key: "default_location".into(), value: Value::String(destination.clone()) };
+            match self.save(Kind::Character, thing, &[edit]) {
+                Ok(path) => {
+                    written.push(path);
+                    followed = " (and its default_location)";
+                }
+                Err(e) => return fail(self, &written, e),
+            }
+        }
+        let mut from: Vec<String> = from_rooms;
+        from.extend(from_carriers.iter().map(|c| format!("carried by {}", c)));
+        let from = if from.is_empty() { "nowhere".to_string() } else { from.join(", ") };
+        let summary = format!(
+            "Moved {}: {} → {}{}.",
+            thing,
+            from,
+            if to_character.is_some() { format!("carried by {}", destination) } else { destination.clone() },
+            followed
+        );
+        self.after_writes(&written, summary)
+    }
+
     // Shared steps.
 
     /// Whether the current room names `id` as an object with no card.
@@ -440,6 +582,16 @@ fn scalar(typed: &str) -> Value {
 fn split_list(typed: &str) -> Vec<String> {
     let parts: Vec<&str> = if typed.contains(',') { typed.split(',').collect() } else { typed.split_whitespace().collect() };
     parts.into_iter().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).collect()
+}
+
+
+/// "in village/well" or "carried by elder".
+fn where_to(destination: &str, carried: bool) -> String {
+    if carried {
+        format!("carried by {}", destination)
+    } else {
+        format!("in {}", destination)
+    }
 }
 
 #[cfg(test)]
