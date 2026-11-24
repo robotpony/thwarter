@@ -276,7 +276,9 @@ Decided by Bruce, 2026-11-23. An author never writes a door file by hand; the co
 - The id is predictable: `door-<from>-<to>-<direction>`, such as `door-bedroom-hallway-west`. The engine names it (`door_id`), so every client names doors the same way.
 - A room that doesn't exist yet is created, as a new room.
 - A new door is a plain `door`. A state hint in brackets picks another template: `/add door(locked) west hallway` makes a `locked-door`.
-- The exact command forms are the console's (`design/CONSOLE_REQUIREMENTS.md`).
+- The exact command forms are the console's (`design/CONSOLE_REQUIREMENTS.md` › REQ-CON-42), including `/add <room> <door>` to give a one-sided door its other side and a bare `/add door` that asks for the direction.
+
+Built in 0.56.0 (66a1b27), with `door_id` from the engine (28692c1).
 
 ## Hidden things
 
