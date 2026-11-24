@@ -76,7 +76,7 @@ Done when a locked-door puzzle plays from both sides.
 - [x] Door built-ins: `door` and `portal` [coder] (REQ-CF-21)
 - [ ] The loader reads `## When:` sections and `thwarter` blocks, and stops reading markers [coder] (`design/SECTIONS.md`)
 - [ ] Rewrite the `door` and `portal` built-ins and the test world's marker files as sections [coder] (`design/SECTIONS.md` › What changes)
-- [ ] The editor draws keyword headings and colours `@`, `#` and `thwarter` blocks [console] (`design/SECTIONS.md`)
+- [x] The editor draws keyword headings and colours `@`, `#` and `thwarter` blocks (0.44.0) [console] (`design/SECTIONS.md`)
 - [ ] Try sections on real content with Bruce, then fold `design/SECTIONS.md` into the content requirements [commander, Bruce]
 - [ ] The `locked-door` built-in, once the key design and the sections trial are settled [coder] (REQ-CF-21)
 - [ ] Linking two rooms through a door template from the console [console] (`design/STATES.md` › Doors)

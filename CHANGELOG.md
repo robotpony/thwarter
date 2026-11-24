@@ -36,6 +36,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.44.0 (2026-11-23)
+
+### Added
+
+- The editor reads the heading format (`design/SECTIONS.md`, 9174b33): `## When: #locked` and `## Unless:` section headings are drawn as rules in the chrome colour, with their tags in magenta; a ```thwarter block is highlighted like frontmatter (keys blue, ids cyan or yellow); and `@name`, a character, is cyan when it exists and yellow when it doesn't.
+
 ## 0.43.2 (2026-11-23)
 
 ### Changed

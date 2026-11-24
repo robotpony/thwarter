@@ -135,6 +135,11 @@ pub trait Lookup {
     fn declared(&self, name: &str) -> bool;
 }
 
+/// `## When: ...` or `## Unless: ...`, a section heading (SECTIONS.md).
+pub fn is_keyword_heading(line: &str) -> bool {
+    line.starts_with("## When:") || line.starts_with("## Unless:")
+}
+
 /// Frontmatter keys whose values are ids, coloured by whether they resolve.
 const ID_KEYS: &[&str] = &["connections", "characters", "objects", "inventory", "default_location", "start"];
 
@@ -144,6 +149,8 @@ pub fn highlight(lines: &[String], lookup: &dyn Lookup) -> Vec<Vec<Option<Role>>
     let mut in_frontmatter = false;
     let mut frontmatter_done = false;
     let mut in_code = false;
+    let mut in_data = false;
+    let mut was_data = false;
     let mut id_key: Option<String> = None;
     for (n, line) in lines.iter().enumerate() {
         let chars: Vec<char> = line.chars().collect();
@@ -158,10 +165,22 @@ pub fn highlight(lines: &[String], lookup: &dyn Lookup) -> Vec<Vec<Option<Role>>
         } else if in_frontmatter {
             frontmatter_line(&chars, &mut roles, &mut id_key, lookup);
         } else if line.trim_start().starts_with("```") {
+            // A ```thwarter block holds a section's data, read like
+            // frontmatter (`design/SECTIONS.md`).
+            in_data = !in_code && line.trim_start().trim_start_matches('`').trim() == "thwarter";
             in_code = !in_code;
-            fill(&mut roles, 0, chars.len(), Role::Code);
+            fill(&mut roles, 0, chars.len(), if in_data || (!in_code && was_data) { Role::Marker } else { Role::Code });
+            was_data = in_data;
+            id_key = None;
+        } else if in_code && in_data {
+            frontmatter_line(&chars, &mut roles, &mut id_key, lookup);
         } else if in_code {
             fill(&mut roles, 0, chars.len(), Role::Code);
+        } else if is_keyword_heading(line) {
+            // `## When: #locked`: a section heading, drawn as a rule.
+            let colon = chars.iter().position(|c| *c == ':').unwrap_or(0);
+            fill(&mut roles, 0, colon + 1, Role::Marker);
+            prose_line(&chars[colon + 1..], &mut roles[colon + 1..], lookup);
         } else {
             prose_line(&chars, &mut roles, lookup);
         }
@@ -317,6 +336,21 @@ fn prose_line(chars: &[char], roles: &mut [Option<Role>], lookup: &dyn Lookup) {
                 }
             }
         }
+        // `@guard-captain`: a character, by id.
+        if chars[at] == '@' && (at == 0 || chars[at - 1].is_whitespace()) && chars.get(at + 1).is_some_and(|c| c.is_alphanumeric()) {
+            let start = at;
+            at += 1;
+            while at < chars.len() && (chars[at].is_alphanumeric() || matches!(chars[at], '-' | '_' | '.')) {
+                at += 1;
+            }
+            while at > start + 1 && chars[at - 1] == '.' {
+                at -= 1;
+            }
+            let id: String = chars[start + 1..at].iter().collect();
+            let id = id.split('.').next().unwrap_or("").to_string();
+            fill(roles, start, at, if lookup.resolves(&id) { Role::Link } else { Role::Missing });
+            continue;
+        }
         if chars[at] == '#' && (at == 0 || chars[at - 1].is_whitespace()) && chars.get(at + 1).is_some_and(|c| c.is_alphanumeric()) {
             let start = at;
             at += 1;
@@ -387,6 +421,18 @@ mod tests {
     }
 
     #[test]
+    fn a_thwarter_block_reads_like_frontmatter() {
+        let lines: Vec<String> = ["---", "id: d", "---", "## When: #open", "```thwarter", "passable: yes", "```", "Prose."]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(runs_in(&lines, 4), vec!["Marker:```thwarter"]);
+        assert_eq!(runs_in(&lines, 5), vec!["Key:passable"]);
+        assert_eq!(runs_in(&lines, 6), vec!["Marker:```"]);
+        assert!(runs_in(&lines, 7).is_empty());
+    }
+
+    #[test]
     fn prose_marks() {
         assert_eq!(runs("## The old well"), vec!["Note:##", "Strong: The old well"]);
         assert_eq!(runs("- a *bright* lamp"), vec!["Marker:-", "Emphasis:*bright*"]);
@@ -394,6 +440,8 @@ mod tests {
         assert_eq!(runs("> said the elder"), vec!["Marker:>", "Quote:said the elder"]);
         assert_eq!(runs("an ~~old~~ new well"), vec!["Struck:~~old~~"]);
         assert_eq!(runs("***"), vec!["Note:***"]);
+        assert_eq!(runs("@elder waves; @nobody doesn't."), vec!["Link:@elder", "Missing:@nobody"]);
+        assert_eq!(runs("## When: #locked"), vec!["Marker:## When:", "Tag:#locked"]);
         assert_eq!(runs("An *old* well"), vec!["Emphasis:*old*"]);
         assert_eq!(runs("very **dark** here"), vec!["Strong:**dark**"]);
         assert_eq!(runs("the [[elder]] sits #village"), vec!["Url:[[elder]]", "Tag:#village"]);

@@ -11,7 +11,7 @@
 //! Keys and drawing are separate from the terminal, so tests drive the
 //! editor with a list of keys and ratatui's test backend.
 
-use super::theme::{highlight, line_role, style, Lookup, Role};
+use super::theme::{highlight, is_keyword_heading, line_role, style, Lookup, Role};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -334,6 +334,14 @@ fn paint(buf: &mut Buffer, area: Rect, lines: &[String], roles: &[Vec<Option<Rol
                 cell.set_style(cell.style().remove_modifier(Modifier::DIM).add_modifier(Modifier::BOLD));
             }
         }
+        // A keyword heading is drawn as a rule across the rest of its row.
+        if number.is_some() && is_keyword_heading(&lines[line_index]) {
+            for x in (area.x + (gutter + shown_chars.len() + 1) as u16)..area.right() {
+                let cell = &mut buf[(x, y)];
+                cell.set_symbol("─");
+                cell.set_style(style(Role::Chrome));
+            }
+        }
         for i in 0..shown_chars.len() {
             let x = area.x + (gutter + i) as u16;
             if x >= area.right() {
@@ -555,6 +563,16 @@ mod tests {
         let x = row.find("[[elder").unwrap() as u16;
         assert_eq!(buffer[(x + 2, y as u16)].fg, Color::Cyan, "{:?}", rows);
         assert!(rows.iter().all(|r| r.chars().count() <= 36), "nothing runs off the edge");
+    }
+
+    #[test]
+    fn a_keyword_heading_is_drawn_as_a_rule() {
+        let editor = Editor::new(Document::single("h", "---\nid: d\n---\nA door.\n\n## When: #open\nIt stands open.\n"));
+        let mut terminal = Terminal::new(TestBackend::new(40, 10)).unwrap();
+        terminal.draw(|frame| editor.draw(frame, frame.area(), &NoLookup)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let row: String = (0..40).map(|x| buffer[(x, 6)].symbol().to_string()).collect();
+        assert!(row.contains("## When: #open ───"), "{}", row);
     }
 
     #[test]
