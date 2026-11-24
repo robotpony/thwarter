@@ -79,7 +79,7 @@ impl Console {
             }
             None => "Game: none yet (/play here starts one)".to_string(),
         });
-        let saves = super::saves::list_saves(&self.world.root).unwrap_or_default();
+        let saves = crate::engines::list_saves(&self.world.root).unwrap_or_default();
         out.push(if saves.is_empty() { "Saves: none".to_string() } else { format!("Saves: {}", saves.join(", ")) });
         let broken = self.world.files.values().filter(|e| e.kind == Kind::Broken).count();
         let warnings = self.world.warnings().len();

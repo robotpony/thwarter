@@ -9,7 +9,6 @@
 //! version and its reconciling with the world come from the same code as
 //! `/load`.
 
-use super::saves::state_home;
 use super::session::{Console, Place};
 use super::Mode;
 use crate::engines::{load_game, save_game};
@@ -151,9 +150,8 @@ pub fn restart(console: &Console, history: &[String], scrollback: &[String]) -> 
         }
         Err(e) => return format!("Not restarted: can't run {}: {}. Still on this build.", exe.display(), e),
     }
-    let dir = match state_home() {
-        Ok(home) => home.join("thwarter").join("restart"),
-        Err(e) => return format!("Not restarted: {:#}", e),
+    let Some(dir) = crate::settings::state_dir().map(|dir| dir.join("restart")) else {
+        return "Not restarted: neither XDG_STATE_HOME nor HOME is set, so there's nowhere to keep the session.".to_string();
     };
     let snapshot = match console.write_snapshot(history, scrollback, &dir) {
         Ok(path) => path,

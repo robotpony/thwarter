@@ -13,7 +13,6 @@ mod full_edit;
 mod panels;
 mod play;
 mod restart;
-mod saves;
 mod screen;
 mod session;
 mod theme;
@@ -65,7 +64,7 @@ pub fn run(world_path: &Path, mode: Mode) -> Result<()> {
 /// the output (REQ-CON-7).
 fn drive_terminal(mut console: Console, world_path: &Path, resumed: Option<restart::Resumed>) -> Result<()> {
     console.interactive = true;
-    console.unknown_log = saves::state_home().ok().map(|home| home.join("thwarter").join("unknown-commands.log"));
+    console.unknown_log = crate::settings::state_dir().map(|dir| dir.join("unknown-commands.log"));
     let console = Arc::new(Mutex::new(console));
     let (send, notices) = std::sync::mpsc::sync_channel(256);
     let _watching = match watch::watch(world_path, console.clone(), send.clone()) {

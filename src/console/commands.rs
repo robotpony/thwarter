@@ -4,7 +4,7 @@
 //! exits, rooms, people and things that fit. The screen draws the list;
 //! this works out what goes in it, so it tests without a terminal.
 
-use super::saves::list_saves;
+use crate::engines::list_saves;
 use super::session::{Console, Place, COMPASS_ALIASES};
 use super::world::Kind;
 use super::Mode;

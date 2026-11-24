@@ -35,6 +35,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.43.2 (2026-11-23)
+
+### Changed
+
+- `/save` and `/load` use the engine's saves (`engines::saves`, 28ff39f, REQ-PC-18), which every player client shares; the paths are the same, so existing saves still load. The unknown-input log and `/restart`'s session file use the engine's state folder (`settings::state_dir`). REQ-CON-11 points at REQ-PC-18 for where saves go and keeps the console's side.
+
+### Removed
+
+- `src/console/saves.rs`, now `src/engines/saves.rs` with its tests. Recover with `git show 64945de:src/console/saves.rs`.
+
 ## 0.43.1 (2026-11-23)
 
 ### Added

@@ -3,13 +3,13 @@
 //! this module turns input into actions and results into text. Nothing
 //! here writes a content file (REQ-CON-3).
 
-use super::saves::{list_saves, save_path, DEFAULT_SAVE};
+use crate::engines::{list_saves, save_named, save_path, DEFAULT_SAVE};
 use super::session::{Console, Place};
 use crate::engines::Parsed;
 use crate::models::game::PlayState;
 use super::world::Kind;
 use super::Mode;
-use crate::engines::{load_game, save_game};
+use crate::engines::load_game;
 use crate::models::game::ActionResult;
 use crate::render::{render_location_as, RenderStyle};
 
@@ -103,13 +103,10 @@ impl Console {
             [name] => name,
             _ => return "Usage: /save [name]".to_string(),
         };
-        let path = match save_path(&self.world.root, name) {
-            Ok(path) => path,
-            Err(e) => return format!("Not saved: {}.", e),
-        };
-        match save_game(&path, state) {
-            Ok(()) => format!("Saved the game as `{}`.", name),
-            Err(e) => format!("Not saved: {:#}", e),
+        // Saves are the engine's, so every player client keeps them alike (REQ-PC-18).
+        match save_named(&self.world.root, name, state) {
+            Ok(_) => format!("Saved the game as `{}`.", name),
+            Err(e) => format!("Not saved: {:#}.", e),
         }
     }
 
