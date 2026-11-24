@@ -43,6 +43,9 @@ pub struct MapLink {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Beside {
     pub room: String,
+    /// The room's title, since a room reached only off the grid has no
+    /// cell to take it from.
+    pub room_title: Option<String>,
     pub direction: String,
     pub target: String,
     pub written: bool,
@@ -186,8 +189,9 @@ impl WorldEngine {
                 }
                 let within = depth.map_or(true, |max| d < max);
                 let written = self.get_location(&target).is_some();
+                let room_title = self.get_location(&room).map(|l| l.name.clone());
                 let beside = |map: &mut Map| {
-                    map.beside.push(Beside { room: room.clone(), direction: direction.clone(), target: target.clone(), written, door: door.clone() });
+                    map.beside.push(Beside { room: room.clone(), room_title: room_title.clone(), direction: direction.clone(), target: target.clone(), written, door: door.clone() });
                 };
                 let compass = if off_grid { None } else { step(&direction) };
                 let Some((dx, dy)) = compass else {
@@ -301,7 +305,7 @@ mod tests {
         let text = crate::render::render_map(&engine.map_layout("hall", Some(1), None));
         assert_eq!(
             text,
-            "           [TOWER ]\n               |\n[ YARD ]-#-[@ HALL]---[ GATE ]\n\nAlso:\n  HALL: down → cellar\n  cellar: up → hall"
+            "           [TOWER ]\n               |\n[ YARD ]-#-[@ HALL]---[ GATE ]\n\nAlso:\n  HALL: down → cellar\n  CELLAR: up → hall"
         );
     }
 }

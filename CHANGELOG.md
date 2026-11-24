@@ -34,6 +34,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.37.1 (2026-11-23)
+
+### Added
+
+- `validate` warns when a one-file room's `id` isn't its path from the world root without `.md` (`castle/kitchen.md` holding `id: castle/hall`), so a room copied without changing its id is caught before it collides (CONTENT_FORMAT.md's `id` row). It's a warning, since the loader allows files anywhere. Bundles were already checked against their folder.
+
+### Fixed
+
+- `thwart map`'s list of exits beside the grid named a room reached only off the grid by its id ("castle/library-upper: down → castle/library"). It now uses the room's title, as the other lines do. `Beside` gains `room_title`.
+
 ## 0.37.0 (2026-11-23)
 
 ### Added

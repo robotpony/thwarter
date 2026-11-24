@@ -894,6 +894,17 @@ fn build_thing(
         }
     }
 
+    // A room's id is its path from the world root (CONTENT_FORMAT.md's
+    // `id` row), so a copied file with a stale id doesn't silently collide.
+    if thing.bundle.is_none() && kind == EntityKind::Location {
+        let path = relative.with_extension("").to_string_lossy().replace('\\', "/");
+        if path != thing.id {
+            built.warnings.push(format!(
+                "{}: id `{}` doesn't match the file's path; a room's id is its path from the world root, `{}`",
+                shown, thing.id, path
+            ));
+        }
+    }
     if let Some(folder) = &thing.bundle {
         let matches = match kind {
             EntityKind::Location => folder == Path::new(&thing.id),
@@ -1222,5 +1233,23 @@ mod tests {
         for expected in ["lost.md: `inherits: nowhere` names no template", "loop.md: `inherits: a` loops back to", "deep.md: its templates chain more than 4 deep"] {
             assert!(problems.iter().any(|p| p.contains(expected)), "{}: {:?}", expected, problems);
         }
+    }
+
+    #[test]
+    fn a_rooms_id_that_differs_from_its_path_warns() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        write(d, "castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\n---\n");
+        // Copied from the hall without changing its id.
+        write(d, "castle/kitchen.md", "---\nid: castle/hall\ntitle: Kitchen\ntype: location\n---\n");
+        write(d, "objects/lamp-copy.md", "---\nid: lamp\ntitle: Lamp\ntype: object\nobject_type: x\n---\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
+        let warnings = engine.current_warnings();
+        let mismatch: Vec<&String> = warnings.iter().filter(|w| w.contains("doesn't match the file's path")).collect();
+        assert_eq!(mismatch.len(), 1, "{:?}", warnings);
+        assert!(mismatch[0].contains("castle/kitchen.md: id `castle/hall`") && mismatch[0].ends_with("`castle/kitchen`"), "{}", mismatch[0]);
+        // Objects' ids don't follow their path, and the duplicate is a problem as before.
+        assert!(engine.current_problems(false).iter().any(|p| p.contains("defined in 2 files")));
     }
 }

@@ -376,13 +376,13 @@ pub fn render_map(map: &crate::engines::map::Map) -> String {
     }
     let mut out: Vec<String> = canvas.into_iter().map(|r| r.into_iter().collect::<String>().trim_end().to_string()).collect();
     if !map.beside.is_empty() {
-        let name = |room: &str| map.cells.iter().find(|c| c.room == room).and_then(|c| c.title.clone()).unwrap_or_else(|| room.to_string());
         out.push(String::new());
         out.push("Also:".to_string());
         for b in &map.beside {
+            let from = b.room_title.clone().unwrap_or_else(|| b.room.clone());
             let door = b.door.as_ref().map(|d| format!(" (through the {}{})", d.title.to_lowercase(), if d.passable { "" } else { ", closed" })).unwrap_or_default();
             let missing = if b.written { "" } else { " (not written yet)" };
-            out.push(format!("  {}: {} → {}{}{}", name(&b.room), b.direction, b.target, door, missing));
+            out.push(format!("  {}: {} → {}{}{}", from, b.direction, b.target, door, missing));
         }
     }
     clean_text(&out.join("\n"))
