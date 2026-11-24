@@ -66,20 +66,8 @@ thwart validate --world /tmp/empty-world
 
 ## CI
 
-No CI pipeline exists yet. A minimal one worth adding once there's more than zero tests:
+`.github/workflows/ci.yml` builds and tests on every push and pull request (added in bca9973): `cargo build --locked --all-targets`, then `cargo test --locked`, on Ubuntu with the stable Rust toolchain and read-only repository permissions. It runs once `main` is pushed to GitHub.
 
-```yaml
-# .github/workflows/test.yml
-name: Test
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo build
-      - run: cargo test
-      - run: ./target/debug/thwart validate --world authors/mx/test-world --strict
-```
+It doesn't run `thwart validate` against the test world, since the world still has five broken exits (`BUGS.md`). Add that step, with `--strict`, once they're fixed.
 
-Note that last step is expected to fail today (five broken connections in the sample world, see `BUGS.md`); either fix the sample content first or drop `--strict`/accept non-zero before wiring this in for real.
+The workflow's actions are pinned by version tag (`actions/checkout@v4` and the rest), not by commit; pinning by commit is the stricter choice if supply-chain risk ever matters more.
