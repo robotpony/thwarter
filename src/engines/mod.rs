@@ -5,6 +5,7 @@ pub mod world_def;
 pub mod variables;
 pub mod builtins;
 pub mod persona;
+pub mod map;
 pub mod location_view;
 pub mod character_engine;
 pub mod narrative_engine;

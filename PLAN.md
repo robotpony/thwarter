@@ -111,7 +111,7 @@ Done when a persona can package a world, and someone else can install it and pla
 
 Built when authoring or play asks for them, most likely as console commands. Until then they stay as they are.
 
-- [ ] `WorldGraph::find_path` and a map [coder] (`design/CLI_DESIGN.md` › `map`)
+- [x] `WorldGraph::find_path` and a map [coder] (`design/CLI_DESIGN.md` › `map`)
 - [ ] Search over locations, characters and objects [coder] (`design/CLI_DESIGN.md` › `search`)
 - [ ] `CharacterEngine` wired into `show` and `validate --strict` [coder] (`design/ARCHITECTURE.md` › Character Engine)
 - [ ] Read `thwart.toml` through `ConfigManager` [coder] (REQ-CFG-1)

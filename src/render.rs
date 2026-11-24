@@ -320,6 +320,74 @@ fn author_blocks(view: &LocationView) -> Rendered {
     Rendered { blocks }
 }
 
+/// A map as ASCII (`thwart map`): each room a `[Title]` box on its grid
+/// cell, `@` for the room it's drawn from and `?` for one not written
+/// yet, exits as `---`, `|`, `/` and `\\`, with `+` for a door on the way
+/// and `#` for a closed one. Exits that don't fit the grid are listed
+/// after it. Titles longer than 18 characters are cut.
+pub fn render_map(map: &crate::engines::map::Map) -> String {
+    if map.cells.is_empty() {
+        return "(no rooms to map)".to_string();
+    }
+    let label = |c: &crate::engines::map::MapCell| -> String {
+        let name = c.title.clone().unwrap_or_else(|| c.room.clone());
+        let name: String = if name.chars().count() > 18 { name.chars().take(17).collect::<String>() + "…" } else { name };
+        let mark = if c.here { "@ " } else if !c.written { "? " } else { "" };
+        format!("{}{}", mark, name)
+    };
+    let width = map.cells.iter().map(|c| label(c).chars().count()).max().unwrap_or(1) + 2;
+    let (min_x, max_x) = (map.cells.iter().map(|c| c.x).min().unwrap(), map.cells.iter().map(|c| c.x).max().unwrap());
+    let (min_y, max_y) = (map.cells.iter().map(|c| c.y).min().unwrap(), map.cells.iter().map(|c| c.y).max().unwrap());
+    let pitch = width + 3;
+    let cols = (max_x - min_x) as usize * pitch + width;
+    let rows = (max_y - min_y) as usize * 2 + 1;
+    let mut canvas = vec![vec![' '; cols]; rows];
+    let at = |x: i32, y: i32| ((x - min_x) as usize * pitch, (y - min_y) as usize * 2);
+    let mut put = |canvas: &mut Vec<Vec<char>>, col: usize, row: usize, text: &str| {
+        for (i, ch) in text.chars().enumerate() {
+            if let Some(cell) = canvas.get_mut(row).and_then(|r| r.get_mut(col + i)) {
+                *cell = ch;
+            }
+        }
+    };
+    for c in &map.cells {
+        let (col, row) = at(c.x, c.y);
+        let text = label(c);
+        let pad = width - 2 - text.chars().count();
+        put(&mut canvas, col, row, &format!("[{}{}{}]", " ".repeat(pad / 2), text, " ".repeat(pad - pad / 2)));
+    }
+    for link in &map.links {
+        // Upper end first (then left), so every link runs down or right.
+        let (a, b) = if (link.from.1, link.from.0) <= (link.to.1, link.to.0) { (link.from, link.to) } else { (link.to, link.from) };
+        let mark = match &link.door {
+            None => None,
+            Some(d) if d.passable => Some('+'),
+            Some(_) => Some('#'),
+        };
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let (col, row) = at(a.0, a.1);
+        match (dx, dy) {
+            (1, 0) => put(&mut canvas, col + width, row, &format!("-{}-", mark.unwrap_or('-'))),
+            (0, 1) => put(&mut canvas, col + width / 2, row + 1, &mark.unwrap_or('|').to_string()),
+            (1, 1) => put(&mut canvas, col + width + 1, row + 1, &mark.unwrap_or('\\').to_string()),
+            (-1, 1) => put(&mut canvas, col - 2, row + 1, &mark.unwrap_or('/').to_string()),
+            _ => {}
+        }
+    }
+    let mut out: Vec<String> = canvas.into_iter().map(|r| r.into_iter().collect::<String>().trim_end().to_string()).collect();
+    if !map.beside.is_empty() {
+        let name = |room: &str| map.cells.iter().find(|c| c.room == room).and_then(|c| c.title.clone()).unwrap_or_else(|| room.to_string());
+        out.push(String::new());
+        out.push("Also:".to_string());
+        for b in &map.beside {
+            let door = b.door.as_ref().map(|d| format!(" (through the {}{})", d.title.to_lowercase(), if d.passable { "" } else { ", closed" })).unwrap_or_default();
+            let missing = if b.written { "" } else { " (not written yet)" };
+            out.push(format!("  {}: {} → {}{}{}", name(&b.room), b.direction, b.target, door, missing));
+        }
+    }
+    clean_text(&out.join("\n"))
+}
+
 /// An object as an author checks it (`thwart show <object>`): title and
 /// id, its type, its description as written, then its fields, actions
 /// and responses.

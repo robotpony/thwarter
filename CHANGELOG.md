@@ -34,6 +34,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.37.0 (2026-11-23)
+
+### Added
+
+- `thwart map [location]` draws an ASCII map (REQ-CLI-17): rooms as `[Title]` boxes on a grid placed by their compass exits, `---`, `|`, `/` and `\` between them, `+` on a link through a door and `#` through a closed one, `@` for the room it's drawn from (the world's start by default) and `?` for one not written yet. Exits that don't fit the grid (up, down, other directions, a cell already taken) are listed after it as `room: direction → target`. `--depth` limits how far it goes and `--output` writes it to a file. `--player`, other `--style`s and `--connections` say they aren't implemented yet.
+- `WorldEngine::map_layout(from, depth, only)` gives the same map as plain data (cells, links, and the exits beside the grid), for the console to draw at its own width, with `only` limiting it to given rooms (such as the ones a player has visited). `WorldEngine::distances(from)` lists every reachable room with its distance, nearest first, and `exits_of(room)` a room's exits through doors. Agreed with the console coder.
+- `WorldEngine::find_path` finds the shortest way between two rooms through every exit and door, and `WorldGraph::find_path`, which always said no, finds it by direct exits.
+
+### Changed
+
+- `design/CLI_REQUIREMENTS.md`: REQ-CLI-17 for `map`; REQ-CLI-8 now covers only `search`.
+
 ## 0.36.1 (2026-11-23)
 
 ### Changed

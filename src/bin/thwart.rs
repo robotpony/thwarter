@@ -178,7 +178,7 @@ fn main() -> ExitCode {
             })
         },
         Commands::Map { location, player, depth, style, output, connections } => {
-            thwarter::cli::commands::map_command(location, player, depth, style, output, connections)
+            thwarter::cli::commands::map_command(world_path, location, player, depth, style, output, connections)
         },
         Commands::Search { query, location, r#type, case_sensitive, regex, missing_connections } => {
             thwarter::cli::commands::search_command(query, location, r#type, case_sensitive, regex, missing_connections)

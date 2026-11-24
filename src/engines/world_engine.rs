@@ -957,10 +957,6 @@ impl WorldEngine {
         self.world_graph.add_location(location);
     }
 
-    pub fn find_path(&self, from: &str, to: &str) -> Option<Vec<String>> {
-        self.world_graph.find_path(from, to)
-    }
-
     pub fn get_connections(&self, location_id: &str) -> Vec<(String, String)> {
         if let Some(location) = self.get_location(location_id) {
             location

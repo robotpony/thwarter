@@ -108,3 +108,18 @@ fn warnings_go_to_stderr_as_a_count_and_json_is_one_document() {
     assert!(!out.contains("WARNING"));
     assert!(err.trim() == "2 warnings; run `thwart validate` to list them", "{}", err);
 }
+
+#[test]
+fn map_draws_from_the_start_and_unbuilt_options_say_so() {
+    let dir = world();
+    let run = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_thwart")).arg("map").args(args).arg("--world").arg(dir.path()).output().unwrap();
+        (out.status.success(), String::from_utf8_lossy(&out.stdout).into_owned(), String::from_utf8_lossy(&out.stderr).into_owned())
+    };
+    let (ok, out, err) = run(&[]);
+    assert!(ok && out.contains("[@ Vault]"), "{} {}", out, err);
+    for (args, why) in [(&["--player", "x"][..], "--player"), (&["--style", "unicode"][..], "--style unicode"), (&["--connections"][..], "--connections"), (&["nowhere"][..], "No location `nowhere`")] {
+        let (ok, _, err) = run(args);
+        assert!(!ok && err.contains(why), "{:?}: {}", args, err);
+    }
+}
