@@ -5,6 +5,10 @@
 //! `~/.local/state` when `XDG_STATE_HOME` isn't set. `<world>` is the
 //! world folder's name and `<hash>` six hex digits of its full path, so
 //! two worlds with the same folder name keep separate saves.
+//!
+//! An installed world (`$XDG_DATA_HOME/thwarter/worlds/<persona>/<world>/`)
+//! keys its saves by name instead, `saves/<persona>/<world>/`, so
+//! reinstalling it, or installing it somewhere else, keeps them (REQ-CFG-6).
 
 use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
@@ -13,10 +17,19 @@ pub const DEFAULT_SAVE: &str = "quicksave";
 
 /// The folder for `world_root`'s saves, under `state_home`.
 pub fn save_dir(world_root: &Path, state_home: &Path) -> PathBuf {
+    save_dir_for(world_root, state_home, crate::packaging::installed_id(world_root))
+}
+
+/// `save_dir`, given what `installed_id` said about the world.
+fn save_dir_for(world_root: &Path, state_home: &Path, installed: Option<(String, String)>) -> PathBuf {
+    let saves = state_home.join("thwarter").join("saves");
+    if let Some((persona, world)) = installed {
+        return saves.join(persona).join(world);
+    }
     let full = world_root.canonicalize().unwrap_or_else(|_| world_root.to_path_buf());
     let name = full.file_name().and_then(|n| n.to_str()).unwrap_or("world");
     let hash = fnv1a(full.to_string_lossy().as_bytes());
-    state_home.join("thwarter").join("saves").join(format!("{}-{:06x}", name, hash & 0xff_ffff))
+    saves.join(format!("{}-{:06x}", name, hash & 0xff_ffff))
 }
 
 /// The file for save `name`. Names are plain words, so a save can't
@@ -74,6 +87,20 @@ mod tests {
         let folder = a.file_name().unwrap().to_str().unwrap();
         assert!(folder.starts_with("test-world-") && folder.len() == "test-world-".len() + 6, "{}", folder);
         assert_eq!(a, save_dir(Path::new("/no/such/authors/mx/test-world"), home), "stable");
+    }
+
+    #[test]
+    fn an_installed_world_keys_its_saves_by_persona_and_world() {
+        let data = tempfile::tempdir().unwrap();
+        let world = data.path().join("worlds/mx/test-world");
+        std::fs::create_dir_all(&world).unwrap();
+        let installed = crate::packaging::installed_id_in(&world, data.path());
+        assert_eq!(save_dir_for(&world, Path::new("/state"), installed), Path::new("/state/thwarter/saves/mx/test-world"));
+        // Anywhere else, the folder's name and a hash of its path.
+        let elsewhere = tempfile::tempdir().unwrap();
+        let installed = crate::packaging::installed_id_in(elsewhere.path(), data.path());
+        let dir = save_dir_for(elsewhere.path(), Path::new("/state"), installed);
+        assert!(dir.parent() == Some(Path::new("/state/thwarter/saves")), "{}", dir.display());
     }
 
     #[test]

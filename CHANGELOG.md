@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.36.1 (2026-11-23)
+
+### Changed
+
+- An installed world's saves are kept by persona and world, `$XDG_STATE_HOME/thwarter/saves/<persona>/<world>/`, rather than by a hash of its path, so reinstalling it or installing it elsewhere keeps them (REQ-CFG-6). It uses the coder's `packaging::installed_id` (58ad7d6). Every other world keeps its `<world>-<hash>` folder, and no saves move.
+
 ## 0.36.0 (2026-11-23)
 
 ### Added
