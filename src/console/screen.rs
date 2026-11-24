@@ -1164,7 +1164,7 @@ mod tests {
         assert!(text.contains("<built-in>"), "{}", text);
         press(&mut screen, &console, Key::Esc);
         assert!(screen.picker.is_none());
-        assert!(screen.output.iter().any(|l| l.trim() == "/new object rock thing"), "{:?}", screen.output);
+        assert!(screen.output.iter().any(|l| l.starts_with("Made rock's card.")), "{:?}", screen.output);
         assert!(screen.editing.is_some(), "then the editor opens on it");
     }
 
@@ -1205,6 +1205,32 @@ mod tests {
             assert!(text.ends_with("play shows it in each"), "width {}: {:?}", width, rows);
             assert!(rows.iter().all(|r| matches!(r, Row::Warning(t) if t.chars().count() <= width)), "width {}: {:?}", width, rows);
         }
+    }
+
+    #[test]
+    fn adding_a_new_thing_elsewhere_puts_it_in_one_room_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("tiny");
+        for entry in walkdir::WalkDir::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny")) {
+            let entry = entry.unwrap();
+            let to = root.join(entry.path().strip_prefix(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny")).unwrap());
+            if entry.file_type().is_dir() {
+                std::fs::create_dir_all(&to).unwrap();
+            } else {
+                std::fs::copy(entry.path(), &to).unwrap();
+            }
+        }
+        let mut console = Console::open(&root, super::super::Mode::Edit).unwrap();
+        console.interactive = true;
+        let console = Mutex::new(console);
+        let mut screen = Screen::new("", None);
+        typed(&mut screen, &console, "go /village/square");
+        typed(&mut screen, &console, "/add desk village/well");
+        press(&mut screen, &console, Key::Esc);
+        let square = std::fs::read_to_string(root.join("village/square.md")).unwrap();
+        let well = std::fs::read_to_string(root.join("village/well.md")).unwrap();
+        assert!(well.contains("desk"), "{}", well);
+        assert!(!square.contains("desk"), "not in edit mode's room too: {}", square);
     }
 
     #[test]

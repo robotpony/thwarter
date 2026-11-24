@@ -37,3 +37,15 @@ Problems (1):
 Warnings (1):
   door `door-village-square-northwest`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
 Validation failed: 1 problem(s), 1 warning(s)
+> go /village/square
+Village Square (room)
+> /add lantern village/well
+lantern is in village/square: move it here? (y/n)
+> n
+Left lantern where it is.
+> /add lantern village/well
+lantern is in village/square: move it here? (y/n)
+> y
+Moved lantern: village/square → village/well.
+> /add lantern village/well
+lantern is already in village/well.

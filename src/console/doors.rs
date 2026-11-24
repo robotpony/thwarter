@@ -27,6 +27,8 @@ use std::path::PathBuf;
 pub enum Asked {
     /// Which way a door goes from this room, for `/add door`.
     DoorDirection { template: String, to: Option<String> },
+    /// Whether to move a thing that's already somewhere, for `/add`.
+    MoveHere { thing: String, to: String },
 }
 
 impl Console {
@@ -79,6 +81,15 @@ impl Console {
                 let Some(here) = self.current_room() else { return super::session::suggest("Edit mode left the room. From one, try again:", &["/add door {direction} [{room}]"]) };
                 let direction = super::author::expand_direction(line.trim());
                 self.make_door(&here, &direction, to.as_deref(), None, &template)
+            }
+            // A thing starts in one place (REQ-CF-31): yes moves it, and
+            // anything else leaves it where it is (Bruce, 2026-11-24).
+            Asked::MoveHere { thing, to } => {
+                if matches!(line.trim().to_lowercase().as_str(), "y" | "yes") {
+                    self.move_thing(&[&thing, &to])
+                } else {
+                    self.t("left_in_place", &[("thing", &thing)])
+                }
             }
         }
     }

@@ -160,13 +160,11 @@ Added chair to village/square, as scenery with no card yet (/edit object chair g
 > /add chair
 chair is already in village/square.
 > /add rope village/well
-Added rope to village/well.
-This adds 1 problem(s):
-  `rope` starts in more than one place: room `village/square`, room `village/well`, character `smith`'s inventory; play shows it in each
+rope is in village/square, carried by smith: move it here? (y/n)
 > /add elder village/well
 elder is already in village/well.
 > /add bench smith
-Added bench to smith's inventory.
+bench is in village/square: move it here? (y/n)
 > /add chair nowhere
 There's no room, character or object called `nowhere` to add chair to.
 > /add
@@ -193,7 +191,7 @@ old shirt (old-shirt)
 > go /village/square
 Village Square (room)
 > /move rope chair
-Moved rope: village/square, village/well, carried by smith → chair.
+Moved rope: village/square, carried by smith → chair.
 > /move lantern bench
 Moved lantern: carried by elder → bench.
 > /move bench bench

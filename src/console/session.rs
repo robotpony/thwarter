@@ -163,7 +163,12 @@ impl Console {
         }
         // A plain line answers the question just asked; a command drops it.
         if let Some(asked) = self.asked.take() {
-            if !line.starts_with('/') {
+            // A yes-or-no question takes only yes or no; anything else
+            // drops it and runs as typed.
+            let yes_no = matches!(asked, super::doors::Asked::MoveHere { .. });
+            let answers = !line.starts_with('/')
+                && (!yes_no || matches!(line.trim().to_lowercase().as_str(), "y" | "yes" | "n" | "no"));
+            if answers {
                 return (self.answer(asked, line), Flow::Continue);
             }
         }

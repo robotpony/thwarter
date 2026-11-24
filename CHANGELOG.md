@@ -55,6 +55,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.66.3 (2026-11-24)
+
+### Fixed
+
+- A new object landed in two rooms: `/add desk hallway` from the bedroom put the desk in both, because the question runner made its card with `/new object`, which also places. The card is written without placing now.
+- `/add` of a thing that's already somewhere asks to move it here (y/n) instead of putting it in a second place (REQ-CON-41, REQ-CF-31). A y/n question takes only y or n; any other line drops it and runs as typed.
+
 ## 0.66.2 (2026-11-24)
 
 ### Changed

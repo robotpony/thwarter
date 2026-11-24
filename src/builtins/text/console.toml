@@ -47,3 +47,7 @@ room_held_by_door = "{Word} the {door}:"
 
 # /inspect (inspect.rs).
 inspect_warnings = "Named in {count} problem(s) or warning(s):"
+
+# /add of a thing that's already somewhere (author.rs, REQ-CON-41).
+move_here = "{thing} is in {places}: move it here? (y/n)"
+left_in_place = "Left {thing} where it is."

@@ -66,15 +66,29 @@ impl Console {
     /// mode at the thing for the length of it, and says what they were.
     pub(super) fn run_answers(&mut self, asking: &Asking, answers: &[Answer]) -> String {
         let mut commands = Vec::new();
-        // Recipes and /set need a card to write to.
+        let mut made = Vec::new();
+        // Recipes and /set need a card to write to. It's written straight,
+        // not with /new, which would also place the thing in edit mode's
+        // room: /add already put it where it belongs, and a thing starts in
+        // one place (the "new object lands in two rooms" bug, 2026-11-24).
         if asking.kind == Kind::Object && self.world.path_of(Kind::Object, &asking.id).is_none() {
-            commands.push(format!("/new object {} thing", asking.id));
+            let new = crate::writer::NewEntity {
+                kind: crate::engines::EntityKind::Object,
+                id: asking.id.clone(),
+                title: super::author::title_or_default(&[], &asking.id),
+                object_type: Some("thing".to_string()),
+            };
+            match self.create(&new, &[]) {
+                Ok(path) => made.push(path),
+                Err(e) => return e,
+            }
+            self.world.refresh_index();
         }
         for answer in answers {
             commands.extend(commands_for(&asking.id, answer));
         }
         if commands.is_empty() {
-            return String::new();
+            return if made.is_empty() { String::new() } else { self.after_writes(&made, format!("Made {}'s card.", asking.id)) };
         }
         let before = self.place.clone();
         let interactive = std::mem::replace(&mut self.interactive, false);
@@ -94,6 +108,9 @@ impl Console {
         // only if it was the thing.
         if !self.place_exists() {
             self.move_to_existing_folder();
+        }
+        if !made.is_empty() {
+            out.insert(0, self.after_writes(&made, format!("Made {}'s card.", asking.id)));
         }
         let commands: Vec<&str> = commands.iter().map(String::as_str).collect();
         suggest(&format!("{}\n\nThe answers were:", out.join("\n")), &commands)

@@ -6,12 +6,12 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 
 ## Open
 
-- [ ] **A new object lands in two rooms**: creating `desk` in the hallway also listed it in the bedroom, so validate warns it starts in more than one place (REQ-CF-31). The first suspect is the object questions' `location in room` answer placing it again after `/add` did, which isn't confirmed yet (Bruce, 2026-11-24) [console]
-- [ ] **`/add` of a thing already placed doesn't move it** (REQ-CON-41 says not to take it from anywhere else); Bruce wants it to ask "desk is in bedroom: move it here? (y/n)" and move it on yes (2026-11-24) [console]
 - [ ] **One compiler warning left**, `narrative_engine`'s unused `conditions` in a stub; it goes when narrative state uses that code. The two in `world_graph::find_path` went with the map in 0.37.0. Down from 11 in 0.7.0 (2026-08-23)
 
 ## Fixed
 
+- 2026-11-24 (0.66.3): a new object no longer lands in two rooms. When `/add` made a thing with no card, the question runner made its card with `/new object`, which also placed it in edit mode's room; `/add desk hallway` from the bedroom put the desk in both. The card is now written without placing it. (Not `location in room`, which is an unknown construct and does nothing.)
+- 2026-11-24 (0.66.3): `/add` of a thing already placed asks "desk is in bedroom: move it here? (y/n)" and moves it on yes, changing nothing on no (REQ-CON-41, Bruce). Only y or n answers; any other line drops the question and runs as typed.
 - 2026-11-23 (0.50.2, 37a5c49): the test world's five connections to rooms that didn't exist went with the old content; the new test world validates clean.
 - 2026-11-23 (0.27.1): `thwart show` no longer prints the world's warnings on standard output; it writes one count to standard error ("2 problems and 27 warnings; run `thwart validate` to list them"), so its result stands alone and `--format json` is one document.
 - 2026-11-23 (0.1.1): `--world`, `--config`, `-q` and `-v` are global, so they work after the subcommand as the docs write them.

@@ -323,6 +323,18 @@ impl Console {
             Err(e) => return e,
         };
         let key = if is_character { "characters" } else { "objects" };
+        // Already somewhere else: a thing starts in one place, so ask to
+        // move it rather than add a second (REQ-CF-31, Bruce, 2026-11-24).
+        let elsewhere: Vec<Holder> = self.world.engine.placement(thing).into_iter().filter(|h| *h != holder).collect();
+        if !elsewhere.is_empty() && !self.held_by(&holder, key).iter().any(|i| i == thing) {
+            let places: Vec<String> = elsewhere.iter().map(short_holder).collect();
+            let to = match &holder {
+                Holder::Room(id) => format!("/{}", id),
+                Holder::Character(id) | Holder::Object(id) => id.clone(),
+            };
+            self.asked = Some(super::doors::Asked::MoveHere { thing: thing.to_string(), to });
+            return self.t("move_here", &[("thing", thing), ("places", &places.join(", "))]);
+        }
         let mut items = self.held_by(&holder, key);
         let place = match &holder {
             Holder::Character(who) => format!("{}'s inventory", who),
