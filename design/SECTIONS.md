@@ -4,7 +4,7 @@ Status: Agreed in outline by Bruce, 2026-11-23, to be tested on real content. Br
 
 ## Summary
 
-Content never tests anything. The game has a state, and content is shown when it matches that state (Bruce). A section under a keyword heading (`## When: #hit #window`) is shown when every tag in its heading is true right now; otherwise it isn't, and if nothing matches an action, nothing happens. A heading never creates a state. States live in bundles, as today. Markdown comments go back to being comments, so every `<!-- thwarter:... -->` marker goes. Characters are written `@guard-captain`, tags `#locked`, and places as links.
+Content never tests anything. The game has a state, and content is shown when it matches that state (Bruce). A section under a keyword heading (`## When: #hit @window`) is shown when every name in its heading is true right now; otherwise it isn't, and if nothing matches an action, nothing happens. A heading never creates a state. States live in bundles, as today. Markdown comments go back to being comments, so every `<!-- thwarter:... -->` marker goes. `#` names states (`#locked`) and `@` names things (`@guard-captain`, `@stick`), and places are links.
 
 ## Why
 
@@ -24,8 +24,8 @@ The syntax a file may use is Markdown's own: inline `code`, fenced blocks with a
 
 Bruce's example: the player is in a bedroom, holding a stick, and hits the window with it. At that moment the game state includes:
 
-- the action, `#hit`, and its target, `#window`
-- what the player holds, `#stick`
+- the action, `#hit`, and its target, `@window`
+- what the player holds, `@stick`
 - where the player is, the bedroom
 - each thing's current state, such as the window being `#closed`
 - the chapter
@@ -42,7 +42,7 @@ state: closed
 ---
 A small window over the bed, its latch painted shut.
 
-## When: #hit #stick
+## When: #hit @stick
 The glass cracks from corner to corner.
 ```
 
@@ -52,27 +52,31 @@ Only the tags in a heading are tested, and all of them must be true. *Proposed*:
 
 *Proposed*, so a room's state text doesn't repeat on every action:
 - **A description section** names no action: `## When: #locked`. It's added to the thing's description whenever it matches, which is when the player looks, examines or enters.
-- **A reply section** names an action: `## When: #hit #stick`. It's shown only on the turn that action happens, as the reply. Nothing else shows it.
+- **A reply section** names an action: `## When: #hit @stick`. It's shown only on the turn that action happens, as the reply. Nothing else shows it.
 
-A heading's tags are read against whose file it's in: in the window's file, the window is the target, so `#window` isn't needed; in the bedroom's file, the bedroom is where the player is, so the same reply is `## When: #hit #window #stick`.
+A heading's tags are read against whose file it's in: in the window's file, the window is the target, so `@window` isn't needed; in the bedroom's file, the bedroom is where the player is, so the same reply is `## When: #hit @window @stick`.
 
 ### Which files answer an action
 
-*Proposed*: for an action, the engine looks for matching reply sections in the target, then in what the action uses (the stick), then in the room, and shows every match in that order. If none matches, the reply is a built-in "Nothing happens." and the turn changes nothing.
+*Proposed*: for an action, the engine looks for matching reply sections in the target, then in what the action uses (the stick), then in the room, and shows every match in that order. If none matches, nothing happens (Bruce): the turn changes nothing, and the reply is a default, "Nothing happens." unless something nearer sets one.
+
+### Default replies
+
+"Nothing happens." is the built-in default (Bruce). The world's settings can set a list of defaults, and so can chapters, sections and the rest, so a ghost story's unanswered actions can read differently from a farce's (Bruce). *Proposed*: the nearest list wins, by the usual lineage: the section, the thing, its area, the chapter, then `world/index.md`. The engine picks one line from the list each time, varied by turn. The list's form is Open question 4.
 
 ### Changing state
 
 A reply section MAY hold a ` ```thwarter ` block whose mechanics run when it's shown:
 
 ````markdown
-## When: #hit #stick
+## When: #hit @stick
 ```thwarter
 becomes: { this: broken }
 ```
 The glass shatters. Cold air pours in.
 ````
 
-*Proposed*: this replaces the frontmatter `actions:` map. A world's verbs are the action tags its headings use, which is what the parser's REQ-PC-14 check already asks ("does any thing have this verb?"). `requires:` becomes tags in the heading: `## When: #unlock #brass-key` works only while the player holds the key, and `## When: #unlock` `## Unless: #brass-key` is the refusal. The `actions:` map and `requires:` then go.
+*Proposed*: this replaces the frontmatter `actions:` map. A world's verbs are the action tags its headings use, which is what the parser's REQ-PC-14 check already asks ("does any thing have this verb?"). `requires:` becomes names in the heading: `## When: #unlock @brass-key` works only while the player holds the key, and a section headed `## Unless: @brass-key` is the refusal. *Proposed*: `When:` and `Unless:` can't share one heading, so a refusal needs Open question 5's answer on combining them. The `actions:` map and `requires:` then go.
 
 A description section's block MAY hold data that applies while it matches, such as a door's `passable:`, merging over frontmatter the way layers merge today (REQ-CF-13). *Proposed*: one block per section, first in it.
 
@@ -82,9 +86,9 @@ States come from bundles (Bruce: "bundles are simpler"). A state exists because 
 
 ### Prefixes, links and names
 
-- `@id` names a character, or another thing with a voice, in prose (Bruce). In play it shows as the character's name.
-- `#name` is a tag. In a heading it's read against the game state; in prose it's an ordinary tag (REQ-CF-30).
-- `#` and `@` share one namespace, with a limit (Bruce): `#` can't reach a character's properties, and `@` can't reach properties only objects have. Object, character and door ids are already unique across the world (REQ-CF-22), so a name means one thing whichever prefix reaches it.
+- `#` means a state and `@` means a thing, and neither searches the other's names (Bruce). So `#open` is always a state or the action of that name, and `@window` is always a thing; a state and a thing can share a name without clashing.
+- `@id` in prose names a thing; in play it shows as the thing's name (`@guard-captain` → Captain Marcus). Object, character and door ids are unique across the world (REQ-CF-22), so `@` always means one thing.
+- `#name` in prose is also an ordinary tag (REQ-CF-30).
 - `[[ ]]` and `[]()` links are for locations (Bruce). *Proposed*: a link still resolves to any kind of thing, as REQ-CF-29 says, since Obsidian needs that; the convention is links for places and `@` for characters.
 
 ### Hugo
@@ -133,15 +137,14 @@ You hear the faint sound of coins shifting inside.
 
 Bruce asked for more detail on three of the earlier questions (2026-11-23). They're restated here with the model above.
 
-1. **Which tags can a heading test?** Bruce's example uses the action, its target and what the player holds. Could a heading also test another thing's state (a bedroom line while the window is broken, `## When: #window.broken`), the chapter (`## When: #after-the-king`), a value (`#story.king.dead`) or the time of day? Each one makes headings more powerful and harder to predict. *Proposed* for the trial: actions, targets, held things, this thing's own states and the chapter.
+1. **Which tags can a heading test?** Bruce's example uses the action, its target and what the player holds. Could a heading also test another thing's state (a bedroom line while the window is broken, `## When: @window #broken`), the chapter (`## When: #after-the-king`), a value (`#story.king.dead`) or the time of day? Each one makes headings more powerful and harder to predict. *Proposed* for the trial: actions, targets, held things, this thing's own states and the chapter.
 2. **Do chapters become sections?** Today a thing changes for a chapter through a file in its `chapters/` folder (`castle/courtyard/chapters/after-the-king.md`). If the chapter is a tag a heading can test (question 1), a small chapter change could be a section in the thing's own file instead: `## When: #after-the-king` with "Black banners hang from the walls." Then `chapters/` files would be only for big changes, as state files are. Should both work, or only files?
 3. **Does a section add to the description, or replace it?** Under "added when it matches", a door that reads "The door is shut." by default and has `## When: #open` "The door stands open." reads "The door is shut. The door stands open." while open. Options:
    - **a.** Sections always add. The default text holds only what's always true ("A heavy iron door, set into the floor."), and every state-dependent line goes in a section. Simple to predict; the author has to write that way.
    - **b.** A section can replace the default by saying so in its block (`replaces: description`). More flexible; one more rule.
    - **c.** Sections add, and a state file in the bundle replaces, as state files do today. Major changes replace, minor ones add.
    *Proposed*: **a** for the trial, since it matches "shown if it's true".
-4. **What happens on an action no section answers?** Nothing happens, and the turn changes nothing (Bruce). *Proposed*: the reply is a built-in "Nothing happens.", varied, which a world MAY replace with a `## When: #nothing` reply in a room or template. Is a silent turn better?
-5. **A name that's both an action and a state.** A door has an `open` state and players type `open door`. Is `## When: #open` the description while the door is open, or the reply to opening it? With one namespace the heading can't say. Options:
-   - **a.** Actions are written as a bare word before the tags: `## When: open #closed` is the reply to opening a closed door, and `## When: #open` is the open door's description. It also reads well: "When: hit #stick".
-   - **b.** A state can't share a name with an action, and `validate` reports it. Doors would need states like `shut` and `ajar`.
-   *Proposed*: **a**. The examples above use `#hit` until this is settled.
+4. **What form does a list of default replies take?** *Proposed*: a `nothing:` list in the settings' or section's ```thwarter block (`nothing: ["Nothing happens.", "That does nothing."]`). The lines are short and systemic, like `title`, so they can bend principle 8. The alternative is prose: a `## When: #nothing` section whose paragraphs are the list, which keeps principle 8 but adds a reserved state name.
+5. **Combining `When:` and `Unless:`.** A refusal reads "unlocking, and not holding the key". *Proposed*: a heading may say both, `## When: #unlock Unless: @brass-key`, or a `### Unless:` subsection inside a `When:` section narrows it. The first is shorter; the second reads as nested Markdown.
+
+An action and a state sharing a name (`open`) isn't a concern (Bruce): `## When: #open` is the open door's description, and it reads as the reply to opening it too.
