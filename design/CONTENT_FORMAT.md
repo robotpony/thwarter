@@ -80,6 +80,7 @@ Object content is far more varied than location or character content (compare a 
 | `weight` | no | Free text by convention (`light`, `heavy`, `immovable`), not a unit. |
 | `value` | no | Free text; sample content mixes numbers (`1000`) and descriptions (`priceless`, `unknown`). |
 | `objects` | no | List of object `id`s this object holds, such as photos on a wall (REQ-CF-31). |
+| `holds` | no | The word play uses for what this object holds: `on` (the default) or `in`, as in "Coins (in the chest)". |
 | `actions` | no | Map of action name to its mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`). The text a player reads is in the body, in a `## When: #wield` reply section, never here. See `design/SECTIONS.md`. |
 | anything else | no | Preserved verbatim (e.g. `properties`, `stats`, `effects`, `contents`, `security` in the sample world). Not validated. |
 
