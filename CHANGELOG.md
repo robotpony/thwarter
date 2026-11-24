@@ -34,6 +34,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.36.0 (2026-11-23)
+
+### Added
+
+- `packaging::installed_id(world_root)` says which installed world a folder is, as `(persona, world)`, when it sits at `worlds/<persona>/<world>/` in the data folder, so the console can key an installed world's saves by name and keep them through `--replace` or a reinstall (REQ-CFG-6). Agreed with the console coder, who changes the save folder to use it.
+
 ## 0.35.1 (2026-11-23)
 
 ### Changed

@@ -408,6 +408,25 @@ pub fn installed(data_dir: &Path) -> Vec<Installed> {
     out
 }
 
+/// Which installed world `world_root` is, as `(persona, world)`, if it
+/// sits at `worlds/<persona>/<world>/` in the data folder (REQ-CFG-6), so
+/// its saves can follow its name rather than its path.
+pub fn installed_id(world_root: &Path) -> Option<(String, String)> {
+    installed_id_in(world_root, &crate::settings::data_dir()?)
+}
+
+/// `installed_id`, with the data folder given.
+pub fn installed_id_in(world_root: &Path, data_dir: &Path) -> Option<(String, String)> {
+    let worlds = std::fs::canonicalize(data_dir.join("worlds")).ok()?;
+    let root = std::fs::canonicalize(world_root).ok()?;
+    let rel = root.strip_prefix(&worlds).ok()?;
+    let parts: Vec<String> = rel.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+    match parts.as_slice() {
+        [persona, world] if is_safe_segment(persona) && is_safe_segment(world) => Some((persona.clone(), world.clone())),
+        _ => None,
+    }
+}
+
 /// The installed world `persona/world` names, if there is one.
 pub fn find_installed(data_dir: &Path, name: &str) -> Option<PathBuf> {
     let (persona, world) = name.split_once('/')?;
@@ -416,4 +435,30 @@ pub fn find_installed(data_dir: &Path, name: &str) -> Option<PathBuf> {
     }
     let path = data_dir.join("worlds").join(persona).join(world);
     path.is_dir().then_some(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_installed_world_is_known_by_persona_and_world() {
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path().join("data");
+        let world = data.join("worlds/bruce/castle");
+        std::fs::create_dir_all(world.join("world")).unwrap();
+        assert_eq!(installed_id_in(&world, &data), Some(("bruce".into(), "castle".into())));
+        assert_eq!(installed_id_in(&world.join("world"), &data), None);
+        std::fs::create_dir_all(dir.path().join("authors/bruce/castle")).unwrap();
+        assert_eq!(installed_id_in(&dir.path().join("authors/bruce/castle"), &data), None);
+        assert_eq!(find_installed(&data, "bruce/castle"), Some(world));
+        assert_eq!(find_installed(&data, "../etc"), None);
+    }
+
+    #[test]
+    fn author_comments_strip_but_markers_stay() {
+        let text = "A hall. <!-- inline -->\n<!-- alone -->\n<!-- thwarter:action pull -->\nClunk.\n";
+        assert_eq!(strip_author_comments(text), "A hall. \n<!-- thwarter:action pull -->\nClunk.\n");
+        assert_eq!(comment_spans(text).len(), 2);
+    }
 }
