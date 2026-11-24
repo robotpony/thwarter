@@ -272,24 +272,19 @@ impl WorldEngine {
         bundles::find_template(&crate::parsers::link_target(name), scope, &self.library)
     }
 
-    /// The questions `/new` and `/add` ask for a thing made in `folder`
-    /// (relative to the world root) from `template`, if any, of `kind`
-    /// (REQ-CF-32): the template's set, else the kind's, each the nearest
-    /// from `folder` out to the root, then built in. The whole set, never
-    /// merged.
-    pub fn questions_for(&self, folder: &Path, template: Option<&str>, kind: &str) -> Option<crate::engines::questions::QuestionSet> {
-        crate::engines::questions::find(&self.question_sets, folder, template, kind)
+    /// The questions `/new` and `/add` ask for a new thing `id` made in
+    /// `folder` (relative to the world root) from `template`, if any, of
+    /// `kind` (REQ-CF-32): the set named for its id, else its template's,
+    /// else its kind's, each the nearest from `folder` out to the root,
+    /// then built in. The whole set, never merged.
+    pub fn questions_for_thing(&self, folder: &Path, id: &str, template: Option<&str>, kind: &str) -> Option<crate::engines::questions::QuestionSet> {
+        crate::engines::questions::find(&self.question_sets, folder, Some(id), template, kind)
     }
 
-    /// A question set named for no template or kind is never asked.
-    fn question_warnings(&self) -> Vec<String> {
-        let kinds = ["location", "room", "object", "character", "door"];
-        let templates: Vec<String> = self.template_names().iter().map(|t| t.rsplit('/').next().unwrap_or(t).to_string()).collect();
-        self.question_sets
-            .iter()
-            .filter(|set| !kinds.contains(&set.name.as_str()) && !templates.contains(&set.name))
-            .map(|set| format!("{}: no template or kind is named `{}`, so these questions are never asked", set.path.display(), set.name))
-            .collect()
+    /// `questions_for_thing` without an id: the template's set, else the
+    /// kind's.
+    pub fn questions_for(&self, folder: &Path, template: Option<&str>, kind: &str) -> Option<crate::engines::questions::QuestionSet> {
+        crate::engines::questions::find(&self.question_sets, folder, None, template, kind)
     }
 
     /// Every template the world defines, by path from the root, then the
@@ -1181,7 +1176,6 @@ impl WorldEngine {
         warnings.extend(self.holds_warnings());
         warnings.extend(self.play_text_warnings.iter().cloned());
         warnings.extend(self.door_warnings());
-        warnings.extend(self.question_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }
@@ -1692,9 +1686,9 @@ mod tests {
         assert_eq!(q("forest", None).as_deref(), Some("Where does it start?"), "the built-in");
         let problems = engine.current_problems(false);
         assert!(problems.iter().any(|p| p.contains("questions/index.md: a file in questions/ is a question set, so it needs `type: questions`")), "{:?}", problems);
-        let warnings = engine.current_warnings();
-        assert!(warnings.iter().any(|w| w.contains("no template or kind is named `teapot`")), "{:?}", warnings);
-        assert_eq!(warnings.len(), 1, "{:?}", warnings);
+        // A set for a thing not written yet is fine (Bruce, 2026-11-24).
+        assert!(engine.current_warnings().is_empty(), "{:?}", engine.current_warnings());
+        assert_eq!(engine.questions_for_thing(Path::new("castle"), "teapot", None, "object").unwrap().questions[0].text, "Hot?");
     }
 
     #[test]

@@ -150,9 +150,6 @@ pub fn parse(name: &str, scope: Option<PathBuf>, path: &Path, body: &str, shown:
         if q.options.iter().filter(|o| o.default).count() > 1 {
             warnings.push(format!("{}: \"{}\" has more than one `(default)`; the first is used", shown, q.text));
         }
-        if q.options.is_empty() {
-            warnings.push(format!("{}: \"{}\" has no options", shown, q.text));
-        }
     }
     (QuestionSet { name: name.to_string(), scope, path: path.to_path_buf(), questions }, warnings)
 }
@@ -165,12 +162,16 @@ pub fn builtin(name: &str) -> Option<QuestionSet> {
     Some(parse(name, None, &path, &layer.body, &path.to_string_lossy()).0)
 }
 
-/// The set to ask for a thing made in `folder` (relative to the world
-/// root) from `template` (if any) of `kind`: the template's set, else the
-/// kind's, each the nearest from `folder` out to the root, then built in.
-pub fn find(sets: &[QuestionSet], folder: &Path, template: Option<&str>, kind: &str) -> Option<QuestionSet> {
-    let template = template.map(|t| t.rsplit('/').next().unwrap_or(t));
-    for name in template.into_iter().chain(std::iter::once(kind)) {
+/// The set to ask for a thing `id` made in `folder` (relative to the
+/// world root) from `template` (if any) of `kind`: the set named for its
+/// id, else its template's, else its kind's, each the nearest from
+/// `folder` out to the root, then built in. Ids and templates match by
+/// their last part (`castle/lantern` is `lantern`).
+pub fn find(sets: &[QuestionSet], folder: &Path, id: Option<&str>, template: Option<&str>, kind: &str) -> Option<QuestionSet> {
+    let short = |t: &str| t.rsplit('/').next().unwrap_or(t).to_string();
+    let names: Vec<String> = id.map(short).into_iter().chain(template.map(short)).chain(std::iter::once(kind.to_string())).collect();
+    for name in &names {
+        let name = name.as_str();
         let mut scope = Some(folder);
         while let Some(at) = scope {
             if let Some(set) = sets.iter().find(|s| s.name == name && s.scope.as_deref() == Some(at)) {
@@ -224,12 +225,17 @@ mod tests {
     fn the_nearest_set_wins_then_the_kinds_then_the_built_in() {
         let set = |name: &str, scope: &str| parse(name, Some(scope.into()), Path::new("x"), "## Q?\n- A\n", "x").0;
         let sets = vec![set("lantern", ""), set("lantern", "castle"), set("object", "castle/cellar")];
-        let found = |folder: &str, template: Option<&str>, kind: &str| find(&sets, Path::new(folder), template, kind).map(|s| (s.name, s.scope));
+        let found = |folder: &str, template: Option<&str>, kind: &str| find(&sets, Path::new(folder), None, template, kind).map(|s| (s.name, s.scope));
         assert_eq!(found("castle/hall", Some("lantern"), "object"), Some(("lantern".into(), Some("castle".into()))));
         assert_eq!(found("forest", Some("templates/lantern"), "object"), Some(("lantern".into(), Some("".into()))));
         assert_eq!(found("castle/cellar", None, "object"), Some(("object".into(), Some("castle/cellar".into()))));
         assert_eq!(found("forest", None, "object"), Some(("object".into(), None)), "the built-in");
         assert_eq!(found("forest", None, "location"), None);
+        // The thing's own id comes first, then its template.
+        let by_id = |id: &str, template: Option<&str>| find(&sets, Path::new("castle/hall"), Some(id), template, "object").map(|s| s.name);
+        assert_eq!(by_id("castle/hall/lantern", Some("teapot")).as_deref(), Some("lantern"));
+        assert_eq!(by_id("brass-lamp", Some("templates/lantern")).as_deref(), Some("lantern"));
+        assert_eq!(by_id("brass-lamp", None).as_deref(), Some("object"));
         assert!(builtin("object").unwrap().questions.iter().all(|q| !q.options.is_empty()));
         assert_eq!(question_file(Path::new("castle/questions/lantern.md")), Some(("castle".into(), "lantern".into())));
         assert_eq!(question_file(Path::new("questions/door.md")), Some(("".into(), "door".into())));

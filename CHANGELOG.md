@@ -49,6 +49,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.61.1 (2026-11-24)
+
+### Changed
+
+- A question set is chosen by the new thing's id, then its template, then its kind (`WorldEngine::questions_for_thing`), as CONTENT_FORMAT now says. A set named for nothing that exists yet is no longer a warning, so a world can write `questions/lantern.md` before any lantern, and a question with no options isn't one either. The warnings left are an unknown construct and more than one `(default)`.
+
 ## 0.61.0 (2026-11-24)
 
 ### Added
