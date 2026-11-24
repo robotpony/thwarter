@@ -275,14 +275,16 @@ mod tests {
         // Without the stick, no section matches.
         assert_eq!(s("hit window"), "Nothing happens.");
         assert_eq!(s("hit window with dragon"), "There's no dragon here.");
-        assert_eq!(s("dance wildly"), "I don't understand `dance wildly`.");
+        assert_eq!(s("dance wildly"), "I don't understand \"dance wildly\".");
 
         // What the player holds is in the turn.
         s("take lamp");
         assert!(s("look").contains("The lamp throws long shadows."));
 
-        // `#open` is the open hatch's description and the reply to opening it.
-        assert!(s("look").contains("It's bolted from this side."));
+        // `#open` is the open hatch's description and the reply to opening
+        // it. A door's own text shows when it's examined, not on a look.
+        assert!(s("x hatch").contains("It's bolted from this side."));
+        assert!(!s("look").contains("It's bolted from this side."));
         // A refused exit's reply is the door's `#go` section.
         assert_eq!(s("go up"), "The bolt holds.");
         assert_eq!(s("open hatch"), "The hatch hangs open.");
@@ -305,7 +307,7 @@ mod tests {
         state.inventory.push("stick".into());
         state.inventory.push("window".into());
         // Every match shows: the target's first, then the room's.
-        assert_eq!(say(&game, &world, &mut state, "hit window with stick"), "The glass cracks.\n\nThe hall echoes with the crack.");
+        assert_eq!(say(&game, &world, &mut state, "hit window with stick"), "The glass cracks. The hall echoes with the crack.");
         // A thing with no section for it falls back to the room's.
         let mut state = PlayState::new("hall");
         state.inventory.push("stick".into());
@@ -404,7 +406,7 @@ mod tests {
         s("take key");
         s("take spoon");
         assert!(s("x iron door").contains("A padlock hangs from the hasp."));
-        assert_eq!(s("down"), "It's locked.");
+        assert_eq!(s("down"), "The iron door is locked.");
         assert_eq!(s("open iron door"), "It's locked.");
         assert_eq!(s("unlock iron door"), "It's locked. Unlock it with what?");
         assert_eq!(s("unlock iron door with spoon"), "That doesn't fit the lock.");
@@ -413,7 +415,8 @@ mod tests {
         assert_eq!(s("unlock iron door with key"), "It isn't locked.");
         assert_eq!(s("unlock iron door"), "It isn't locked.");
         assert!(s("inventory").contains("a spoon") && !s("inventory").contains("brass key"));
-        assert_eq!(s("open iron door"), "The door stands open.\n\nCold air rises from the dark below.");
+        assert_eq!(s("open iron door"), "It swings open. Cold air rises from the dark below.");
+        assert_eq!(s("open iron door"), "It's already open.");
         assert_eq!(s("take key"), "You take the brass key.");
         assert!(s("inventory").contains("a brass key"));
         assert!(s("down").starts_with("Gold."));
@@ -425,7 +428,7 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/hall").unwrap();
         let mut s = |line: &str| say(&game, &world, &mut state, line);
-        assert_eq!(s("east"), "It's locked.");
+        assert_eq!(s("east"), "The shed door is locked.");
         assert_eq!(s("unlock shed door"), "The lock falls open.");
         assert_eq!(s("lock shed door"), "The lock clicks shut.");
         // The lever opens the shed door through `connects:`.
@@ -492,16 +495,17 @@ mod tests {
         // The room lists every visible thing by title, each held thing
         // after what holds it.
         let look = s("look");
-        assert!(look.contains("You see some walls, an old photo on the walls, a shelf on the walls, and a vase on the shelf."), "{}", look);
-        // A holder lists what it holds; what that holds is in scope too.
-        assert_eq!(s("x walls"), "Papered walls.\nYou see an old photo and a shelf.");
+        assert!(look.contains("There's an old photo and a shelf on the walls and a vase on the shelf."), "{}", look);
+        assert!(!look.contains("You see"), "the walls are scenery: {}", look);
+        // A holder says what it holds; what that holds is in scope too.
+        assert_eq!(s("x walls"), "Papered walls.\nThere's an old photo and a shelf on the walls.");
         assert_eq!(s("look at photo"), "A family, unsmiling.");
         assert_eq!(s("x vase"), "Blue glass.");
         assert_eq!(s("take vase"), "You take the vase.");
         assert_eq!(s("x shelf"), "A narrow shelf.");
         assert_eq!(s("take photo"), "You take the old photo.");
-        assert_eq!(s("x walls"), "Papered walls.\nYou see a shelf.");
-        assert!(s("look").contains("You see some walls and a shelf on the walls."));
+        assert_eq!(s("x walls"), "Papered walls.\nThere's a shelf on the walls.");
+        assert!(s("look").contains("There's a shelf on the walls."), "the vase and photo are taken");
         assert!(s("inventory").contains("an old photo"));
 
         // Placed twice is a warning; a cycle is a problem.
@@ -512,7 +516,7 @@ mod tests {
         assert!(world.current_problems(false).iter().any(|p| p.contains("object `walls` holds itself")), "{:?}", world.current_problems(false));
         // Play still follows a cycle only once.
         let mut state = game.start(&world, "hallway").unwrap();
-        assert_eq!(say(&game, &world, &mut state, "x vase"), "You see some walls.");
+        assert_eq!(say(&game, &world, &mut state, "x vase"), "There's some walls on the vase.");
         assert_eq!(say(&game, &world, &mut state, "x photo"), "A family, unsmiling.");
     }
 
@@ -537,7 +541,7 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "hallway").unwrap();
         let look = say(&game, &world, &mut state, "look");
-        assert!(look.contains("an old photo on the walls") && look.contains("some coins in the chest"), "{}", look);
+        assert!(look.contains("an old photo and a shelf on the walls") && look.contains("some coins in the chest"), "{}", look);
         world.set_file(&d.join("objects/chest.md"), "---\nid: chest\ntitle: Chest\ntype: object\nobject_type: box\nholds:\nobjects: [coins]\n---\n");
         assert!(world.current_warnings().iter().any(|w| w.contains("object `chest`: `holds:` is empty")), "{:?}", world.current_warnings());
 
@@ -547,7 +551,7 @@ mod tests {
         let mut state = game.start(&world, "castle/hall").unwrap();
         say(&game, &world, &mut state, "take key");
         say(&game, &world, &mut state, "unlock iron door with key");
-        assert!(say(&game, &world, &mut state, "look").contains("a brass key in the iron door"));
+        assert!(say(&game, &world, &mut state, "look").contains("There's a brass key in the iron door."));
     }
 
     #[test]

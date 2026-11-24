@@ -3,4 +3,7 @@ inherits: index
 passable: yes
 ---
 ## When: #open
-The door stands open.
+It swings open.
+
+## When: #open #no-action
+It's already open.

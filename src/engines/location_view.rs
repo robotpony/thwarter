@@ -17,6 +17,9 @@ pub struct LocationView {
     /// What the room's objects and doors hold, as play sees it (REQ-CF-31):
     /// each with its holder, in the order they're shown. Empty outside play.
     pub held: Vec<Held>,
+    /// The objects here that are scenery, part of the room's prose (no
+    /// card, or `object_type: scenery`): play doesn't list them.
+    pub scenery: Vec<String>,
 }
 
 /// A thing another thing holds: a photo on a wall, a key in a lock.
@@ -53,6 +56,8 @@ pub struct DoorView {
     pub transparent: bool,
     /// For a door that can be seen through, the title of the room beyond.
     pub beyond: Option<String>,
+    /// Its state in a game (`open`, `locked`); `None` outside play.
+    pub state: Option<String>,
 }
 
 /// A character or object named by a location. `name` is `None` when no

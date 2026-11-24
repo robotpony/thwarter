@@ -10,7 +10,8 @@
 //! ```
 //!
 //! `{list}` is the things, people or directions joined with commas and
-//! `and` ("a chair, a bed, and an old shirt").
+//! `and` ("a chair, a bed, and an old shirt"); `{or}` joins them with `or`
+//! ("north, east, or down").
 
 use std::collections::BTreeMap;
 
@@ -25,8 +26,15 @@ pub struct PlayText {
     pub character: String,
     /// More than one: "Captain Marcus and the king are here."
     pub characters: String,
-    /// The ways out: "You can go north and west."
+    /// What the room's things hold: "There's an old photo on the walls."
+    /// Also follows a holder's description when it's examined.
+    pub held: String,
+    /// The ways out: "You can go north or west."
     pub exits: String,
+    /// One way out through a door, in `exits`' list: "down through an
+    /// iron door". `{door}` is the door's name with an article, and "open"
+    /// when it stands open.
+    pub door_exit: String,
     /// No way out.
     pub no_exits: String,
     /// What the player carries: "You have a key."
@@ -44,7 +52,9 @@ impl Default for PlayText {
             objects: "You see {list}.".into(),
             character: "{list} is here.".into(),
             characters: "{list} are here.".into(),
-            exits: "You can go {list}.".into(),
+            held: "There's {list}.".into(),
+            exits: "You can go {or}.".into(),
+            door_exit: "{direction} through {door}".into(),
             no_exits: "There's no way out.".into(),
             inventory: "You have {list}.".into(),
             empty_inventory: "You aren't carrying anything.".into(),
@@ -55,7 +65,7 @@ impl Default for PlayText {
 
 /// The settings by name, as `world.toml` writes them, for the reference
 /// copy and for checking keys.
-pub const KEYS: &[&str] = &["show_room_names", "objects", "character", "characters", "exits", "no_exits", "inventory", "empty_inventory", "serial_comma"];
+pub const KEYS: &[&str] = &["show_room_names", "objects", "character", "characters", "held", "exits", "door_exit", "no_exits", "inventory", "empty_inventory", "serial_comma"];
 
 impl PlayText {
     /// The defaults with `[play]`'s values over them. A key it doesn't
@@ -71,7 +81,9 @@ impl PlayText {
         strings.insert("objects", &mut text.objects);
         strings.insert("character", &mut text.character);
         strings.insert("characters", &mut text.characters);
+        strings.insert("held", &mut text.held);
         strings.insert("exits", &mut text.exits);
+        strings.insert("door_exit", &mut text.door_exit);
         strings.insert("no_exits", &mut text.no_exits);
         strings.insert("inventory", &mut text.inventory);
         strings.insert("empty_inventory", &mut text.empty_inventory);
@@ -104,9 +116,25 @@ impl PlayText {
         }
     }
 
-    /// `template` with `{list}` filled.
+    /// `items` joined with `or`: "a", "a or b", "a, b, or c".
+    pub fn list_or(&self, items: &[String]) -> String {
+        match items {
+            [] => String::new(),
+            [one] => one.clone(),
+            [a, b] => format!("{} or {}", a, b),
+            [init @ .., last] => format!("{}{} or {}", init.join(", "), if self.serial_comma { "," } else { "" }, last),
+        }
+    }
+
+    /// `template` with `{list}` and `{or}` filled.
     pub fn fill(&self, template: &str, items: &[String]) -> String {
-        template.replace("{list}", &self.list(items))
+        template.replace("{list}", &self.list(items)).replace("{or}", &self.list_or(items))
+    }
+
+    /// `door_exit` for one door: "down through an open iron door".
+    pub fn door_exit(&self, direction: &str, door: &str, open: bool) -> String {
+        let name = if open { format!("open {}", door) } else { door.to_string() };
+        self.door_exit.replace("{direction}", direction).replace("{door}", &with_article(&name))
     }
 }
 
@@ -137,6 +165,8 @@ mod tests {
         assert_eq!(t.list(&s(&["a chair", "a bed", "an old shirt"])), "a chair, a bed, and an old shirt");
         let no_serial = PlayText { serial_comma: false, ..PlayText::default() };
         assert_eq!(no_serial.list(&s(&["a", "b", "c"])), "a, b and c");
+        assert_eq!(t.fill(&t.exits, &s(&["north", "east", "down"])), "You can go north, east, or down.");
+        assert_eq!(t.door_exit("down", "Iron door", true), "down through an open iron door");
         assert_eq!(with_article("Chair"), "a chair");
         assert_eq!(with_article("old shirt"), "an old shirt");
         assert_eq!(with_article("Walls"), "some walls");

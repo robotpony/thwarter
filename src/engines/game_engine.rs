@@ -24,18 +24,15 @@ pub struct GameEngine {
     pub ask_which: fn(verb: &str, noun: &str, candidates: &[String], turn: u64) -> String,
 }
 
-/// The built-in replies, in the story's voice rather than the system's
-/// (`design/STATES.md` › Ambiguity), varied by turn.
+/// The built-in reply, in the story's voice rather than the system's
+/// (`design/STATES.md` › Ambiguity): one plain question, so the player
+/// always knows what to type next.
 pub fn default_ask_which(verb: &str, noun: &str, candidates: &[String], turn: u64) -> String {
-    let forms = [
-        "Which {noun} do you want to {verb}: {or}?",
-        "You look at {and}, not sure which to {verb}.",
-    ];
-    forms[(turn as usize) % forms.len()]
+    let _ = turn;
+    "Which {noun} do you want to {verb}, {or}?"
         .replace("{noun}", noun)
         .replace("{verb}", verb)
         .replace("{or}", &join_or(candidates))
-        .replace("{and}", &join_and(candidates))
 }
 
 impl Default for GameEngine {
@@ -127,6 +124,7 @@ impl GameEngine {
         for door in view.exits.iter_mut().filter_map(|e| e.door.as_mut()) {
             let text = self.describe(world, state, EntityKind::Door, &door.id, &door.description);
             door.description = world.fill(&text, &Scope { at: At::play(state), this: Some((EntityKind::Door, &door.id)), here: None });
+            door.state = self.current_state(world, state, EntityKind::Door, &door.id);
         }
         view.objects
             .retain(|o| !state.was_taken(&state.location, &o.id) && !state.inventory.contains(&o.id));
@@ -152,8 +150,11 @@ impl GameEngine {
                 }
             }
         }
-        let phrase: fn(&EntityRef) -> String = if kind == EntityKind::Character { person } else { the_object };
-        let names: Vec<String> = candidates.iter().map(phrase).collect();
+        if kind == EntityKind::Character {
+            let names: Vec<String> = candidates.iter().map(person).collect();
+            return format!("Who do you want to {}, {}?", verb, join_or(&names));
+        }
+        let names: Vec<String> = candidates.iter().map(the_object).collect();
         let noun = noun.trim().to_lowercase();
         let noun = noun.strip_prefix("the ").unwrap_or(&noun).trim().to_string();
         (self.ask_which)(verb, &noun, &names, state.turn)
@@ -245,7 +246,11 @@ impl GameEngine {
                     let stays = Outcome(self.current_state(world, state, EntityKind::Door, &door.id).unwrap_or_else(|| "no-action".into()));
                     let replies = self.replies(world, state, "go", (EntityKind::Door, &door.id), None, &stays);
                     return ActionResult::say(match replies.is_empty() {
-                        true => format!("The {} is closed.", door.title.to_lowercase()),
+                        true => format!(
+                            "The {} is {}.",
+                            door.title.to_lowercase(),
+                            if self.current_state(world, state, EntityKind::Door, &door.id).as_deref() == Some("locked") { "locked" } else { "closed" }
+                        ),
                         false => self.say_replies(world, state, &replies),
                     });
                 }
@@ -416,7 +421,10 @@ impl GameEngine {
             }
             Ok(None) => {
                 return match resolve(noun, &view.characters, person) {
-                    Ok(Some(p)) => ActionResult::say(format!("You can't {} {}.", verb, person(&p))),
+                    Ok(Some(p)) if matches!(verb.as_str(), "talk" | "speak" | "chat" | "ask") => {
+                        ActionResult::say(format!("{} has nothing to say.", person(&p)))
+                    }
+                    Ok(Some(p)) => ActionResult::say(format!("You can't {} {}.", verb, person_mid(&p))),
                     Err(which) => ActionResult::say(self.which(world, state, &verb, noun, EntityKind::Character, &which)),
                     Ok(None) => ActionResult::say(format!("There's no {} here.", noun.trim())),
                 }
@@ -544,12 +552,17 @@ impl GameEngine {
     }
 
     /// Replies as the player reads them, each filled from its own thing.
+    /// One-paragraph replies run together as one paragraph ("It swings
+    /// open. Cold air rises from the dark below."); longer ones keep a
+    /// blank line between them.
     fn say_replies(&self, world: &WorldEngine, state: &PlayState, replies: &[(EntityKind, String, String)]) -> String {
-        replies
+        let said: Vec<String> = replies
             .iter()
             .map(|(kind, id, text)| prose(world, &world.fill(text, &Scope { at: At::play(state), this: Some((*kind, id)), here: None })))
-            .collect::<Vec<_>>()
-            .join("\n\n")
+            .filter(|t| !t.trim().is_empty())
+            .collect();
+        let short = said.iter().all(|t| !t.trim().contains('\n'));
+        said.join(if short { " " } else { "\n\n" })
     }
 
     /// A thing as its script sees it: id, title, state, values, and what
@@ -698,7 +711,11 @@ impl GameEngine {
         if names.is_empty() {
             return text.to_string();
         }
-        let line = world.play_text().fill(&world.play_text().objects, &names);
+        // "There's an old photo on the walls.", as the room says it.
+        let holder_name = world.current(EntityKind::Object, holder, At::play(state)).or_else(|| world.current(EntityKind::Door, holder, At::play(state))).map(|e| e.title().to_string()).unwrap_or_else(|| crate::engines::title_from_id(holder));
+        let text_ = world.play_text();
+        let phrase = format!("{} {} the {}", text_.list(&names), world.holds_word(holder, At::play(state)), holder_name.to_lowercase());
+        let line = text_.fill(&text_.held, &[phrase]);
         match text.trim().is_empty() {
             true => line,
             false => format!("{}\n{}", text.trim(), line),
@@ -1030,6 +1047,16 @@ fn person(character: &EntityRef) -> String {
     character.display_name()
 }
 
+/// A person's name mid-sentence: "the cook" for "The cook", but "King
+/// Aldric" as written.
+fn person_mid(character: &EntityRef) -> String {
+    let name = character.display_name();
+    match name.strip_prefix("The ") {
+        Some(rest) => format!("the {}", rest),
+        None => name,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1073,12 +1100,10 @@ mod tests {
         let (_d, world) = world();
         let (game, mut state) = play(&world);
         let r = game.act(&world, &mut state, &PlayAction::Look);
-        // No room name by default; what's here follows the prose, then
-        // after a blank line the ways out and who's here (world.toml [play]).
-        assert_eq!(
-            r.text,
-            "Grass.\nYou see a rusty sword, an old sword, a stone bench, and a well.\n\nYou can go north and west.\nKing Aldric is here."
-        );
+        // No room name by default; who's here follows the prose, then
+        // after a blank line what's here, then the ways out (world.toml
+        // [play]). The bench is scenery, so the prose has it.
+        assert_eq!(r.text, "Grass.\nKing Aldric is here.\n\nYou see a rusty sword, an old sword, and a well.\n\nYou can go north or west.");
         assert!(r.changes.is_empty());
     }
 
@@ -1128,7 +1153,7 @@ mod tests {
             ("bench", "You can't take the stone bench."),
             ("well", "The well won't budge."),
             ("king", "You can't take people."),
-            ("sword", "Which sword do you want to take: the rusty sword or the old sword?"),
+            ("sword", "Which sword do you want to take, the rusty sword or the old sword?"),
             ("lamp", "There's no lamp here."),
             ("", "Take what?"),
         ];
@@ -1174,7 +1199,7 @@ mod tests {
         assert_eq!(game.act(&world, &mut state, &PlayAction::Take("Brass Lantern".into())).text, "You already have the brass lantern.");
         assert_eq!(
             game.act(&world, &mut state, &PlayAction::Examine("aldric".into())).text,
-            "You look at King Aldric and Queen Aldric, not sure which to examine."
+            "Who do you want to examine, King Aldric or Queen Aldric?"
         );
     }
 
@@ -1495,12 +1520,9 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/yard").unwrap();
         assert_eq!(game.act(&world, &mut state, &PlayAction::Take("sword".into())).text, "Two blades glint. You'll have to say which.");
-        // Without a shared template, the built-in replies vary by turn.
+        // Without a shared template, the built-in question.
         world.set_file(&d.join("objects/old-sword.md"), "---\nid: old-sword\ntitle: Old sword\ntype: object\nobject_type: weapon\n---\n");
-        let first = game.act(&world, &mut state, &PlayAction::Take("sword".into())).text;
-        let second = game.act(&world, &mut state, &PlayAction::Take("sword".into())).text;
-        assert_ne!(first, second);
-        assert!(first.contains("the rusty sword") && second.contains("the old sword"), "{} / {}", first, second);
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Take("sword".into())).text, "Which sword do you want to take, the rusty sword or the old sword?");
     }
 
     #[test]
@@ -1559,7 +1581,8 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/hall").unwrap();
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
-        assert!(look.contains("You can go east and down.\nThrough the iron grate you can see the Cell.\nAn iron door is set in the floor, shut."), "{}", look);
+        assert!(look.contains("You can go east through an iron grate or down through an iron door.\nThrough the iron grate you can see the Cell."), "{}", look);
+        assert!(!look.contains("shut"), "a door's own text shows when it's examined: {}", look);
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text, "The iron door is closed.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("east".into())).text, "The iron grate is closed.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("iron door".into())).text, "An iron door is set in the floor, shut.");

@@ -39,6 +39,26 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.53.0 (2026-11-24)
+
+### Changed
+
+- Play reads a room in Bruce's order (REQ-ENG-43): the description with who's here, then what's here, then what things hold ("There's an old photo on the walls and some coins in the chest."), then the ways out, naming their doors ("You can go north, east through a shed door, or down through an open iron door."). Scenery is left out of "You see", since the prose has it. A door's own text shows when it's examined, not on every look.
+- An examined holder says what it holds the same way: "Papered walls. There's an old photo on the walls."
+- Built-in replies read as the story (REQ-ENG-45): "Which key do you want to take, the brass key or the iron key?" every time, "Who do you want to …" for people, "The iron door is locked." for a locked exit, and `I don't understand "xyzzy".` with plain quotation marks. Replies from several things run together as one paragraph: "It swings open. Cold air rises from the dark below."
+- The `locked-door` built-in opens with "It swings open.", like `door`, and leaves a locked exit to the built-in "The iron door is locked."
+
+### Added
+
+- `[play]` gains `held` ("There's {list}.") and `door_exit` ("{direction} through {door}"), and any template may use `{or}` for a list joined with "or"; `exits` now defaults to "You can go {or}.". The test world's reference copy lists them.
+- `validate` warns about a character whose `default_location` room doesn't list it in `characters:`, so it never appears (REQ-ENG-46).
+- Typing the room's own name examines it, as `look around` does (REQ-PC-10).
+
+### Fixed
+
+- "You can't talk The cook." Talking to someone with nothing written now says "The cook has nothing to say.", and other verbs say "You can't kick the cook."
+- Opening an open `locked-door` said "Nothing happens."; it says "It's already open.", and closing a closed one says "It's already shut."
+
 ## 0.52.0 (2026-11-24)
 
 ### Added

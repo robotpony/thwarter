@@ -641,6 +641,19 @@ impl WorldEngine {
                 warnings.push(format!("`{}` starts in more than one place: {}; play shows it in each", id, named.join(", ")));
             }
         }
+        // A room shows who it lists in `characters:`; `default_location`
+        // alone doesn't put anyone there, so the character never appears.
+        let mut people: Vec<&Character> = self.characters.values().collect();
+        people.sort_by(|a, b| a.id.cmp(&b.id));
+        for c in people {
+            let Some(room) = c.default_location.as_deref().and_then(|at| self.get_location(at)) else { continue };
+            if !room.characters.contains(&c.id) {
+                warnings.push(format!(
+                    "character `{}`: `default_location: {}` doesn't put it there; add `{}` to {}'s `characters:` so play shows it",
+                    c.id, room.id, c.id, room.id
+                ));
+            }
+        }
         warnings
     }
 
@@ -1326,6 +1339,7 @@ impl WorldEngine {
                                 passable: door.passable,
                                 transparent: door.transparent,
                                 beyond,
+                                state: None,
                             }),
                         };
                     }
@@ -1378,6 +1392,11 @@ impl WorldEngine {
             body: location.description.clone(),
             exits,
             characters,
+            scenery: objects
+                .iter()
+                .filter(|o| self.objects.get(o.id.as_str()).map_or(true, |card| card.object_type == "scenery"))
+                .map(|o| o.id.clone())
+                .collect(),
             objects,
             held,
         })
@@ -1604,12 +1623,26 @@ mod tests {
     fn small_world() -> (tempfile::TempDir, WorldEngine, WorldLoadReport) {
         let dir = tempfile::tempdir().unwrap();
         write(dir.path(), "castle/yard.md", "---\nid: castle/yard\ntitle: Yard\ntype: location\nconnections:\n  north: castle/hall\n---\nGrass.\n");
-        write(dir.path(), "castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\n---\n");
+        write(dir.path(), "castle/hall.md", "---\nid: castle/hall\ntitle: Hall\ntype: location\ncharacters: [king]\n---\n");
         write(dir.path(), "npcs/king.md", "---\nid: king\ntitle: King\ntype: character\ndefault_location: castle/hall\n---\n");
         write(dir.path(), "broken.md", "no frontmatter\n");
         let mut engine = WorldEngine::new();
         let report = engine.load_world(dir.path()).unwrap();
         (dir, engine, report)
+    }
+
+    #[test]
+    fn a_character_its_room_doesnt_list_is_a_warning() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "hall.md", "---\nid: hall\ntitle: Hall\ntype: location\n---\n");
+        write(dir.path(), "npcs/cook.md", "---\nid: cook\ntitle: The cook\ntype: character\ndefault_location: hall\n---\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(dir.path()).unwrap();
+        let warnings = engine.current_warnings();
+        assert!(warnings.iter().any(|w| w.starts_with("character `cook`: `default_location: hall` doesn't put it there")), "{:?}", warnings);
+        write(dir.path(), "hall.md", "---\nid: hall\ntitle: Hall\ntype: location\ncharacters: [cook]\n---\n");
+        engine.load_world(dir.path()).unwrap();
+        assert!(engine.current_warnings().is_empty(), "{:?}", engine.current_warnings());
     }
 
     #[test]
@@ -1702,7 +1735,7 @@ mod tests {
         assert!(report.warnings.is_empty());
         engine.set_file(&dir.path().join("objects/hall.md"), "---\nid: castle/hall\ntitle: Hall Bell\ntype: object\nobject_type: x\n---\n");
         assert_eq!(engine.shared_ids(), vec![("castle/hall".to_string(), vec![EntityKind::Location, EntityKind::Object])]);
-        let warnings = engine.current_warnings();
+        let warnings: Vec<String> = engine.current_warnings().into_iter().filter(|w| w.starts_with("id ")).collect();
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].starts_with("id `castle/hall` is used by more than one kind (location, object)"), "{}", warnings[0]);
         assert_eq!(engine.current_problems(false).len(), 1); // still only broken.md

@@ -14,7 +14,7 @@ pub enum Parsed {
     /// A known verb missing its noun (`Take what?`): a reply, not an
     /// action. It changes nothing and counts no turn.
     Reply(String),
-    /// A line the engine can't read: ``I don't understand `<line>`.``
+    /// A line the engine can't read: `I don't understand "<line>".`
     /// It changes nothing and counts no turn (REQ-PC-5); a client may log
     /// the line.
     Unknown(String),
@@ -35,6 +35,14 @@ impl GameEngine {
     /// (REQ-PC-13), unless the noun names nothing in scope and no thing in
     /// the world has that action, which isn't understood (REQ-PC-14).
     pub fn parse_command(&self, world: &WorldEngine, line: &str, state: &PlayState) -> Parsed {
+        // The room's own name examines it, as `look around` does (REQ-PC-10).
+        let typed = line.trim().to_lowercase();
+        let typed = typed.strip_prefix("the ").unwrap_or(&typed).trim();
+        if let Some(room) = world.location_at(&state.location, crate::engines::At::play(state)) {
+            if !typed.is_empty() && direction(typed).is_none() && (typed == room.name.to_lowercase() || typed == room.id.to_lowercase()) {
+                return Parsed::Action(PlayAction::Examine(typed.to_string()));
+            }
+        }
         match parse_words(line) {
             Words::Other { verb, noun, with } => {
                 let known = world.has_action(&verb);
@@ -57,7 +65,7 @@ enum Words {
 }
 
 fn unknown(line: &str) -> Parsed {
-    Parsed::Unknown(format!("I don't understand `{}`.", line.trim()))
+    Parsed::Unknown(format!("I don't understand \"{}\".", line.trim()))
 }
 
 /// The syntax alone: no world, no state (REQ-PC-2 to 8).
@@ -197,9 +205,9 @@ mod tests {
         assert_eq!(parse("take the"), Parsed::Reply("Take what?".into()));
         assert_eq!(parse("go"), Parsed::Reply("Go where?".into()));
         assert_eq!(parse("look at"), Parsed::Reply("Look at what?".into()));
-        assert_eq!(parse("n please"), Parsed::Unknown("I don't understand `n please`.".into()));
-        assert_eq!(parse(""), Parsed::Unknown("I don't understand ``.".into()));
-        assert_eq!(parse("i lamp"), Parsed::Unknown("I don't understand `i lamp`.".into()));
+        assert_eq!(parse("n please"), Parsed::Unknown("I don't understand \"n please\".".into()));
+        assert_eq!(parse(""), Parsed::Unknown("I don't understand \"\".".into()));
+        assert_eq!(parse("i lamp"), Parsed::Unknown("I don't understand \"i lamp\".".into()));
     }
 
     fn world() -> (tempfile::TempDir, WorldEngine) {
@@ -240,8 +248,8 @@ mod tests {
         let Parsed::Action(lick) = p(&state, "lick lever") else { panic!() };
         assert_eq!(game.act(&world, &mut state, &lick).text, "Nothing happens.");
         // REQ-PC-14: a verb no thing has, on nothing here.
-        assert_eq!(p(&state, "dance wildly"), Parsed::Unknown("I don't understand `dance wildly`.".into()));
-        assert_eq!(p(&state, "dance"), Parsed::Unknown("I don't understand `dance`.".into()));
+        assert_eq!(p(&state, "dance wildly"), Parsed::Unknown("I don't understand \"dance wildly\".".into()));
+        assert_eq!(p(&state, "dance"), Parsed::Unknown("I don't understand \"dance\".".into()));
         // A verb some thing has, on nothing here: the engine says so.
         assert_eq!(p(&state, "pull wildly"), use_("pull", "wildly"));
         // An action in a state the thing isn't in yet still counts.

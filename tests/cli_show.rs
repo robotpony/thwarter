@@ -31,7 +31,7 @@ fn world() -> World {
     write(d, "world/index.md", "---\ntitle: Tiny Castle\ntype: world\nauthor: bruce\nstart: vault\n---\nYou wake.\n");
     write(d, "world/story.md", "---\ntype: story\nvars: { king: alive }\n---\n");
     write(d, "chapters/10-before.md", "---\ntitle: Before\n---\n");
-    write(d, "vault/index.md", "---\nid: vault\ntitle: Vault\ntype: location\nstate: shut\n---\n");
+    write(d, "vault/index.md", "---\nid: vault\ntitle: Vault\ntype: location\nstate: shut\ncharacters: [guard]\n---\n");
     write(d, "vault/shut.md", "---\ninherits: index\n---\nShut.\n");
     write(d, "vault/open.md", "---\ninherits: index\n---\nOpen.\n");
     write(d, "vault/chapters/before.md", "---\n---\nQuiet.\n");

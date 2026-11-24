@@ -10,3 +10,6 @@ You pull the door shut.
 
 ## When: #unlock #no-action
 It isn't locked.
+
+## When: #close #no-action
+It's already shut.

@@ -13,6 +13,3 @@ That doesn't fit the lock.
 
 ## When: #open #no-action
 It's locked.
-
-## When: #go
-It's locked.
