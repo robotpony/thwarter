@@ -67,6 +67,8 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 - [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
+- [ ] Objects hold objects: loading, scope, examine lists, one place per thing, unified with `keep()` [coder] (REQ-CF-31)
+- [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
 
 ## Phase 6 · Doors and play
 
