@@ -6,7 +6,7 @@ This document defines the command-style interface for the Thwarter command line 
 
 ## Status
 
-For what's actually implemented versus still a mock or unbuilt, see the implementation status table in `design/ARCHITECTURE.md`. Short version: `validate`, `show` and `map` do real work against loaded world content; `search`, `debug`, `go`, `do`, `test`, and `create` are either honestly-labeled "not implemented" or not wired into the CLI at all. Everything below this line is the target interface, not a description of current behavior.
+For what's actually implemented versus still a mock or unbuilt, see the implementation status table in `design/ARCHITECTURE.md`. Short version: `validate`, `show`, `map` and `search` do real work against loaded world content; `debug`, `go`, `do`, `test`, and `create` are either honestly-labeled "not implemented" or not wired into the CLI at all. Everything below this line is the target interface, not a description of current behavior.
 
 ## Command Structure
 
@@ -122,16 +122,19 @@ thwart search <query> [location] [options]
 **Examples:**
 ```bash
 thwart search "golden key"                     # Search for objects/text
-thwart search npc castle/                      # Find NPCs in location tree
+thwart search --type=character guard castle/   # Characters under castle/ matching "guard"
 thwart search --type=character "wizard"        # Search for specific character
+thwart search --type=door gate                 # Doors matching "gate"
 thwart search --missing-connections            # Find broken location links
 ```
 
 **Options:**
-- `--type=<character|object|location|text>` - Limit search scope
-- `--case-sensitive` - Enable case-sensitive matching
-- `--regex` - Use regular expression matching
+- `--type=<location|object|character|door|text>` - Limit search scope; `text` searches prose only
+- `--case-sensitive` - Enable case-sensitive matching (the default ignores case)
+- `--regex` - Use regular expression matching (linear-time, so no pattern can hang it)
 - `--missing-connections` - Find broken location references
+
+The query matches ids, titles and prose, including object responses. A location limits the search to rooms in that folder, what they hold, and characters who start there. No matches isn't an error (REQ-CLI-18).
 
 ### Interactive Actions
 
