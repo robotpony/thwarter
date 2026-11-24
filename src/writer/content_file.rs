@@ -110,6 +110,15 @@ impl ContentFile {
         self
     }
 
+    /// `text` as a layer file at `path` (see `load_layer`).
+    pub fn layer_from_text(path: impl AsRef<Path>, text: &str) -> Result<Self> {
+        let path = path.as_ref();
+        MarkdownParser::new()
+            .split_document(text)
+            .with_context(|| format!("{} doesn't parse", path.display()))?;
+        Self::split(path.to_path_buf(), text, String::new(), String::new())
+    }
+
     /// Whether this file is a whole thing, with its own `id` and `type`.
     pub fn is_thing(&self) -> bool {
         !self.type_name.is_empty()

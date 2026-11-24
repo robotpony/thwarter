@@ -32,6 +32,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.32.0 (2026-11-23)
+
+### Added
+
+- `WorldWriter::make_bundle_loaded(engine, kind, id, first_state, strict)` turns a one-file thing into a bundle (REQ-ENG-28): `lantern.md` becomes `lantern/index.md` with the same id and permissions, optionally with a first state file (`inherits: index`) beside it. The index is left alone, so the thing has no starting state until one is set. The new files are written before the old one is removed, so a half-done move leaves a duplicate id that `validate` reports, never a lost file.
+- `WorldWriter::save_bundle_loaded(engine, kind, id, sections, strict)` saves a bundle's files together (REQ-ENG-29), in the shape agreed with the console coder. Each `Section` (a path, its text, and the text the editor opened) must be one of the bundle's files, must parse as what it is there (the index as the same thing, a state or chapter file with no `id`, `type` or `state:`), and must still match the disk. The merged thing must still load, checked on a copy of the engine. Only then is anything written, and only the sections that changed; a section for a file that doesn't exist yet is created. Every refusal starts with its section's path, so the editor can put the cursor there.
+- `WorldWriter::delete_state_loaded` removes a state (refused for the starting state) and lists the actions that switch to it. `WorldWriter::rename_state_loaded` renames a state's file, the index's `state:` when it's the starting one, and every `becomes:` that switches to it, each checked by reading back. `BundleReport` lists what was written, created, left unchanged, moved, deleted, and what's left for the author.
+
 ## 0.31.0 (2026-11-23)
 
 ### Added
