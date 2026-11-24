@@ -317,7 +317,7 @@ mod tests {
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(look.contains("Ana stands in the Hall (visit 1, turn 1). The king is alive. The lamp is unlit. {{< figure >}}"), "{}", look);
         assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("lamp".into())).text, "A unlit lamp, and health 100.");
-        game.act(&world, &mut state, &PlayAction::Use { verb: "light".into(), noun: "lamp".into() });
+        game.act(&world, &mut state, &PlayAction::Use { verb: "light".into(), noun: "lamp".into(), with: None });
         assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("lamp".into())).text, "A lit lamp, and health 100.");
         // Values hold once set; the room's state switched, so `this.` reads the new version.
         let look = game.act(&world, &mut state, &PlayAction::Look).text;

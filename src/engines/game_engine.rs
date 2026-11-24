@@ -80,7 +80,7 @@ impl GameEngine {
             PlayAction::Examine(noun) => self.examine(world, state, noun),
             PlayAction::Inventory => self.inventory(world, state),
             PlayAction::Search => self.search(world, state, "You search carefully"),
-            PlayAction::Use { verb, noun } => self.use_object(world, state, verb, noun),
+            PlayAction::Use { verb, noun, with } => self.use_object(world, state, verb, noun, with.as_deref()),
         }
     }
 
@@ -102,7 +102,12 @@ impl GameEngine {
     /// taken or is carried.
     fn whole_view(&self, world: &WorldEngine, state: &PlayState) -> Option<LocationView> {
         let mut view = world.describe_location_at(&state.location, At::play(state))?;
-        view.body = world.fill(&view.body, &Scope { at: At::play(state), this: Some((EntityKind::Location, &state.location)), here: None });
+        // Each description with the sections this turn matches.
+        let body = self.describe(world, state, EntityKind::Location, &state.location, &view.body);
+        view.body = world.fill(&body, &Scope { at: At::play(state), this: Some((EntityKind::Location, &state.location)), here: None });
+        for door in view.exits.iter_mut().filter_map(|e| e.door.as_mut()) {
+            door.description = self.describe(world, state, EntityKind::Door, &door.id, &door.description);
+        }
         view.objects
             .retain(|o| !state.was_taken(&state.location, &o.id) && !state.inventory.contains(&o.id));
         Some(view)
@@ -154,8 +159,13 @@ impl GameEngine {
                 found.push((EntityKind::Location, e.target.clone(), format!("a way {}", e.direction)));
             }
         }
+        // The room's `## When: #searched` section, if any, comes first.
+        let said = self.searched(world, state).map(|t| prose(world, &world.fill(&t, &Scope { at: At::play(state), this: Some((EntityKind::Location, &state.location)), here: None })));
         if found.is_empty() {
-            return ActionResult::say(format!("{}, but find nothing new.", opening));
+            return ActionResult::say(match said {
+                Some(text) => text,
+                None => format!("{}, but find nothing new.", opening),
+            });
         }
         let mut changes = Vec::new();
         for (kind, id, _) in &found {
@@ -163,7 +173,11 @@ impl GameEngine {
             changes.push(Change::Noticed { type_name: kind.type_name().to_string(), id: id.clone() });
         }
         let names: Vec<String> = found.into_iter().map(|(_, _, name)| name).collect();
-        ActionResult { text: format!("{} and find {}.", opening, join_and(&names)), changes, note: None }
+        let text = match said {
+            Some(said) => format!("{}\n\nYou find {}.", said, join_and(&names)),
+            None => format!("{} and find {}.", opening, join_and(&names)),
+        };
+        ActionResult { text, changes, note: None }
     }
 
     fn look(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
@@ -280,7 +294,8 @@ impl GameEngine {
             Ok(Some(object)) if world.door_at(&object.id, At::play(state)).is_some() && world.object_at(&object.id, At::play(state)).is_none() => {
                 let door = world.door_at(&object.id, At::play(state)).unwrap();
                 let scope = Scope { at: At::play(state), this: Some((EntityKind::Door, &door.id)), here: None };
-                let text = door.description.trim();
+                let text = self.describe(world, state, EntityKind::Door, &door.id, &door.description);
+                let text = text.trim();
                 return if text.is_empty() {
                     ActionResult::say(format!("You see nothing special about {}.", the_object(&object)))
                 } else {
@@ -289,10 +304,11 @@ impl GameEngine {
             }
             Ok(Some(object)) => {
                 // The description, with what its state adds.
-                return match world.object_at(&object.id, At::play(state)) {
-                    Some(card) if !card.description.trim().is_empty() => {
+                let text = world.object_at(&object.id, At::play(state)).map(|card| self.describe(world, state, EntityKind::Object, &object.id, &card.description));
+                return match text {
+                    Some(text) if !text.trim().is_empty() => {
                         let scope = Scope { at: At::play(state), this: Some((EntityKind::Object, &object.id)), here: None };
-                        ActionResult::say(prose(world, &world.fill(card.description.trim(), &scope)))
+                        ActionResult::say(prose(world, &world.fill(text.trim(), &scope)))
                     }
                     _ => ActionResult::say(format!("You see nothing special about {}.", the_object(&object))),
                 }
@@ -301,10 +317,10 @@ impl GameEngine {
             Ok(None) => {}
         }
         match resolve(noun, &view.characters, person) {
-            Ok(Some(person)) => match world.character_at(&person.id, At::play(state)) {
-                Some(card) if !card.description.trim().is_empty() => {
+            Ok(Some(person)) => match world.character_at(&person.id, At::play(state)).map(|card| self.describe(world, state, EntityKind::Character, &person.id, &card.description)) {
+                Some(text) if !text.trim().is_empty() => {
                     let scope = Scope { at: At::play(state), this: Some((EntityKind::Character, &person.id)), here: None };
-                    ActionResult::say(prose(world, &world.fill(card.description.trim(), &scope)))
+                    ActionResult::say(prose(world, &world.fill(text.trim(), &scope)))
                 }
                 _ => ActionResult::say(format!("You see nothing special about {}.", person.display_name())),
             },
@@ -317,7 +333,7 @@ impl GameEngine {
     /// (`becomes`), set values (`sets`) and move the story (`chapter`).
     /// A target that can't be found is skipped with an author note, which
     /// `validate` also reports.
-    fn use_object(&self, world: &WorldEngine, state: &mut PlayState, verb: &str, noun: &str) -> ActionResult {
+    fn use_object(&self, world: &WorldEngine, state: &mut PlayState, verb: &str, noun: &str, with: Option<&str>) -> ActionResult {
         let verb = verb.trim().to_lowercase();
         if noun.trim().is_empty() {
             return ActionResult::say(format!("What do you want to {}?", verb));
@@ -354,16 +370,38 @@ impl GameEngine {
                 }
             }
         };
-        let cant = || ActionResult::say(format!("You can't {} {}.", verb, the_object(&object)));
         // An object's actions, or a door's (`open door`, `unlock door`).
-        let (this_kind, actions) = match (world.object_at(&object.id, At::play(state)), world.door_at(&object.id, At::play(state))) {
-            (Some(o), _) => (EntityKind::Object, o.actions),
-            (None, Some(d)) => (EntityKind::Door, d.actions),
-            (None, None) => return cant(),
+        let kind_of = |id: &str| if world.object_at(id, At::play(state)).is_none() && world.door_at(id, At::play(state)).is_some() { EntityKind::Door } else { EntityKind::Object };
+        let this_kind = kind_of(&object.id);
+        let actions = match this_kind {
+            EntityKind::Door => world.door_at(&object.id, At::play(state)).map(|d| d.actions),
+            _ => world.object_at(&object.id, At::play(state)).map(|o| o.actions),
+        }
+        .unwrap_or_default();
+        // What it's used with (`hit window with stick`).
+        let used = match with.map(str::trim).filter(|w| !w.is_empty()) {
+            None => None,
+            Some(w) => match resolve(w, &things, the_object) {
+                Ok(Some(u)) => Some(u),
+                Err(which) => return ActionResult::say(self.which(world, state, &verb, w, EntityKind::Object, &which)),
+                Ok(None) => return ActionResult::say(format!("There's no {} here.", w)),
+            },
         };
+        let used_kind = used.as_ref().map(|u| kind_of(&u.id));
+        // The reply sections for this turn, read before the action changes
+        // anything (`design/SECTIONS.md`).
+        let reply = self.reply(world, state, &verb, (this_kind, &object.id), used.as_ref().zip(used_kind).map(|(u, k)| (k, u.id.as_str())));
         let key = verb.replace(' ', "-");
         let Some(action) = actions.iter().find(|(name, _)| name.eq_ignore_ascii_case(&key)).map(|(_, a)| a.clone()) else {
-            return cant();
+            // No mechanics: a reply section is the whole action, and with
+            // none, nothing happens.
+            return match reply {
+                Some((kind, id, text)) => {
+                    let scope = Scope { at: At::play(state), this: Some((kind, &id)), here: None };
+                    ActionResult::say(prose(world, &world.fill(&text, &scope)))
+                }
+                None => ActionResult::say("Nothing happens."),
+            };
         };
         // A hidden thing answers to its exact name only for an action with
         // no `requires:`; otherwise it is as good as absent (Bruce,
@@ -407,9 +445,15 @@ impl GameEngine {
             }
         }
 
-        // Reply sections aren't built yet (`design/SECTIONS.md`), so the
-        // reply is built in.
-        let text = builtin_reply(&verb, &name, state.turn);
+        // A reply section replaces the built-in reply; it's filled after
+        // the changes, so it can show them.
+        let text = match reply {
+            Some((kind, id, text)) => {
+                let scope = Scope { at: At::play(state), this: Some((kind, &id)), here: None };
+                prose(world, &world.fill(&text, &scope))
+            }
+            None => builtin_reply(&verb, &name, state.turn),
+        };
         let mut result = ActionResult { text, changes, note: None };
         if !notes.is_empty() {
             result.note = Some(notes.join("; "));
@@ -1024,8 +1068,8 @@ mod tests {
         assert!(world.current_problems(false).is_empty(), "{:?}", world.current_problems(false));
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/yard").unwrap();
-        let pull = PlayAction::Use { verb: "pull".into(), noun: "lever".into() };
-        let shove = PlayAction::Use { verb: "shove".into(), noun: "lever".into() };
+        let pull = PlayAction::Use { verb: "pull".into(), noun: "lever".into(), with: None };
+        let shove = PlayAction::Use { verb: "shove".into(), noun: "lever".into(), with: None };
 
         game.act(&world, &mut state, &PlayAction::Go("north".into()));
         // Replies are built in until reply sections are (design/SECTIONS.md).
@@ -1046,10 +1090,10 @@ mod tests {
         assert_eq!(state.chapter.as_ref().unwrap().name(), "after");
         assert!(r.changes.contains(&Change::EnteredChapter { name: "after".into() }));
 
-        let kick = |noun: &str| PlayAction::Use { verb: "kick".into(), noun: noun.into() };
+        let kick = |noun: &str| PlayAction::Use { verb: "kick".into(), noun: noun.into(), with: None };
         assert_eq!(game.act(&world, &mut state, &kick("iron lever")).text, "You kick the iron lever. Something changes.");
-        let lick = PlayAction::Use { verb: "lick".into(), noun: "lever".into() };
-        assert_eq!(game.act(&world, &mut state, &lick).text, "You can't lick the iron lever.");
+        let lick = PlayAction::Use { verb: "lick".into(), noun: "lever".into(), with: None };
+        assert_eq!(game.act(&world, &mut state, &lick).text, "Nothing happens.");
         assert_eq!(game.act(&world, &mut state, &kick("dragon")).text, "There's no dragon here.");
         assert_eq!(game.act(&world, &mut state, &kick("")).text, "What do you want to kick?");
     }
@@ -1121,10 +1165,10 @@ mod tests {
         // Hidden: never listed or found, but an action can name it exactly.
         assert_eq!(act(&mut state, PlayAction::Examine("lever".into())), "There's no lever here.");
         assert_eq!(act(&mut state, PlayAction::Examine("ghost".into())), "There's no ghost here.");
-        let pull = |noun: &str| PlayAction::Use { verb: "pull".into(), noun: noun.into() };
+        let pull = |noun: &str| PlayAction::Use { verb: "pull".into(), noun: noun.into(), with: None };
         assert_eq!(act(&mut state, pull("lev")), "There's no lev here.");
         // An action with `requires:` can't reach a hidden thing, even with the key in hand.
-        assert_eq!(act(&mut state, PlayAction::Use { verb: "turn".into(), noun: "lever".into() }), "There's no lever here.");
+        assert_eq!(act(&mut state, PlayAction::Use { verb: "turn".into(), noun: "lever".into(), with: None }), "There's no lever here.");
         assert!(act(&mut state, pull("lever")).starts_with("You pull the lever."));
         assert_eq!(act(&mut state, PlayAction::Examine("ghost".into())), "Pale.");
     }
@@ -1227,7 +1271,7 @@ mod tests {
         assert_eq!(game.act(&world, &mut state, &PlayAction::Go("east".into())).text, "The iron grate is closed.");
         assert_eq!(game.act(&world, &mut state, &PlayAction::Examine("iron door".into())).text, "An iron door is set in the floor, shut.");
 
-        assert!(game.act(&world, &mut state, &PlayAction::Use { verb: "pull".into(), noun: "lever".into() }).text.starts_with("You pull the lever."));
+        assert!(game.act(&world, &mut state, &PlayAction::Use { verb: "pull".into(), noun: "lever".into(), with: None }).text.starts_with("You pull the lever."));
         assert_eq!(state.state_of("door", "vault-door"), Some("open"));
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(!look.contains("shut"), "{}", look); // the open state has no prose, and the index none either
@@ -1243,7 +1287,7 @@ mod tests {
         world.set_file(&dir.path().join("castle/doors/vault-door/index.md"), "---\nid: vault-door\ntitle: Iron door\ntype: door\ninherits: door\nsides:\n  castle/hall: { direction: down }\n  castle/vault: { direction: up }\nactions:\n  open: { becomes: { this: open } }\n---\n");
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/hall").unwrap();
-        assert!(game.act(&world, &mut state, &PlayAction::Use { verb: "open".into(), noun: "door".into() }).text.starts_with("You open the iron door."), "`this` is the door");
+        assert!(game.act(&world, &mut state, &PlayAction::Use { verb: "open".into(), noun: "door".into(), with: None }).text.starts_with("You open the iron door."), "`this` is the door");
         assert!(game.act(&world, &mut state, &PlayAction::Go("down".into())).text.starts_with("Vault"));
     }
 

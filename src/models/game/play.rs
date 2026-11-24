@@ -122,8 +122,9 @@ pub enum PlayAction {
     /// Look closely around the room, finding faint things.
     Search,
     /// An object's own named action (`design/STATES.md` › Changing
-    /// state): `pull lever` is `verb` "pull", `noun` "lever".
-    Use { verb: String, noun: String },
+    /// state): `pull lever` is `verb` "pull", `noun` "lever";
+    /// `hit window with stick` adds `with` "stick".
+    Use { verb: String, noun: String, with: Option<String> },
 }
 
 /// What an action did: the text to show, and the state changes made.

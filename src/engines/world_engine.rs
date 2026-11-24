@@ -826,6 +826,13 @@ impl WorldEngine {
         if self.objects.values().any(|o| named(&o.actions)) || self.doors.values().any(|d| named(&d.actions)) {
             return true;
         }
+        // A `#verb` in any section's heading is a verb the world knows
+        // (`## When: #hit @stick`).
+        let tag = format!("#{}", key);
+        let in_heading = |t: &Thing| t.templates.iter().chain(std::iter::once(&t.index)).any(|l| l.sections.iter().any(|s| s.tags.iter().any(|g| g.eq_ignore_ascii_case(&tag))));
+        if self.things.values().any(in_heading) {
+            return true;
+        }
         let chapters: Vec<Option<String>> = std::iter::once(None).chain(self.chapters.iter().map(|c| Some(c.name().to_string()))).collect();
         self.things.values().filter(|t| matches!(t.kind, EntityKind::Object | EntityKind::Door)).any(|t| {
             let states: Vec<Option<String>> = std::iter::once(None).chain(t.state_names().into_iter().map(Some)).collect();

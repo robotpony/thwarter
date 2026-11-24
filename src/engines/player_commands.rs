@@ -36,11 +36,11 @@ impl GameEngine {
     /// the world has that action, which isn't understood (REQ-PC-14).
     pub fn parse_command(&self, world: &WorldEngine, line: &str, state: &PlayState) -> Parsed {
         match parse_words(line) {
-            Words::Other { verb, noun } => {
+            Words::Other { verb, noun, with } => {
                 let known = world.has_action(&verb);
                 match noun {
                     None if known => Parsed::Reply(format!("What do you want to {}?", verb)),
-                    Some(noun) if known || self.names_anything(world, state, &noun) => Parsed::Action(PlayAction::Use { verb, noun }),
+                    Some(noun) if known || self.names_anything(world, state, &noun) => Parsed::Action(PlayAction::Use { verb, noun, with }),
                     _ => unknown(line),
                 }
             }
@@ -53,7 +53,7 @@ impl GameEngine {
 /// object action.
 enum Words {
     Parsed(Parsed),
-    Other { verb: String, noun: Option<String> },
+    Other { verb: String, noun: Option<String>, with: Option<String> },
 }
 
 fn unknown(line: &str) -> Parsed {
@@ -102,8 +102,14 @@ fn parse_words(line: &str) -> Words {
         "inventory" | "i" | "inv" => done(unknown(line)),
         _ if direction(verb).is_some() => done(unknown(line)),
         _ => {
-            let noun = strip_article(rest);
-            Words::Other { verb: verb.to_string(), noun: (!noun.is_empty()).then(|| noun.join(" ")) }
+            // `hit window with stick`: what the action uses follows `with`.
+            let (noun, with) = match rest.iter().position(|w| *w == "with") {
+                Some(at) => (&rest[..at], Some(strip_article(&rest[at + 1..]))),
+                None => (rest, None),
+            };
+            let noun = strip_article(noun);
+            let with = with.filter(|w| !w.is_empty()).map(|w| w.join(" "));
+            Words::Other { verb: verb.to_string(), noun: (!noun.is_empty()).then(|| noun.join(" ")), with }
         }
     }
 }
@@ -139,8 +145,8 @@ mod tests {
     fn parse(line: &str) -> Parsed {
         match parse_words(line) {
             Words::Parsed(p) => p,
-            Words::Other { verb, noun } => match noun {
-                Some(noun) => Parsed::Action(Use { verb, noun }),
+            Words::Other { verb, noun, with } => match noun {
+                Some(noun) => Parsed::Action(Use { verb, noun, with }),
                 None => unknown(line),
             },
         }
@@ -168,7 +174,9 @@ mod tests {
         assert_eq!(parse("i"), act(Inventory));
         assert_eq!(parse("inventory"), act(Inventory));
         assert_eq!(parse("  Search "), act(Search));
-        assert_eq!(parse("pull the lever"), act(Use { verb: "pull".into(), noun: "lever".into() }));
+        assert_eq!(parse("pull the lever"), act(Use { verb: "pull".into(), noun: "lever".into(), with: None }));
+        assert_eq!(parse("hit the window with a stick"), act(Use { verb: "hit".into(), noun: "window".into(), with: Some("stick".into()) }));
+        assert_eq!(parse("hit window with"), act(Use { verb: "hit".into(), noun: "window".into(), with: None }));
     }
 
     #[test]
@@ -209,7 +217,7 @@ mod tests {
         let game = GameEngine::new();
         let mut state = game.start(&world, "yard").unwrap();
         let p = |state: &PlayState, line: &str| game.parse_command(&world, line, state);
-        let use_ = |verb: &str, noun: &str| Parsed::Action(Use { verb: verb.into(), noun: noun.into() });
+        let use_ = |verb: &str, noun: &str| Parsed::Action(Use { verb: verb.into(), noun: noun.into(), with: None });
 
         // REQ-PC-13: a verb some thing has.
         assert_eq!(p(&state, "pull the lever"), use_("pull", "lever"));
@@ -218,7 +226,7 @@ mod tests {
         // you can't.
         assert_eq!(p(&state, "lick lever"), use_("lick", "lever"));
         let Parsed::Action(lick) = p(&state, "lick lever") else { panic!() };
-        assert_eq!(game.act(&world, &mut state, &lick).text, "You can't lick the lever.");
+        assert_eq!(game.act(&world, &mut state, &lick).text, "Nothing happens.");
         // REQ-PC-14: a verb no thing has, on nothing here.
         assert_eq!(p(&state, "dance wildly"), Parsed::Unknown("I don't understand `dance wildly`.".into()));
         assert_eq!(p(&state, "dance"), Parsed::Unknown("I don't understand `dance`.".into()));

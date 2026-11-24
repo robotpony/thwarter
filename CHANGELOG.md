@@ -37,6 +37,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.46.0 (2026-11-23)
+
+### Added
+
+- Sections are shown by matching the turn's tags (`design/SECTIONS.md`, REQ-ENG-36; `engines/turn.rs`). Each turn has `@` for what the player holds and the room, `#` for the chapter, and `#` for the current state of the thing described; an action's turn adds `#<verb>`, `@<target>` and `@<what it's used with>`. Descriptions in play (rooms, doors, objects, characters) add each section that matches. An action's reply is the matching `#<verb>` sections in the target, then what it's used with, then the room: with a frontmatter action its mechanics apply and the section replaces the built-in reply; without one the section is the whole action; with neither, "Nothing happens." A `#verb` in any heading counts as a verb the world knows. `## When: #searched` in a room leads the reply to `search`.
+- The parser reads `with`: `hit window with stick` is `PlayAction::Use { verb, noun, with }`.
+
+### Changed
+
+- An object action the thing doesn't have, with no section to answer it, now replies "Nothing happens." instead of "You can't lick the lever."
+
 ## 0.45.0 (2026-11-23)
 
 ### Added
