@@ -549,7 +549,8 @@ mod tests {
         let text = render_location_as(&view, RenderStyle::Author);
         // The text is play's; who holds what is the view's data, for the
         // console's sidebar (Bruce, 2026-11-24).
-        assert!(text.starts_with("Hallway (hallway)\n\n"), "{}", text);
+        assert!(!text.contains("Hallway"), "no title line; the sidebar has it: {}", text);
+        assert_eq!((view.title.as_str(), view.id.as_str()), ("Hallway", "hallway"));
         assert!(text.contains("There's an old photo and a shelf on the walls and a vase on the shelf."), "{}", text);
         assert!(!text.contains("(photo-1)") && !text.contains("\n  "), "no detail lines: {}", text);
         let held: Vec<(&str, &str)> = view.held.iter().map(|h| (h.thing.id.as_str(), h.holder.as_str())).collect();

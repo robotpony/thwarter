@@ -321,22 +321,14 @@ pub fn held_line(view: &LocationView, text: &crate::engines::play_text::PlayText
     Some(Block::line(BlockKind::Here, line, false))
 }
 
-/// A location as an author checks it while writing (Bruce, 2026-11-24;
-/// `design/ENGINE_TEXT.md`): its title and id, then exactly what play
+/// A location as an author checks it while writing: exactly what play
 /// shows, worded by `texts`, so the author judges the prose as a player
-/// meets it. The author's detail (ids, exit targets, doors and their
-/// state, what isn't written yet) is the console's to show from the
+/// meets it (Bruce, 2026-11-24). The room's name shows only if
+/// `[play] show_room_names` says so, as in play; its title, id and the
+/// rest of the author's detail are the console's to show from the
 /// `LocationView`, in its sidebar and `/inspect`.
 fn author_blocks(view: &LocationView, texts: &Texts, links: Resolver) -> Rendered {
-    let mut play = PlayText::from_texts(texts);
-    play.show_room_names = false;
-    let mut blocks = vec![Block::line(BlockKind::Title, format!("{} ({})", view.title, view.id), false)];
-    let mut rest = play_blocks(view, links, &play).blocks;
-    if let Some(first) = rest.first_mut() {
-        first.space_before = true;
-    }
-    blocks.extend(rest);
-    Rendered { blocks }
+    play_blocks(view, links, &PlayText::from_texts(texts))
 }
 
 
@@ -811,8 +803,6 @@ mod tests {
     #[test]
     fn renders_full_room() {
         let expected = "\
-Castle Courtyard (castle/courtyard)
-
 A dry fountain.
 Captain Marcus and Ghost are here.
 
@@ -860,7 +850,7 @@ You can go north or down.";
         v.coordinates = None;
         v.body = "  \n".into();
         let text = render_location(&v);
-        assert!(text.starts_with("Castle Courtyard (castle/courtyard)\n\n(no description yet)\nCaptain Marcus"), "{}", text);
+        assert!(text.starts_with("(no description yet)\nCaptain Marcus"), "{}", text);
     }
 
     /// The player view as it was before blocks, kept to prove `to_plain`
@@ -942,7 +932,10 @@ You can go north or down.";
         v.body = "A \u{1b}]0;pwned\u{7}fountain.".into();
         v.objects = vec![EntityRef { id: "x\u{1b}[5m".into(), name: Some("Bell\u{7}".into()), state: None }];
         let named = crate::engines::play_text::PlayText { show_room_names: true, ..Default::default() };
-        for text in [render_location(&v), play_blocks(&v, &no_links, &named).to_plain()] {
+        let mut texts = Texts::defaults();
+        let mut warnings = Vec::new();
+        texts.apply("play", "[play]\nshow_room_names = true\n".parse::<toml::Value>().unwrap().get("play"), "test", &mut warnings);
+        for text in [render_location_with(&v, &texts), play_blocks(&v, &no_links, &named).to_plain()] {
             assert!(!text.chars().any(|c| c.is_control() && c != '\n'), "{:?}", text);
             assert!(text.contains("Courtyard") && text.contains("A fountain."), "{}", text);
         }

@@ -54,6 +54,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.66.1 (2026-11-24)
+
+### Changed
+
+- Edit mode's room view and `thwart show <room>` drop their title line (Bruce: "Titles are for search, listing in inventory, etc."). They're exactly play's view: the room's name shows only if `[play] show_room_names` says so, in both modes. The title and id stay in the `LocationView` for the console's sidebar.
+
 ## 0.66.0 (2026-11-24)
 
 ### Added
