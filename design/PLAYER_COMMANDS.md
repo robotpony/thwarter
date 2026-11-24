@@ -4,7 +4,7 @@ The command language every client shares (Bruce, 2026-11-23): what a player can 
 
 The console's play mode is one such client. Its own commands (`/edit`, `/play here` and the rest) are in `design/CONSOLE_REQUIREMENTS.md`, not here.
 
-Owner: commander. Ids: REQ-PC. Each requirement says whether it's built, as of 0.53.0.
+Owner: commander. Ids: REQ-PC. Each requirement says whether it's built, as of 0.62.1.
 
 ## Summary
 
@@ -75,6 +75,6 @@ From the console's unknown-input log, 2026-11-23, at Bruce's request. *Proposed*
 
 1. Which verbs come next? Candidates: `drop`, `wait` (`z`), `again` (`g`), `it` for the last thing named, `take all`, `give`, and talking to characters (`talk`, `ask`; today `talk to` someone only says they have nothing to say), which waits on the dialogue format (`design/CONTENT_FORMAT.md` › What's still open). Bruce to choose.
 2. Should `search` and `look around` stay two verbs or become one? Both find faint things today; `search` has its own reply (`design/STATES.md` › Hidden things).
-3. May a world override a built-in verb for one object, such as a `take` action on a cursed idol that refuses? Proposed: yes, through a `take refused` response block, the same way doors use `go refused`.
+3. May a world override a built-in verb for one object, such as a `take` action on a cursed idol that refuses? Proposed: yes, through a reply section on the thing, `## When: #take`, the same way a door's `## When: #go` answers a refused exit, with the take's outcome named so the idol stays put.
 4. Which game commands beyond saving does every client need: `/quit`, `/restart`, `/help`, a list of saves?
 5. Should multi-word verbs parse (`turn on lamp`, `look under rug`)? Today the first word is the verb, so a world would name that action `turn` and the player would type `turn lamp`.

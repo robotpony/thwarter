@@ -11,7 +11,7 @@ cargo test parsers::        # one module
 cargo test --release        # release mode
 ```
 
-There are currently zero unit tests. See `design/UNIT_TESTS.md` for what's planned and in what order.
+Over 250 unit and integration tests run with `cargo test`, beside the console transcripts below. `design/UNIT_TESTS.md` says what's worth testing. Tests use their own fixture worlds in `tests/worlds/` (`tiny`, `sample`), never the test world, which Bruce rewrites.
 
 ## Console transcripts
 
@@ -28,7 +28,7 @@ A transcript that changes content (`/new`, `/set`, `/link`, `/unlink`) MUST add 
 
 ## Exercising the CLI against real content
 
-The commands below are real: they're the ones `src/bin/thwart.rs` actually defines, run against the sample world at `authors/mx/test-world/`.
+The commands below are real: they're the ones `src/bin/thwart.rs` actually defines, run against the test world at `authors/mx/test-world/`, which Bruce is rewriting, so its warnings change; `tests/worlds/tiny` is stable.
 
 ```bash
 # Validate the whole world: parse errors and broken location references
@@ -47,7 +47,7 @@ thwart show --world authors/mx/test-world bedroom
 thwart show --world authors/mx/test-world bedroom --format json
 ```
 
-Expected result against the shipped sample world: `validate --strict` passes with no problems and no warnings; `show` names the world, "Test world", and its starting room, the bedroom. The world is small on purpose: Bruce is writing it afresh (2026-11-23), and tests that need more use the fixture in `tests/worlds/sample/`.
+Expected result against the test world as committed: `validate --strict` passes with no problems and no warnings; `show` names the world, "Test world", and its starting room, the bedroom. The world is small on purpose: Bruce is writing it afresh (2026-11-23), and tests that need more use the fixture in `tests/worlds/sample/`.
 
 ### What a broken world looks like
 

@@ -6,7 +6,7 @@ This document defines the command-style interface for the Thwarter command line 
 
 ## Status
 
-For what's actually implemented versus still a mock or unbuilt, see the implementation status table in `design/ARCHITECTURE.md`. Short version: `validate`, `show`, `map` and `search` do real work against loaded world content; `debug`, `go`, `do`, `test`, and `create` are either honestly-labeled "not implemented" or not wired into the CLI at all. Everything below this line is the target interface, not a description of current behavior.
+For what's built, see the implementation status table in `design/ARCHITECTURE.md`. As of 0.62: `validate`, `show`, `map` and `search` do real work; `edit` and `play` open the console (`design/CONSOLE_REQUIREMENTS.md`); `package`, `install` and `installed` share worlds (`design/CLI_REQUIREMENTS.md` › REQ-CLI-12 to 16); `debug` says it isn't implemented. `go`, `do`, `test` and `create` were never built, and the console replaced them: playing is `thwart play`, making things is `/new` and `/add` in `thwart edit`, and tests are console transcripts. Their sections below are kept as ideas, marked *not planned*.
 
 ## Command Structure
 
@@ -141,6 +141,9 @@ The query matches ids, titles and prose, including object responses. A location 
 ### Interactive Actions
 
 #### `do` - Execute Game Actions
+
+*Not planned*: `thwart play` and its saves cover this.
+
 ```bash
 thwart do <action> [location] [options]
 ```
@@ -159,6 +162,9 @@ thwart do "look around" --state=game.json    # Execute from saved state
 - `--interactive` - Enter interactive mode after execution
 
 #### `test` - Run Test Scenarios
+
+*Not planned*: console transcripts (`tests/transcripts/`, REQ-CON-9) are the test scenarios.
+
 ```bash
 thwart test <scenario> [location] [options]
 ```
@@ -199,6 +205,9 @@ thwart debug --trace-action="take key"         # Trace action execution
 - `--profile` - Enable performance profiling
 
 #### `create` - Content Generation
+
+*Not planned*: the console's `/new` and `/add` make things, with question sets (REQ-CF-32).
+
 ```bash
 thwart create <template> <location> [options]
 ```
@@ -249,19 +258,16 @@ profile_enabled = false
 ```
 
 ### Per-World Configuration: `world.toml`
-```toml
-[metadata]
-title = "My Interactive Fiction"
-author = "Author Name"
-version = "1.0.0"
 
+Tool and play settings only. The world's title, author and starting room are in `world/index.md` (`design/STATES.md` › world/), and `[play]` is in `design/CONTENT_FORMAT.md` › How play words a room. The test world's `world.toml` lists every key at its default.
+
+```toml
 [settings]
-starting_location = "home/bedroom"
 default_map_style = "ascii"
 
-[characters]
-default_health = 100
-default_mood = "neutral"
+[play]
+show_room_names = false
+exits = "You can go {or}."
 ```
 
 ## Error Handling
@@ -297,32 +303,23 @@ thwart validate --output=validation_report.json --format=json
 
 ### Interactive Testing
 ```bash
-# Show current world state
+# Show the world, or one room
 thwart show
+thwart show bedroom
 
-# Move player to specific location
-thwart move castle/throne-room --save-state=checkpoint1.json
-
-# Execute action and save state
-thwart exec "examine throne" --state=checkpoint1.json --save-state=checkpoint2.json
-
-# Generate map from player perspective
-thwart map --player=default --output=player_map.txt
+# Play it, or write it, in the console
+thwart play
+thwart edit
 ```
 
 ### Development Workflow
-```bash
-# Generate new location
-thwart generate location castle/secret-chamber --name="Secret Chamber"
+```
+# In the console (thwart edit), from the bedroom:
+in bedroom > /new room north closet
+in bedroom > /validate
 
-# Validate the new content
-thwart validate castle/secret-chamber
-
-# Test the location
-thwart test --script=chamber_tests.yml castle/secret-chamber
-
-# Generate updated world map
-thwart map --output=updated_map.txt
+# Then, from the shell:
+thwart map
 ```
 
 ## Implementation Notes

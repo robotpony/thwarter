@@ -1,37 +1,23 @@
-# Unit Testing Plan
+# Testing approach
 
-Sized for a solo P0 CLI tool, not a mature codebase: no coverage target, just tests for the parts that have real behaviour. The work is tracked in `PLAN.md` › Phase 2.
+No coverage target: tests cover the parts with real behaviour, and each change brings its own (CLAUDE.md › Conventions). How to run them is in `TESTING.md`.
 
-## Priority order
+## Where tests live
 
-Test the parser first. It's the piece most likely to silently disagree with `design/CONTENT_FORMAT.md` (it already did once), and it's the piece every other component depends on.
+- **Unit tests** sit beside the code, in each module's `#[cfg(test)]` block: the parser, layers and merging, the world and game engines, turns and sections, scripts, play text, the player command parser, saves, question sets and the console's pieces. Most build a small world in a temporary folder.
+- **CLI tests** in `tests/cli_*.rs` run the built `thwart` binary and check exit codes and key lines (`show`, `package`).
+- **Console transcripts** in `tests/transcripts/*.txt` are the console's acceptance tests (REQ-CON-9): a session written as the console prints it, input after `> `. A transcript that changes content says `# copy: yes` and runs on a copy.
+- **Fixture worlds** are `tests/worlds/tiny` (a village square, its well and the elder) and `tests/worlds/sample` (a castle and forest with characters and objects, 12 files). Tests never use `authors/mx/test-world/`, since Bruce rewrites it.
 
-1. **`markdown_parser.rs`** — highest priority. Cover:
-   - A well-formed location/character/object file each, asserting every field lands correctly
-   - Missing `type` field (should error, not default to something)
-   - Missing a type-required field (`id`, `title`, `object_type`)
-   - Frontmatter never closed (no second `---`)
-   - No frontmatter at all (file doesn't start with `---`)
-   - The `Inventory:` / `inventory:` case-normalization edge case, since a real sample file had this
-2. **`WorldEngine`** — `load_world` against a small `tempfile`-built world directory; `broken_connections` against a world with a known-bad connection.
-3. **Models** (`Location`, `Character`, `GameObject`) — constructors and any non-trivial derived behavior. Thin right now; grows as engines gain real logic.
-4. **`CharacterEngine`** — placement and `get_characters_at_location`, once it's actually wired into a CLI command (`PLAN.md` › Phase 3). Not worth testing in isolation before that.
-5. **CLI commands** — integration-style tests running the built binary against a fixture world directory, checking exit codes and key output lines (e.g., `validate` against a world with a known broken connection should exit non-zero and mention it).
+## What to test
 
-Everything downstream of the stub engines (`NarrativeEngine` consequence execution, `GameEngine` action effects) isn't worth testing yet: there's no behavior there to test, only `TODO`s. Add tests when the implementation lands, not before.
+1. Anything that reads content: a fixture or temporary-world test for each format rule in `design/CONTENT_FORMAT.md`, including what's refused and what only warns.
+2. Each player command and reply in `design/PLAYER_COMMANDS.md`, through `parse_command` and `act`.
+3. Each console command, by transcript when it shows output, by unit test when it doesn't.
+4. A bug, by a test that fails before its fix.
 
-## What "done" looks like for now
+Text a player or author reads is pinned by transcripts, so a wording change is a reviewed `THWART_BLESS=1` diff. With Phase 8, a test also fails on a new user-facing string written in code (`design/ENGINE_TEXT.md`).
 
-Not a coverage percentage. A test suite that would have caught the two real bugs this repo actually had:
-- The parser/content-format mismatch (a fixture-based parser test would have caught this immediately)
-- The broken `Cargo.toml` (`cargo test` running in CI catches this by definition, once CI exists)
+## CI
 
-## Running tests
-
-```bash
-cargo test              # all tests
-cargo test parsers::     # one module
-cargo test -- --nocapture
-```
-
-No CI pipeline exists yet. Adding a minimal one (`cargo build && cargo test` on push) is worth doing once there are tests for it to run; a CI config with nothing to check is its own kind of false signal.
+`.github/workflows/ci.yml` runs `cargo build --locked --all-targets` and `cargo test --locked` on every push (`TESTING.md` › CI). A version bump commits `Cargo.lock` with `Cargo.toml`, or `--locked` fails.

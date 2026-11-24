@@ -2,7 +2,7 @@
 
 Status: Agreed, with open questions (below). Reviewed decision by decision with Bruce on 2026-11-23. Nothing here is built yet. Items marked *proposed* are the commander's suggestions that Bruce hasn't confirmed yet; everything else Bruce has agreed to.
 
-`design/SECTIONS.md`, agreed in outline by Bruce and under trial, shows content by matching `## When:` headings against the game state, replaces actions and responses with reply sections, and retires the `<!-- thwarter:... -->` markers. Where the two disagree, `design/SECTIONS.md` is the direction; this document is updated when the trial confirms it.
+`design/SECTIONS.md`, agreed in outline by Bruce and under trial, shows content by matching `## When:` headings against the game state, replaces actions and responses with reply sections, and retires the `<!-- thwarter:... -->` markers. This document now uses sections throughout; where the two disagree, `design/SECTIONS.md` wins.
 
 ## Summary
 
@@ -187,7 +187,7 @@ Within each level, a parent chapter comes before its sub-chapter. An area can th
 An overlay applies on top of whichever state is current; it can't vary by state. Bruce sees no case for that yet (2026-11-23), so it's out of scope.
 
 Frontmatter merges by the inheritance rules below. Prose merges block by block (agreed by Bruce, 2026-11-23):
-- A body is a description followed by response blocks (see Responses). Each part merges separately: the description replaces the description below it, and each block replaces only the block of the same name below it. So a state can change one response without restating the description, and the other way round.
+- A body is a description followed by `## When:` sections (`design/SECTIONS.md`). The description replaces the description below it; sections are kept apart from it and shown when their tags match, and a thing's own section replaces a template's with the same tags. So a state can change one reply without restating the description, and the other way round.
 - A thing's own layers (its `index.md`, state and chapter versions) replace prose. An area's layers add it: an area chapter's description is added after the description of every room beneath it, so "the castle in mourning" reads as each room's own text plus `Black banners hang from every wall.`
 - A description that is empty once author comments are removed counts as no prose, so a layer holding only a note never blanks a room.
 
@@ -265,7 +265,7 @@ sides:
 - A one-way door has one side that is never passable (a trapdoor you fall through, a door that locks behind you). To be tested.
 - A standard door joins exactly two rooms. A portal is a special type of door that can join more.
 - The room view shows the door's current text beside its exits; the room's own prose never changes for a door.
-- Trying to go through a door that isn't passable gives the door's `<!-- thwarter:action go refused -->` block from its current state, so a closed door and a locked one can say different things; without one, a built-in reply ("The iron door is closed."). Decided by the commander, 2026-11-23, following Responses.
+- Trying to go through a door that isn't passable gives the door's `## When: #go` section for its current state, so a closed door and a locked one can say different things; without one, the engine's reply naming the door ("The iron door is locked.").
 - Built in 0.33.0 (bbd1e64): doors, portals, the built-in `door` and `portal` (bundles with `closed`, the starting state, and `open`), and the validation rules.
 
 ### Adding a door from the console
@@ -296,7 +296,7 @@ Built in 0.23.0 (a2e45a9), and confirmed by the commander:
 - An absent thing can't be named by anything.
 - Visibility covers objects, characters and exits (an exit by the visibility of the room it leads to). Things the player carries are always shown. Doors join in Phase 6.
 - A hidden thing is never listed or found by search. An action that names it exactly still works (a secret lever, a magic word) if that action has no prerequisite (`requires:`) and the thing is of a type that can be found; otherwise it behaves as absent until something reveals it (Bruce, 2026-11-23). Which types can be found is to settle with the built-ins: *proposed*, objects, doors and exits can, characters can't unless they say so.
-- *Pending Bruce*: search replies are built in today ("You search carefully and find the brass key and a way north."). A room could override them with a `<!-- thwarter:reply search -->` block.
+- Search replies are built in ("You search carefully and find the brass key and a way north."), and a room's `## When: #searched` section leads them. The built-in wording moves to `[engine]` in Phase 8 (`design/ENGINE_TEXT.md`).
 
 Revealing is ordinary state switching: an action `becomes:` a state with a different `visibility:`. Special activation, such as magic, is a `requires:` on that action (`requires: { has: wand }`).
 
@@ -304,7 +304,7 @@ Revealing is ordinary state switching: an action `becomes:` a state with a diffe
 
 When a command could mean more than one thing ("open door" with two doors), the reply is part of the story, not a fixed system message (Bruce, 2026-11-23): "Which door do you want to open?", "You stare at both doors, not sure which to open." The engine has a set of such replies and varies them. *Proposed*: an author can override them per world, and per thing for a thing with something to say.
 
-Built in 0.24.0 (79af69c): the reply is the `<!-- thwarter:reply ambiguous -->` block of the nearest template every candidate shares, with its variables filled in, as Bruce decided. Otherwise one of the built-in replies, which always name the candidates in one question so the player can still choose ("Which key do you want to take, the brass key or the iron key?"; for people, "Who do you want to examine, King Aldric or Queen Aldric?"). Overrides per world or per thing aren't built; each is one more lookup if a world needs it.
+Built in 0.24.0 (79af69c): the reply is the `## When: #ambiguous` section of the nearest template every candidate shares, with its variables filled in, as Bruce decided. Otherwise one of the built-in replies, which always name the candidates in one question so the player can still choose ("Which key do you want to take, the brass key or the iron key?"; for people, "Who do you want to examine, King Aldric or Queen Aldric?"). A world-wide override comes with Phase 8's `[engine]` table (`design/ENGINE_TEXT.md`).
 
 ## Scope
 
@@ -337,21 +337,19 @@ actions:
 ---
 A rusted iron lever juts from the wall.
 
-<!-- thwarter:action pull -->
+## When: #pull
 Gears grind somewhere below.
 ```
 
 ## Responses
 
-What a player reads when they act is prose in the body, never frontmatter (principle 8; agreed by Bruce, 2026-11-23).
+What a player reads when they act is prose in the body, never frontmatter (principle 8; agreed by Bruce, 2026-11-23). It's written as `## When:` reply sections; the full model is `design/SECTIONS.md` › The model and › Outcomes and replies.
 
-- The body starts with the thing's description. Each response follows a marker line, the same comment form as section headers: `<!-- thwarter:action pull -->`.
-- `<!-- thwarter:action pull refused -->` is the reply when the action's `requires:` isn't met.
-- A response block can stand alone, with no mechanics in frontmatter: a block for `kick` holding "Ow." is a whole action.
-- An action with mechanics but no block gets a built-in reply made from the verb and the title ("You pull the iron lever."), varied like the ambiguity replies. So does a refused action with no `refused` block.
-- Edit mode warns about each of these: an action with no response, a refusal with no reply, a block with no matching mechanics. The editor shows the author which responses an object needs and which it could have.
-- Ambiguity replies an author overrides are blocks too: `<!-- thwarter:reply ambiguous -->`.
-- In the editor, response markers are drawn like section headers, not typed.
+- A reply section names the action and, where it matters, the outcome: `## When: #pull`, `## When: #unlock #wrong-key`. Write the reply where the thing ends up, and if nothing changes, name why.
+- A reply section can stand alone, with no mechanics in frontmatter: `## When: #kick` holding "Ow." is a whole action.
+- An action with no reply that matches gets "Nothing happens." (REQ-PC-14). A failed `requires:` gets a built-in refusal. Both become `[engine]` text in Phase 8 (`design/ENGINE_TEXT.md`).
+- Ambiguity replies an author overrides are sections too: `## When: #ambiguous`.
+- In the editor, keyword headings are drawn as rules (REQ-CON-39).
 
 ## Variables
 

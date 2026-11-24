@@ -22,6 +22,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Changed
 
+- Doc pass, at Bruce's request: `design/STATES.md`, `design/CONTENT_REQUIREMENTS.md` (REQ-CF-3, REQ-CF-17) and principle 7 describe `## When:` reply sections, not the retired marker comments; `design/CLI_DESIGN.md` matches the commands that exist and marks `do`, `test` and `create` not planned; `design/UNIT_TESTS.md` describes the tests as they are (the 2026-08 plan is `git show 2d36b93:design/UNIT_TESTS.md`); `TESTING.md` and `design/DESIGN.md` are current.
 - The phase plan: authoring first, then play, in one console with an edit and a play mode; engine work only as they need it (Bruce, 2026-11-23). `map`, `search` and the remaining `validate` checks moved to a "Tooling, as needed" phase, and tests moved into each phase.
 - `REQUIREMENTS.md` gains §4.6 Console (REQ-CON-1 to 11), the file writer and in-memory changes (REQ-ENG-7 to 9), and objects without cards as allowed scenery (REQ-CF-8). The separate P1 play REPL and P2 editing REPL are now one console.
 - `tasks/unit-testing-plan.md` moved to `design/UNIT_TESTS.md`.

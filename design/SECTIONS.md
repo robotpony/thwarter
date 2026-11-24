@@ -62,7 +62,7 @@ A heading's tags are read against whose file it's in: in the window's file, the 
 
 ### Default replies
 
-"Nothing happens." is the built-in default (Bruce). The world's settings can set a list of defaults, and so can chapters, sections and the rest, so a ghost story's unanswered actions can read differently from a farce's (Bruce). *Proposed*: the nearest list wins, by the usual lineage: the section, the thing, its area, the chapter, then `world/index.md`. The engine picks one line from the list each time, varied by turn. The list's form is Open question 4.
+"Nothing happens." is the built-in default (Bruce). The world's settings can set a list of defaults, and so can chapters, sections and the rest, so a ghost story's unanswered actions can read differently from a farce's (Bruce). The world-wide list is `[engine]`'s `nothing` in `world.toml`, with the built-in defaults compiled in (`design/ENGINE_TEXT.md`). A thing, area or chapter sets its own with `## When: #nothing` sections, one line each, and the nearest wins by the usual lineage. A list picks entry `turn % len`, never at random.
 
 ### Changing state
 
@@ -123,7 +123,7 @@ A keyword heading shows as an ordinary heading ("When: #locked") if Hugo renders
 
 ## Before and after
 
-The test world's treasure chest today ends with three marker blocks:
+A treasure chest from the July 2025 test world (removed in 37a5c49) ended with three marker blocks:
 
 ```markdown
 An ornate wooden chest bound with iron and secured with multiple locks. ...
@@ -153,11 +153,9 @@ You hear the faint sound of coins shifting inside.
 
 ## What changes
 
-- REQ-CF-6 and REQ-CF-17 (`actions:` and response markers), REQ-CF-28 (headings are prose) and REQ-CF-29 (links) change; new requirements cover keyword headings, the game-state match, `thwarter` blocks and `@`. The commander writes them once the trial confirms the format.
-- Principle 7 changes from "only `requires: { has: ... }`" to "only all-of and none-of tags in a heading".
-- The engine builds each turn's tags and matches sections (coder). The parser needs `with`: `hit window with stick` names the target and what's used.
-- The editor draws `When:` and `Unless:` headings as rules, and colours `@`, `#` and `thwarter` blocks; built in f959c28 (console coder).
-- No conversion (Bruce): the project is early, so the test world's nine files with markers and the `door` and `portal` built-ins are rewritten, and the loader stops reading markers. A leftover marker is an ordinary comment.
+- Done: the engine builds each turn's tags and matches sections (0.46.0), the parser takes `with` (`hit window with stick`), the editor draws keyword headings as rules and colours `@`, `#` and `thwarter` blocks (f959c28), and the test world and the door built-ins were rewritten with no conversion, so a leftover marker is an ordinary comment (Bruce).
+- Done in the docs: REQ-CF-3 and REQ-CF-17 use reply sections, and principle 7 names heading tags beside `requires:`.
+- Still to write once the trial confirms the format: REQ-CF-28 (headings are prose) and REQ-CF-29 (links) for keyword headings, and requirements for the game-state match, `thwarter` blocks and `@` (commander). Then this document folds into `design/CONTENT_REQUIREMENTS.md` (`PLAN.md` › Phase 6).
 
 ## Open questions
 
@@ -170,7 +168,7 @@ Bruce asked for more detail on three of the earlier questions (2026-11-23). They
    - **b.** A section can replace the default by saying so in its block (`replaces: description`). More flexible; one more rule.
    - **c.** Sections add, and a state file in the bundle replaces, as state files do today. Major changes replace, minor ones add.
    *Proposed*: **a** for the trial, since it matches "shown if it's true".
-4. **What form does a list of default replies take?** *Proposed*: a `nothing:` list in the settings' or section's ```thwarter block (`nothing: ["Nothing happens.", "That does nothing."]`). The lines are short and systemic, like `title`, so they can bend principle 8. The alternative is prose: a `## When: #nothing` section whose paragraphs are the list, which keeps principle 8 but adds a reserved state name.
+4. ~~What form does a list of default replies take?~~ Settled 2026-11-24 with Phase 8: `[engine]`'s `nothing` list world-wide, `## When: #nothing` sections nearer (Default replies above).
 5. **Combining `When:` and `Unless:`.** Settled (Bruce, 2026-11-23): no nesting, and a heading stays one keyword with its names. Harder conditions go in code: inline code, or a fenced ```thwarter block acting as a gate. *Proposed* gate keys: `requires:` and `unless:`, so two `## When: #unlock` sections can be told apart by their blocks.
 
 An action and a state sharing a name (`open`) isn't a concern (Bruce): `## When: #open` is the open door's description, and it reads as the reply to opening it too.
