@@ -96,14 +96,24 @@ type: questions
 - Loose, it can be taken (default)
 - Hanging on a wall, pulled free -> recipe fixed-until pull
 - On something here -> ask thing, then move into it
+
+## What is it called?
+- Lantern (default)
+- Brass lantern -> set title Brass lantern
+- Something else -> set title
 ```
 
-- **Which set.** The file's name is the template or kind it sets up: `questions/lantern.md` is asked when making a thing from the `lantern` template, `questions/object.md` for any object without a set of its own, `questions/door.md` for `/add door`. The template's set comes first, then its kind's. There's no `for:` key, since the name already says it, the way a template's name does.
+- **Which set.** The file's name says what it sets up: the new thing's id, its template, or its kind, tried in that order. `questions/lantern.md` is asked when making a thing called `lantern` or one from a `lantern` template, `questions/object.md` for any object without a set of its own, `questions/door.md` for `/add door`. There's no `for:` key, since the name already says it, the way a template's name does. A set can exist before any thing or template of its name does.
 - **Where sets live.** A `questions/` folder is reserved, like `templates/`: it can sit in any scope, and the loader reads its files as question sets, never as things. A set is looked up from the new thing's folder out to the world's root, then in the engine's built-ins (`src/builtins/questions/`, compiled in). A set of the same name overrides one farther out, and a world's overrides a built-in. Nothing merges: the nearest whole file wins.
 - **Questions.** Each `##` heading is one question, asked in order. Prose under a heading is a hint shown with it.
-- **Options.** Each list item is one option. `(default)` marks what Esc takes; with none, the first option is the default. An option's text is what the author sees. After `->` (or `→`) comes what it does, one of four constructs: `set <key>` (the author types the value), `recipe <name> <args>`, `ask thing` (pick a thing here), or `ask value <name> <default>`. An option with no `->` changes nothing.
+- **What it acts on.** A set is always about the thing being made, and every construct acts on that thing, so a set names no ids: `set title` sets the new thing's title, the way `this` means the thing in a script.
+- **Options.** Each list item is one option. `(default)` marks what Esc takes; with none, the first option is the default. An option's text is what the author sees. After `->` (or `→`) comes what it does, one of four constructs:
+  - `set <key> <value>` sets a key to the value written in (`- Brass lantern (default) -> set title Brass lantern`); `set <key>` alone asks the author to type it.
+  - `recipe <name> <args>` runs a recipe (below).
+  - `ask thing` picks a thing here.
+  - `ask value <name> <default>` asks for a value, offering the default. An option with no `->` changes nothing.
 - **Recipes** are shorthand for console commands (`/state`, `/set … in <state>`, `/action`), and the console prints the commands an answer stood for. The four built-ins are `fixed-until`, `locked-with`, `switch` and `container`. Their exact forms are the console's (`design/CONSOLE_REQUIREMENTS.md`).
-- `validate` warns about a set whose name matches no template or kind, an option with an unknown construct, and more than one `(default)` under a question.
+- `validate` warns about an option with an unknown construct and more than one `(default)` under a question. A set whose name matches nothing yet isn't a warning, since it may be waiting for its thing.
 
 ## How play words a room: `[play]` in `world.toml`
 

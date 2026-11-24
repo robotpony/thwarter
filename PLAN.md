@@ -71,6 +71,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
 - [x] Question sets: the loader reads `questions/` folders and built-ins, and `validate` checks them [coder] (REQ-CF-32, `design/CONTENT_FORMAT.md` › `type: questions`)
 - [x] `/new` and `/add` ask a set's questions, run the answers and print the commands they stood for, with the four recipes (0.60.0, 0.61.0) [console] (REQ-CF-32)
+- [ ] Question sets: `set <key> <value>` with the value written in, and no warning for a set whose name matches nothing yet [coder] (REQ-CF-32)
 - [ ] Review the built-in question content with Bruce, once the mechanics work [commander, Bruce]
 
 ## Phase 6 · Doors and play
