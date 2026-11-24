@@ -84,7 +84,7 @@ Done when a locked-door puzzle plays from both sides.
 - [x] Rhai scripts: `actions.rhai` and ```rhai blocks, functions as actions, outcomes, keep and the owned scope [coder] (`design/SECTIONS.md` › Scripts, Outcomes and replies)
 - [x] The `locked-door` built-in as the vault door example shows [coder] (REQ-CF-21, `design/STATES.md` › Keys)
 - [x] Connections between things for scripts (`connects:`) [coder] (`design/STATES.md` › One thing affecting another)
-- [ ] Linking two rooms through a door template from the console [console] (`design/STATES.md` › Doors)
+- [ ] `/add door west hallway`: doors made from the console, with `door_id` from the engine [console, coder] (`design/STATES.md` › Adding a door from the console)
 - [x] Keys for locked doors: designed with Bruce as a scripted built-in [commander] (`design/STATES.md` › Keys)
 - [ ] Clocks and game values: time, weather, randomness [commander, coder] (`design/STATES.md` › Open questions)
 - [x] The player command parser moves into the engine as `parse_command` [coder] (REQ-PC-1)

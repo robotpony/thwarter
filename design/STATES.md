@@ -268,6 +268,16 @@ sides:
 - Trying to go through a door that isn't passable gives the door's `<!-- thwarter:action go refused -->` block from its current state, so a closed door and a locked one can say different things; without one, a built-in reply ("The iron door is closed."). Decided by the commander, 2026-11-23, following Responses.
 - Built in 0.33.0 (bbd1e64): doors, portals, the built-in `door` and `portal` (bundles with `closed`, the starting state, and `open`), and the validation rules.
 
+### Adding a door from the console
+
+Decided by Bruce, 2026-11-23. An author never writes a door file by hand; the console's `/add` makes it.
+- `/add door west hallway`, or `/add door --(west)--> hallway`, adds a door on the room edit mode is in, leading west to the hallway. `/add door bedroom` adds it to one room only, and `/add hallway door` links a second room to it later, so a door can be built in two steps (a one-sided door is a warning meanwhile, REQ-CF-19).
+- The other side is the opposite direction (west to east, up to down). A special case overrides it with a command or by hand.
+- The id is predictable: `door-<from>-<to>-<direction>`, such as `door-bedroom-hallway-west`. The engine names it (`door_id`), so every client names doors the same way.
+- A room that doesn't exist yet is created, as a new room.
+- A new door is a plain `door`. A state hint in brackets picks another template: `/add door(locked) west hallway` makes a `locked-door`.
+- The exact command forms are the console's (`design/CONSOLE_REQUIREMENTS.md`).
+
 ## Hidden things
 
 Hidden means several things in stories (Bruce, 2026-11-23), and they apply to any thing, not only doors. A state's `visibility:` says which (agreed by Bruce, 2026-11-23):
