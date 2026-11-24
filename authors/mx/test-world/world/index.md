@@ -1,9 +1,9 @@
 ---
-title: Castle Adventure - Extended World
+title: Test world
 type: world
 author: mx
 version: 2.0.0
-start: castle/courtyard
+start: bedroom
 ---
 
-Large-scale testing world with 28 locations and 18 NPCs
+The sample world for trying the engine.

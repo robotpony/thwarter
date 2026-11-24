@@ -1,0 +1,5 @@
+# Tool settings only. The world's title, author, version and starting room
+# are in world/index.md (design/STATES.md).
+
+[settings]
+default_map_style = "ascii"

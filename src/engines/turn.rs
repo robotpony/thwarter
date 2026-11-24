@@ -313,10 +313,20 @@ mod tests {
         assert_eq!(say(&game, &world, &mut state, "hit lamp with stick"), "The hall echoes with the crack.");
     }
 
+    /// The shipped test world is Bruce's to rewrite, so tests only check
+    /// that it loads without problems.
     #[test]
-    fn the_test_worlds_replies_are_sections() {
+    fn the_shipped_test_world_validates() {
         let mut world = WorldEngine::new();
         world.load_world(std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/authors/mx/test-world"))).unwrap();
+        assert!(world.current_problems(true).is_empty(), "{:?}", world.current_problems(true));
+        assert!(world.get_location("bedroom").is_some());
+    }
+
+    #[test]
+    fn the_sample_worlds_replies_are_sections() {
+        let mut world = WorldEngine::new();
+        world.load_world(std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/worlds/sample"))).unwrap();
         let game = GameEngine::new();
         let mut state = game.start(&world, "castle/treasury").unwrap();
         assert_eq!(say(&game, &world, &mut state, "listen chest"), "You hear the faint sound of coins shifting inside.");

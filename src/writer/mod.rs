@@ -556,12 +556,13 @@ mod tests {
         }
     }
 
-    /// Every entity in the shipped test world takes a one-field edit that
-    /// changes exactly one line, and the world reloads with the same problems.
+    /// Every entity in the sample fixture world takes a one-field edit
+    /// that changes exactly one line, and the world reloads with the same
+    /// problems.
     #[test]
-    fn editing_the_test_world_changes_one_line_per_file() {
+    fn editing_the_sample_world_changes_one_line_per_file() {
         let dir = tempfile::tempdir().unwrap();
-        copy_dir(Path::new("authors/mx/test-world"), dir.path());
+        copy_dir(Path::new("tests/worlds/sample"), dir.path());
         let mut engine = WorldEngine::new();
         let report = engine.load_world(dir.path()).unwrap();
         let problems_before = engine.problems(&report, true);
@@ -569,7 +570,7 @@ mod tests {
 
         let mut keys: Vec<_> = engine.sources.keys().cloned().collect();
         keys.sort();
-        assert!(keys.len() >= 50);
+        assert!(keys.len() >= 10, "{}", keys.len());
         for (kind, id) in keys {
             let path = engine.source_path(kind, &id).unwrap().to_path_buf();
             let before = fs::read_to_string(&path).unwrap();

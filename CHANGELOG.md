@@ -37,6 +37,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 
+## 0.50.2 (2026-11-23)
+
+### Changed
+
+- The shipped test world starts again from Bruce's new rooms: `bedroom`, `closet` and `hallway`, with the `chair`, `old-shirt`, `photo-1` and `walls` objects, committed as he wrote them. `world/index.md` is now "Test world", starting in `bedroom`; `version` stays, since packaging names the file with it.
+- Tests that need content load a small fixture, `tests/worlds/sample/` (six rooms, two characters, three objects, from the old world with exits to rooms it lacks removed), so they never depend on content Bruce rewrites. A test checks that `authors/mx/test-world` loads with no problems.
+
+### Removed
+
+- The July 2025 test content in `authors/mx/test-world`: `castle/` (16 rooms), `forest/` (12 rooms), `npcs/` (18 characters) and nine objects (`ancient-tomes`, `crystal-orb`, `flowing-water`, `forge-fire`, `golden-throne`, `master-sword`, `staff-of-oak`, `standing-stones`, `treasure-chest`), at Bruce's request. Recover it with `git checkout 83291af -- authors/mx/test-world/castle authors/mx/test-world/forest authors/mx/test-world/npcs authors/mx/test-world/objects authors/mx/test-world/world/index.md`.
+
 ## 0.50.1 (2026-11-23)
 
 ### Added
