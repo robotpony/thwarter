@@ -70,6 +70,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.74.1 (2026-11-24)
+
+### Fixed
+
+- The validate test loaded Bruce's `authors/mx/test-world`, so a draft with an exit to a room not written yet (`master-bedroom`) failed it. It now checks the `tests/worlds/sample` fixture, `--strict` too.
+
 ## 0.74.0 (2026-11-24)
 
 ### Added

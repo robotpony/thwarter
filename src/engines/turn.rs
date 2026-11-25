@@ -320,14 +320,15 @@ mod tests {
         assert_eq!(say(&game, &world, &mut state, "hit lamp with stick"), "The hall echoes with the crack.");
     }
 
-    /// The shipped test world is Bruce's to rewrite, so tests only check
-    /// that it loads without problems.
+    /// The sample fixture world loads without problems, `--strict` too.
+    /// Bruce's `authors/mx/test-world` isn't checked: it's his to rewrite,
+    /// and a draft mid-write may name rooms not written yet.
     #[test]
-    fn the_shipped_test_world_validates() {
+    fn the_sample_world_validates() {
         let mut world = WorldEngine::new();
-        world.load_world(std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/authors/mx/test-world"))).unwrap();
+        world.load_world(std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/worlds/sample"))).unwrap();
         assert!(world.current_problems(true).is_empty(), "{:?}", world.current_problems(true));
-        assert!(world.get_location("bedroom").is_some());
+        assert!(world.get_location("castle/treasury").is_some());
     }
 
     #[test]
