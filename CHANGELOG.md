@@ -70,6 +70,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.74.2 (2026-11-24)
+
+### Fixed
+
+- The `[play]` reference copy the tests check is now in `tests/worlds/sample/world.toml`, not Bruce's test world, whose copy is his to reword.
+
 ## 0.74.1 (2026-11-24)
 
 ### Fixed

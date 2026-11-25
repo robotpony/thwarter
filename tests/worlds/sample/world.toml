@@ -3,3 +3,20 @@
 
 [settings]
 default_map_style = "ascii"
+
+# Every [play] setting at its default: the reference copy the tests check
+# against the compiled-in defaults (src/builtins/text/play.toml).
+[play]
+show_room_names = false                 # show the room's name above its description
+objects = "You see {list}."             # what's in the room, right after the description
+character = "{list} is here."           # one person here
+characters = "{list} are here."         # more than one
+held = "There's {list}."                # what things hold: "an old photo on the walls"
+exits = "You can go {or}."              # the ways out; {or} joins with "or", {list} with "and"
+door_exit = "{direction} through {door}" # one way out through a door: "down through an iron door"
+no_exits = "There's no way out."
+see_through = "Through the {door} you can see the {room}."  # a door you can see through
+no_description = "(no description yet)"   # a room with no prose
+inventory = "You have {list}."
+empty_inventory = "You aren't carrying anything."
+serial_comma = true                     # "a, b, and c" rather than "a, b and c"

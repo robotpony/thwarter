@@ -176,11 +176,12 @@ mod tests {
         assert_eq!(warnings.len(), 2, "{:?}", warnings);
     }
 
-    /// The test world's `world.toml` is the reference copy of every
-    /// setting, each at its default.
+    /// The sample fixture's `world.toml` is the reference copy of every
+    /// setting, each at its default. Bruce's test world has a copy too,
+    /// which is his to reword, so it isn't checked.
     #[test]
-    fn the_test_worlds_reference_copy_lists_every_default() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/authors/mx/test-world/world.toml");
+    fn the_sample_worlds_reference_copy_lists_every_default() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/worlds/sample/world.toml");
         let value: toml::Value = std::fs::read_to_string(path).unwrap().parse().unwrap();
         let table = value.get("play").and_then(|v| v.as_table()).expect("a [play] table");
         let mut names: Vec<&str> = table.keys().map(String::as_str).collect();
