@@ -380,6 +380,9 @@ impl Console {
             Parsed::Action(PlayAction::Look) => self.look(),
             Parsed::Action(PlayAction::Examine(noun)) => self.examine(&noun),
             Parsed::Action(PlayAction::Go(target)) => self.go(&target),
+            Parsed::Action(PlayAction::Where) if self.pwd() == "/" => self.t("edit_where_root", &[]),
+            Parsed::Action(PlayAction::Where) => self.t("edit_where", &[("place", &self.pwd())]),
+            Parsed::Action(PlayAction::LookToward(direction)) => self.look_toward(&direction),
             // A play verb that is also a command's name (`save`): ask
             // which was meant, since play's verb doesn't work here
             // (REQ-CON-56).
@@ -413,6 +416,24 @@ impl Console {
         }
         let rest = line[first.len()..].trim_start();
         Some(if rest.is_empty() { name } else { format!("{} {}", name, rest) })
+    }
+
+    /// `look <direction>` in edit mode: where that exit goes, by id, and
+    /// whether it's written (REQ-PC-23).
+    fn look_toward(&self, direction: &str) -> String {
+        let room = match &self.place {
+            Place::File(path) => self.world.files.get(path).filter(|e| e.kind == Kind::Room).map(|e| e.id.clone()),
+            Place::Dir(_) => None,
+        };
+        let Some(room) = room else { return self.t("edit_look_toward_no_room", &[]) };
+        let way: String = direction.chars().take(1).flat_map(char::to_uppercase).chain(direction.chars().skip(1)).collect();
+        match self.world.engine.get_connections(&room).into_iter().find(|(d, _)| d == direction) {
+            Some((_, target)) if self.world.engine.get_location(&target).is_some() => {
+                self.t("edit_look_toward", &[("direction", &way), ("target", &target)])
+            }
+            Some((_, target)) => self.t("edit_look_toward_unwritten", &[("direction", &way), ("target", &target)]),
+            None => self.t("edit_look_toward_none", &[("direction", direction)]),
+        }
     }
 
     /// `go <direction or name>`, `go back` and `go /`.

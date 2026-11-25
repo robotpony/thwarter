@@ -124,7 +124,7 @@ Bruce authors it with the console coder, starting now, using what exists and gro
 
 Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce playtests edit and play modes before any of these start.
 
-- [ ] `where` and `where am i` (play in 0.81.0; edit mode to go) [coder, console] (REQ-PC-21)
+- [x] `where` and `where am i` (play in 0.81.0, edit mode in 0.81.1) [coder, console] (REQ-PC-21)
 - [x] `enter <place>` as `go` (0.81.0) [coder] (REQ-PC-22)
 - [x] `look <direction>` and `what's <direction>` (0.81.0) [coder] (REQ-PC-23)
 - [x] Typo suggestions for verbs [coder] (REQ-PC-24)

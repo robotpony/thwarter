@@ -40,3 +40,17 @@ No game is in progress, so there's nothing to save.
 village/  area: 2 room(s)
 npcs/     Global characters: 1
 objects/  Global objects: 1
+> where
+Edit mode is at the world's root.
+> look north
+Only a room has exits. Go to one first.
+> go square
+Village Square (room)
+> where am i?
+Edit mode is at village/square.
+> what's north
+North: village/well.
+> look east
+East: village/inn, not written yet.
+> look west
+There's no exit west from here.

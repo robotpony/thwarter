@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.81.1 (2026-11-25)
+
+### Added
+
+- Edit mode answers `where` and `where am i` with where it is (REQ-PC-21), and `look <direction>` or `what's <direction>` with the room that exit leads to, by id, and whether it's written (REQ-PC-23). The wording is in `[console]`. Covered by `tests/transcripts/lists-and-maps.txt`.
+
 ## 0.81.0 (2026-11-25)
 
 ### Added

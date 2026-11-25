@@ -122,6 +122,12 @@ watch_failed = "Can't watch the world's files ({reason}); use /reload after chan
 # /map (panels.rs).
 no_room_to_map = "There's no room to map from: go to a room, or /play to start a game."
 map_around = "Map around {room}:"
+edit_where = "Edit mode is at {place}."
+edit_where_root = "Edit mode is at the world's root."
+edit_look_toward = "{direction}: {target}."
+edit_look_toward_unwritten = "{direction}: {target}, not written yet."
+edit_look_toward_none = "There's no exit {direction} from here."
+edit_look_toward_no_room = "Only a room has exits. Go to one first."
 map_whole = "The whole world, from {room}:"
 map_apart = "Rooms no exit joins to those, from {room}:"
 bare_command_ask = "In edit mode, `{word}` is a command. Did you mean:"
