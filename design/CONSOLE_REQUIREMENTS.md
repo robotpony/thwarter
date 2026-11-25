@@ -328,7 +328,7 @@ Bruce, 2026-11-24. A name the prose mentions but nothing defines (`[[hole]]`, `@
 
 Bruce, 2026-11-25. Writing a room or thing means remembering which command does what; the sidebar can offer what fits where you are.
 
-- REQ-CON-63: Ctrl-Space MUST open a quick menu of actions for what edit mode is at (room, thing or door), in edit mode only. Inside it, arrows move, Enter picks, and each entry's letter picks it directly; Esc closes it. `/menu` MUST open the same menu from the prompt in every terminal. Ctrl-Space reaches the console only when macOS's input-source shortcut (System Settings › Keyboard › Shortcuts › Input Sources, on by default) is off. Through the kitty keyboard protocol (iTerm2 3.5+, Ghostty, kitty, WezTerm) it arrives as itself. Other terminals send it as NUL, which Terminal.app also sends for Ctrl-2, so there NUL MUST open the menu too, and Ctrl-2 opening it is accepted. The sidebar shows both (`⌃Space or /menu  quick menu`), since the console doesn't ask the terminal what it supports: a terminal that doesn't answer would stop it starting.
+- REQ-CON-63: Ctrl-M MUST open a quick menu of actions for what edit mode is at (room, thing or door), at the prompt and in the full-screen editor, in edit mode only (Bruce, 2026-11-25). In the editor its entries act on the thing being edited, and the editor takes Ctrl-M before the text area, which would read it as a new line. Inside the menu, arrows move, Enter picks, and each entry's letter picks it directly; Esc closes it. `/menu` MUST open the same menu from the prompt in every terminal. Ctrl-M arrives as itself only through the kitty keyboard protocol (iTerm2 3.5+, Ghostty, kitty, WezTerm); elsewhere it's the same byte as Enter, so there `/menu` is the only way in and the editor has none. Ctrl-Space MUST NOT open it: macOS takes that key for input sources by default, and Bruce dropped it after trying it in Ghostty (2026-11-25). The sidebar shows both (`⌃M or /menu  quick menu`), since the console doesn't ask the terminal what it supports: a terminal that doesn't answer would stop it starting.
 - REQ-CON-64: The menu MUST offer these entries where they apply, each standing for a command:
 
   ```
@@ -351,6 +351,13 @@ Bruce, 2026-11-25. Writing a room or thing means remembering which command does 
 - REQ-CON-66: Hide or reveal MUST ask which state and which `visibility:` (visible, faint, hidden, absent; `design/STATES.md` › Hidden things) and write it without opening the file. On a thing with no states it asks for a state's name first and makes it, as `/state` does.
 - REQ-CON-67: Starting state MUST list the thing's states, with the current `state:` marked, and set the one picked.
 - REQ-CON-68: Add a reply MUST ask for the verb, offering first what the engine's response hints say the thing needs or could have, then add a `## When:` section for it and open the editor there. Until response hints exist it asks for the verb plainly.
+
+## Sidebar clicks
+
+Bruce, 2026-11-25.
+
+- REQ-CON-69: A click on a quick menu entry, a TO WRITE name or an exit in the sidebar MUST do what its key or command does, straight away: the entry starts its questions, the name is written as REQ-CON-58 says, and the exit is gone through, as `go <direction>` would. A click elsewhere does nothing.
+- REQ-CON-70: To get clicks the console captures the mouse, so it MUST scroll the output and the sidebar with the wheel itself, under the pointer. Selecting text then takes Shift-drag, which Ghostty and iTerm2 pass to the terminal by default; Bruce accepts that cost. `/help` and the sidebar's foot SHOULD say so once.
 
 ## Command registry
 

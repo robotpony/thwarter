@@ -51,6 +51,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.95.1 (2026-11-25)
+
+### Changed
+
+- Ctrl-M opens the quick menu, at the prompt and in the full-screen editor, where it saves the document, acts on the thing being edited and reopens the editor afterwards (REQ-CON-63, Bruce, 2026-11-25). It needs the kitty keyboard protocol; elsewhere `/menu` is the way in.
+- `design/CONSOLE_REQUIREMENTS.md` › Sidebar clicks (REQ-CON-69, 70): clicks on quick menu entries, TO WRITE names and exits, with the wheel handled by the console and Shift-drag to select. Not built yet.
+
+### Removed
+
+- Ctrl-Space and NUL no longer open the quick menu: macOS takes Ctrl-Space for input sources, and NUL is also Terminal.app's Ctrl-2. Recover the handling with `git show e2216dc:src/console/screen.rs`.
+
 ## 0.95.0 (2026-11-25)
 
 ### Added

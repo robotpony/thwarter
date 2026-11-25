@@ -127,6 +127,10 @@ impl<'a> Screen<'a> {
 
     /// One key, with the console to act on.
     pub fn key(&mut self, input: Input, console: &Mutex<Console>) {
+        if self.quick.is_some() {
+            self.quick_key(input, console);
+            return;
+        }
         // A TO WRITE key switches documents from the editor too: save this
         // one, then make and open that one (REQ-CON-59).
         if let (Some(_), Input { key: Key::Char(c @ '1'..='9'), alt: true, .. }) = (&self.editing, &input) {
@@ -144,6 +148,30 @@ impl<'a> Screen<'a> {
             self.submit(console);
             return;
         }
+        // Ctrl-M opens the quick menu from the editor too, before the text
+        // area reads it as a new line (REQ-CON-63). The document is saved
+        // and closed, the menu acts on its thing, and the editor reopens
+        // on it afterwards.
+        if self.editing.is_some() && matches!(input, Input { key: Key::Char('m'), ctrl: true, .. }) {
+            let (editor, target) = self.editing.as_mut().expect("the editor is open");
+            if !editor.save_to_switch(&mut EditFiles { console, target }) {
+                return;
+            }
+            let (editor, target) = self.editing.take().expect("the editor is open");
+            let (kind, id, path) = target.thing();
+            let (kind, id, path) = (kind, id.to_string(), path.to_string());
+            let report = lock(console).edit_closed(&target, editor.closed());
+            if !report.is_empty() {
+                self.push(&report);
+            }
+            lock(console).place = super::session::Place::File(path);
+            self.open_quick(console);
+            match self.quick.as_mut() {
+                Some(quick) => quick.reopen = Some((kind, id)),
+                None => self.reopen(console, kind, &id),
+            }
+            return;
+        }
         if let Some((editor, target)) = &mut self.editing {
             let mut files = EditFiles { console, target };
             if !editor.key(input, &mut files) {
@@ -157,14 +185,9 @@ impl<'a> Screen<'a> {
             self.picker_key(input, console);
             return;
         }
-        if self.quick.is_some() {
-            self.quick_key(input, console);
-            return;
-        }
-        // Ctrl-Space, or the NUL a terminal without the kitty protocol
-        // sends for it (and Terminal.app for Ctrl-2), opens the quick menu
-        // (REQ-CON-63).
-        if matches!(input, Input { key: Key::Char(' '), ctrl: true, .. } | Input { key: Key::Null, .. }) {
+        // Ctrl-M opens the quick menu (REQ-CON-63). Without the kitty
+        // protocol it arrives as Enter, so only /menu reaches it there.
+        if matches!(input, Input { key: Key::Char('m'), ctrl: true, .. }) {
             self.open_quick(console);
             return;
         }
@@ -350,7 +373,9 @@ impl<'a> Screen<'a> {
     fn quick_key(&mut self, input: Input, console: &Mutex<Console>) {
         let Some(quick) = self.quick.as_mut() else { return };
         if input.key == Key::Esc || matches!(input, Input { key: Key::Char('c'), ctrl: true, .. }) {
-            self.quick = None;
+            if let Some((kind, id)) = self.quick.take().and_then(|q| q.reopen) {
+                self.reopen(console, kind, &id);
+            }
             return;
         }
         if !quick.key(input) {
@@ -374,6 +399,20 @@ impl<'a> Screen<'a> {
         self.push(&typed);
         self.output.push(String::new());
         self.after_command(console);
+        if let (Some((kind, id)), None, None) = (quick.reopen, &self.editing, &self.picker) {
+            self.reopen(console, kind, &id);
+        }
+    }
+
+    /// Opens the editor on a thing again, at wherever its file now is.
+    fn reopen(&mut self, console: &Mutex<Console>, kind: super::world::Kind, id: &str) {
+        let guard = lock(console);
+        if let Some(path) = guard.world.path_of(kind, id) {
+            if let Ok(target) = guard.open_target(kind, id.to_string(), path) {
+                let document = guard.edit_document(&target);
+                self.editing = Some((Editor::new(document).with_texts(guard.texts.clone()), target));
+            }
+        }
     }
 
     /// A key while questions are being asked.
@@ -552,6 +591,12 @@ impl<'a> Screen<'a> {
         };
         match &self.editing {
             Some((editor, target)) => editor.draw(frame, output_area, &console.lookup_for(target)),
+            None if self.quick.is_some() => {
+                self.draw_output(frame, output_area);
+                if let Some(quick) = &self.quick {
+                    quick.draw(frame, output_area, &self.words);
+                }
+            }
             None => {
                 self.draw_output(frame, output_area);
                 if let Some(picker) = &self.picker {
@@ -640,11 +685,14 @@ struct Quick<'a> {
     /// The option chosen in a choice question.
     choice: usize,
     area: TextArea<'a>,
+    /// The thing to open the editor on again afterwards, when the menu
+    /// was opened from the editor.
+    reopen: Option<(super::world::Kind, String)>,
 }
 
 impl<'a> Quick<'a> {
     fn new(menu: QuickMenu) -> Self {
-        Quick { menu, selected: 0, asking: false, at: 0, answers: Vec::new(), choice: 0, area: input_line() }
+        Quick { menu, selected: 0, asking: false, at: 0, answers: Vec::new(), choice: 0, area: input_line(), reopen: None }
     }
 
     fn entry(&self) -> &super::quick_menu::Entry {
@@ -1548,18 +1596,30 @@ mod tests {
         console.interactive = true;
         let console = Mutex::new(console);
         let mut screen = Screen::new("", None);
+        let ctrl_m = Input { key: Key::Char('m'), ctrl: true, ..Input::default() };
         // Nowhere to be yet: it says so rather than opening.
-        screen.key(Input { key: Key::Char(' '), ctrl: true, ..Input::default() }, &console);
+        screen.key(ctrl_m.clone(), &console);
         assert!(screen.quick.is_none());
         typed(&mut screen, &console, "go /village/square");
-        // Ctrl-Space opens it; so does /menu, and the NUL older terminals send.
+        // Ctrl-M opens it; Ctrl-Space doesn't, since macOS takes it.
         screen.key(Input { key: Key::Char(' '), ctrl: true, ..Input::default() }, &console);
+        assert!(screen.quick.is_none(), "Ctrl-Space is retired");
+        screen.key(ctrl_m.clone(), &console);
         let text = screen_text(&screen, &console, 110, 30);
         assert!(text.contains("Quick menu: village/square") && text.contains("add a door here"), "{}", text);
         press(&mut screen, &console, Key::Esc);
-        press(&mut screen, &console, Key::Null);
-        assert!(screen.quick.is_some(), "NUL opens it too");
+        // From the editor: it saves, asks about the thing being edited, and
+        // the editor comes back afterwards, even after Esc.
+        typed(&mut screen, &console, "/edit");
+        assert!(screen.editing.is_some());
+        screen.key(ctrl_m.clone(), &console);
+        assert!(screen.editing.is_none() && screen.quick.is_some(), "Ctrl-M isn't a new line in the editor");
         press(&mut screen, &console, Key::Esc);
+        assert!(screen.editing.is_some(), "Esc goes back to the editor");
+        press(&mut screen, &console, Key::Esc);
+        if screen.editing.is_some() {
+            screen.key(Input { key: Key::Char('q'), ctrl: true, ..Input::default() }, &console);
+        }
         typed(&mut screen, &console, "/menu");
         assert!(screen.quick.is_some(), "/menu opens it");
         // l: link to, then a direction and a room, one question at a time.

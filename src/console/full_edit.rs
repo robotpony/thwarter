@@ -37,6 +37,11 @@ pub struct EditTarget {
 }
 
 impl EditTarget {
+    /// What's being edited, as (kind, id, path in `World::files`).
+    pub(super) fn thing(&self) -> (Kind, &str, &str) {
+        (self.kind, &self.id, &self.path)
+    }
+
     /// The file's text if it changed on disk since it was opened, saved or
     /// last reported, which then counts as what the editor opened.
     fn changed_on_disk(&mut self) -> Option<String> {

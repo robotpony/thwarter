@@ -57,7 +57,7 @@ made_card = "Made {id}'s card."
 answers_were = "The answers were:"
 
 # The quick menu (quick_menu.rs, REQ-CON-63 to 68).
-side_quick_menu = "  ⌃Space or /menu  quick menu"
+side_quick_menu = "  ⌃M or /menu  quick menu"
 qm_heading = "Quick menu: {id} ({kind})"
 qm_nowhere = "The quick menu is for a room, thing or door; go to one first."
 qm_typed = "Typed, that was:"
