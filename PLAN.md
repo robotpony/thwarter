@@ -36,7 +36,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 - [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
 - [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
-- [ ] A quick menu in the sidebar for where you are: add action, add state, add chapter version, link to, add a reply, add a thing or door, recipes, hide or reveal (a state's `visibility:`), starting state, play from here. Each entry asks its questions in a picker, not a typed command; popup or bottom of the console to settle (Bruce, 2026-11-25) [console] (requirement to come in `design/CONSOLE_REQUIREMENTS.md`)
+- [ ] A quick menu in the sidebar for where you are: add action, add state, add chapter version, link to, add a reply, add a thing or door, recipes, hide or reveal (a state's `visibility:`), starting state, play from here. Each entry asks its questions in a picker, not a typed command, at the bottom of the console, opened with Ctrl-Space (Bruce, 2026-11-25) [console] (`design/CONSOLE_REQUIREMENTS.md` › Quick menu, REQ-CON-63 to 68)
 - [ ] Review the built-in question content with Bruce, once the mechanics work [commander, Bruce]
 
 ## Phase 6 · Doors and play

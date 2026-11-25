@@ -324,6 +324,34 @@ Bruce, 2026-11-24. A name the prose mentions but nothing defines (`[[hole]]`, `@
 - REQ-CON-58: Picking an entry MUST make it with defaults and open it in the editor, as `/add` would but without the question picker: the card REQ-CF-8 makes (scenery, title from the id), listed in the first room whose prose names it. A name an exit leads to becomes a room instead. Changing it afterwards is a normal `/set`.
 - REQ-CON-59: Each of the first nine entries MUST have its own key, Ctrl-1 to Ctrl-9 in list order, like browser tabs (Bruce, 2026-11-24: Ctrl, not Cmd): no leader, no letter. Alt-1 to Alt-9 MUST do the same. Entries past nine have no key; `/write <name>` reaches them, and `/write [<name>]` does the same for any entry from the prompt. Ctrl-9 is the ninth entry, not the last. Ctrl-digits arrive as themselves only through the kitty keyboard protocol (iTerm2 3.5+, Ghostty, kitty, WezTerm). Other terminals, such as Terminal.app, send NUL, Esc, control codes or plain digits instead, which MUST NOT be read as TO WRITE keys; Esc stays Esc. In those terminals Alt is the key. The sidebar shows Ctrl's (⌃1 on macOS). The keys MUST work in the editor too, like switching tabs: it saves the open document first, and if that save fails it stays open with the reason. The editor binds no Ctrl- or Alt-digit, so nothing clashes; if one ever does, the TO WRITE key wins.
 
+## Quick menu
+
+Bruce, 2026-11-25. Writing a room or thing means remembering which command does what; the sidebar can offer what fits where you are.
+
+- REQ-CON-63: Ctrl-Space MUST open a quick menu of actions for what edit mode is at (room, thing or door), in edit mode only. Inside it, arrows move, Enter picks, and each entry's letter picks it directly; Esc closes it. The sidebar shows the key (`⌃Space  quick menu`).
+- REQ-CON-64: The menu MUST offer these entries where they apply, each standing for a command:
+
+  ```
+  Quick menu: lantern                     (thing)
+    a  add action ............ /action
+    s  add state ............. /state
+    v  hide or reveal ........ a state's visibility:
+    t  starting state ........ /state {name} start
+    r  add a reply ........... a ## When: section for a verb
+    l  link to ............... /link
+    n  add a thing here ...... /add
+    d  add a door here ....... /add door  (rooms)
+    c  add chapter version ... /chapter   (not built)
+    p  recipes ............... fixed-until, locked-with, switch, container
+    g  play from here
+  ```
+
+  An entry whose command isn't built yet MUST NOT show. Letters stay fixed per entry, so a hidden one leaves no gap that moves the rest.
+- REQ-CON-65: An entry MUST ask its questions at the bottom of the console, one line at a time above the prompt, with the REQ-CON-46 picker's keys (arrows or letters for choices, Enter takes the default, Esc takes the defaults for the rest), then run the command and print the typed form it stood for, so an author learns it. An entry MAY be a question set of its own (`questions/menu-<entry>.md`) so a world can reword it.
+- REQ-CON-66: Hide or reveal MUST ask which state and which `visibility:` (visible, faint, hidden, absent; `design/STATES.md` › Hidden things) and write it without opening the file. On a thing with no states it asks for a state's name first and makes it, as `/state` does.
+- REQ-CON-67: Starting state MUST list the thing's states, with the current `state:` marked, and set the one picked.
+- REQ-CON-68: Add a reply MUST ask for the verb, offering first what the engine's response hints say the thing needs or could have, then add a `## When:` section for it and open the editor there. Until response hints exist it asks for the verb plainly.
+
 ## Command registry
 
 Bruce approved this, 2026-11-24 (the author rule is REQ-WS-5, 7 to 9). Today one command is written in five places (the `/` menu table, the dispatch `match`, `/help`, the transcripts' list of commands that change content, and the handler's own usage text), and they drift: 23 menu entries, 31 help lines, 34 dispatch arms. This section replaces them with one registry.
