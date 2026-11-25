@@ -233,18 +233,9 @@ The console restarts itself onto a new build in place, so it can be changed and 
 
 Who is writing, as a persona (`REQUIREMENTS.md` › 5.2, REQ-WS-4 to 6). Decided by Bruce, 2026-11-23; built after the lines above (`PLAN.md`).
 
-- REQ-CON-34: On first run, the console MUST ask who's writing. It lists the personas in `authors/` or offers to create one, writes `authors/<name>/index.md` for a new one, and records the choice in `$XDG_CONFIG_HOME/thwarter/config.toml` (`~/.config/thwarter/config.toml` by default).
-
-  ```
-  Who's writing?
-    1. mx      Bruce Alderson
-    2. (a new persona)
-  > 1
-  Writing as mx. /author switches.
-  ```
-
-- REQ-CON-35: `/author` MUST switch persona, and the status bar MUST show who you're writing as.
-- REQ-CON-36: A new world MUST go under the current persona, with `author: <id>` in its `world/index.md`.
+- REQ-CON-34: An author is the machine user for now (REQ-WS-5, 7; Bruce, 2026-11-24): the persona id is `$USER`, with no first-run ask. Choosing a persona waits.
+- REQ-CON-35: `/author`, switching persona, waits with REQ-CON-34. The status bar MAY show the user writing.
+- REQ-CON-36: A new world MUST be written with `authors: $USER` in its `world/index.md`. `authors:` is one id or a list; `author:` is still read.
 - REQ-CON-37: A persona's contact details ship with every packaged world (REQ-WS-6), so before packaging the console MUST say which details will go with it.
 
 ## Colour
@@ -319,10 +310,10 @@ Bruce, 2026-11-24. A name the prose mentions but nothing defines (`[[hole]]`, `@
 
 ## Command registry
 
-*Proposed (Bruce, 2026-11-24; the author rule is the commander's REQ-WS-7 to 9, also proposed).* Today one command is written in five places (the `/` menu table, the dispatch `match`, `/help`, the transcripts' list of commands that change content, and the handler's own usage text), and they drift: 23 menu entries, 31 help lines, 34 dispatch arms. This section replaces them with one registry.
+Bruce approved this, 2026-11-24 (the author rule is REQ-WS-5, 7 to 9). Today one command is written in five places (the `/` menu table, the dispatch `match`, `/help`, the transcripts' list of commands that change content, and the handler's own usage text), and they drift: 23 menu entries, 31 help lines, 34 dispatch arms. This section replaces them with one registry.
 
 - REQ-CON-50: Every console command MUST be described once, in a `type: command` Markdown file, and the `/` menu, `/help`, usage replies, argument completion, the mode guard and the test guard MUST all read that description. Nothing else lists commands.
-- REQ-CON-51: A command file's frontmatter has `name`, `aliases`, `about` (the one-line summary the `/` menu and `/help` list show), `args` (named parameters as the `/` menu shows them: `{thing} [{room}]`), `modes` (`edit`, `play`), `changes` (whether it writes to the world), and either `handler` (a built-in) or `run` (a world command, REQ-CON-54). Its body is the help prose and examples, which `/help <command>` shows.
+- REQ-CON-51: A command file's frontmatter has `name`, `aliases`, `about` (the one-line summary the `/` menu and `/help` list show), `args` (named parameters as the `/` menu shows them: `{thing} [{room}]`), `modes` (`edit`, `play`), `changes` (whether it writes to the world), and one of `handler` (a built-in), `run` or `script` (a world command, REQ-CON-54). Its body is the help prose and examples, which `/help <command>` shows.
 
   ```markdown
   ---
@@ -343,8 +334,8 @@ Bruce, 2026-11-24. A name the prose mentions but nothing defines (`[[hole]]`, `@
 
 - REQ-CON-52: Commands load in layers, later ones adding or changing: built-in `src/builtins/commands/<name>.md`; then the world's `world/commands/<name>.md`; then the person's `config.toml` `[console.commands.<name>]`, which MAY add aliases, reword `about` or hide a command, and MUST NOT add one. Per-reply message text stays in `[console]` (REQ-ENG-49).
 - REQ-CON-53: Built-in handlers stay in Rust, registered by the `handler` name. Every built-in file MUST have a handler and every handler a file; a test fails on either gap. The console checks a command's arguments against `args` before its handler runs, and a wrong count answers with the usage built from `args`.
-- REQ-CON-54: A world command MUST be a `run:` list of existing console commands with `{param}` slots, run as if typed, so each one's own confirmation still asks (REQ-WS-9: no more than the author could type). It MUST NOT run `/author`, personal config, packaging or install, the writing helpers, or another world command. No Rhai for now. It MUST NOT shadow a built-in: the built-in wins, with a load warning. `/help` lists world commands under the world's title.
-- REQ-CON-55: World commands work only in edit mode, and only when the current persona is the world's `author:` and the world is in an `authors/` workspace (REQ-WS-7, 8). Otherwise they're off, and naming one says why, with the `/set author` hint when the world has no `author:`.
+- REQ-CON-54: A world command MUST be either a `run:` list of existing console commands with `{param}` slots, run as if typed, or a Rhai `script` that reads the world and runs console commands, with the world scripts' limits (no files, no network). Either way each command's own confirmation still asks, so it does no more than the author could type (REQ-WS-9). It MUST NOT run `/author`, personal config, packaging or install, the writing helpers, or another world command. It MUST NOT shadow a built-in: the built-in wins, with a load warning. `/help` lists world commands under the world's title.
+- REQ-CON-55: World commands work only in edit mode, and only when the machine user (`$USER`) is in the world's `authors:` and the world isn't installed (REQ-WS-7, 8; Bruce, 2026-11-24). Otherwise they're off, and naming one says why; with no `authors:` it offers to add the current user.
 - REQ-CON-56: Commands SHOULD be forgiving (Bruce, 2026-11-24). Built-in aliases ship (`/rm`, `/ls`). A unique prefix runs its command. A mistyped name answers "did you mean". A bare command name with no slash in edit mode runs it when it isn't also a play verb, else asks.
 
 ## Open questions
