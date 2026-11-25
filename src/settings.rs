@@ -25,6 +25,14 @@ pub fn config_dir() -> Option<PathBuf> {
     xdg(env("XDG_CONFIG_HOME"), env("HOME"), ".config").map(|d| d.join("thwarter"))
 }
 
+/// The person at the keyboard, for now the machine's user (REQ-WS-7):
+/// `$THWART_USER` when set (tests, or a shared login), else `$USER`, else
+/// `$USERNAME` on Windows. Their persona id is the same name until
+/// choosing another persona is built.
+pub fn current_user() -> Option<String> {
+    ["THWART_USER", "USER", "USERNAME"].iter().filter_map(|k| env(k)).find(|u| !u.trim().is_empty())
+}
+
 /// `$XDG_DATA_HOME/thwarter`, else `~/.local/share/thwarter`. Installed
 /// worlds go in its `worlds/<persona>/<world>/` (REQ-CFG-5).
 pub fn data_dir() -> Option<PathBuf> {

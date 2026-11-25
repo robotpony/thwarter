@@ -12,6 +12,10 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct WorldDef {
     pub title: Option<String>,
+    /// `authors:`, one id or a list: machine user names, also persona
+    /// ids (REQ-WS-5, 7). An old `author:` is read as a one-item list.
+    pub authors: Vec<String>,
+    /// The first of `authors`, for clients not yet reading the list.
     pub author: Option<String>,
     pub version: Option<String>,
     /// The room a new game starts in.
@@ -59,6 +63,26 @@ pub(crate) fn world_file(parts: &[String]) -> Option<WorldFile> {
         ["styles", ..] => WorldFile::Styles,
         _ => WorldFile::Other,
     })
+}
+
+/// `authors:` as ids: one id, or a list of them, each a plain name with
+/// no spaces. Duplicates are dropped. `None` when it's neither.
+fn author_ids(value: &Value) -> Option<Vec<String>> {
+    let items: Vec<&Value> = match value {
+        Value::Sequence(list) => list.iter().collect(),
+        one => vec![one],
+    };
+    let mut ids: Vec<String> = Vec::new();
+    for item in items {
+        let id = value_text(item)?.trim().to_string();
+        if id.is_empty() || id.chars().any(char::is_whitespace) {
+            return None;
+        }
+        if !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    Some(ids)
 }
 
 /// A scalar value as text: values are strings (`design/STATES.md` ›
@@ -118,16 +142,37 @@ fn check_keys(layer: &Layer, expected_type: &str, allowed: &[&str], problems: &m
 
 impl WorldDef {
     pub(crate) fn read_index(&mut self, layer: &Layer, problems: &mut Vec<String>, warnings: &mut Vec<String>) {
-        if !check_keys(layer, "world", &["type", "title", "author", "version", "start"], problems, warnings) {
+        if !check_keys(layer, "world", &["type", "title", "authors", "author", "version", "start"], problems, warnings) {
             return;
         }
         let text = |key: &str| layer.metadata.get(key).and_then(value_text);
         self.title = text("title");
-        self.author = text("author");
+        let shown = layer.path.display();
+        match (layer.metadata.get("authors"), text("author")) {
+            (Some(value), old) => {
+                match author_ids(value) {
+                    Some(ids) => self.set_authors(ids),
+                    None => problems.push(format!("{}: `authors:` is one id or a list of ids, like `authors: [mx, alice]`", shown)),
+                }
+                if old.is_some() {
+                    warnings.push(format!("{}: `author:` is ignored beside `authors:`; remove it", shown));
+                }
+            }
+            (None, Some(old)) => {
+                warnings.push(format!("{}: `author: {}` is the old name; rename it `authors: {}`", shown, old, old));
+                self.set_authors(vec![old]);
+            }
+            (None, None) => self.set_authors(Vec::new()),
+        }
         self.version = text("version");
         self.start = layer.metadata.get("start").and_then(crate::parsers::id_value);
         self.intro = layer.body.clone();
         self.source = Some(layer.path.clone());
+    }
+
+    fn set_authors(&mut self, ids: Vec<String>) {
+        self.author = ids.first().cloned();
+        self.authors = ids;
     }
 
     pub(crate) fn read_story(&mut self, layer: &Layer, problems: &mut Vec<String>, warnings: &mut Vec<String>) {
@@ -171,9 +216,11 @@ impl WorldDef {
         if toml.get("metadata").is_none() && get("settings", "starting_location").is_none() {
             return WorldDef::default();
         }
+        let authors: Vec<String> = get("metadata", "author").into_iter().collect();
         WorldDef {
             title: get("metadata", "title"),
-            author: get("metadata", "author"),
+            author: authors.first().cloned(),
+            authors,
             version: get("metadata", "version"),
             start: get("settings", "starting_location"),
             intro: get("metadata", "description").unwrap_or_default(),
@@ -211,11 +258,13 @@ mod tests {
         write(d, "world.toml", "[metadata]\ntitle = \"Old title\"\n");
         let mut engine = WorldEngine::new();
         let report = engine.load_world(d).unwrap();
-        // Its `author:` names no persona folder beside the world.
+        // The old `author:` still reads, with a rename hint. Bruce has no
+        // persona file, which is fine: the id is the name.
         assert!(report.errors.is_empty(), "{:?}", report.errors);
         assert_eq!(report.warnings.len(), 1, "{:?}", report.warnings);
-        assert!(report.warnings[0].contains("`author: Bruce` names no persona"), "{:?}", report.warnings);
+        assert!(report.warnings[0].contains("`author: Bruce` is the old name; rename it `authors: Bruce`"), "{:?}", report.warnings);
         let world = engine.world();
+        assert_eq!(world.authors, ["Bruce"]);
         assert_eq!(world.title.as_deref(), Some("Castle")); // world/ wins over world.toml
         assert_eq!(world.author.as_deref(), Some("Bruce"));
         assert_eq!(world.version.as_deref(), Some("2.0.0"));
@@ -285,5 +334,32 @@ mod tests {
         let mut engine = WorldEngine::new();
         engine.load_world(d).unwrap();
         assert!(engine.get_location("castle/static/hall").is_some());
+    }
+
+    #[test]
+    fn authors_is_one_id_or_a_list() {
+        let load = |index: &str| {
+            let dir = base();
+            write(dir.path(), "world/index.md", index);
+            let mut engine = WorldEngine::new();
+            engine.load_world(dir.path()).unwrap();
+            (dir, engine)
+        };
+        let (_d, one) = load("---\ntype: world\nauthors: mx\n---\n");
+        assert_eq!(one.world().authors, ["mx"]);
+        assert_eq!(one.world().author.as_deref(), Some("mx"));
+        assert!(one.current_warnings().is_empty(), "{:?}", one.current_warnings());
+        let (_d, two) = load("---\ntype: world\nauthors: [mx, alice, mx]\n---\n");
+        assert_eq!(two.world().authors, ["mx", "alice"]);
+        assert!(two.is_author("alice") && two.is_author("mx") && !two.is_author("bob"));
+        let (_d, both) = load("---\ntype: world\nauthors: [mx]\nauthor: old\n---\n");
+        assert_eq!(both.world().authors, ["mx"]);
+        assert!(both.current_warnings().iter().any(|w| w.contains("`author:` is ignored beside `authors:`")), "{:?}", both.current_warnings());
+        let (_d, bad) = load("---\ntype: world\nauthors: [B. Writer]\n---\n");
+        assert!(bad.current_problems(false).iter().any(|p| p.contains("`authors:` is one id or a list of ids")), "{:?}", bad.current_problems(false));
+        // No `authors:` means no one is an author, and validate says so.
+        let (_d, none) = load("---\ntype: world\ntitle: Castle\n---\n");
+        assert!(none.world().authors.is_empty() && !none.is_author("mx"));
+        assert!(none.current_warnings().iter().any(|w| w.contains("names no `authors:`")), "{:?}", none.current_warnings());
     }
 }

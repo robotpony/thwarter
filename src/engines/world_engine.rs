@@ -103,11 +103,11 @@ pub struct WorldEngine {
     library: std::collections::BTreeMap<String, Layer>,
     /// The world's question sets, from its `questions/` folders (REQ-CF-32).
     question_sets: Vec<crate::engines::questions::QuestionSet>,
-    /// The persona `world/index.md`'s `author:` names (REQ-WS-5), and a
-    /// problem or warning about it.
-    persona: Option<Persona>,
-    persona_problem: Option<String>,
-    persona_warning: Option<String>,
+    /// The personas `world/index.md`'s `authors:` names that have a
+    /// folder (REQ-WS-5), in its order, and problems or warnings about them.
+    personas: Vec<Persona>,
+    persona_problem: Vec<String>,
+    persona_warning: Vec<String>,
     /// Links out of the world that the last load skipped (REQ-CFG-10).
     link_warnings: Vec<String>,
 }
@@ -321,17 +321,29 @@ impl WorldEngine {
             roles: std::collections::BTreeMap::new(),
             library: std::collections::BTreeMap::new(),
             question_sets: Vec::new(),
-            persona: None,
-            persona_problem: None,
-            persona_warning: None,
+            personas: Vec::new(),
+            persona_problem: Vec::new(),
+            persona_warning: Vec::new(),
             link_warnings: Vec::new(),
         }
     }
 
-    /// The world's author, from the persona `world/index.md`'s `author:`
-    /// names (REQ-WS-4, 5).
+    /// The world's first author, from the persona `world/index.md`'s
+    /// `authors:` names first (REQ-WS-4, 5).
     pub fn persona(&self) -> Option<&Persona> {
-        self.persona.as_ref()
+        self.personas.iter().find(|p| Some(&p.id) == self.world.authors.first())
+    }
+
+    /// Every author's persona that has a folder, in `authors:` order.
+    pub fn personas(&self) -> &[Persona] {
+        &self.personas
+    }
+
+    /// Whether `user` is an author of this world (REQ-WS-7, 8): named in
+    /// its `authors:`, and the world isn't an installed one.
+    pub fn is_author(&self, user: &str) -> bool {
+        self.world.authors.iter().any(|a| a == user)
+            && self.world_root.as_deref().map_or(true, |root| crate::packaging::installed_id(root).is_none())
     }
 
     /// The template `name` means, seen from `scope` (a folder relative to
@@ -1001,25 +1013,34 @@ impl WorldEngine {
         }
     }
 
-    /// Find the persona the world's `author:` names, beside the world.
+    /// Find the persona each of the world's `authors:` names, beside the
+    /// world, and warn when it names no one (REQ-WS-5, 7).
     fn read_persona(&mut self) {
-        self.persona = None;
-        self.persona_problem = None;
-        self.persona_warning = None;
-        let (Some(id), Some(root)) = (self.world.author.clone(), self.world_root.clone()) else { return };
-        let source = self.world.source.clone().unwrap_or_else(|| root.join("world/index.md"));
-        let Some(folder) = crate::engines::persona::persona_folder(&root, &id) else { return };
-        match crate::engines::persona::read_persona(&folder) {
-            Ok(Some(persona)) => self.persona = Some(persona),
-            Ok(None) => {
-                self.persona_warning = Some(format!(
-                    "{}: `author: {}` names no persona; a persona is a folder beside the world, {}",
-                    source.display(),
-                    id,
-                    folder.display()
-                ))
+        self.personas.clear();
+        self.persona_problem.clear();
+        self.persona_warning.clear();
+        let Some(root) = self.world_root.clone() else { return };
+        if self.world.authors.is_empty() {
+            let source = self.world.source.clone().unwrap_or_else(|| root.join("world/index.md"));
+            // Only a world with `world/index.md`, where REQ-WS-5 puts it; a
+            // bare folder of rooms, or one still on `world.toml`, isn't asked.
+            if self.world.source.as_deref().map_or(false, |s| s.ends_with("world/index.md")) {
+                self.persona_warning.push(format!(
+                    "{}: names no `authors:`, so no one is its author and features for authors stay off; add `authors: <your user name>`",
+                    source.display()
+                ));
             }
-            Err(e) => self.persona_problem = Some(e),
+            return;
+        }
+        for id in self.world.authors.clone() {
+            let Some(folder) = crate::engines::persona::persona_folder(&root, &id) else { continue };
+            // A persona file is optional: without one the id is the name
+            // (REQ-WS-5).
+            match crate::engines::persona::read_persona(&folder) {
+                Ok(Some(persona)) => self.personas.push(persona),
+                Ok(None) => {}
+                Err(e) => self.persona_problem.push(e),
+            }
         }
     }
 

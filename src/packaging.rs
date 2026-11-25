@@ -23,7 +23,13 @@ pub const MAX_FILES: usize = 10_000;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Manifest {
     pub format: u32,
+    /// The first author: the world's folder in the package.
     pub persona: String,
+    /// Every author, the first included, whose file may ship as
+    /// `<id>/index.md` (REQ-WS-5). Empty in a package from before
+    /// `authors:`, which ships only `persona`'s.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authors: Vec<String>,
     pub world: String,
     pub title: Option<String>,
     pub version: Option<String>,
@@ -37,8 +43,12 @@ pub struct Manifest {
 #[derive(Debug, Clone)]
 pub struct PackagePlan {
     pub manifest: Manifest,
-    /// The persona, if its folder was found; its file ships if it has one.
+    /// The first author's persona, if its folder was found; its file
+    /// ships if it has one.
     pub persona: Option<Persona>,
+    /// Every author's persona that was found, the first included; each
+    /// with a file ships it (REQ-CFG-7).
+    pub personas: Vec<Persona>,
     /// The world's files, relative to the world folder, sorted.
     pub files: Vec<PathBuf>,
     /// Author comments in the files, and how many files hold them.
@@ -95,13 +105,13 @@ impl PackagePlan {
             bail!("the world has {} problem(s), so it can't be packaged; run `thwart validate` to list them", problems.len());
         }
         let world_id = world_root.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string();
-        let persona_id = engine
-            .world()
-            .author
-            .clone()
+        let authors = engine.world().authors.clone();
+        let persona_id = authors
+            .first()
+            .cloned()
             .or_else(|| world_root.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()).map(str::to_string))
             .ok_or_else(|| anyhow!("the world names no author, and its folder has no persona folder around it"))?;
-        for (what, id) in [("persona", &persona_id), ("world", &world_id)] {
+        for (what, id) in [("persona", &persona_id), ("world", &world_id)].into_iter().chain(authors.iter().map(|a| ("author", a))) {
             if !is_safe_segment(id) {
                 bail!("the {} id `{}` can't name a folder in a package", what, id);
             }
@@ -132,6 +142,7 @@ impl PackagePlan {
         let manifest = Manifest {
             format: 1,
             persona: persona_id.clone(),
+            authors: if authors.len() > 1 { authors.clone() } else { Vec::new() },
             world: world_id.clone(),
             title: w.title.clone(),
             version: w.version.clone(),
@@ -145,6 +156,7 @@ impl PackagePlan {
         Ok(PackagePlan {
             manifest,
             persona: engine.persona().cloned(),
+            personas: engine.personas().to_vec(),
             files,
             comments,
             comment_files,
@@ -171,6 +183,16 @@ impl PackagePlan {
                 }
             }
             None => out.push(format!("This package ships as `{}`, with no persona file and no contact details.", self.manifest.persona)),
+        }
+        // Co-authors' details ship too (REQ-WS-6).
+        for p in self.personas.iter().filter(|p| p.id != self.manifest.persona && p.path.is_some()) {
+            out.push(format!("It also ships {}'s details ({}):", p.title, p.id));
+            for (key, value) in &p.contacts {
+                out.push(format!("  {}: {}", key, value));
+            }
+            if p.contacts.is_empty() {
+                out.push("  (no contact details)".to_string());
+            }
         }
         out.push(if strip_comments {
             format!("Author comments are left out ({} in {} file(s)).", self.comments, self.comment_files)
@@ -199,6 +221,12 @@ impl PackagePlan {
             if let Some(path) = self.persona.as_ref().and_then(|p| p.path.as_ref()) {
                 zip.start_file(format!("{}/index.md", self.manifest.persona), options)?;
                 zip.write_all(&std::fs::read(path)?)?;
+            }
+            for p in self.personas.iter().filter(|p| p.id != self.manifest.persona && self.manifest.authors.contains(&p.id)) {
+                if let Some(path) = &p.path {
+                    zip.start_file(format!("{}/index.md", p.id), options)?;
+                    zip.write_all(&std::fs::read(path)?)?;
+                }
             }
             for rel in &self.files {
                 let bytes = std::fs::read(self.world_root.join(rel))?;
@@ -251,13 +279,14 @@ fn check_archive(archive: &mut zip::ZipArchive<std::fs::File>) -> Result<(Manife
     if manifest.format != 1 {
         bail!("this package is format {}; this thwart reads format 1", manifest.format);
     }
-    for (what, id) in [("persona", &manifest.persona), ("world", &manifest.world)] {
+    for (what, id) in [("persona", &manifest.persona), ("world", &manifest.world)].into_iter().chain(manifest.authors.iter().map(|a| ("author", a))) {
         if !is_safe_segment(id) {
             bail!("the package's {} id `{}` can't name a folder", what, id);
         }
     }
     let world_prefix = Path::new(&manifest.persona).join(&manifest.world);
-    let persona_file = Path::new(&manifest.persona).join("index.md");
+    let persona_files: Vec<PathBuf> =
+        std::iter::once(&manifest.persona).chain(manifest.authors.iter()).map(|id| Path::new(id).join("index.md")).collect();
     let mut total: u64 = 0;
     let mut entries = Vec::new();
     for i in 0..archive.len() {
@@ -281,7 +310,7 @@ fn check_archive(archive: &mut zip::ZipArchive<std::fs::File>) -> Result<(Manife
         if entry.is_dir() || raw == MANIFEST {
             continue;
         }
-        if path != persona_file && !path.starts_with(&world_prefix) {
+        if !persona_files.contains(&path) && !path.starts_with(&world_prefix) {
             bail!("{} is outside {}/, where a package keeps its files", shown, world_prefix.display());
         }
         entries.push((i, path));
@@ -309,7 +338,8 @@ pub fn install(package: &Path, data_dir: &Path, replace: bool) -> Result<Install
     let staging = persona_dir.join(format!(".{}.installing-{}", manifest.world, std::process::id()));
     let _ = std::fs::remove_dir_all(&staging);
     let world_prefix = Path::new(&manifest.persona).join(&manifest.world);
-    let mut persona_text: Option<Vec<u8>> = None;
+    // Each author's file, by id: `<id>/index.md`.
+    let mut persona_texts: Vec<(String, Vec<u8>)> = Vec::new();
     let unpacked = (|| -> Result<()> {
         let mut budget = MAX_TOTAL_BYTES;
         for (i, path) in &entries {
@@ -327,7 +357,10 @@ pub fn install(package: &Path, data_dir: &Path, replace: bool) -> Result<Install
                     std::fs::create_dir_all(dest.parent().unwrap())?;
                     std::fs::write(&dest, &bytes)?;
                 }
-                Err(_) => persona_text = Some(bytes),
+                Err(_) => {
+                    let id = path.iter().next().map(|c| c.to_string_lossy().into_owned()).unwrap_or_default();
+                    persona_texts.push((id, bytes));
+                }
             }
         }
         std::fs::create_dir_all(&staging)?;
@@ -351,23 +384,24 @@ pub fn install(package: &Path, data_dir: &Path, replace: bool) -> Result<Install
         std::fs::rename(&staging, &target).with_context(|| format!("can't install to {}", target.display()))?;
     }
 
-    let persona_note = match persona_text {
-        None => None,
-        Some(bytes) => {
-            let path = persona_dir.join("index.md");
-            match std::fs::read(&path) {
-                Ok(old) if old == bytes => None,
-                Ok(_) => {
-                    std::fs::write(&path, &bytes)?;
-                    Some(format!("updated {}'s details from the package", manifest.persona))
-                }
-                Err(_) => {
-                    std::fs::write(&path, &bytes)?;
-                    Some(format!("added {}'s details", manifest.persona))
-                }
+    let mut notes = Vec::new();
+    for (id, bytes) in persona_texts {
+        let dir = data_dir.join("worlds").join(&id);
+        std::fs::create_dir_all(&dir).with_context(|| format!("can't create {}", dir.display()))?;
+        let path = dir.join("index.md");
+        match std::fs::read(&path) {
+            Ok(old) if old == bytes => {}
+            Ok(_) => {
+                std::fs::write(&path, &bytes)?;
+                notes.push(format!("updated {}'s details from the package", id));
+            }
+            Err(_) => {
+                std::fs::write(&path, &bytes)?;
+                notes.push(format!("added {}'s details", id));
             }
         }
-    };
+    }
+    let persona_note = (!notes.is_empty()).then(|| notes.join("; "));
     Ok(InstallReport { manifest, path: target, replaced, persona_note })
 }
 

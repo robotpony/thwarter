@@ -28,7 +28,7 @@ fn world() -> World {
     write(dir.path(), "authors/bruce/index.md", "---\ntype: author\ntitle: B. Alderson\nwebsite: https://example.com\n---\nWrites small worlds.\n");
     let root = dir.path().join("authors/bruce/castle");
     let d = root.as_path();
-    write(d, "world/index.md", "---\ntitle: Tiny Castle\ntype: world\nauthor: bruce\nstart: vault\n---\nYou wake.\n");
+    write(d, "world/index.md", "---\ntitle: Tiny Castle\ntype: world\nauthors: bruce\nstart: vault\n---\nYou wake.\n");
     write(d, "world/story.md", "---\ntype: story\nvars: { king: alive }\n---\n");
     write(d, "chapters/10-before.md", "---\ntitle: Before\n---\n");
     write(d, "vault/index.md", "---\nid: vault\ntitle: Vault\ntype: location\nstate: shut\ncharacters: [guard]\n---\n");

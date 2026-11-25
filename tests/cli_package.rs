@@ -42,7 +42,7 @@ fn setup() -> Setup {
     let d = dir.path();
     write(d, "authors/bruce/index.md", "---\ntype: author\ntitle: B. Writer\nemail: b@example.com\n---\nWrites.\n");
     let w = d.join("authors/bruce/castle");
-    write(&w, "world/index.md", "---\ntitle: Castle\ntype: world\nauthor: bruce\nversion: 1.2\nstart: hall\n---\nYou wake.\n");
+    write(&w, "world/index.md", "---\ntitle: Castle\ntype: world\nauthors: bruce\nversion: 1.2\nstart: hall\n---\nYou wake.\n");
     write(&w, "world/styles/terse.md", "My private style notes.\n");
     write(&w, "world.toml", "[settings]\ndefault_map_style = \"ascii\"\n");
     write(&w, "hall.md", "---\nid: hall\ntitle: Hall\ntype: location\n---\nStone. <!-- the butler did it -->\n\n<!-- spoiler: the vault is under the stairs -->\n");
@@ -180,4 +180,31 @@ fn hostile_packages_are_refused_before_anything_is_written() {
     assert!(!ok && err.contains("is a link"), "{}", err);
 
     assert!(!s.data().join("thwarter/worlds/eve").exists() || std::fs::read_dir(s.data().join("thwarter/worlds/eve")).unwrap().next().is_none());
+}
+
+#[test]
+fn every_author_with_a_persona_file_ships_and_installs() {
+    let s = setup();
+    let d = s.dir.path();
+    write(d, "authors/alice/index.md", "---\ntype: author\ntitle: A. Writer\nwebsite: https://example.org\n---\nAlso writes.\n");
+    let w = s.world();
+    write(&w, "world/index.md", "---\ntitle: Castle\ntype: world\nauthors: [bruce, alice, nobody]\nversion: 1.2\nstart: hall\n---\nYou wake.\n");
+    let world = w.to_str().unwrap();
+    let (ok, _, err) = s.run(&["package", world, "--yes"]);
+    assert!(ok, "{}", err);
+    assert!(err.contains("It also ships A. Writer's details (alice):") && err.contains("website: https://example.org"), "{}", err);
+    let package = s.out().join("bruce-castle-1.2.thwarter");
+    let names = entries(&package);
+    assert!(names.contains(&"bruce/index.md".to_string()) && names.contains(&"alice/index.md".to_string()), "{:?}", names);
+    // `nobody` has no persona file, so nothing ships for it.
+    assert!(!names.iter().any(|n| n.starts_with("nobody/")), "{:?}", names);
+    let manifest: toml::Value = toml::from_str(&read_entry(&package, "thwarter-package.toml")).unwrap();
+    assert_eq!(manifest["persona"].as_str(), Some("bruce"));
+    let authors: Vec<&str> = manifest["authors"].as_array().unwrap().iter().filter_map(|a| a.as_str()).collect();
+    assert_eq!(authors, ["bruce", "alice", "nobody"]);
+
+    let (ok, out, err) = s.run(&["install", package.to_str().unwrap()]);
+    assert!(ok, "{}{}", out, err);
+    assert!(s.data().join("thwarter/worlds/alice/index.md").exists());
+    assert!(s.data().join("thwarter/worlds/bruce/castle/world/index.md").exists());
 }

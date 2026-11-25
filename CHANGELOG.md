@@ -66,6 +66,20 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.72.0 (2026-11-24)
+
+### Added
+
+- `authors:` in `world/index.md`, one id or a list (`authors: mx`, `authors: [mx, alice]`), read into `WorldDef::authors` (REQ-WS-5, REQ-ENG-56). `WorldDef::author` stays as the first one for clients still reading it.
+- `WorldEngine::is_author(user)`, true when `user` is in `authors:` and the world isn't installed, and `settings::current_user()` (`$THWART_USER`, `$USER`, `$USERNAME`) for the console's author checks (REQ-WS-7, 8). `WorldEngine::personas()` gives every author's persona.
+- `validate` warns about a `world/index.md` with no `authors:`, and suggests renaming an old `author:` (REQ-CLI-20).
+- `thwart package` ships `<id>/index.md` for every author with a persona file, listed in the manifest's `authors`; `install` puts each in `worlds/<id>/index.md` (REQ-CLI-12). A thwart older than this refuses a package with more than one author's file.
+
+### Changed
+
+- An author with no persona folder is no longer a warning: the id is the name (REQ-WS-5).
+- `design/ENGINE_REQUIREMENTS.md` › Forgiving verbs: REQ-ENG-51 to 54 are approved, not yet built.
+
 ## 0.71.0 (2026-11-24)
 
 ### Added
