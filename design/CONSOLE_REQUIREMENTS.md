@@ -64,6 +64,16 @@ bedroom already has a west exit, to door-bedroom-west. To change it:
 - REQ-CON-60: `/start` MUST make the room edit mode is in the world's start, in `world/index.md`'s `start:` (Bruce, 2026-11-24). A world with no `world/index.md` MUST be offered one wherever it's missing (`/edit world`, `/start`): its title, `authors:` with the machine user, and `start:` set to the current room, else the first. `/start` makes it without asking, since that's what was typed.
 - REQ-CON-61: In edit mode an exit to a room nothing defines MUST show only as a TO WRITE entry, not in the problems pane (Bruce, 2026-11-24). Play mode and `/validate` still count it as a problem, as `thwart validate` and `package` do.
 
+- REQ-CON-62: `thwart edit` and `thwart play` with no world given (no `--world`, no configured default, none around the current folder) MUST NOT open a built-in default (Bruce, 2026-11-24). In a terminal they offer the worlds the engine finds as a picker, like the `/` menu: each world's title, its path, and whether it's installed. ↑ and ↓ choose, Enter opens, Esc quits. Edit lists only worlds you can write (not installed ones); play lists both. With none to list, edit offers to make one under `authors/$USER/`, and play says there are none and how to install one. Without a terminal, both list the worlds and exit with an error, as the CLI does.
+
+  ```
+  Which world?
+  > Tiny World        authors/mx/tiny
+    The Lighthouse    authors/mx/lighthouse
+    Castle Adventure  ~/.local/share/thwarter/worlds/castle  installed
+  ↑↓ choose · enter opens · esc quits
+  ```
+
 - REQ-CON-5: Edit mode MUST offer commands that create or change one thing at a time, for example `/new room north <id>` (a new room, linked north of the current one), `/new object`, `/new character`, `/set` (one field), `/link` (add or change one exit) and `/unlink` (remove one exit). Each MUST save the change to the file (REQ-ENG-7) and report any problems it causes (REQ-ENG-8). On a terminal, `/new` and `/add` then open the full-screen editor on what they made or added (Bruce, 2026-11-24); a setting to turn that off MAY follow. The author always names a new entity's `id`; the console MUST NOT make one up, since an `id` can't be renamed yet. In a room, the first word after `/new room` is a direction; outside a room, it's the new room's `id`.
 - REQ-CON-41: `/add <thing> [room or character]` MUST put a person or thing into a room, the current one if none is named, or an object into a character's inventory (Bruce, 2026-11-23). A name with no card goes in as scenery (REQ-CF-8). A thing starts in one place (REQ-CF-31), so a thing already somewhere else MUST NOT be added a second time: `/add` asks "desk is in bedroom: move it here? (y/n)", moves it on yes, and changes nothing on no (Bruce, 2026-11-24).
 

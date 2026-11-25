@@ -8,6 +8,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Added
 
+- `design/CONSOLE_REQUIREMENTS.md`: REQ-CON-62, a world picker for `thwart edit` and `thwart play` when no world is given, in place of a built-in default.
 - `design/CONSOLE_REQUIREMENTS.md`: the command registry is approved (REQ-CON-50 to 56), and a world command may be a Rhai `script` as well as a `run` list (REQ-CON-54). Authors are the machine user, in `authors:` (REQ-CON-34 to 36, 55).
 - `design/CONSOLE_REQUIREMENTS.md` › To write, REQ-CON-57 to 59: a TO WRITE list in the sidebar, one entry per unwritten name, made with defaults from Cmd-1 to Cmd-9 or `/write`.
 - `design/ENGINE_REQUIREMENTS.md` › Forgiving verbs: REQ-ENG-51 to 54, proposed, for aliases in a `[verbs]` table, the order a typed verb resolves in, unique prefixes that never beat an exact match, and did-you-mean for verbs only.
