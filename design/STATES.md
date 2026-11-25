@@ -575,11 +575,13 @@ Whether a mention in the body (`@vault-door`) also connects is still open (`desi
 
 ### Clocks
 
-Time is counted in turns, which the engine already keeps (`game.turn`). Everything else is built on states and values, with no new condition language.
+Agreed with Bruce on 2026-11-25. Time is counted in turns, which the engine already keeps (`game.turn`). Everything else is built on states and values, with no new condition language.
 
 - **Changes over time.** A state MAY say `after: { turns: 20, becomes: stale }`: 20 turns after a thing enters that state, it switches. The count is per thing, from when it entered the state, so bread bought late goes stale late.
-- **A range** (`turns: 15-25`) picks a point in it, the first source of randomness.
-- **Game time.** `world/index.md` MAY set `start_time: "08:00"` and `minutes_per_turn: 5`. The engine then supplies `game.time` and `game.day` from the turn count. A world that sets nothing has turns only.
+- **A range** (`turns: 15-25`) picks a point in it when the thing enters the state.
+- **At a point in the game.** A thing MAY say `at: { turn: 50, becomes: ringing }` in its frontmatter: when `game.turn` reaches 50 it switches, whatever state it's in, once (Bruce). With game time set, `at: { time: "12:00", becomes: ringing }` does the same at that time each day.
+- **Seeded randomness.** Each new game gets a seed, kept in the save, so a loaded game, a replay or a transcript turns out the same; `/restart` gets a new one (Bruce). Ranges and the choice between several reply blocks draw from it. The built-in `[engine]` lists keep picking `turn % len`.
+- **Game time.** `world/index.md` MAY set `start_time: "08:00"` and `minutes_per_turn: 5`. The engine then supplies `game.time` and `game.day` from the turn count, so clock time never drifts from turns. A world that sets nothing has turns only.
 - **Weather** is an ordinary bundle in `world/` with states and `after:`, so it changes the way bread spoils:
 
 ```yaml
@@ -590,8 +592,8 @@ after: { turns: 10-30, becomes: rain }
 The sky is clear.
 ```
 
-  Rooms show it with `{{ weather.title }}` or a link, and actions can check it once `requires:` needs a state check.
-- **Randomness in prose.** A response MAY have several blocks with the same name, and play picks one each time, so "Ow." doesn't repeat word for word. The built-in replies already vary this way.
+  Rooms show it with `{{ weather.title }}` or a link. A heading tests it with `@thing:state`: `## When: @weather:rain` matches while the weather is in its rain state, from any thing or room (Bruce; `design/SECTIONS.md` › Open question 1).
+- **Randomness in prose.** A response MAY have several blocks with the same name, and play picks one each time with the game's seed, so "Ow." doesn't repeat word for word.
 
 ## Validation
 
@@ -611,6 +613,6 @@ The sky is clear.
 
 ## Open questions
 
-1. **Clocks and game values**: proposed above (Keys and clocks), to review with Bruce. Phase 6.
+1. **Clocks and game values**: settled with Bruce, 2026-11-25 (Keys and clocks › Clocks).
 2. **Showing play state**: it MUST be visible in a sidebar in the console and be queryable (Bruce, 2026-11-23). The layout and the query commands are console work for `design/CONSOLE_REQUIREMENTS.md`. Phase 5.
 3. **Keys for built-in locked doors**: settled with Bruce, 2026-11-23 (Keys and clocks › Keys).
