@@ -44,6 +44,12 @@ take_person = "You can't take people."             # #take #person, thing
 take_scenery = "You can't take the {name}."        # #take #scenery, thing
 immovable = "The {name} won't budge."              # #take #immovable, thing
 
+# Taking everything, waiting, repeating
+take_all_nothing = "There's nothing here to take."  # #take #nothing, world
+waited = "Time passes."                            # #wait, world
+nothing_to_repeat = "There's nothing to repeat."   # #again #nothing, world
+it_unknown = "I'm not sure what \"it\" means."     # #not-understood #it, world
+
 # Dropping and giving
 drop_what = "Drop what?"                           # #drop #no-noun, world
 not_carried = "You aren't carrying any {noun}."    # #not-carried, world

@@ -56,6 +56,26 @@ impl GameEngine {
     }
 
     fn act_raw(&self, world: &WorldEngine, state: &mut PlayState, action: &PlayAction) -> ActionResult {
+        // `again` is the last action, run once more (REQ-PC-27).
+        let action = match action {
+            PlayAction::Again => match state.last_action.clone() {
+                Some(last) => last,
+                None => return ActionResult::say(self.say(world, state, "nothing_to_repeat", None, &[])),
+            },
+            other => other.clone(),
+        };
+        let action = &action;
+        state.last_action = Some(action.clone());
+        // What `it` means next (REQ-PC-28): the thing this action names.
+        let named = match action {
+            PlayAction::Take(n) | PlayAction::Examine(n) | PlayAction::Drop(n) | PlayAction::Talk(n) => Some(n.clone()),
+            PlayAction::Give { noun, .. } => Some(noun.clone()),
+            PlayAction::Use { noun, .. } => Some(noun.clone()),
+            _ => None,
+        };
+        if let Some(n) = named.filter(|n| !n.trim().is_empty()) {
+            state.it = Some(n);
+        }
         state.turn += 1;
         if world.get_location(&state.location).is_none() {
             return ActionResult::say(self.say(world, state, "nowhere_gone", None, &[]))
@@ -69,6 +89,9 @@ impl GameEngine {
             PlayAction::Inventory => self.inventory(world, state),
             PlayAction::Search => self.search(world, state, false),
             PlayAction::Drop(noun) => self.drop(world, state, noun),
+            PlayAction::TakeAll => self.take_all(world, state),
+            PlayAction::Wait => ActionResult::say(self.say(world, state, "waited", None, &[])),
+            PlayAction::Again => ActionResult::say(self.say(world, state, "nothing_to_repeat", None, &[])),
             PlayAction::Give { noun, to } => self.give(world, state, noun, to),
             PlayAction::Talk(noun) => self.talk(world, state, noun),
             PlayAction::Ask { person, topic } => self.ask(world, state, person, topic),
@@ -315,6 +338,32 @@ impl GameEngine {
             [one] => Some(one.clone()),
             _ => None,
         }
+    }
+
+    /// `take all` (REQ-PC-26): each loose thing here, one reply each, in
+    /// the room's order. Scenery, immovable things and people stay.
+    fn take_all(&self, world: &WorldEngine, state: &mut PlayState) -> ActionResult {
+        let Some(view) = self.view(world, state) else {
+            return ActionResult::say(self.say(world, state, "nowhere", None, &[]));
+        };
+        let loose: Vec<String> = view
+            .objects
+            .iter()
+            .filter(|o| world.object_at(&o.id, At::play(state)).map_or(false, |c| !c.weight.as_deref().map_or(false, |w| w.eq_ignore_ascii_case("immovable")) && !c.object_type.eq_ignore_ascii_case("scenery")))
+            .map(|o| o.id.clone())
+            .collect();
+        if loose.is_empty() {
+            return ActionResult::say(self.say(world, state, "take_all_nothing", None, &[]));
+        }
+        let mut result = ActionResult::say(String::new());
+        let mut lines = Vec::new();
+        for id in loose {
+            let taken = self.take(world, state, &id);
+            lines.push(taken.text);
+            result.changes.extend(taken.changes);
+        }
+        result.text = lines.join("\n");
+        result
     }
 
     /// `drop <thing>`: a carried thing goes down in this room, back where
@@ -1934,6 +1983,33 @@ mod tests {
         assert!(r.text.starts_with("Gold."), "{}", r.text);
         game.act(&world, &mut state, &PlayAction::Go("up".into()));
         assert_eq!(state.location, "castle/hall");
+    }
+
+    #[test]
+    fn take_all_wait_again_and_it() {
+        let (_dir, world) = world();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        let play = |state: &mut PlayState, line: &str| match game.parse_command(&world, line, state) {
+            Parsed::Action(a) => game.act(&world, state, &a).text,
+            Parsed::Reply(r) | Parsed::Unknown(r) => r,
+        };
+        assert_eq!(play(&mut state, "again"), "There's nothing to repeat.");
+        assert_eq!(play(&mut state, "take it"), "I'm not sure what \"it\" means.");
+        // The swords are loose; the bench is scenery and the well won't budge.
+        assert_eq!(play(&mut state, "take all"), "You take the rusty sword.\nYou take the old sword.");
+        assert_eq!(state.inventory, ["rusty-sword", "old-sword"]);
+        assert_eq!(play(&mut state, "take all"), "There's nothing here to take.");
+        let turn = state.turn;
+        assert_eq!(play(&mut state, "z"), "Time passes.");
+        assert_eq!(state.turn, turn + 1);
+        assert_eq!(play(&mut state, "g"), "Time passes.");
+        assert_eq!(state.turn, turn + 2);
+        // `it` is the last thing named.
+        play(&mut state, "drop rusty sword");
+        assert_eq!(play(&mut state, "take it"), "You take the rusty sword.");
+        assert_eq!(play(&mut state, "examine it"), "Pitted with rust.");
+        assert_eq!(play(&mut state, "again"), "Pitted with rust.");
     }
 
     #[test]

@@ -2,7 +2,8 @@
 # REQ-ENG-51): `alias = "verb"`, the alias the player types and the verb it
 # means. A world adds its own in world.toml's [verbs], including for its
 # own object verbs (`yank = "pull"`). The built-in verbs are look,
-# examine, go, take, drop, give, talk, ask, inventory, search and where; directions and their
+# examine, go, take, drop, give, talk, ask, inventory, search, where,
+# wait and again; directions and their
 # shorthands (n, u, in) are read before any alias.
 [verbs]
 l = "look"
@@ -16,3 +17,5 @@ i = "inventory"
 inv = "inventory"
 speak = "talk"
 chat = "talk"
+z = "wait"
+g = "again"

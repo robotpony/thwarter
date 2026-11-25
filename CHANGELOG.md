@@ -4,6 +4,15 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.87.0 (2026-11-25)
+
+### Added
+
+- `take all` (or `take everything`) takes each loose thing here, one reply a line, leaving scenery, immovable things and people; with none, "There's nothing here to take." (REQ-PC-26).
+- `wait` (`z`) lets a turn pass: "Time passes." `again` (`g`) runs the last action once more; with none, "There's nothing to repeat." The last action is kept in `PlayState::last_action`, so a save keeps it (REQ-PC-27).
+- `it` means the last thing the player named, as typed: `take lamp`, then `examine it`. Before any: "I'm not sure what "it" means." It's `PlayState::it` (REQ-PC-28).
+- `[engine]` keys `take_all_nothing`, `waited`, `nothing_to_repeat` and `it_unknown`; `#wait` and `#again` join the reserved tags. `PlayAction` serializes, for the saved last action.
+
 ## 0.86.1 (2026-11-25)
 
 ### Added

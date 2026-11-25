@@ -44,6 +44,12 @@ pub struct PlayState {
     /// or given to a person (by theirs), until the player takes it back.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub held: BTreeMap<String, Vec<String>>,
+    /// The last action read as a command, for `again` (REQ-PC-27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_action: Option<PlayAction>,
+    /// The last thing the player named, as typed, for `it` (REQ-PC-28).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub it: Option<String>,
 }
 
 /// A chapter as a save names it: the folder that defines it (empty for
@@ -115,7 +121,7 @@ impl PlayState {
 
 /// One player action, already parsed from what they typed. The console
 /// owns verbs and aliases (REQ-CON-10); the engine owns effects (REQ-ENG-5).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PlayAction {
     Look,
     /// A direction: `north`, or an abbreviation such as `n`.
@@ -128,6 +134,12 @@ pub enum PlayAction {
     Search,
     /// Put a carried thing down in the room.
     Drop(String),
+    /// `take all`: every loose thing here (REQ-PC-26).
+    TakeAll,
+    /// Let a turn pass (REQ-PC-27).
+    Wait,
+    /// Repeat the last action (REQ-PC-27).
+    Again,
     /// Hand a carried thing to a person: `give lantern to the cook`.
     Give { noun: String, to: String },
     /// `talk to <person>` (REQ-PC-31).

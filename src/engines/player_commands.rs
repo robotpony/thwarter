@@ -73,6 +73,21 @@ impl GameEngine {
             VerbMatch::Ask(verbs) => return Parsed::Reply(say("which_verb", &[("or", &or_list(&verbs, false))])),
             VerbMatch::Suggest(verbs) => return Parsed::Unknown(say("did_you_mean", &[("or", &or_list(&verbs, true)), ("line", line.trim())])),
         };
+        // `it` is the last thing the player named (REQ-PC-28).
+        let with_it;
+        let line = match line.split_whitespace().skip(1).any(|w| w.eq_ignore_ascii_case("it")) {
+            false => line,
+            true => match &state.it {
+                Some(it) => {
+                    let mut words = line.split_whitespace();
+                    let verb = words.next().unwrap_or("");
+                    let rest: Vec<&str> = words.map(|w| if w.eq_ignore_ascii_case("it") { it.as_str() } else { w }).collect();
+                    with_it = format!("{} {}", verb, rest.join(" "));
+                    with_it.as_str()
+                }
+                None => return Parsed::Reply(say("it_unknown", &[])),
+            },
+        };
         let parsed = match parse_words(line, &say) {
             Words::Other { verb, noun, with } => {
                 let known = world.has_action(&verb);
@@ -196,6 +211,7 @@ fn parse_words(line: &str, say: &Say) -> Words {
             more => done(Parsed::Action(Go(more.join(" ")))),
         },
         "take" => match rest {
+            ["all"] | ["everything"] => done(Parsed::Action(TakeAll)),
             ["up", noun @ ..] if !noun.is_empty() => done(with_noun(noun, Take, ask("take_what"))),
             noun => done(with_noun(noun, Take, ask("take_what"))),
         },
@@ -205,6 +221,8 @@ fn parse_words(line: &str, say: &Say) -> Words {
         },
         "examine" => done(with_noun(rest, Examine, ask("examine_what"))),
         "drop" => done(with_noun(rest, Drop, ask("drop_what"))),
+        "wait" if rest.is_empty() => done(Parsed::Action(Wait)),
+        "again" if rest.is_empty() => done(Parsed::Action(Again)),
         // `talk to the cook` (REQ-PC-31).
         "talk" => {
             let rest = match rest {
