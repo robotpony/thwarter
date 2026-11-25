@@ -45,7 +45,7 @@ cargo build --release
 
 ### Quick Start
 
-World content lives at `authors/<your-name>/<world-name>/` (see World Structure below). `--world` overrides the default configured in `thwart.toml`.
+World content lives at `authors/<your-name>/<world-name>/` (see World Structure below). There's no built-in default world: a command uses `--world`, then `[world] path` in `thwart.toml` (or your personal `config.toml`), then the world the current folder is in. With none of those, it lists the worlds it can find and stops (REQ-CLI-21).
 
 ```bash
 # Validate a world's files (broken connections, parse errors)
@@ -75,7 +75,7 @@ authors/
         └── objects/
             ├── walls.md        # Object files
             └── photo-1.md
-thwart.toml                     # CLI preferences, including the default world path
+thwart.toml                     # CLI preferences, including an optional default world path
 ```
 
 ### Example Location File
