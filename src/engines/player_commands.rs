@@ -90,7 +90,7 @@ impl GameEngine {
         };
         let parsed = match parse_words(line, &say) {
             Words::Other { verb, noun, with } => {
-                let known = world.has_action(&verb);
+                let known = world.has_action(&verb) || crate::engines::verbs::STORY.contains(&verb.as_str());
                 match noun {
                     None if known => Parsed::Reply(say("no_noun", &[("verb", &verb)])),
                     Some(noun) if known || self.names_anything(world, state, &noun) => Parsed::Action(PlayAction::Use { verb, noun, with }),
@@ -127,7 +127,7 @@ impl GameEngine {
     /// typo from one of those or an alias is a suggestion (REQ-ENG-52 to 54).
     fn resolve_verb(&self, world: &WorldEngine, state: &PlayState, word: &str) -> VerbMatch {
         use crate::engines::verbs::{one_typo, BUILT_IN};
-        if word.is_empty() || direction(word).is_some() || BUILT_IN.contains(&word) || PHRASES.contains(&word) {
+        if word.is_empty() || direction(word).is_some() || BUILT_IN.contains(&word) || crate::engines::verbs::STORY.contains(&word) || PHRASES.contains(&word) {
             return VerbMatch::Keep;
         }
         if let Some(verb) = world.verbs().alias(word) {
@@ -222,6 +222,20 @@ fn parse_words(line: &str, say: &Say) -> Words {
         "examine" => done(with_noun(rest, Examine, ask("examine_what"))),
         "drop" => done(with_noun(rest, Drop, ask("drop_what"))),
         "wait" if rest.is_empty() => done(Parsed::Action(Wait)),
+        // Story verbs alone (REQ-PC-29).
+        "jump" | "run" | "kick" | "hit" if rest.is_empty() => done(Parsed::Action(Verb(verb.to_string()))),
+        // `stack the cup on the table` (REQ-PC-30).
+        "stack" if rest.iter().any(|w| matches!(*w, "on" | "onto")) => {
+            let at = rest.iter().position(|w| matches!(*w, "on" | "onto")).unwrap_or(0);
+            let noun = strip_article(&rest[..at]);
+            let on = strip_article(&rest[at + 1..]);
+            Words::Other { verb: verb.to_string(), noun: (!noun.is_empty()).then(|| noun.join(" ")), with: (!on.is_empty()).then(|| on.join(" ")) }
+        }
+        // `push the cart north`: the direction rides in `with`.
+        "push" | "pull" if rest.len() >= 2 && direction(rest[rest.len() - 1]).is_some() => {
+            let noun = strip_article(&rest[..rest.len() - 1]);
+            Words::Other { verb: verb.to_string(), noun: (!noun.is_empty()).then(|| noun.join(" ")), with: direction(rest[rest.len() - 1]) }
+        }
         "again" if rest.is_empty() => done(Parsed::Action(Again)),
         // `talk to the cook` (REQ-PC-31).
         "talk" => {
@@ -290,6 +304,11 @@ fn parse_words(line: &str, say: &Say) -> Words {
             Words::Other { verb: verb.to_string(), noun: (!noun.is_empty()).then(|| noun.join(" ")), with }
         }
     }
+}
+
+/// Whether `typed` is a direction or its short form.
+pub(crate) fn is_direction(typed: &str) -> bool {
+    direction(typed).is_some()
 }
 
 /// The full direction name for a typed direction or its short form.

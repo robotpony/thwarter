@@ -111,6 +111,23 @@ pub const OUTCOMES: &[(&str, &str, Chain)] = &[
     ("give_to_whom", "#give #no-person", Chain::World),
     ("give_refused", "#give #refused", Chain::Thing),
     ("take_all_nothing", "#take #nothing", Chain::World),
+    ("jump", "#jump #nothing", Chain::World),
+    ("run", "#run #nothing", Chain::World),
+    ("kick", "#kick #nothing", Chain::World),
+    ("hit", "#hit #nothing", Chain::World),
+    ("jump_thing", "#jump #nothing", Chain::Thing),
+    ("run_thing", "#run #nothing", Chain::Thing),
+    ("kick_thing", "#kick #nothing", Chain::Thing),
+    ("hit_thing", "#hit #nothing", Chain::Thing),
+    ("thrown", "#throw", Chain::Thing),
+    ("breaks", "#break", Chain::Thing),
+    ("wont_break", "#break #refused", Chain::Thing),
+    ("already_broken", "#break #nothing", Chain::Thing),
+    ("stack_on_what", "#stack #no-noun", Chain::World),
+    ("stacked", "#stack", Chain::Thing),
+    ("cant_stack", "#stack #refused", Chain::Thing),
+    ("wont_move", "#push #immovable", Chain::Thing),
+    ("pushed", "#push", Chain::Thing),
     ("waited", "#wait", Chain::World),
     ("nothing_to_repeat", "#again #nothing", Chain::World),
     ("it_unknown", "#not-understood #it", Chain::World),
@@ -601,8 +618,8 @@ mod tests {
         assert!(look.contains("A small room.") && !look.contains("long shadows"), "{}", look);
         // A verb only a heading knows is still understood (REQ-PC-14).
         assert_eq!(s("hit window with stick"), "The glass cracks.");
-        // Without the stick, no section matches.
-        assert_eq!(s("hit window"), "Nothing happens.");
+        // Without the stick, no section matches, and `hit` says so itself.
+        assert_eq!(s("hit window"), "Hitting the window does nothing.");
         assert_eq!(s("hit window with dragon"), "There's no dragon here.");
         assert_eq!(s("dance wildly"), "I don't understand \"dance wildly\".");
 
@@ -782,7 +799,7 @@ mod tests {
         // But it can't reach the vault door, which it doesn't connect to.
         let mut state = game.start(&world, "castle/hall").unwrap();
         let r = game.act(&world, &mut state, &crate::models::game::PlayAction::Use { verb: "kick".into(), noun: "lever".into(), with: None });
-        assert_eq!(r.text, "Nothing happens.");
+        assert_eq!(r.text, "Kicking the lever does nothing.");
         assert!(r.note.unwrap().contains("isn't connected"));
         assert_eq!(state.state_of("door", "vault-door"), None);
     }

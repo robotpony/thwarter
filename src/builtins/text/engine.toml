@@ -50,6 +50,25 @@ waited = "Time passes."                            # #wait, world
 nothing_to_repeat = "There's nothing to repeat."   # #again #nothing, world
 it_unknown = "I'm not sure what \"it\" means."     # #not-understood #it, world
 
+# Story verbs (REQ-PC-29, 30), when nothing in the story answers them
+jump = "You jump on the spot."                     # #jump #nothing, world
+run = "You run on the spot for a moment."          # #run #nothing, world
+kick = "You kick at the air."                      # #kick #nothing, world
+hit = "You swing at nothing."                      # #hit #nothing, world
+jump_thing = "Jumping on the {name} gets you nowhere."  # #jump #nothing, thing
+run_thing = "You run at the {name}, then think better of it."  # #run #nothing, thing
+kick_thing = "Kicking the {name} does nothing."    # #kick #nothing, thing
+hit_thing = "Hitting the {name} does nothing."     # #hit #nothing, thing
+thrown = "You throw the {name}. It lands on the floor."  # #throw, thing
+breaks = "The {name} breaks."                      # #break, thing
+wont_break = "The {name} won't break."             # #break #refused, thing
+already_broken = "The {name} is already broken."   # #break #nothing, thing
+stack_on_what = "Stack the {name} on what?"        # #stack #no-noun, world
+stacked = "You put the {name} {word} the {holder}."  # #stack, thing
+cant_stack = "You can't stack anything on the {holder}."  # #stack #refused, thing
+wont_move = "The {name} won't move."               # #push #immovable, thing
+pushed = "You {verb} the {name} {direction}."      # #push, thing
+
 # Dropping and giving
 drop_what = "Drop what?"                           # #drop #no-noun, world
 not_carried = "You aren't carrying any {noun}."    # #not-carried, world

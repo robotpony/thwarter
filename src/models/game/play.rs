@@ -138,6 +138,8 @@ pub enum PlayAction {
     TakeAll,
     /// Let a turn pass (REQ-PC-27).
     Wait,
+    /// A story verb with no thing: `jump`, `run`, `kick`, `hit` (REQ-PC-29).
+    Verb(String),
     /// Repeat the last action (REQ-PC-27).
     Again,
     /// Hand a carried thing to a person: `give lantern to the cook`.

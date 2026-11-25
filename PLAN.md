@@ -55,7 +55,7 @@ Bruce authors it with the console coder, starting now, using what exists and gro
 - [x] Done (squashed): 18 items, the test world restarted and every playtest ask so far: `where`, `enter`, `look <direction>`, typo suggestions, `/list`, `/map` of the whole world, bare command names, prose room views, door states, `drop`, `give`, `talk`, `ask`, `take all`, `wait`, `again` and `it`, to 0.88.0; the full list is `git show a33296b:PLAN.md`.
 - [ ] Write the world: a short story that uses states, chapters, templates and a door [Bruce, console]
 - [ ] A transcript that plays it through [console] (REQ-CON-9)
-- [ ] Story verbs: `jump`, `run`, `kick` and `hit` with default replies; `throw`, `smash`, `break`, `stack`, `push` and `pull` with built-in effects [coder] (REQ-PC-29, 30)
+- [x] Story verbs: `jump`, `run`, `kick` and `hit` with default replies; `throw`, `smash`, `break`, `stack`, `push` and `pull` with built-in effects (0.90.0) [coder] (REQ-PC-29, 30)
 
 ## Phase 8 · Text as data
 

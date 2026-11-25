@@ -91,6 +91,7 @@ impl GameEngine {
             PlayAction::Drop(noun) => self.drop(world, state, noun),
             PlayAction::TakeAll => self.take_all(world, state),
             PlayAction::Wait => ActionResult::say(self.say(world, state, "waited", None, &[])),
+            PlayAction::Verb(verb) => self.bare_verb(world, state, verb),
             PlayAction::Again => ActionResult::say(self.say(world, state, "nothing_to_repeat", None, &[])),
             PlayAction::Give { noun, to } => self.give(world, state, noun, to),
             PlayAction::Talk(noun) => self.talk(world, state, noun),
@@ -379,13 +380,7 @@ impl GameEngine {
             Err(which) => return ActionResult::say(self.which(world, state, "drop", noun, EntityKind::Object, &which)),
         };
         let name = object_name(&object);
-        state.inventory.retain(|id| id != &object.id);
-        let room = state.location.clone();
-        let back_home = state.taken.get_mut(&room).and_then(|list| list.iter().position(|x| x == &object.id).map(|i| list.remove(i))).is_some();
-        state.taken.retain(|_, l| !l.is_empty());
-        if !back_home {
-            state.held.entry(room.clone()).or_default().push(object.id.clone());
-        }
+        let room = self.put_down(state, &object.id);
         let stays = Outcome(self.current_state(world, state, EntityKind::Object, &object.id).unwrap_or_else(|| "no-action".into()));
         let replies = self.replies(world, state, "drop", (EntityKind::Object, &object.id), None, &stays);
         let text = match replies.is_empty() {
@@ -393,6 +388,135 @@ impl GameEngine {
             false => self.say_replies(world, state, &replies),
         };
         ActionResult { text, changes: vec![Change::Dropped { object: object.id.clone(), room }], note: None, topics: Vec::new() }
+    }
+
+    /// A carried thing put down in the player's room: back as written if
+    /// it was taken from here, else the room holds it. Returns the room.
+    fn put_down(&self, state: &mut PlayState, id: &str) -> String {
+        state.inventory.retain(|x| x != id);
+        let room = state.location.clone();
+        let back_home = state.taken.get_mut(&room).and_then(|list| list.iter().position(|x| x == id).map(|i| list.remove(i))).is_some();
+        state.taken.retain(|_, l| !l.is_empty());
+        if !back_home {
+            state.held.entry(room.clone()).or_default().push(id.to_string());
+        }
+        room
+    }
+
+    /// A story verb with no thing (REQ-PC-29): the room's `## When: #jump`
+    /// section, else `[engine]`'s reply for the verb.
+    fn bare_verb(&self, world: &WorldEngine, state: &mut PlayState, verb: &str) -> ActionResult {
+        let room = state.location.clone();
+        let replies = self.replies(world, state, verb, (EntityKind::Location, &room), None, &Outcome("no-action".into()));
+        if !replies.is_empty() {
+            return ActionResult::say(self.say_replies(world, state, &replies));
+        }
+        ActionResult::say(self.say(world, state, verb, None, &[]))
+    }
+
+    /// What a story verb does to a thing when nothing in the story answers
+    /// it (REQ-PC-29, 30): `throw` puts it down here; `smash` and `break`
+    /// move it to its `broken` state; `stack` puts it on a thing that
+    /// holds things; `push` and `pull` move a `pushable: true` thing
+    /// through an exit, the player with it. `jump`, `run`, `kick` and
+    /// `hit` only say so.
+    fn story_effect(&self, world: &WorldEngine, state: &mut PlayState, verb: &str, target: (EntityKind, &EntityRef), used: Option<(EntityKind, &str)>, toward: Option<&str>) -> ActionResult {
+        let (kind, object) = target;
+        let about = Some((kind, object.id.as_str()));
+        let name = object_name(object);
+        let carried = state.inventory.contains(&object.id);
+        match verb {
+            "throw" => {
+                if !carried {
+                    return ActionResult::say(self.say(world, state, "not_carried", None, &[("noun", &name)]));
+                }
+                let room = self.put_down(state, &object.id);
+                ActionResult { text: self.say(world, state, "thrown", about, &[("name", &name)]), changes: vec![Change::Dropped { object: object.id.clone(), room }], note: None, topics: Vec::new() }
+            }
+            "smash" | "break" => {
+                let has_broken = world.thing(kind, &object.id).map_or(false, |t| t.has_state("broken"));
+                if !has_broken {
+                    return ActionResult::say(self.say(world, state, "wont_break", about, &[("name", &name)]));
+                }
+                if self.current_state(world, state, kind, &object.id).as_deref() == Some("broken") {
+                    return ActionResult::say(self.say(world, state, "already_broken", about, &[("name", &name)]));
+                }
+                match state.switch_state(world, kind, &object.id, "broken") {
+                    Ok(()) => ActionResult {
+                        text: self.say(world, state, "breaks", about, &[("name", &name)]),
+                        changes: vec![Change::Became { type_name: kind.type_name().to_string(), id: object.id.clone(), state: "broken".into() }],
+                        note: None,
+                        topics: Vec::new(),
+                    },
+                    Err(e) => ActionResult::say(self.say(world, state, "wont_break", about, &[("name", &name)])).with_note(e.to_string()),
+                }
+            }
+            "stack" => {
+                let Some((_, holder)) = used else {
+                    return ActionResult::say(self.say(world, state, "stack_on_what", None, &[("name", &name)]));
+                };
+                let holder_name = world.object_at(holder, At::play(state)).map(|o| o.title.to_lowercase()).or_else(|| world.door_at(holder, At::play(state)).map(|d| d.title.to_lowercase())).unwrap_or_else(|| holder.to_string());
+                let holds = world.object_at(holder, At::play(state)).map_or(false, |o| o.holds.is_some() || !o.objects.is_empty());
+                if !holds || holder == object.id {
+                    return ActionResult::say(self.say(world, state, "cant_stack", Some((EntityKind::Object, holder)), &[("holder", &holder_name)]));
+                }
+                if !carried {
+                    return ActionResult::say(self.say(world, state, "not_carried", None, &[("noun", &name)]));
+                }
+                state.inventory.retain(|x| x != &object.id);
+                state.held.entry(holder.to_string()).or_default().push(object.id.clone());
+                let word = world.holds_word(holder, At::play(state));
+                ActionResult {
+                    text: self.say(world, state, "stacked", about, &[("name", &name), ("word", &word), ("holder", &holder_name)]),
+                    changes: vec![Change::Kept { object: object.id.clone(), by: holder.to_string() }],
+                    note: None,
+                    topics: Vec::new(),
+                }
+            }
+            "push" | "pull" => {
+                let pushable = world.object_at(&object.id, At::play(state)).and_then(|o| o.extra.get("pushable").cloned()).map_or(false, |v| v.as_bool() == Some(true) || v.as_str() == Some("yes"));
+                let Some(direction) = toward.filter(|_| pushable && !carried) else {
+                    return ActionResult::say(self.say(world, state, "wont_move", about, &[("verb", verb), ("name", &name)]));
+                };
+                let from = state.location.clone();
+                let mut moved = self.go(world, state, direction);
+                let Some(Change::Moved { to, .. }) = moved.changes.iter().find(|c| matches!(c, Change::Moved { .. })).cloned() else {
+                    return moved;
+                };
+                // The thing goes too: out of the room it was in, into this one.
+                let held_there = state.held.get_mut(&from).map(|l| {
+                    let had = l.iter().any(|x| x == &object.id);
+                    l.retain(|x| x != &object.id);
+                    had
+                });
+                state.held.retain(|_, l| !l.is_empty());
+                if held_there != Some(true) {
+                    let taken = state.taken.entry(from.clone()).or_default();
+                    if !taken.contains(&object.id) {
+                        taken.push(object.id.clone());
+                    }
+                }
+                let back_home = state.taken.get_mut(&to).and_then(|l| l.iter().position(|x| x == &object.id).map(|i| l.remove(i))).is_some();
+                state.taken.retain(|_, l| !l.is_empty());
+                if !back_home {
+                    state.held.entry(to.clone()).or_default().push(object.id.clone());
+                }
+                let said = self.say(world, state, "pushed", about, &[("verb", verb), ("name", &name), ("direction", &expand_direction(direction))]);
+                // The room's view again, now with the thing in it.
+                let look = self.look(world, state).text;
+                moved.text = format!("{}\n\n{}", said, look);
+                moved.changes.push(Change::Dropped { object: object.id.clone(), room: to });
+                moved
+            }
+            _ => {
+                // The thing's own wording for nothing happening wins.
+                let args = [("verb", verb), ("name", name.as_str())];
+                match self.story_reply(world, state, "nothing", about, &args) {
+                    Some(text) => ActionResult::say(prose(world, crate::engines::layers::strip_comments(&text).trim())),
+                    None => ActionResult::say(self.say(world, state, &format!("{}_thing", verb), about, &[("name", &name)])),
+                }
+            }
+        }
     }
 
     /// `give <thing> to <person>`: the person takes it only when the story
@@ -758,6 +882,9 @@ impl GameEngine {
             _ => world.object_at(&object.id, At::play(state)).map(|o| o.actions),
         }
         .unwrap_or_default();
+        // `push cart north`: the direction, not a thing used.
+        let toward = with.filter(|w| matches!(verb.as_str(), "push" | "pull") && crate::engines::player_commands::is_direction(w)).map(str::to_string);
+        let with = if toward.is_some() { None } else { with };
         // What it's used with (`hit window with stick`).
         let used = match with.map(str::trim).filter(|w| !w.is_empty()) {
             None => None,
@@ -821,6 +948,14 @@ impl GameEngine {
         // thing's own replace its template's. With none, a built-in reply
         // if something changed, else nothing happened.
         let replies = self.replies(world, state, &verb, (this_kind, &object.id), used_ref.as_ref().map(|(k, id)| (*k, id.as_str())), &outcome);
+        // A story verb nothing answered has its built-in effect (REQ-PC-30).
+        if replies.is_empty() && changes.is_empty() && !acted && crate::engines::verbs::STORY.contains(&verb.as_str()) {
+            let mut result = self.story_effect(world, state, &verb, (this_kind, &object), used_ref.as_ref().map(|(k, id)| (*k, id.as_str())), toward.as_deref());
+            if !notes.is_empty() {
+                result.note = Some(notes.join("; "));
+            }
+            return result;
+        }
         let text = if replies.is_empty() {
             if changes.is_empty() && !acted {
                 self.say(world, state, "nothing", Some((this_kind, &object.id)), &[("verb", &verb), ("name", &name)])
@@ -1983,6 +2118,60 @@ mod tests {
         assert!(r.text.starts_with("Gold."), "{}", r.text);
         game.act(&world, &mut state, &PlayAction::Go("up".into()));
         assert_eq!(state.location, "castle/hall");
+    }
+
+    #[test]
+    fn story_verbs_have_replies_and_effects_when_nothing_answers() {
+        let (dir, mut world) = world();
+        let w = |rel: &str, text: &str| {
+            let p = dir.path().join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, text).unwrap();
+        };
+        w("castle/yard.md", "---\nid: castle/yard\ntitle: Yard\ntype: location\nconnections:\n  north: castle/hall\n  west: castle/gone\ncharacters: [king]\nobjects: [rusty-sword, old-sword, stone-bench, well, vase, cart, table]\n---\nGrass.\n");
+        w("objects/vase/index.md", "---\nid: vase\ntitle: Vase\ntype: object\nobject_type: decor\nstate: whole\n---\nBlue.\n");
+        w("objects/vase/whole.md", "---\ninherits: index\n---\n");
+        w("objects/vase/broken.md", "---\ninherits: index\n---\nShards.\n");
+        w("objects/cart.md", "---\nid: cart\ntitle: Cart\ntype: object\nobject_type: vehicle\nweight: heavy\npushable: true\n---\n");
+        w("objects/table.md", "---\nid: table\ntitle: Table\ntype: object\nobject_type: furniture\nweight: immovable\nholds: on\n---\n");
+        world.load_world(dir.path()).unwrap();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        let play = |state: &mut PlayState, line: &str| match game.parse_command(&world, line, state) {
+            Parsed::Action(a) => game.act(&world, state, &a).text,
+            Parsed::Reply(r) | Parsed::Unknown(r) => r,
+        };
+        assert_eq!(play(&mut state, "jump"), "You jump on the spot.");
+        assert_eq!(play(&mut state, "run"), "You run on the spot for a moment.");
+        assert_eq!(play(&mut state, "kick well"), "Kicking the well does nothing.");
+        assert_eq!(play(&mut state, "hit king"), "You can't hit King Aldric.");
+        assert_eq!(play(&mut state, "kick the dragon"), "There's no dragon here.");
+        // throw: carried, then down here.
+        assert_eq!(play(&mut state, "throw rusty sword"), "You aren't carrying any rusty sword.");
+        play(&mut state, "take rusty sword");
+        assert_eq!(play(&mut state, "throw rusty sword"), "You throw the rusty sword. It lands on the floor.");
+        assert!(state.inventory.is_empty());
+        // smash and break: to `broken` if it has one.
+        assert_eq!(play(&mut state, "break well"), "The well won't break.");
+        assert_eq!(play(&mut state, "smash vase"), "The vase breaks.");
+        assert_eq!(state.state_of("object", "vase"), Some("broken"));
+        assert_eq!(play(&mut state, "break vase"), "The vase is already broken.");
+        // stack: onto a thing that holds things.
+        play(&mut state, "take old sword");
+        assert_eq!(play(&mut state, "stack old sword"), "Stack the old sword on what?");
+        assert_eq!(play(&mut state, "stack old sword on well"), "You can't stack anything on the well.");
+        assert_eq!(play(&mut state, "stack the old sword on the table"), "You put the old sword on the table.");
+        assert_eq!(state.held["table"], ["old-sword"]);
+        // push: a pushable thing goes through the exit, and the player with it.
+        assert_eq!(play(&mut state, "push well north"), "The well won't move.");
+        assert_eq!(play(&mut state, "push cart"), "The cart won't move.");
+        assert_eq!(play(&mut state, "push cart west"), "You can't go west from here.");
+        let pushed = play(&mut state, "push the cart north");
+        assert!(pushed.starts_with("You push the cart north.\n\nStone."), "{}", pushed);
+        assert!(pushed.contains("You see a cart."), "{}", pushed);
+        assert_eq!(state.location, "castle/hall");
+        assert!(play(&mut state, "pull cart south").starts_with("You pull the cart south."));
+        assert!(state.held.get("castle/hall").is_none() && !state.was_taken("castle/yard", "cart"), "{:?}", state);
     }
 
     #[test]

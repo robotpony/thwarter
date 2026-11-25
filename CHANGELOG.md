@@ -4,6 +4,18 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.90.0 (2026-11-25)
+
+### Added
+
+- Story verbs (REQ-PC-29, 30). A thing's own action, script or `## When:` section answers first; these are what happens when nothing does:
+  - `jump`, `run`, `kick` and `hit` are understood alone ("You jump on the spot.", or the room's `## When: #jump`) and with a thing ("Kicking the well does nothing.", or the thing's own `## When: #nothing` wording). `run` is its own verb, not `go`.
+  - `throw <thing>` puts a carried thing down here: "You throw the lamp. It lands on the floor."
+  - `smash` and `break` move a thing into its `broken` state, or say "The well won't break."
+  - `stack <thing> on <thing>` puts a carried thing on a thing that holds things (`holds:` or `objects:`), else "You can't stack anything on the well."
+  - `push` and `pull <thing> <direction>` move a `pushable: true` thing through that exit, and the player with it, then show the room. Otherwise "The cart won't move."
+- `[engine]` keys for each reply, from `jump` to `pushed`. The story verbs are read only as typed, never as a prefix or a typo, so a world verb like `lick` or a prefix like `pu` reads as before.
+
 ## 0.89.0 (2026-11-25)
 
 ### Added

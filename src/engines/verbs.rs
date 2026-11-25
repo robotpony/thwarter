@@ -7,6 +7,10 @@ use std::collections::BTreeMap;
 /// The verbs the parser itself knows. Every other verb is a thing's.
 pub const BUILT_IN: &[&str] = &["look", "examine", "go", "take", "inventory", "search", "where", "drop", "give", "talk", "ask", "wait", "again"];
 
+/// Verbs with a built-in reply or effect when no thing answers them
+/// (REQ-PC-29, 30). A thing's own action or section still comes first.
+pub const STORY: &[&str] = &["jump", "run", "kick", "hit", "throw", "smash", "break", "stack", "push", "pull"];
+
 /// The compiled-in aliases.
 pub const DEFAULTS: &str = include_str!("../builtins/verbs.toml");
 
