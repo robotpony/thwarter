@@ -453,9 +453,10 @@ pub fn render_object(o: &crate::models::world::GameObject) -> String {
 }
 
 /// A door as an author checks it (`thwart show <door>`): its sides and
-/// where each leads, whether it can be passed or seen through now, and
-/// its actions.
-pub fn render_door(d: &crate::models::world::Door) -> String {
+/// where each leads, the state shown (`asked` with `--state`, else
+/// `starting`) and whether it can be seen through, and its actions. A
+/// door with no states says whether it's always open or always closed.
+pub fn render_door(d: &crate::models::world::Door, starting: Option<&str>, asked: Option<&str>) -> String {
     let mut out = vec![format!("{} ({})", d.title, d.id), if d.portal { "portal".to_string() } else { "door".to_string() }];
     out.push(String::new());
     let body = d.description.trim();
@@ -467,11 +468,12 @@ pub fn render_door(d: &crate::models::world::Door) -> String {
         let to = d.leads_to(&side.room).map(|t| format!(" to {}", t)).unwrap_or_else(|| " (leads nowhere)".to_string());
         out.push(format!("  {:<width$}  {}{}", side.room, side.direction, to, width = width));
     }
-    out.push(format!(
-        "{}, {}",
-        if d.passable { "Passable" } else { "Not passable" },
-        if d.transparent { "see-through" } else { "opaque" }
-    ));
+    let state = match (asked, starting) {
+        (Some(s), _) => format!("In state {}", s),
+        (None, Some(s)) => format!("Starts {}", s),
+        (None, None) => format!("Always {}", if d.passable { "open" } else { "closed" }),
+    };
+    out.push(format!("{}, {}", state, if d.transparent { "see-through" } else { "opaque" }));
     let mut names: Vec<&String> = d.actions.keys().collect();
     names.sort();
     if !names.is_empty() {

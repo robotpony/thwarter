@@ -54,7 +54,6 @@ it's reserved as a variable level	src/engines/world_engine.rs: a validation mess
 (no description yet)	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
 moves to chapter {}	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
  (leads nowhere)	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
-Not passable	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
 Carries: nothing	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
 # Console literals the wider guard finds that stay in code.
 unknown location `{}`	src/console/panels.rs: matches the engine's problem wording to find rooms to write, so it follows the engine's text
@@ -66,3 +65,4 @@ doesn't parse	src/console/world.rs: Kind::label, a label people also type (/edit
 world settings	src/console/world.rs: Kind::label, a label people also type; moves with a label_in(&Texts), follow-up
 chapter overlay	src/console/world.rs: Kind::label, a label people also type; moves with a label_in(&Texts), follow-up
 game start	src/console/world.rs: Kind::label, a label people also type; moves with a label_in(&Texts), follow-up
+In state {}	src/render.rs: `thwart show <door> --state`; command-line output, Phase 11

@@ -136,7 +136,7 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [x] Edit mode's room view introduces exits, people and things with prose from `[play]` and `[console]`, not headings (Bruce, 2026-11-24) [coder] (shared renderer; `design/ENGINE_TEXT.md` › Where tables live)
 - [x] One blank line before and after every block of output, the prompt included; the screen's tests check it, since transcripts are compact (881fe90, Bruce, 2026-11-24) [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [x] Sidebar fixes from Bruce's playtest: the problems pane's wrap and literal backticks (881fe90) [console]
-- [ ] A door's exit shows its state ("closed", "locked"), not "not passable", and its name before its id [coder] (shared renderer)
+- [x] A door's exit shows its state ("closed", "locked"), not "not passable", and its name before its id: the sidebar and play in 2d36b93, `thwart show <door>` in 0.81.2 [coder] (shared renderer)
 - [x] Play reads rooms and replies as the story: people right after the prose, held things on a plain look, doors named in the ways out (95ed0c9, REQ-ENG-43, 45, 46)
 - [ ] New verbs `drop`, `talk`, `ask` and `give` [coder] (`design/PLAYER_COMMANDS.md` › Open question 1; Bruce to choose)
 

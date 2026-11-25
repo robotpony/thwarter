@@ -145,7 +145,10 @@ fn show_thing(engine: &WorldEngine, name: &str, req: &ShowRequest, formatter: &O
         }
         ParsedEntity::Object(o) => render_object(o),
         ParsedEntity::Character(c) => render_character(c),
-        ParsedEntity::Door(d) => crate::render::render_door(d),
+        ParsedEntity::Door(d) => {
+            let starting = engine.thing(kind, &id).and_then(|t| t.starting_state.clone());
+            crate::render::render_door(d, starting.as_deref(), req.state.as_deref())
+        }
     };
     println!("{}", crate::render::clean_text(&text));
     if let Some(thing) = engine.thing(kind, &id) {

@@ -153,3 +153,20 @@ fn search_finds_text_and_broken_exits() {
     let (ok, _, err) = run(&["--type", "text"]);
     assert!(!ok && err.contains("--type text needs a query"), "{}", err);
 }
+
+#[test]
+fn a_door_shows_its_state_not_whether_it_is_passable() {
+    let w = world();
+    let d = w.path();
+    write(d, "hall/index.md", "---\nid: hall\ntitle: Hall\ntype: location\nconnections: { down: trapdoor, east: grate }\n---\n");
+    write(d, "doors/trapdoor.md", "---\nid: trapdoor\ntitle: Trapdoor\ntype: door\ninherits: door\nsides:\n  hall: { direction: down }\n  vault: { direction: up }\n---\n");
+    write(d, "doors/grate.md", "---\nid: grate\ntitle: Grate\ntype: door\npassable: no\ntransparent: yes\nsides:\n  hall: { direction: east }\n  vault: { direction: west }\n---\n");
+    let (ok, out, err) = show(d, &["trapdoor"]);
+    assert!(ok, "{}", err);
+    assert!(out.contains("\nStarts closed, opaque\n"), "{}", out);
+    let (_, out, _) = show(d, &["trapdoor", "--state", "open"]);
+    assert!(out.contains("\nIn state open, opaque\n"), "{}", out);
+    let (_, out, _) = show(d, &["grate"]);
+    assert!(out.contains("\nAlways closed, see-through"), "{}", out);
+    assert!(!out.to_lowercase().contains("passable"), "{}", out);
+}

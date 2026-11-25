@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.81.2 (2026-11-25)
+
+### Changed
+
+- `thwart show <door>` says the door's state where it said "Passable" or "Not passable": "Starts closed, opaque", "In state open, opaque" with `--state open`, or "Always closed, see-through" for a door with no states. No exit says "not passable" anywhere now (`PLAN.md` › Phase 7).
+
 ## 0.81.1 (2026-11-25)
 
 ### Added
