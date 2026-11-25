@@ -9,49 +9,6 @@ use super::session::{Console, Place, COMPASS_ALIASES};
 use super::world::Kind;
 use super::Mode;
 
-/// One console command, as the `/` menu lists it.
-pub struct Command {
-    pub name: &'static str,
-    /// Its arguments, as `/help` writes them.
-    pub args: &'static str,
-    pub about: &'static str,
-    /// Whether it only works in edit mode.
-    pub edit_only: bool,
-}
-
-const fn command(name: &'static str, args: &'static str, about: &'static str, edit_only: bool) -> Command {
-    Command { name, args, about, edit_only }
-}
-
-/// Every console command, in the order the menu shows them.
-pub const COMMANDS: &[Command] = &[
-    command("edit", "[room|object|character] [{id}]", "edit where you are, or what you name", false),
-    command("play", "[here]", "play, resuming the game, or from the room edit mode is in", false),
-    command("new", "room|character|object {id} [{title}]", "make a room, character or object", true),
-    command("set", "{key} {value}", "change one field of where you are", true),
-    command("link", "{direction} {room}", "add or change an exit from this room", true),
-    command("unlink", "{direction}", "remove an exit from this room", true),
-    command("add", "{thing} [{room|character|thing}]", "put a person or thing here too; scenery if it has no card", true),
-    command("move", "{thing} {room|character|thing}", "put something somewhere else, or a room in an area", true),
-    command("state", "{name} [start]", "a state of the thing you're at; makes it a bundle", true),
-    command("action", "{verb} {from} --> {to} [with {thing}]", "an action from one state to another", true),
-    command("recipe", "fixed-until|locked-with|switch|container ...", "a common shape, as the commands it stands for", true),
-    command("save", "[{name}]", "save the game", false),
-    command("load", "[{name}]", "load a saved game", false),
-    command("reload", "", "reload the world from disk, staying where you are", false),
-    command("restart", "", "restart the console on the newest build", false),
-    command("status", "", "the world, where you are, the game, saves and the build", false),
-    command("map", "", "the map around you; the sidebar shows the nearest rooms", false),
-    command("validate", "[strict]", "check the world as thwart validate does", false),
-    command("start", "", "play starts in the room you're in", true),
-    command("write", "[{name}]", "make a name the world mentions but doesn't define, and open it", true),
-    command("remove", "{thing}", "delete a thing, room or door and what refers to it, after asking", true),
-    command("inspect", "[{thing}]", "a thing in full: its file, where it starts, states, sections, warnings", false),
-    command("clear", "", "empty the output", false),
-    command("help", "", "every command", false),
-    command("quit", "", "leave the console", false),
-];
-
 /// One suggestion: what replaces the word being typed, and how it's shown.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Suggestion {
@@ -97,7 +54,10 @@ impl Console {
             [] => return done,
             [first, args @ ..] if first.starts_with('/') => {
                 let name = &first[1..];
-                done.hint = COMMANDS.iter().find(|c| c.name == name).map(|c| format!("/{} {}", c.name, c.args));
+                done.hint = match super::registry::lookup(name) {
+                    super::registry::Lookup::Found(c) => Some(c.usage()),
+                    _ => None,
+                };
                 self.command_args(name, args)
             }
             ["go" | "walk" | "move"] => self.places_to_go(),
@@ -111,14 +71,14 @@ impl Console {
 
     /// The commands that work in this mode and start with `typed`.
     fn commands_like(&self, typed: &str) -> Vec<Suggestion> {
-        COMMANDS
+        super::registry::commands()
             .iter()
-            .filter(|c| self.mode == Mode::Edit || !c.edit_only)
+            .filter(|c| self.mode == Mode::Edit || !c.edit_only())
             .filter(|c| c.name.starts_with(&typed.to_lowercase()))
             .map(|c| Suggestion {
                 text: format!("/{}", c.name),
                 label: format!("/{}", c.name),
-                detail: c.about.to_string(),
+                detail: c.about.clone(),
                 more: !c.args.is_empty() && !c.args.starts_with('['),
             })
             .collect()
@@ -313,7 +273,7 @@ mod tests {
     fn a_slash_offers_the_commands_that_work_here() {
         let mut console = tiny();
         let all = console.complete("/");
-        assert_eq!(all.suggestions.len(), COMMANDS.len());
+        assert_eq!(all.suggestions.len(), super::super::registry::commands().len());
         assert_eq!(texts(&console.complete("/re")), vec!["/recipe", "/reload", "/restart", "/remove"]);
         console.handle("/play");
         assert!(!texts(&console.complete("/")).contains(&"/set"), "edit-only commands leave play mode's list");

@@ -5,6 +5,7 @@
 
 use crate::engines::{Parsed, DIRECTIONS};
 use crate::models::game::PlayAction;
+use super::registry;
 use super::view;
 use super::world::{Kind, World};
 use super::Mode;
@@ -184,11 +185,38 @@ impl Console {
 
     fn console_command(&mut self, command: &str) -> (String, Flow) {
         let words = split_args(command);
-        let name = words.first().map(String::as_str).unwrap_or("");
+        let typed = words.first().map(String::as_str).unwrap_or("");
         let rest: Vec<&str> = words.iter().skip(1).map(String::as_str).collect();
+        if typed.is_empty() {
+            return (self.t("type_help", &[]), Flow::Continue);
+        }
+        // Name, alias, then a unique prefix, from the registry (REQ-CON-56).
+        let def = match registry::lookup(typed) {
+            registry::Lookup::Found(def) => def,
+            registry::Lookup::Ambiguous(list) => {
+                let names: Vec<String> = list.iter().map(|c| format!("/{}", c.name)).collect();
+                let names: Vec<&str> = names.iter().map(String::as_str).collect();
+                return (suggest(&format!("/{} could be:", typed), &names), Flow::Continue);
+            }
+            registry::Lookup::Unknown(near) => {
+                self.log_unknown("command", &format!("/{}", command));
+                let mut out = self.t("unknown_command", &[("command", typed)]);
+                if !near.is_empty() {
+                    let names: Vec<String> = near.iter().map(|c| c.usage()).collect();
+                    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+                    out = suggest(&format!("{} Did you mean:", out), &names);
+                }
+                return (out, Flow::Continue);
+            }
+        };
+        if def.edit_only() && self.mode != Mode::Edit {
+            return (format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", def.name), Flow::Continue);
+        }
+        let name = def.handler.as_str();
         let out = match (name, rest.as_slice()) {
-            ("quit" | "q", _) => return ("Bye.".to_string(), Flow::Quit),
-            ("help" | "?", _) => self.help(),
+            ("quit", _) => return ("Bye.".to_string(), Flow::Quit),
+            ("help", []) => self.help(),
+            ("help", [one]) => self.help_for(one),
             ("clear", []) if self.interactive => return (String::new(), Flow::Clear),
             ("clear", []) => "/clear empties the screen's output, which needs a terminal.".to_string(),
             ("status", []) => self.status_report(),
@@ -199,61 +227,61 @@ impl Console {
             ("remove", args) => self.remove(args),
             ("write", args) => self.write_command(args),
             ("start", []) => self.start_command(),
-            ("validate", _) => suggest("Usage:", &["/validate [strict]"]),
-            ("clear" | "status" | "map", _) => self.t("usage_bare", &[("command", name)]),
             ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
             ("restart", []) => "/restart restarts the console on the newest build, which needs a terminal.".to_string(),
-            ("restart", _) => self.t("usage_bare", &[("command", "restart")]),
             ("edit", args) => self.full_edit(args),
             ("play", []) => self.play(),
             ("play", ["here"]) => self.play_here(),
-            ("play", _) => suggest("Usage:", &["/play", "/play here"]),
             ("save", args) => self.save_game_as(args),
             ("load", args) => self.load_game_named(args),
             ("reload", _) => self.reload(),
-            ("new", args) if self.mode == Mode::Edit => self.new_and_edit(args),
-            ("set", args) if self.mode == Mode::Edit && args.len() >= 4 && args[args.len() - 2] == "in" => self.set_in_state(args),
-            ("set", args) if self.mode == Mode::Edit => self.set(args),
-            ("state", args) if self.mode == Mode::Edit => self.state_command(args),
-            ("action", args) if self.mode == Mode::Edit => self.action_command(args),
-            ("recipe", args) if self.mode == Mode::Edit => self.recipe_command(args),
-            ("link", args) if self.mode == Mode::Edit => self.link(args),
-            ("unlink", args) if self.mode == Mode::Edit => self.unlink(args),
-            ("move", args) if self.mode == Mode::Edit => self.move_thing(args),
-            ("add", args) if self.mode == Mode::Edit => self.add_and_edit(args),
-            ("new" | "set" | "link" | "unlink" | "move" | "add" | "state" | "action" | "recipe", _) => {
-                format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", name)
-            }
-            ("", _) => self.t("type_help", &[]),
-            _ => {
-                self.log_unknown("command", &format!("/{}", command));
-                self.t("unknown_command", &[("command", name)])
-            }
+            ("new", args) => self.new_and_edit(args),
+            ("set", args) if args.len() >= 4 && args[args.len() - 2] == "in" => self.set_in_state(args),
+            ("set", args) => self.set(args),
+            ("state", args) => self.state_command(args),
+            ("action", args) => self.action_command(args),
+            ("recipe", args) => self.recipe_command(args),
+            ("link", args) => self.link(args),
+            ("unlink", args) => self.unlink(args),
+            ("move", args) => self.move_thing(args),
+            ("add", args) => self.add_and_edit(args),
+            // Arguments the command doesn't take: its usage, from its file.
+            _ if HANDLERS.contains(&name) => suggest("Usage:", &[&def.usage()]),
+            _ => format!("/{} has no handler in this build.", def.name),
         };
         (out, Flow::Continue)
     }
 
+    /// `/help <command>`: one command in full, from its file.
+    fn help_for(&self, typed: &str) -> String {
+        let typed = typed.trim_start_matches('/');
+        match registry::lookup(typed) {
+            registry::Lookup::Found(c) => {
+                let mut out = vec![c.usage()];
+                if !c.aliases.is_empty() {
+                    out.push(format!("Also: {}", c.aliases.iter().map(|a| format!("/{}", a)).collect::<Vec<_>>().join(", ")));
+                }
+                if c.edit_only() {
+                    out.push("Edit mode only.".to_string());
+                }
+                out.push(String::new());
+                out.push(c.help.clone());
+                out.join("\n")
+            }
+            _ => self.t("unknown_command", &[("command", typed)]),
+        }
+    }
+
     fn help(&self) -> String {
-        let mut lines = vec![
-            "Console commands, in either mode:".to_string(),
-            "  /edit [name]    edit where you are, or the room or thing named".to_string(),
-            "  /play           switch to play mode, resuming the game".to_string(),
-            "  /play here      play from the room edit mode is in".to_string(),
-            "  /save [name]    save the game (quicksave if no name)".to_string(),
-            "  /load [name]    load a saved game".to_string(),
-            "  /reload         reload the world from disk, staying where you are".to_string(),
-            "  /status         the world, where you are, the game, saves and the build".to_string(),
-            "  /map            the map around you (the sidebar shows the nearest rooms)".to_string(),
-            "  /validate       check the world as thwart validate does, edits included".to_string(),
-            "  /start          play starts in the room you're in".to_string(),
-            "  /write [name]   make a name the world mentions but doesn't define, and open it".to_string(),
-            "  /remove {name}  delete a thing, room or door and what refers to it, after asking".to_string(),
-            "  /inspect [name] a thing in full: its file, where it starts, states, sections, warnings".to_string(),
-            "  /clear          empty the output (the session carries on)".to_string(),
-            "  /restart        restart the console on the newest build, keeping your place".to_string(),
-            "  /help           this list".to_string(),
-            "  /quit           leave the console".to_string(),
-        ];
+        // Every command from the registry, so the list can't drift from the
+        // menu (REQ-CON-50).
+        let usable: Vec<&registry::CommandDef> =
+            registry::commands().iter().filter(|c| self.mode == Mode::Edit || !c.edit_only()).collect();
+        let width = usable.iter().map(|c| c.usage().chars().count()).max().unwrap_or(0).min(40);
+        let mut lines = vec!["Console commands (/help <command> for one in full):".to_string()];
+        for c in usable {
+            lines.push(format!("  {:<width$}  {}", c.usage(), c.about, width = width));
+        }
         match self.mode {
             Mode::Edit => lines.extend([
                 String::new(),
@@ -263,26 +291,6 @@ impl Console {
                 "  go back               back to where you were;  go /  goes to the world root".to_string(),
                 "  look                  show where you are: a room, a thing, or a folder".to_string(),
                 "  examine <thing>, x    show a person or thing here without going to it".to_string(),
-                String::new(),
-                "Changing content (each saves the file):".to_string(),
-                "  /new room <direction> <id> [title]   a room through a new exit from this one".to_string(),
-                "  /new room <id> [title]               a room with no exits, outside a room".to_string(),
-                "  /new character <id> [title]          a character, placed here if in a room".to_string(),
-                "  /new object <id> <type> [title]      an object, placed here if in a room".to_string(),
-                "  /set <key> <value>                   one field; attributes.health 80 sets one entry".to_string(),
-                "  /link <direction> <room>             add or change one exit from this room".to_string(),
-                "  /unlink <direction>                  remove one exit from this room".to_string(),
-                "  /add <thing> [room, character, thing] put a person or thing here too (scenery if no card)".to_string(),
-                "  /move <thing> <room, character, thing> put a person or thing somewhere else".to_string(),
-                "  /state <name> [start]                a state of the thing you're at (makes it a bundle)".to_string(),
-                "  /set <key> <value> in <state>        one field, only while in that state".to_string(),
-                "  /action <verb> <from> --> <to>       an action between states (with <thing>: needs it held)".to_string(),
-                "  /recipe <name> ...                   a common shape: fixed-until, locked-with, switch, container".to_string(),
-                String::new(),
-                "Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):".to_string(),
-                "  /edit room [id]                      the room you're in, or the one named".to_string(),
-                "  /edit character [id]                 the character you're in, or the one named".to_string(),
-                "  /edit object [id]                    an object; scenery here gets its card".to_string(),
             ]),
             Mode::Play => lines.extend([
                 String::new(),
@@ -869,11 +877,30 @@ fn parent_of(path: &str) -> String {
     path.rsplit_once('/').map(|(parent, _)| parent.to_string()).unwrap_or_default()
 }
 
+
+/// Every handler `console_command` dispatches to. Each registry entry's
+/// `handler` MUST be here and each name here MUST have an entry (REQ-CON-53);
+/// a test fails on either gap.
+const HANDLERS: &[&str] = &[
+    "quit", "help", "clear", "status", "validate", "map", "inspect", "remove", "write", "start", "restart", "edit", "play", "save",
+    "load", "reload", "new", "set", "state", "action", "recipe", "link", "unlink", "move", "add",
+];
+
 #[cfg(test)]
 mod tests {
     //! `/reload` cases a transcript can't reach, because they change
     //! files while the console runs (REQ-CON-7).
     use super::*;
+
+    #[test]
+    fn every_registry_command_has_a_handler_and_every_handler_a_command() {
+        for c in registry::commands() {
+            assert!(HANDLERS.contains(&c.handler.as_str()), "commands/{}.md names handler `{}`, which isn't dispatched", c.name, c.handler);
+        }
+        for h in HANDLERS {
+            assert!(registry::commands().iter().any(|c| c.handler == *h), "handler `{}` has no command file", h);
+        }
+    }
     use std::fs;
     use walkdir::WalkDir;
 

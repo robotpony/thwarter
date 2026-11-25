@@ -62,24 +62,32 @@ Edit mode, at village/square.
 > /edit spaceship
 Nothing called `spaceship` here or anywhere in the world.
 > /help
-Console commands, in either mode:
-  /edit [name]    edit where you are, or the room or thing named
-  /play           switch to play mode, resuming the game
-  /play here      play from the room edit mode is in
-  /save [name]    save the game (quicksave if no name)
-  /load [name]    load a saved game
-  /reload         reload the world from disk, staying where you are
-  /status         the world, where you are, the game, saves and the build
-  /map            the map around you (the sidebar shows the nearest rooms)
-  /validate       check the world as thwart validate does, edits included
-  /start          play starts in the room you're in
-  /write [name]   make a name the world mentions but doesn't define, and open it
-  /remove {name}  delete a thing, room or door and what refers to it, after asking
-  /inspect [name] a thing in full: its file, where it starts, states, sections, warnings
-  /clear          empty the output (the session carries on)
-  /restart        restart the console on the newest build, keeping your place
-  /help           this list
-  /quit           leave the console
+Console commands (/help <command> for one in full):
+  /edit [room|object|character] [{id}]      edit where you are, or what you name
+  /play [here]                              play, resuming the game, or from the room edit mode is in
+  /new room|character|object {id} [{title}]  make a room, character or object
+  /set {key} {value}                        change one field of where you are
+  /link {direction} {room}                  add or change an exit from this room
+  /unlink {direction}                       remove an exit from this room
+  /add {thing} [{room|character|thing}]     put a person or thing here too; scenery if it has no card
+  /move {thing} {room|character|thing}      put something somewhere else, or a room in an area
+  /state {name} [start]                     a state of the thing you're at; makes it a bundle
+  /action {verb} {from} --> {to} [with {thing}]  an action from one state to another
+  /recipe fixed-until|locked-with|switch|container ...  a common shape, as the commands it stands for
+  /save [{name}]                            save the game
+  /load [{name}]                            load a saved game
+  /reload                                   reload the world from disk, staying where you are
+  /restart                                  restart the console on the newest build
+  /status                                   the world, where you are, the game, saves and the build
+  /map                                      the map around you; the sidebar shows the nearest rooms
+  /validate [strict]                        check the world as thwart validate does
+  /start                                    play starts in the room you're in
+  /write [{name}]                           make a name the world mentions but doesn't define, and open it
+  /remove {thing}                           delete a thing, room or door and what refers to it, after asking
+  /inspect [{thing}]                        a thing in full: its file, where it starts, states, sections, warnings
+  /clear                                    empty the output
+  /help                                     every command
+  /quit                                     leave the console
 
 Edit mode moves through the world as play does:
   north, n, go up, ...  follow an exit from this room
@@ -87,26 +95,6 @@ Edit mode moves through the world as play does:
   go back               back to where you were;  go /  goes to the world root
   look                  show where you are: a room, a thing, or a folder
   examine <thing>, x    show a person or thing here without going to it
-
-Changing content (each saves the file):
-  /new room <direction> <id> [title]   a room through a new exit from this one
-  /new room <id> [title]               a room with no exits, outside a room
-  /new character <id> [title]          a character, placed here if in a room
-  /new object <id> <type> [title]      an object, placed here if in a room
-  /set <key> <value>                   one field; attributes.health 80 sets one entry
-  /link <direction> <room>             add or change one exit from this room
-  /unlink <direction>                  remove one exit from this room
-  /add <thing> [room, character, thing] put a person or thing here too (scenery if no card)
-  /move <thing> <room, character, thing> put a person or thing somewhere else
-  /state <name> [start]                a state of the thing you're at (makes it a bundle)
-  /set <key> <value> in <state>        one field, only while in that state
-  /action <verb> <from> --> <to>       an action between states (with <thing>: needs it held)
-  /recipe <name> ...                   a common shape: fixed-until, locked-with, switch, container
-
-Full editing, in a full-screen editor (ctrl-s or ⌘s saves, esc closes):
-  /edit room [id]                      the room you're in, or the one named
-  /edit character [id]                 the character you're in, or the one named
-  /edit object [id]                    an object; scenery here gets its card
 > /status
 Tiny World, at tests/worlds/tiny
 Mode: edit; edit mode is at village/square

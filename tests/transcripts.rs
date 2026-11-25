@@ -32,7 +32,6 @@ const DIR: &str = "tests/transcripts";
 /// run on a copy, or it would change the fixture world.
 /// (`/edit` alone only switches mode; `/edit room` and the like will
 /// write once full editing exists.)
-const CHANGES_CONTENT: &[&str] = &["/new", "/set", "/link", "/unlink", "/move", "/add", "/state", "/action", "/recipe", "/remove", "/write", "/start"];
 
 struct Transcript {
     header: String,
@@ -130,8 +129,11 @@ fn transcripts() {
             }
         };
         let input = input_of(&t.expected);
+        // The commands that change content, with their aliases, from the
+        // registry (REQ-CON-50).
+        let changing: Vec<String> = thwarter::console::registry::changing().iter().map(|c| format!("/{}", c)).collect();
         if !t.copy {
-            if let Some(line) = input.lines().find(|l| CHANGES_CONTENT.iter().any(|c| l.split_whitespace().next() == Some(*c))) {
+            if let Some(line) = input.lines().find(|l| changing.iter().any(|c| l.split_whitespace().next() == Some(c.as_str()))) {
                 failures.push(format!("{}: `{}` changes files, so this transcript needs `# copy: yes`", name, line));
                 continue;
             }

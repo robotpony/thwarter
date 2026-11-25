@@ -1,0 +1,35 @@
+# world: tests/worlds/tiny
+# mode: edit
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
+> /insp lantern
+Brass Lantern (lantern), object
+  file       objects/lantern.md
+  scope      global
+  actions    light
+  starts in  room `village/square`
+> /re
+/re could be:
+
+  /recipe
+  /reload
+  /restart
+  /remove
+> /remvoe lantern
+Unknown command `/remvoe`. Type /help for commands. Did you mean:
+
+  /remove {thing}
+> /xyzzy
+Unknown command `/xyzzy`. Type /help for commands.
+> /help rm
+/remove {thing}
+Also: /rm, /delete
+Edit mode only.
+
+Deletes a thing, room or door and every reference it can rewrite, after showing what goes and asking. There's no undo.
+
+    /remove lantern
+> /validate loudly
+Usage:
+
+  /validate [strict]

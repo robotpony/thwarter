@@ -69,6 +69,22 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.74.0 (2026-11-24)
+
+### Added
+
+- The command registry, first part (REQ-CON-50 to 53, 56; Bruce approved): each built-in command is one `type: command` file in `src/builtins/commands/`, with its aliases, `about`, `args`, modes, whether it changes content, its handler, and its help as the body. The `/` menu, `/help`, the edit-mode guard and the transcripts' list of commands that change content all read it. A test fails if a file names a handler that isn't dispatched or a handler has no file.
+- Forgiving names: aliases (`/rm`, `/q`, `/mv` and others), a unique prefix (`/insp`), "could be" for a prefix several share, and "did you mean" for a near miss. `/help <command>` shows one command in full.
+
+### Changed
+
+- `/help` lists every command from the registry with its usage; the hand-written edit-mode command lists are gone, since they were a second copy. Arguments a command doesn't take answer with its usage from its file.
+
+### Not yet
+
+- World commands (`world/commands/`, REQ-CON-54, 55), the personal `[console.commands]` layer (REQ-CON-52), checking argument counts against `args` before a handler runs, and bare command names without the slash.
+
 ## 0.73.3 (2026-11-24)
 
 ### Removed

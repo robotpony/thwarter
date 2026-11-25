@@ -67,7 +67,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
 - [x] Removing a thing: its file or bundle deleted, and every reference to its id taken out (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, beside REQ-ENG-30)
 - [x] `/remove <thing>` deletes an object, room, character or door after the author confirms; no undo yet (Bruce, 2026-11-24) (0.68.0) [console] (`design/CONSOLE_REQUIREMENTS.md`, beside REQ-CON-5)
-- [ ] One command registry: every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
+- [ ] One command registry (built-ins, aliases, prefixes and did-you-mean done in 0.74.0; world commands and the config layer to go): every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
 - [ ] Forgiving play verbs: aliases, unique prefixes and did-you-mean for verbs, the way commands get them (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, to write)
 - [x] (0.73.1) The sidebar's exits read as aligned columns with arrow leaders (`east -----> bedroom    closed door`); a door shows only as its state when it blocks the way, and its title and id move to `/inspect` (Bruce, 2026-11-24) [console]
 - [x] A new door's id and title read from both sides (faebdce, 5aa92db, b878529): `door-bedroom-hallway`, titled from its rooms ("Bedroom door"), not the template's "Door" (Bruce, 2026-11-24) [coder, console]
