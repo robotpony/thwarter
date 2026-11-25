@@ -125,6 +125,10 @@ pub enum PlayAction {
     Inventory,
     /// Look closely around the room, finding faint things.
     Search,
+    /// Name the room the player is in (REQ-PC-21).
+    Where,
+    /// Say what's one way, without going (REQ-PC-23).
+    LookToward(String),
     /// An object's own named action (`design/STATES.md` › Changing
     /// state): `pull lever` is `verb` "pull", `noun` "lever";
     /// `hit window with stick` adds `with` "stick".

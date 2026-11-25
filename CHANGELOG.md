@@ -4,6 +4,19 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.81.0 (2026-11-25)
+
+### Added
+
+- `where` and `where am i` name the room the player is in: "You're in the hall." (REQ-PC-21, `[engine] where`, outcome `#where`).
+- `look <direction>`, `what's <direction>` and `what is <direction>` say what's that way without going: "North: Great Hall.", or the door with its state, "Down: a closed iron door." A hidden or missing way gets "You see no way up." (REQ-PC-23, `[engine]` keys `look_toward`, `look_toward_door` and `look_toward_none`, outcome `#look-toward`).
+- `enter` is a default alias of `go` in `src/builtins/verbs.toml`, and `go` finds an exit by the name of the room it leads to, its id or the id's last part, with or without an article: `enter the vault`, `go closet` (REQ-PC-22). A name two exits lead to isn't guessed.
+- A closing `?`, `!` or `.` and a curly apostrophe no longer change how a line reads: `where am i?`, `what’s north?`.
+
+### Changed
+
+- `#where` and `#look-toward` join the reserved tags, so `validate` warns about a state named like them.
+
 ## 0.80.0
 
 ### Added

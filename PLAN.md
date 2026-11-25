@@ -124,9 +124,9 @@ Bruce authors it with the console coder, starting now, using what exists and gro
 
 Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce playtests edit and play modes before any of these start.
 
-- [ ] `where` and `where am i` [coder, console] (REQ-PC-21)
-- [ ] `enter <place>` as `go` [coder] (REQ-PC-22)
-- [ ] `look <direction>` and `what's <direction>` [coder] (REQ-PC-23)
+- [ ] `where` and `where am i` (play in 0.81.0; edit mode to go) [coder, console] (REQ-PC-21)
+- [x] `enter <place>` as `go` (0.81.0) [coder] (REQ-PC-22)
+- [x] `look <direction>` and `what's <direction>` (0.81.0) [coder] (REQ-PC-23)
 - [x] Typo suggestions for verbs [coder] (REQ-PC-24)
 - [x] `/list objects|rooms|characters` in edit mode (0.80.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [x] `/map` from the world's root draws the whole world, instead of asking for a room (0.80.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)

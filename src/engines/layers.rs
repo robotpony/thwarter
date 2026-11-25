@@ -42,7 +42,7 @@ fn depth(value: &Value) -> usize {
 /// mean the door's state of the same name, so they aren't reserved.
 pub const RESERVED_TAGS: &[&str] = &[
     "#ambiguous", "#searched", "#not-understood", "#no-noun", "#not-here", "#nowhere", "#no-exit", "#carried", "#person",
-    "#scenery", "#immovable", "#nothing", "#found", "#acted", "#refused", "#ambiguous-verb", "#suggest",
+    "#scenery", "#immovable", "#nothing", "#found", "#acted", "#refused", "#ambiguous-verb", "#suggest", "#where", "#look-toward",
 ];
 
 /// One file's frontmatter and prose, untyped.

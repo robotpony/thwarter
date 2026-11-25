@@ -55,6 +55,11 @@ impl GameEngine {
         // prefix becomes the verb it means; several prefixes ask; a typo
         // gets a suggestion that runs nothing.
         let typed = line;
+        // `where am i?`, `what's north?`: a closing mark and a curly
+        // apostrophe don't change what's asked (REQ-PC-21, 23).
+        let plain = line.replace('\u{2019}', "'");
+        let plain = plain.trim_end().trim_end_matches(['?', '!', '.']);
+        let line = plain;
         let trimmed = line.trim_start();
         let (head, rest) = trimmed.split_at(trimmed.find(char::is_whitespace).unwrap_or(trimmed.len()));
         let first = head.to_lowercase();
@@ -135,7 +140,7 @@ impl GameEngine {
 }
 
 /// Words the parser reads as the start of a two-word verb.
-const PHRASES: &[&str] = &["pick"];
+const PHRASES: &[&str] = &["pick", "what's", "whats", "what"];
 
 /// Verbs joined with "or", each in plain quotes when `quoted`.
 fn or_list(verbs: &[String], quoted: bool) -> String {
@@ -180,6 +185,8 @@ fn parse_words(line: &str, say: &Say) -> Words {
     match verb {
         "look" => match rest {
             [] => done(Parsed::Action(Look)),
+            // What's that way, without going (REQ-PC-23).
+            [one] if direction(one).is_some() => done(Parsed::Action(LookToward(direction(one).unwrap_or_default()))),
             ["at", noun @ ..] => done(with_noun(noun, Examine, ask("look_at_what"))),
             noun => done(with_noun(noun, Examine, ask("look_at_what"))),
         },
@@ -198,6 +205,19 @@ fn parse_words(line: &str, say: &Say) -> Words {
         },
         "examine" => done(with_noun(rest, Examine, ask("examine_what"))),
         "inventory" if rest.is_empty() => done(Parsed::Action(Inventory)),
+        // `where`, `where am i` (REQ-PC-21).
+        "where" => match rest {
+            [] | ["am", "i"] => done(Parsed::Action(Where)),
+            _ => done(unknown(line, say)),
+        },
+        // `what's north`, `what is north` (REQ-PC-23).
+        "what's" | "whats" | "what" => match rest {
+            [one] | ["is", one] if verb != "what" || rest.len() == 2 => match direction(one) {
+                Some(d) => done(Parsed::Action(LookToward(d))),
+                None => done(unknown(line, say)),
+            },
+            _ => done(unknown(line, say)),
+        },
         "search" if rest.is_empty() => done(Parsed::Action(Search)),
         // Built-in verbs used another way (`inventory lamp`, `n please`)
         // aren't read.

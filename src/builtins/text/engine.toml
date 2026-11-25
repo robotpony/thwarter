@@ -27,6 +27,10 @@ who = "Who do you want to {verb}, {or}?"           # #ambiguous, thing
 # Where you are
 nowhere = "You're nowhere."                        # #nowhere, world
 nowhere_gone = "You're nowhere: this place no longer exists."  # #nowhere, world
+where = "You're in the {room}."                    # #where, world
+look_toward = "{Direction}: {room}."               # #look-toward, world
+look_toward_door = "{Direction}: {door}."          # #look-toward, thing
+look_toward_none = "You see no way {direction}."   # #look-toward #no-exit, world
 
 # Going
 no_exit = "You can't go {direction} from here."    # #go #no-exit, world

@@ -68,6 +68,8 @@ impl GameEngine {
             PlayAction::Examine(noun) => self.examine(world, state, noun),
             PlayAction::Inventory => self.inventory(world, state),
             PlayAction::Search => self.search(world, state, false),
+            PlayAction::Where => self.where_am_i(world, state),
+            PlayAction::LookToward(direction) => self.look_toward(world, state, direction),
             PlayAction::Use { verb, noun, with } => self.use_object(world, state, verb, noun, with.as_deref()),
         }
     }
@@ -220,7 +222,7 @@ impl GameEngine {
                     ["to", "the" | "a" | "an", rest @ ..] | ["to", rest @ ..] if !rest.is_empty() => expand_direction(&rest.join(" ")),
                     _ => direction.clone(),
                 };
-                if here.connections.contains_key(&rest) { rest } else { direction }
+                if here.connections.contains_key(&rest) { rest } else { self.exit_to_place(world, state, &rest).unwrap_or(direction) }
             }
         };
         let Some(named) = here.connections.get(&direction) else {
@@ -269,6 +271,76 @@ impl GameEngine {
         let mut result = self.look(world, state);
         result.changes.push(Change::Moved { from, to: target.clone() });
         result
+    }
+
+    /// The exit that leads to the room `place` names, by its title, id or
+    /// the id's last part: `go closet`, `enter the closet` (REQ-PC-22).
+    /// None when no exit or more than one does.
+    fn exit_to_place(&self, world: &WorldEngine, state: &PlayState, place: &str) -> Option<String> {
+        let words: Vec<&str> = place.split_whitespace().collect();
+        let place = match words.as_slice() {
+            ["the" | "a" | "an", rest @ ..] if !rest.is_empty() => rest.join(" "),
+            _ => words.join(" "),
+        };
+        let here = world.location_at(&state.location, At::play(state))?;
+        let mut found: Vec<String> = Vec::new();
+        for (direction, named) in &here.connections {
+            let target = match world.door_at(named, At::play(state)) {
+                Some(door) if world.get_location(named).is_none() => match door.leads_to(&state.location) {
+                    Some(to) => to.to_string(),
+                    None => continue,
+                },
+                _ => named.clone(),
+            };
+            let Some(room) = world.location_at(&target, At::play(state)) else { continue };
+            let last = target.rsplit('/').next().unwrap_or(&target).to_lowercase();
+            if room.name.to_lowercase() == place || target.to_lowercase() == place || last == place {
+                found.push(direction.clone());
+            }
+        }
+        found.sort();
+        found.dedup();
+        match found.as_slice() {
+            [one] => Some(one.clone()),
+            _ => None,
+        }
+    }
+
+    /// `where`: the room the player is in (REQ-PC-21).
+    fn where_am_i(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
+        match world.location_at(&state.location, At::play(state)) {
+            Some(here) => ActionResult::say(self.say(world, state, "where", None, &[("room", &here.name.to_lowercase())])),
+            None => ActionResult::say(self.say(world, state, "nowhere", None, &[])),
+        }
+    }
+
+    /// `look north`: what's that way, without going (REQ-PC-23). A room
+    /// is named by its title, a door by its name and state ("a closed
+    /// door"); a hidden or missing way is no way.
+    fn look_toward(&self, world: &WorldEngine, state: &PlayState, direction: &str) -> ActionResult {
+        let direction = expand_direction(direction);
+        let Some(here) = world.location_at(&state.location, At::play(state)) else {
+            return ActionResult::say(self.say(world, state, "nowhere", None, &[]));
+        };
+        let none = || ActionResult::say(self.say(world, state, "look_toward_none", None, &[("direction", &direction)]));
+        let Some(named) = here.connections.get(&direction) else { return none() };
+        if world.get_location(named).is_some() {
+            let Some(room) = world.location_at(named, At::play(state)).filter(|_| shown(world, state, EntityKind::Location, named)) else {
+                return none();
+            };
+            return ActionResult::say(self.say(world, state, "look_toward", None, &[("direction", &direction), ("room", &room.name)]));
+        }
+        match world.door_at(named, At::play(state)) {
+            Some(door) if shown(world, state, EntityKind::Door, &door.id) => {
+                let name = match self.current_state(world, state, EntityKind::Door, &door.id).as_deref() {
+                    Some(s @ ("open" | "closed" | "locked")) => format!("{} {}", s, door.title),
+                    _ => door.title.clone(),
+                };
+                let door_name = crate::engines::play_text::with_article(&name);
+                ActionResult::say(self.say(world, state, "look_toward_door", Some((EntityKind::Door, &door.id)), &[("direction", &direction), ("door", &door_name)]))
+            }
+            _ => none(),
+        }
     }
 
     fn take(&self, world: &WorldEngine, state: &mut PlayState, noun: &str) -> ActionResult {
@@ -1109,6 +1181,7 @@ fn person_mid(character: &EntityRef) -> String {
 mod tests {
     use super::*;
     use std::fs;
+    use crate::engines::Parsed;
 
     fn world() -> (tempfile::TempDir, WorldEngine) {
         let dir = tempfile::tempdir().unwrap();
@@ -1648,6 +1721,32 @@ mod tests {
         assert!(r.text.starts_with("Gold."), "{}", r.text);
         game.act(&world, &mut state, &PlayAction::Go("up".into()));
         assert_eq!(state.location, "castle/hall");
+    }
+
+    #[test]
+    fn where_look_toward_and_enter_say_what_is_where() {
+        // REQ-PC-21 to 23.
+        let (_d, world) = door_world();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/hall").unwrap();
+        let mut play = |line: &str| match game.parse_command(&world, line, &state) {
+            Parsed::Action(a) => game.act(&world, &mut state, &a).text,
+            Parsed::Reply(r) | Parsed::Unknown(r) => r,
+        };
+        assert_eq!(play("where am i?"), "You're in the hall.");
+        assert_eq!(play("where"), "You're in the hall.");
+        assert_eq!(play("look down"), "Down: a closed iron door.");
+        assert_eq!(play("what\u{2019}s east?"), "East: an iron grate.");
+        assert_eq!(play("what is north"), "You see no way north.");
+        assert_eq!(play("look lever"), "You see nothing special about the lever.");
+        play("pull lever");
+        assert_eq!(play("look d"), "Down: an open iron door.");
+        // `enter` is `go`, and a room's name finds the exit to it.
+        assert!(play("enter the vault").starts_with("Gold."));
+        assert_eq!(play("where"), "You're in the vault.");
+        assert!(play("go hall").starts_with("Stone."));
+        assert_eq!(play("look up"), "You see no way up.");
+        assert_eq!(play("where is it"), "I don't understand \"where is it\".");
     }
 
     #[test]
