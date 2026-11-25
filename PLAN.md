@@ -26,8 +26,7 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 
 The console side (Bruce with the console coder). Done when an author can build a bundle with states and a chapter, and run the world, without touching a file by hand.
 
-- [x] Done (squashed): 24 items, among them `/restart`, the full-screen console, the `/` menu, the `game/` folder, renaming and removing with every reference updated, forgiving verbs, the world picker, doors named from both sides, `/start`, TO WRITE, objects that hold objects and question sets, to 0.88.0; the full list is `git show a33296b:PLAN.md`.
-- [x] Scope: a sticky default, per-command overrides, `/move` (global and area in 0.89.0, local in 0.92.0) [console] (REQ-CON-26 to 29)
+- [x] Done (squashed): 25 items, among them `/restart`, the full-screen console, the `/` menu, the `game/` folder, renaming and removing with every reference updated, forgiving verbs, the world picker, doors named from both sides, `/start`, TO WRITE, objects that hold objects, question sets and scope with `/move`, to 0.92.0; the full list is `git show a33296b:PLAN.md`, and scope is in `git show c485a58:PLAN.md`.
 - [ ] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
@@ -43,9 +42,8 @@ The console side (Bruce with the console coder). Done when an author can build a
 
 Done when a locked-door puzzle plays from both sides.
 
-- [x] Done (squashed): 17 items, from doors as their own type and `## When:` sections to Rhai scripts, keys, `/add door`, `/validate` and the parser in the engine; the full list is `git show a33296b:PLAN.md`.
+- [x] Done (squashed): 18 items, from doors as their own type and `## When:` sections to Rhai scripts, keys, `/add door`, `/validate`, the parser in the engine, and clocks with game time and weather (0.94.0); the full list is `git show a33296b:PLAN.md`, and clocks are in `git show c485a58:PLAN.md`.
 - [ ] Try sections on real content with Bruce, then fold `design/SECTIONS.md` into the content requirements [commander, Bruce]
-- [x] Clocks and game values: `after:` and `at:`, a seed per game, game time, and `@thing:state` in headings for weather (0.93.0; weather in `world/` and `#arrive` in 0.94.0) (Bruce, 2026-11-25) [coder] (`design/STATES.md` › Clocks)
 - [ ] Settle the player command open questions with Bruce: 1, 2, 3 and 5 settled 2026-11-25, 4 (game commands every client needs) to go [commander] (`design/PLAYER_COMMANDS.md` › Open questions)
 - [ ] Multi-word verbs a world names (`#turn-on`), longest first, with built-in `look in` and `look under`; paused until Bruce restarts the coder [coder] (`design/PLAYER_COMMANDS.md` › Open question 5)
 - [ ] `refuse: true` in a built-in verb's section stops the verb for that thing; paused until Bruce restarts the coder [coder] (`design/PLAYER_COMMANDS.md` › Open question 3)
@@ -54,10 +52,9 @@ Done when a locked-door puzzle plays from both sides.
 
 Bruce authors it with the console coder, starting now, using what exists and growing as features land. Done when it plays start to finish and has a transcript test.
 
-- [x] Done (squashed): 18 items, the test world restarted and every playtest ask so far: `where`, `enter`, `look <direction>`, typo suggestions, `/list`, `/map` of the whole world, bare command names, prose room views, door states, `drop`, `give`, `talk`, `ask`, `take all`, `wait`, `again` and `it`, to 0.88.0; the full list is `git show a33296b:PLAN.md`.
+- [x] Done (squashed): 19 items, the test world restarted and every playtest ask so far: `where`, `enter`, `look <direction>`, typo suggestions, `/list`, `/map` of the whole world, bare command names, prose room views, door states, `drop`, `give`, `talk`, `ask`, `take all`, `wait`, `again`, `it` and the story verbs, to 0.90.0; the full list is `git show a33296b:PLAN.md`, and the story verbs are in `git show c485a58:PLAN.md`.
 - [ ] Write the world: a short story that uses states, chapters, templates and a door [Bruce, console]
 - [ ] A transcript that plays it through [console] (REQ-CON-9)
-- [x] Story verbs: `jump`, `run`, `kick` and `hit` with default replies; `throw`, `smash`, `break`, `stack`, `push` and `pull` with built-in effects (0.90.0) [coder] (REQ-PC-29, 30)
 
 ## Phase 8 · Text as data
 
