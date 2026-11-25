@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## Unreleased
+
+### Added
+
+- `design/CONSOLE_REQUIREMENTS.md` › Quick menu (REQ-CON-63 to 68): a sidebar menu for where edit mode is, opened with Ctrl-Space or `/menu`, whose entries ask their questions at the bottom of the console and print the command they stood for (Bruce, 2026-11-25).
+
 ## 0.94.0 (2026-11-25)
 
 ### Added
