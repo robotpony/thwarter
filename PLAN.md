@@ -146,10 +146,10 @@ Every sentence the engine, play and the console write comes from a text table wi
 
 - [x] One `Texts` type for `[play]`, `[engine]` and `[console]` tables, defaults from `src/builtins/text/` [coder] (`design/ENGINE_TEXT.md` › The shape)
 - [x] Engine and play strings become `[engine]` keys, the default text unchanged [coder]
-- [ ] Console strings become `[console]` keys, the default text unchanged [console]
+- [x] Console strings become `[console]` keys, the default text unchanged [console]
 - [ ] A test that fails on a new user-facing string outside the defaults: a heuristic scan with an allowlist [coder, console] (`design/ENGINE_TEXT.md` › The guard test)
 - [x] Overrides: `world.toml`'s `[play]` and `[engine]` over the defaults, with validate's warning for an unknown key [coder]
-- [ ] Overrides: the personal config's `[console]` over the defaults, with a warning for an unknown key [console]
+- [x] Overrides: the personal config's `[console]` over the defaults, with a warning for an unknown key [console]
 - [ ] Story overrides: a `## When:` section replaces an `[engine]` reply by exact outcome tag, reserved outcome names, `{{ turn.x }}` slots [coder] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies)
 - [x] Edit mode's room view reads as play's plus its title line; ids, targets and door states go to the console as a `LocationView` [coder] (`design/ENGINE_TEXT.md` › Where tables live)
 - [x] The sidebar shows the current room's ids, exits and doors, and `/inspect <thing>` shows one in full (0.65.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)

@@ -48,7 +48,7 @@ impl Console {
         let Some((word, rest)) = args.split_first() else { return usage() };
         let template = template_for(word);
         let Some(here) = self.current_room() else {
-            return super::session::suggest("A door starts in a room. Go to one, then:", &["/add door {direction} [{room}]"]);
+            return super::session::suggest(&self.t("door_needs_room", &[]), &["/add door {direction} [{room}]"]);
         };
         // `--(west)-->` is the direction drawn as an arrow; a bare `-->`
         // leaves it to be asked.
@@ -73,7 +73,7 @@ impl Console {
         };
         let Some(direction) = direction.map(|d| super::author::expand_direction(&d)) else {
             self.asked = Some(Asked::DoorDirection { template, to });
-            return format!("Which way is the door from {}? north, east, south, west, up, down, or any word.", here);
+            return self.t("door_which_way", &[("room", &here)]);
         };
         self.make_door(&here, &direction, to.as_deref(), far_direction.as_deref(), &template)
     }
@@ -82,7 +82,7 @@ impl Console {
     pub(super) fn answer(&mut self, asked: Asked, line: &str) -> String {
         match asked {
             Asked::DoorDirection { template, to } => {
-                let Some(here) = self.current_room() else { return super::session::suggest("Edit mode left the room. From one, try again:", &["/add door {direction} [{room}]"]) };
+                let Some(here) = self.current_room() else { return super::session::suggest(&self.t("door_left_room", &[]), &["/add door {direction} [{room}]"]) };
                 let direction = super::author::expand_direction(line.trim());
                 self.make_door(&here, &direction, to.as_deref(), None, &template)
             }
@@ -100,7 +100,7 @@ impl Console {
                 if matches!(line.trim().to_lowercase().as_str(), "y" | "yes") {
                     self.make_world_index(None, true)
                 } else {
-                    "Left the world without world/index.md; its settings stay in world.toml.".to_string()
+                    self.t("no_world_index_kept", &[])
                 }
             }
         }
@@ -110,17 +110,17 @@ impl Console {
     /// facing the opposite way.
     pub(super) fn add_door_side(&mut self, room_typed: &str, door: &str, direction: Option<&str>) -> String {
         let room = self.room_id(room_typed);
-        let Some(existing) = self.world.engine.doors.get(door) else { return format!("There's no door called `{}`.", door) };
+        let Some(existing) = self.world.engine.doors.get(door) else { return self.t("no_door_called", &[("door", door)]) };
         if existing.sides.iter().any(|s| s.room == room) {
-            return format!("{} is already a side of {}.", room, door);
+            return self.t("door_side_already", &[("room", &room), ("door", door)]);
         }
         if existing.sides.len() >= 2 {
-            return format!("{} already joins {} and {}.", door, existing.sides[0].room, existing.sides[1].room);
+            return self.t("door_full", &[("door", door), ("a", &existing.sides[0].room), ("b", &existing.sides[1].room)]);
         }
         let near = existing.sides.first().map(|s| s.direction.clone());
         let back = match direction.map(str::to_string).or_else(|| near.as_deref().and_then(opposite).map(str::to_string)) {
             Some(back) => back,
-            None => return super::session::suggest(&format!("Which way is {} from {}?", door, room), &[&format!("/add {} {} {{direction}}", room_typed, door)]),
+            None => return super::session::suggest(&self.t("door_side_which_way", &[("door", door), ("room", &room)]), &[&format!("/add {} {} {{direction}}", room_typed, door)]),
         };
         let mut written = Vec::new();
         if let Err(e) = self.ensure_room(&room, &mut written) {
@@ -130,7 +130,7 @@ impl Console {
             return self.after_writes(&written, e);
         }
         self.added = Some((Kind::Door, door.to_string()));
-        self.after_writes(&written, format!("{} now has a side {} too.", door, side_of(&back, &room)))
+        self.after_writes(&written, self.t("door_side_added", &[("door", door), ("side", &side_of(&back, &room))]))
     }
 
     /// Writes the door and the exits to it.
@@ -181,8 +181,8 @@ impl Console {
             }
         }
         let summary = match (&to, &back) {
-            (Some(to), Some(back)) => format!("Added {}: {}, {}.", id, side_of(direction, here), side_of(back, to)),
-            _ => super::session::suggest(&format!("Added {}, {}. It has one side so far; to give it another:", id, side_of(direction, here)), &[&format!("/add {{room}} {}", id)]),
+            (Some(to), Some(back)) => self.t("door_added", &[("door", &id), ("side", &side_of(direction, here)), ("other", &side_of(back, to))]),
+            _ => super::session::suggest(&self.t("door_added_one_side", &[("door", &id), ("side", &side_of(direction, here))]), &[&format!("/add {{room}} {}", id)]),
         };
         self.added = Some((Kind::Door, id.clone()));
         self.after_writes(&written, summary)

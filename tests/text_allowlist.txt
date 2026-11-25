@@ -1,0 +1,4 @@
+# Literals the text guard (design/ENGINE_TEXT.md › The guard test) lets
+# through, one per line: the literal, a tab, then why it's exempt.
+Play mode.	src/console/theme.rs: a prefix line_role matches to pick a colour, not printed
+Author note:	src/console/theme.rs: a prefix line_role matches to pick a colour, not printed

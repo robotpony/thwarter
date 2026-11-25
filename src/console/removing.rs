@@ -12,19 +12,19 @@ impl Console {
     pub(super) fn remove(&mut self, args: &[&str]) -> String {
         let typed = args.join(" ");
         if typed.trim().is_empty() {
-            return suggest("Remove what?", &["/remove {thing}"]);
+            return suggest(&self.t("remove_what", &[]), &["/remove {thing}"]);
         }
         let Some((kind, id)) = self.removable(&typed) else { return self.t("nothing_called", &[("name", &typed)]) };
-        let Some(entity) = entity_kind(kind) else { return format!("{} can't be removed.", id) };
+        let Some(entity) = entity_kind(kind) else { return self.t("cant_be_removed", &[("id", &id)]) };
         let writer = match crate::writer::WorldWriter::new(&self.world.root) {
             Ok(w) => w,
-            Err(e) => return format!("Can't write to the world: {}", e),
+            Err(e) => return self.t("cant_write_world", &[("reason", &e.to_string())]),
         };
         let plan = match writer.plan_remove(&self.world.engine, entity, &id) {
             Ok(plan) => plan,
-            Err(e) => return format!("Not removed: {}", e),
+            Err(e) => return self.t("not_removed", &[("reason", &e.to_string())]),
         };
-        let mut out = vec![format!("Remove {} ({})?", id, kind.label())];
+        let mut out = vec![self.t("remove_ask", &[("id", &id), ("kind", kind.label())])];
         let others: Vec<String> = plan.removed.iter().skip(1).map(|(_, i)| i.clone()).collect();
         if !others.is_empty() {
             out.push(format!("  also removes  {}", others.join(", ")));
@@ -37,11 +37,11 @@ impl Console {
         }
         if !plan.by_hand.is_empty() {
             out.push(String::new());
-            out.push("Left to fix by hand:".to_string());
+            out.push(self.t("left_to_fix", &[]));
             out.extend(plan.by_hand.iter().map(|b| format!("  {}", b)));
         }
         out.push(String::new());
-        out.push("There's no undo. Remove it? (y/n)".to_string());
+        out.push(self.t("remove_no_undo", &[]));
         self.asked = Some(Asked::Remove { kind, id });
         out.join("\n")
     }
@@ -49,28 +49,30 @@ impl Console {
     /// The answer to "Remove it?".
     pub(super) fn confirm_remove(&mut self, kind: Kind, id: &str, line: &str) -> String {
         if !matches!(line.trim().to_lowercase().as_str(), "y" | "yes") {
-            return format!("Kept {}.", id);
+            return self.t("remove_kept", &[("id", id)]);
         }
-        let Some(entity) = entity_kind(kind) else { return format!("{} can't be removed.", id) };
+        let Some(entity) = entity_kind(kind) else { return self.t("cant_be_removed", &[("id", &id)]) };
         let writer = match crate::writer::WorldWriter::new(&self.world.root) {
             Ok(w) => w,
-            Err(e) => return format!("Can't write to the world: {}", e),
+            Err(e) => return self.t("cant_write_world", &[("reason", &e.to_string())]),
         };
         if self.warnings_before.is_none() {
             self.warnings_before = Some(self.world.warnings());
         }
         let report = match writer.remove_loaded(&mut self.world.engine, entity, id, false) {
             Ok(r) => r,
-            Err(e) => return format!("Not removed: {}", e),
+            Err(e) => return self.t("not_removed", &[("reason", &e.to_string())]),
         };
-        let mut summary = vec![format!(
-            "Removed {}: {} deleted, {} changed.",
-            report.removed.iter().map(|(_, i)| i.as_str()).collect::<Vec<_>>().join(", "),
-            report.deleted.len(),
-            report.written.len()
+        let mut summary = vec![self.t(
+            "removed",
+            &[
+                ("ids", &report.removed.iter().map(|(_, i)| i.as_str()).collect::<Vec<_>>().join(", ")),
+                ("deleted", &report.deleted.len().to_string()),
+                ("changed", &report.written.len().to_string()),
+            ],
         )];
         if !report.by_hand.is_empty() {
-            summary.push("Left to fix by hand:".to_string());
+            summary.push(self.t("left_to_fix", &[]));
             summary.extend(report.by_hand.iter().map(|b| format!("  {}", b)));
         }
         let touched: Vec<_> = report.written.iter().chain(&report.deleted).cloned().collect();

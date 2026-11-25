@@ -29,7 +29,8 @@ pub fn watch(root: &Path, console: Arc<Mutex<Console>>, notices: SyncSender<Stri
             Ok(DebouncedEventBatch::Rescan) => vec!["(changes were missed)".to_string()],
             Ok(_) => return,
             Err(e) => {
-                let _ = notices.send(format!("File watching failed: {}. /reload still works.", e));
+                let text = console.lock().map(|c| c.t("watching_failed", &[("reason", &e.to_string())])).unwrap_or_default();
+                let _ = notices.send(text);
                 return;
             }
         };

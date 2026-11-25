@@ -63,6 +63,8 @@ pub struct Console {
     /// The console's wording: the built-in `[console]` table with the
     /// author's own over it, from their config.toml (REQ-ENG-49).
     pub(super) texts: crate::engines::texts::Texts,
+    /// What was wrong with the author's `[console]`, for the greeting.
+    pub(super) config_warnings: Vec<String>,
     /// Questions `/add` or `/new` left for the screen to ask.
     pub(super) pending_questions: Option<super::asking::Asking>,
     /// What `/add` just added, for it to open in the editor.
@@ -112,9 +114,11 @@ impl Console {
             created: Vec::new(),
             added: None,
             pending_questions: None,
-            texts: console_texts(),
+            texts: Default::default(),
+            config_warnings: Vec::new(),
             unknown_log: None,
         };
+        (console.texts, console.config_warnings) = console_texts();
         if mode == Mode::Play {
             if let Some(room) = console.world.default_room() {
                 console.start_game(&room).map_err(anyhow::Error::msg)?;
@@ -149,6 +153,7 @@ impl Console {
             self.world.root.display()
         )];
         out.extend(self.problem_summary());
+        out.extend(self.config_warnings.iter().cloned());
         if self.mode == Mode::Play {
             out.push(String::new());
             out.push(self.play_look());
@@ -204,7 +209,7 @@ impl Console {
                 if !near.is_empty() {
                     let names: Vec<String> = near.iter().map(|c| c.usage()).collect();
                     let names: Vec<&str> = names.iter().map(String::as_str).collect();
-                    out = suggest(&format!("{} Did you mean:", out), &names);
+                    out = suggest(&format!("{} {}", out, self.t("did_you_mean", &[])), &names);
                 }
                 return (out, Flow::Continue);
             }
@@ -259,10 +264,10 @@ impl Console {
             registry::Lookup::Found(c) => {
                 let mut out = vec![c.usage()];
                 if !c.aliases.is_empty() {
-                    out.push(format!("Also: {}", c.aliases.iter().map(|a| format!("/{}", a)).collect::<Vec<_>>().join(", ")));
+                    out.push(self.t("also_aliases", &[("aliases", &c.aliases.iter().map(|a| format!("/{}", a)).collect::<Vec<_>>().join(", "))]));
                 }
                 if c.edit_only() {
-                    out.push("Edit mode only.".to_string());
+                    out.push(self.t("edit_mode_only", &[]));
                 }
                 out.push(String::new());
                 out.push(c.help.clone());
@@ -278,14 +283,14 @@ impl Console {
         let usable: Vec<&registry::CommandDef> =
             registry::commands().iter().filter(|c| self.mode == Mode::Edit || !c.edit_only()).collect();
         let width = usable.iter().map(|c| c.usage().chars().count()).max().unwrap_or(0).min(40);
-        let mut lines = vec!["Console commands (/help <command> for one in full):".to_string()];
+        let mut lines = vec![self.t("help_heading", &[])];
         for c in usable {
             lines.push(format!("  {:<width$}  {}", c.usage(), c.about, width = width));
         }
         match self.mode {
             Mode::Edit => lines.extend([
                 String::new(),
-                "Edit mode moves through the world as play does:".to_string(),
+                self.t("help_edit_heading", &[]),
                 "  north, n, go up, ...  follow an exit from this room".to_string(),
                 "  go <name>             go to a room, area, folder, character or object".to_string(),
                 "  go back               back to where you were;  go /  goes to the world root".to_string(),
@@ -294,7 +299,7 @@ impl Console {
             ]),
             Mode::Play => lines.extend([
                 String::new(),
-                "In the game:".to_string(),
+                self.t("help_play_heading", &[]),
                 "  look, l                   look around".to_string(),
                 "  go <direction>, north, n  go somewhere (ne, up, u, ...)".to_string(),
                 "  take <thing>, get         pick something up".to_string(),
@@ -384,7 +389,7 @@ impl Console {
             Parsed::Action(PlayAction::Examine(noun)) => self.examine(&noun),
             Parsed::Action(PlayAction::Go(target)) => self.go(&target),
             Parsed::Action(_) => {
-                suggest("That's a play-mode command. In edit mode, change what's in a room, or try it in play:", &["/new {kind} {id}", "/set {key} {value}", "/play here"])
+                suggest(&self.t("play_command_in_edit", &[]), &["/new {kind} {id}", "/set {key} {value}", "/play here"])
             }
             Parsed::Reply(question) => question,
             Parsed::Unknown(_) => {
@@ -621,17 +626,17 @@ impl Console {
         match entry.kind {
             Kind::Room => match self.world.engine.describe_location(&entry.id) {
                 Some(view) => crate::render::render_location_with(&view, &self.room_texts()),
-                None => format!("{} is not in the world.", entry.id),
+                None => self.t("not_in_world", &[("id", &entry.id)]),
             },
             Kind::Character => match self.world.engine.characters.get(&entry.id) {
-                Some(c) => view::character(c),
-                None => format!("{} is not in the world.", entry.id),
+                Some(c) => view::character(c, &self.texts),
+                None => self.t("not_in_world", &[("id", &entry.id)]),
             },
             Kind::Object => match self.world.engine.objects.get(&entry.id) {
-                Some(o) => view::object(o),
-                None => format!("{} is not in the world.", entry.id),
+                Some(o) => view::object(o, &self.texts),
+                None => self.t("not_in_world", &[("id", &entry.id)]),
             },
-            Kind::World => view::world(self.world.engine.world(), &path),
+            Kind::World => view::world(self.world.engine.world(), &path, &self.texts),
             Kind::Broken => {
                 let reason = if entry.title.is_empty() { "it doesn't parse" } else { entry.title.as_str() };
                 format!("{}.md isn't part of the world: {}", path, reason)
@@ -843,20 +848,35 @@ pub(super) fn suggest(text: &str, commands: &[&str]) -> String {
 }
 
 /// The `[console]` text table: the built-in defaults, with the author's
-/// `[console]` from `config.toml` laid over them. Problems in it are
-/// skipped, keeping the default for that key.
-fn console_texts() -> crate::engines::texts::Texts {
+/// `[console]` from `config.toml` laid over them, and a warning for each
+/// problem in it. A problem keeps the default for that key.
+fn console_texts() -> (crate::engines::texts::Texts, Vec<String>) {
     with_personal(crate::engines::texts::Texts::defaults())
 }
 
 /// `texts` with the author's own `[console]` from `config.toml` over it.
-fn with_personal(mut texts: crate::engines::texts::Texts) -> crate::engines::texts::Texts {
-    let Some(path) = crate::settings::config_dir().map(|d| d.join("config.toml")) else { return texts };
-    let Ok(text) = std::fs::read_to_string(&path) else { return texts };
-    let Ok(value) = text.parse::<toml::Value>() else { return texts };
+fn with_personal(texts: crate::engines::texts::Texts) -> (crate::engines::texts::Texts, Vec<String>) {
+    let Some(path) = crate::settings::config_dir().map(|d| d.join("config.toml")) else { return (texts, Vec::new()) };
+    let Ok(text) = std::fs::read_to_string(&path) else { return (texts, Vec::new()) };
+    personal_over(texts, &text, &path.display().to_string())
+}
+
+/// `config` (a config.toml's text) laid over `texts`. `[console.commands]`
+/// is the command layer's (REQ-CON-52), so it isn't a text key.
+fn personal_over(mut texts: crate::engines::texts::Texts, config: &str, source: &str) -> (crate::engines::texts::Texts, Vec<String>) {
+    let mut value = match config.parse::<toml::Value>() {
+        Ok(value) => value,
+        // settings.rs reports a config.toml that doesn't parse.
+        Err(_) => return (texts, Vec::new()),
+    };
     let mut warnings = Vec::new();
-    texts.apply("console", value.get("console"), &path.display().to_string(), &mut warnings);
-    texts
+    if let Some(table) = value.get_mut("console").and_then(|v| v.as_table_mut()) {
+        table.remove("commands");
+    }
+    if value.get("console").is_some() {
+        texts.apply("console", value.get("console"), source, &mut warnings);
+    }
+    (texts, warnings)
 }
 
 impl Console {
@@ -864,7 +884,7 @@ impl Console {
     /// `[engine]`, with the author's `[console]` over them, so the world's
     /// wording shows while it's being written (Bruce, 2026-11-24).
     pub(super) fn room_texts(&self) -> crate::engines::texts::Texts {
-        with_personal(self.world.engine.texts().clone())
+        with_personal(self.world.engine.texts().clone()).0
     }
 
     /// A line of the console's own text, from `[console]` (REQ-ENG-49).
@@ -891,6 +911,17 @@ mod tests {
     //! `/reload` cases a transcript can't reach, because they change
     //! files while the console runs (REQ-CON-7).
     use super::*;
+
+    #[test]
+    fn the_authors_console_table_rewords_and_warns_about_unknown_keys() {
+        let config = "[console]\ntype_help = \"Try /help.\"\ncolour = \"red\"\n[console.commands.quit]\naliases = [\"q\"]\n";
+        let (texts, warnings) = personal_over(crate::engines::texts::Texts::defaults(), config, "config.toml");
+        assert_eq!(texts.text("console", "type_help", &[]), "Try /help.");
+        assert_eq!(warnings.len(), 1, "{:?}", warnings);
+        assert!(warnings[0].contains("`[console] colour` isn't a console setting"), "{:?}", warnings);
+        let (_, none) = personal_over(crate::engines::texts::Texts::defaults(), "[world]\npath = \"x\"\n", "config.toml");
+        assert!(none.is_empty(), "no [console], nothing to say: {:?}", none);
+    }
 
     #[test]
     fn every_registry_command_has_a_handler_and_every_handler_a_command() {

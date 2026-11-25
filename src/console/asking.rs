@@ -88,7 +88,7 @@ impl Console {
             commands.extend(commands_for(&asking.id, answer));
         }
         if commands.is_empty() {
-            return if made.is_empty() { String::new() } else { self.after_writes(&made, format!("Made {}'s card.", asking.id)) };
+            return if made.is_empty() { String::new() } else { self.after_writes(&made, self.t("made_card", &[("id", &asking.id)])) };
         }
         let before = self.place.clone();
         let interactive = std::mem::replace(&mut self.interactive, false);
@@ -110,10 +110,10 @@ impl Console {
             self.move_to_existing_folder();
         }
         if !made.is_empty() {
-            out.insert(0, self.after_writes(&made, format!("Made {}'s card.", asking.id)));
+            out.insert(0, self.after_writes(&made, self.t("made_card", &[("id", &asking.id)])));
         }
         let commands: Vec<&str> = commands.iter().map(String::as_str).collect();
-        suggest(&format!("{}\n\nThe answers were:", out.join("\n")), &commands)
+        suggest(&format!("{}\n\n{}", out.join("\n"), self.t("answers_were", &[])), &commands)
     }
 }
 

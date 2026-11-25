@@ -194,8 +194,8 @@ impl Console {
     /// `/map`: the whole map around you, as `thwart map` draws it.
     pub(super) fn map_command(&self) -> String {
         match self.map_room() {
-            Some(room) => format!("Map around {}:\n\n{}", room, crate::render::render_map(&self.world.engine.map_layout(&room, None, None))),
-            None => "There's no room to map from: go to a room, or /play to start a game.".to_string(),
+            Some(room) => format!("{}\n\n{}", self.t("map_around", &[("room", &room)]), crate::render::render_map(&self.world.engine.map_layout(&room, None, None))),
+            None => self.t("no_room_to_map", &[]),
         }
     }
 

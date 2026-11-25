@@ -48,14 +48,14 @@ impl Console {
         let typed = args.join(" ");
         if typed.trim().is_empty() {
             if list.is_empty() {
-                return "Nothing to write: every name the world mentions is written.".to_string();
+                return self.t("nothing_to_write", &[]);
             }
             let lines: Vec<String> = list.iter().map(|e| format!("/write {}", e.name)).collect();
             let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
-            return suggest("Not written yet:", &lines);
+            return suggest(&self.t("not_written_yet", &[]), &lines);
         }
         let Some(entry) = list.iter().find(|e| e.name == typed || e.name.eq_ignore_ascii_case(&typed)) else {
-            return format!("`{}` isn't on the TO WRITE list.", typed);
+            return self.t("not_on_to_write", &[("name", &typed)]);
         };
         // The link resolves by exact id or file name, so the new thing
         // takes the name as written (the coder's 999e382).
@@ -73,7 +73,7 @@ impl Console {
             Ok(path) => written.push(path),
             Err(e) => return e,
         }
-        let mut summary = format!("Wrote {} ({}).", id, kind.label());
+        let mut summary = self.t("wrote", &[("id", &id), ("kind", kind.label())]);
         // A thing goes in the first room, thing or person whose file names it.
         if kind == Kind::Object {
             if let Some(holder) = entry.mentions.iter().find_map(|m| m.holder.clone()) {

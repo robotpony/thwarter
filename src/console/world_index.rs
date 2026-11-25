@@ -19,7 +19,7 @@ impl Console {
     /// `/start`: the room edit mode is in becomes where play starts.
     pub(super) fn start_command(&mut self) -> String {
         let Some(room) = self.current_room() else {
-            return super::session::suggest("Go to a room first, then:", &["/start"]);
+            return super::session::suggest(&self.t("go_to_a_room_first", &[]), &["/start"]);
         };
         if self.world.files.get(INDEX).is_none() {
             return self.make_world_index(Some(room.clone()), false);
@@ -27,11 +27,11 @@ impl Console {
         let path = self.world.root.join(format!("{}.md", INDEX));
         let text = match std::fs::read_to_string(&path) {
             Ok(t) => t,
-            Err(e) => return format!("Can't read world/index.md: {}", e),
+            Err(e) => return self.t("cant_read_world_index", &[("reason", &e.to_string())]),
         };
         let text = super::states::set_key(&text, "start", &room);
         match self.write_world_index(&text) {
-            Ok(path) => self.after_writes(&[path], format!("Play starts in {} now.", room)),
+            Ok(path) => self.after_writes(&[path], self.t("play_starts_in", &[("room", &room)])),
             Err(e) => e,
         }
     }
@@ -41,11 +41,7 @@ impl Console {
     pub(super) fn offer_world_index(&mut self) -> String {
         self.asked = Some(Asked::MakeWorldIndex);
         let start = self.current_room().or_else(|| self.world.default_room()).unwrap_or_else(|| "(no room yet)".to_string());
-        format!(
-            "This world has no world/index.md yet. Make one, with authors: {} and start: {}? (y/n)",
-            machine_user(),
-            start
-        )
+        self.t("offer_world_index", &[("author", &machine_user()), ("room", &start)])
     }
 
     /// Writes `world/index.md` and reloads the world. The writer edits
@@ -56,7 +52,7 @@ impl Console {
         let path = self.world.root.join(format!("{}.md", INDEX));
         std::fs::create_dir_all(path.parent().unwrap_or(&self.world.root))
             .and_then(|_| std::fs::write(&path, text))
-            .map_err(|e| format!("Couldn't write world/index.md: {}", e))?;
+            .map_err(|e| self.t("cant_write_world_index", &[("reason", &e.to_string())]))?;
         let reloaded = self.reload();
         if !reloaded.starts_with("Reloaded") {
             return Err(reloaded);
@@ -84,8 +80,8 @@ impl Console {
             Err(e) => return e,
         };
         let summary = match &start {
-            Some(room) => format!("Made world/index.md: authors {}, play starts in {}.", machine_user(), room),
-            None => format!("Made world/index.md: authors {}.", machine_user()),
+            Some(room) => self.t("made_world_index_start", &[("author", &machine_user()), ("room", room)]),
+            None => self.t("made_world_index", &[("author", &machine_user())]),
         };
         let out = self.after_writes(&[path], summary);
         if edit && self.interactive {

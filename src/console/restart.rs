@@ -90,7 +90,7 @@ impl Console {
             return Resumed {
                 history: Vec::new(),
                 scrollback: Vec::new(),
-                greeting: format!("{}\nThe session couldn't be carried over, so this is a fresh start.", restarted_on()),
+                greeting: format!("{}\n{}", restarted_on(self), self.t("session_not_carried_over", &[])),
             };
         };
 
@@ -102,8 +102,8 @@ impl Console {
                     notes.extend(warnings.iter().map(|w| format!("Game: {}", w)));
                 }
                 Err(e) => {
-                    let fresh = if self.game.is_some() { " It starts again from the beginning." } else { "" };
-                    notes.push(format!("The game was reset: {:#}.{}", e, fresh));
+                    let fresh = if self.game.is_some() { self.t("game_reset_fresh", &[]) } else { String::new() };
+                    notes.push(self.t("game_reset", &[("reason", &format!("{:#}", e)), ("fresh", &fresh)]));
                 }
             }
             let _ = std::fs::remove_file(game);
@@ -112,7 +112,7 @@ impl Console {
         }
         if self.mode == Mode::Play && self.game.is_none() {
             self.mode = Mode::Edit;
-            notes.push("There's no game to go back to, so this is edit mode.".to_string());
+            notes.push(self.t("no_game_to_resume", &[]));
         }
 
         let (kind, at) = snapshot.place;
@@ -120,10 +120,10 @@ impl Console {
         if !self.place_exists() {
             let gone = self.pwd();
             self.move_to_existing_folder();
-            notes.push(format!("{} is gone; now at {}.", gone, self.pwd()));
+            notes.push(self.t("place_gone", &[("place", &gone), ("now", &self.pwd())]));
         }
 
-        let mut greeting = vec![restarted_on(), "You are precisely where you were when you left.".to_string()];
+        let mut greeting = vec![restarted_on(self), self.t("resumed_where_you_were", &[])];
         greeting.extend(notes);
         Resumed { history: snapshot.history, scrollback: snapshot.scrollback, greeting: greeting.join("\n") }
     }
@@ -135,31 +135,30 @@ impl Console {
 pub fn restart(console: &Console, history: &[String], scrollback: &[String]) -> String {
     let exe = match current_exe() {
         Ok(exe) => exe,
-        Err(e) => return format!("Can't restart: {:#}", e),
+        Err(e) => return console.t("cant_restart", &[("reason", &format!("{:#}", e))]),
     };
     // A build that can't even print its version would leave the terminal
     // with nothing running, so check it starts first.
     match std::process::Command::new(&exe).arg("--version").output() {
         Ok(out) if out.status.success() => {}
         Ok(out) => {
-            return format!(
-                "Not restarted: {} doesn't start ({}). Still on this build.",
-                exe.display(),
-                String::from_utf8_lossy(&out.stderr).trim()
+            return console.t(
+                "restart_doesnt_start",
+                &[("exe", &exe.display().to_string()), ("reason", String::from_utf8_lossy(&out.stderr).trim())],
             )
         }
-        Err(e) => return format!("Not restarted: can't run {}: {}. Still on this build.", exe.display(), e),
+        Err(e) => return console.t("restart_cant_run", &[("exe", &exe.display().to_string()), ("reason", &e.to_string())]),
     }
     let Some(dir) = crate::settings::state_dir().map(|dir| dir.join("restart")) else {
-        return "Not restarted: neither XDG_STATE_HOME nor HOME is set, so there's nowhere to keep the session.".to_string();
+        return console.t("restart_no_state_dir", &[]);
     };
     let snapshot = match console.write_snapshot(history, scrollback, &dir) {
         Ok(path) => path,
-        Err(e) => return format!("Not restarted: can't save the session: {:#}", e),
+        Err(e) => return console.t("restart_cant_save", &[("reason", &format!("{:#}", e))]),
     };
     let error = exec(&exe, &snapshot);
     let _ = std::fs::remove_file(&snapshot);
-    format!("Not restarted: {}. Still on this build.", error)
+    console.t("restart_failed", &[("reason", &error.to_string())])
 }
 
 #[cfg(unix)]
@@ -185,14 +184,14 @@ fn current_exe() -> Result<PathBuf> {
 }
 
 /// "Restarted on thwart 0.12.1 (built 14:02)."
-fn restarted_on() -> String {
+fn restarted_on(console: &Console) -> String {
     let built = current_exe()
         .ok()
         .and_then(|exe| std::fs::metadata(exe).ok())
         .and_then(|m| m.modified().ok())
         .map(|time| chrono::DateTime::<chrono::Local>::from(time).format(" (built %H:%M)").to_string())
         .unwrap_or_default();
-    format!("Restarted on thwart {}{}.", env!("CARGO_PKG_VERSION"), built)
+    console.t("restarted_on", &[("version", env!("CARGO_PKG_VERSION")), ("built", &built)])
 }
 
 #[cfg(test)]

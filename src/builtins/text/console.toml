@@ -51,3 +51,172 @@ inspect_warnings = "Named in {count} problem(s) or warning(s):"
 # /add of a thing that's already somewhere (author.rs, REQ-CON-41).
 move_here = "{thing} is in {places}: move it here? (y/n)"
 left_in_place = "Left {thing} where it is."
+
+# Question sets (asking.rs).
+made_card = "Made {id}'s card."
+answers_were = "The answers were:"
+
+# /new, /set, /link and /unlink (author.rs).
+usage_details = "Usage (/help has the details):"
+name_new_room = "Name the new room:"
+usage_room_and_elsewhere = "Usage, in a room and elsewhere:"
+exit_already = "{room} already has a {direction} exit, to {target}. To change it:"
+usage_new_object = "Usage: /new object <id> <type> [title], where type is free-form: tool, weapon, furniture, ..."
+usage_for_example = "Usage, for example:"
+give_a_value = "Give `{key}` a value:"
+set_on = "Set {key} on {id}."
+link_needs_room = "/link changes an exit of the room you're in; go to a room first."
+linked = "Linked {room} {direction} to {target}."
+unlinked = "Removed the {direction} exit from {room}."
+bare_ids = "Character and object ids are bare names, without folders: `{id}`."
+
+# /add and /move (author.rs).
+add_needs_room = "/add {thing} needs a room. Go to one, or name it:"
+add_character_into_thing = "{thing} is a character; characters go in rooms, not into things or other characters."
+add_no_holder = "There's no room, character or object called `{target}` to add {thing} to."
+already_in = "{thing} is already in {place}."
+added_to = "Added {thing} to {place}{note}."
+move_scope_later = "Changing a thing's scope with /move comes with the scope work (REQ-CON-29)."
+nothing_to_move = "Nothing called `{thing}` is in the world to move."
+move_character_into_thing = "{thing} is a character; characters go to rooms, not into things or other characters."
+move_no_holder = "There's no room, character or object called `{target}` to move {thing} to."
+already_there = "{thing} is already {place}."
+move_stopped = "Moving {thing} stopped partway."
+moved_thing = "Moved {thing}: {from} → {to}{followed}."
+not_moved = "Not moved: {reason}"
+moved_room = "Moved {old} → {new}: {file}"
+
+# Writing to the world (author.rs).
+cant_write_world = "Can't write to the world: {reason}"
+not_created = "Not created: {reason}"
+not_saved = "Not saved: {reason}"
+
+# Doors (doors.rs).
+door_needs_room = "A door starts in a room. Go to one, then:"
+door_which_way = "Which way is the door from {room}? north, east, south, west, up, down, or any word."
+door_left_room = "Edit mode left the room. From one, try again:"
+no_world_index_kept = "Left the world without world/index.md; its settings stay in world.toml."
+no_door_called = "There's no door called `{door}`."
+door_side_already = "{room} is already a side of {door}."
+door_full = "{door} already joins {a} and {b}."
+door_side_which_way = "Which way is {door} from {room}?"
+door_side_added = "{door} now has a side {side} too."
+door_added = "Added {door}: {side}, {other}."
+door_added_one_side = "Added {door}, {side}. It has one side so far; to give it another:"
+
+# /inspect (inspect.rs).
+inspect_what = "Inspect what? Name a thing, or go to one:"
+cant_inspect = "{id} can't be inspected."
+
+# File watching (mod.rs).
+watch_failed = "Can't watch the world's files ({reason}); use /reload after changes."
+
+# /map (panels.rs).
+no_room_to_map = "There's no room to map from: go to a room, or /play to start a game."
+map_around = "Map around {room}:"
+
+# Play mode, /play and /play here (play.rs).
+no_game_start_one = "No game is in progress. To start one in the room edit mode is in:"
+player_nowhere = "You're nowhere: `{room}` isn't in the world.\nAuthor note: /edit, then /play here from a room, moves the player."
+cant_start_there = "Can't start there: {reason}"
+already_playing = "Already in play mode."
+no_rooms_to_play = "This world has no rooms to play in."
+play_here_needs_room = "/play here needs edit mode to be in a room. Go to one, then:"
+
+# /save and /load (play.rs).
+nothing_to_save = "No game is in progress, so there's nothing to save."
+game_saved = "Saved the game as `{name}`."
+game_not_saved = "Not saved: {reason}."
+game_not_loaded_name = "Not loaded: {reason}."
+no_save_no_saves = "There's no save called `{name}`, and this world has no saves yet."
+no_save_called = "There's no save called `{name}`. Saves: {saves}."
+game_not_loaded = "Not loaded: {reason}"
+game_loaded = "Loaded `{name}`."
+load_author_note = "Author note: {note}"
+
+# /remove (removing.rs).
+remove_what = "Remove what?"
+not_removed = "Not removed: {reason}"
+cant_be_removed = "{id} can't be removed."
+remove_ask = "Remove {id} ({kind})?"
+left_to_fix = "Left to fix by hand:"
+remove_no_undo = "There's no undo. Remove it? (y/n)"
+remove_kept = "Kept {id}."
+removed = "Removed {ids}: {deleted} deleted, {changed} changed."
+
+# /restart and resuming after it (restart.rs).
+session_not_carried_over = "The session couldn't be carried over, so this is a fresh start."
+game_reset = "The game was reset: {reason}.{fresh}"
+game_reset_fresh = " It starts again from the beginning."
+no_game_to_resume = "There's no game to go back to, so this is edit mode."
+resumed_where_you_were = "You are precisely where you were when you left."
+cant_restart = "Can't restart: {reason}"
+restart_doesnt_start = "Not restarted: {exe} doesn't start ({reason}). Still on this build."
+restart_cant_run = "Not restarted: can't run {exe}: {reason}. Still on this build."
+restart_no_state_dir = "Not restarted: neither XDG_STATE_HOME nor HOME is set, so there's nowhere to keep the session."
+restart_cant_save = "Not restarted: can't save the session: {reason}"
+restart_failed = "Not restarted: {reason}. Still on this build."
+restarted_on = "Restarted on thwart {version}{built}."
+
+# /edit and the full-screen editor (full_edit.rs).
+edit_mode_at = "Edit mode, at {place}."
+edit_needs_terminal = "/edit opens {path}.md in a full-screen editor, which needs a terminal."
+edit_file_gone = "{path}.md is gone from disk. Copy anything you want to keep, esc, then /reload."
+edit_changed_on_disk = "{path}.md changed on disk since you opened it. Ctrl-s again overwrites that change; esc keeps it and drops yours."
+edit_saved_parses = "Saved {path}.md; it parses now, as {kind} `{id}`."
+edit_saved = "Saved {path}.md."
+edit_closed_unsaved = "Closed {path}.md without saving."
+edit_wrong_kind = "{path} is a {found}, not a {kind}: /edit opens it."
+edit_no_room = "No room `{id}`. To make one:"
+edit_no_character = "No character `{id}`. To make one:"
+edit_no_object = "No object `{id}` here or in the world. To make one:"
+edit_cant_open = "Can't open {path}.md: {reason}"
+edit_not_saved = "Not saved: {reason}"
+edit_not_same_thing = "Not saved: this file holds {kind} `{id}`, and the text now says {new_kind} `{new_id}`. Ids and types can't be changed here yet."
+# Help and command lookup (session.rs).
+did_you_mean = "Did you mean:"
+also_aliases = "Also: {aliases}"
+edit_mode_only = "Edit mode only."
+help_heading = "Console commands (/help <command> for one in full):"
+help_edit_heading = "Edit mode moves through the world as play does:"
+help_play_heading = "In the game:"
+play_command_in_edit = "That's a play-mode command. In edit mode, change what's in a room, or try it in play:"
+not_in_world = "{id} is not in the world."
+
+# States and recipes (states.rs).
+states_need_a_thing = "States belong to a thing. Go to one, then:"
+kind_has_no_states = "{id} is a {kind}, which has no states."
+made_state = "Made the {state} state"
+state_exists = "{id} already has a {state} state"
+set_in_state = "Set {key} to {value} while {id} is {state}."
+recipe_switch_usage = "Name both verbs and both states, for example:"
+recipes = "The recipes:"
+recipe_stopped = "Stopped at {command}: {reply}"
+recipe_that_was = "That was:"
+bad_state_name = "`{name}` can't name a state: one word, without dots or slashes."
+not_made = "Not made: {reason}"
+no_states_yet = "{id} has no states yet."
+cant_read = "Can't read {file}: {reason}"
+
+# /write (to_write.rs).
+nothing_to_write = "Nothing to write: every name the world mentions is written."
+not_written_yet = "Not written yet:"
+not_on_to_write = "`{name}` isn't on the TO WRITE list."
+wrote = "Wrote {id} ({kind})."
+
+# Edit mode's views of characters and the world (view.rs).
+starts_in = "Starts in: {room}"
+
+# /start and world/index.md (world_index.rs).
+go_to_a_room_first = "Go to a room first, then:"
+cant_read_world_index = "Can't read world/index.md: {reason}"
+play_starts_in = "Play starts in {room} now."
+cant_write_world_index = "Couldn't write world/index.md: {reason}"
+made_world_index_start = "Made world/index.md: authors {author}, play starts in {room}."
+made_world_index = "Made world/index.md: authors {author}."
+offer_world_index = "This world has no world/index.md yet. Make one, with authors: {author} and start: {room}? (y/n)"
+
+# The full-screen console (screen.rs, watch.rs).
+last_time = "Last time:"
+which_one = "Which one?"
+watching_failed = "File watching failed: {reason}. /reload still works."

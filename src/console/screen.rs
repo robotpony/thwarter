@@ -44,6 +44,8 @@ const SIDEBAR_FROM: u16 = 100;
 const CHECK_EVERY: Duration = Duration::from_millis(500);
 
 pub struct Screen<'a> {
+    /// The screen's own lines, from `[console]`.
+    words: Words,
     /// What the console has printed, one logical line each.
     output: Vec<String>,
     /// How far the output is scrolled up from the bottom, in screen rows.
@@ -93,6 +95,7 @@ impl<'a> Screen<'a> {
             last_check: Instant::now(),
             quit: false,
             restart: false,
+            words: Words::from(&crate::engines::texts::Texts::defaults()),
         };
         match resumed {
             Some(resumed) => {
@@ -389,7 +392,7 @@ impl<'a> Screen<'a> {
             let earlier: Vec<String> = earlier[earlier.len().saturating_sub(HISTORY)..].to_vec();
             if !earlier.is_empty() {
                 self.output.push(String::new());
-                self.output.push("Last time:".to_string());
+                self.output.push(self.words.last_time.clone());
                 for line in &earlier[earlier.len().saturating_sub(LAST_SHOWN)..] {
                     self.output.push(format!("  > {}", line));
                 }
@@ -481,7 +484,7 @@ impl<'a> Screen<'a> {
             None => {
                 self.draw_output(frame, output_area);
                 if let Some(picker) = &self.picker {
-                    picker.draw(frame, output_area);
+                    picker.draw(frame, output_area, &self.words.which_one);
                 } else if let Some(menu) = &self.menu {
                     draw_menu(frame, output_area, menu);
                 }
@@ -605,7 +608,7 @@ impl<'a> Picker<'a> {
         }
     }
 
-    fn draw(&self, frame: &mut Frame, area: Rect) {
+    fn draw(&self, frame: &mut Frame, area: Rect, which_one: &str) {
         let set = &self.asking.set;
         let Some(question) = set.questions.get(self.at) else { return };
         let mut lines = vec![
@@ -635,7 +638,7 @@ impl<'a> Picker<'a> {
                 lines.push(Line::from(format!(" {} {}", prompt, area.lines().join(" "))));
             }
             Step::Picking { things, selected, .. } => {
-                lines.push(Line::styled(" Which one?", style(Role::Note)));
+                lines.push(Line::styled(format!(" {}", which_one), style(Role::Note)));
                 for (i, thing) in things.iter().enumerate() {
                     let mark = if i == *selected { "▸" } else { " " };
                     let mut line = Line::from(format!(" {} {}", mark, thing));
@@ -718,12 +721,25 @@ fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu) {
     frame.render_widget(Paragraph::new(lines).block(block), popup);
 }
 
+/// The screen's own lines, read from `[console]` when the screen opens.
+struct Words {
+    last_time: String,
+    which_one: String,
+}
+
+impl From<&crate::engines::texts::Texts> for Words {
+    fn from(texts: &crate::engines::texts::Texts) -> Self {
+        Words { last_time: texts.text("console", "last_time", &[]), which_one: texts.text("console", "which_one", &[]) }
+    }
+}
+
 /// Runs the full-screen console until `/quit` or Ctrl-D.
 pub fn run(console: Arc<Mutex<Console>>, notices: Receiver<String>, resumed: Option<Resumed>) -> Result<()> {
     use ratatui::crossterm::event::{self, Event, KeyEventKind};
     let greeting = lock(&console).greeting();
     let was_resumed = resumed.is_some();
     let mut screen = Screen::new(&greeting, resumed);
+    screen.words = Words::from(&lock(&console).texts);
     if let Some(file) = lock(&console).history_file() {
         screen.keep_history(file, was_resumed);
     }

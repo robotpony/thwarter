@@ -29,7 +29,7 @@ impl Console {
             }
         };
         let Some(state) = self.game.as_mut() else {
-            return super::session::suggest("No game is in progress. To start one in the room edit mode is in:", &["/play here"]);
+            return super::session::suggest(&self.t("no_game_start_one", &[]), &["/play here"]);
         };
         let result = self.game_engine.act(&self.world.engine, state, &action);
         // On a terminal, the author note goes to the sidebar; scripts and
@@ -44,7 +44,7 @@ impl Console {
     /// The player's room, as the player sees it.
     pub(super) fn play_look(&self) -> String {
         let Some(state) = &self.game else {
-            return super::session::suggest("No game is in progress. To start one in the room edit mode is in:", &["/play here"]);
+            return super::session::suggest(&self.t("no_game_start_one", &[]), &["/play here"]);
         };
         match self.game_engine.view(&self.world.engine, state) {
             // The player's text, in the world's own wording (`[play]` in
@@ -53,16 +53,13 @@ impl Console {
                 let engine = &self.world.engine;
                 crate::render::play_blocks(&view, &|n| engine.link_for(n), engine.play_text()).to_plain()
             }
-            None => format!(
-                "You're nowhere: `{}` isn't in the world.\nAuthor note: /edit, then /play here from a room, moves the player.",
-                state.location
-            ),
+            None => self.t("player_nowhere", &[("room", &state.location)]),
         }
     }
 
     /// Starts a game in `room`, replacing any game in progress.
     pub(super) fn start_game(&mut self, room: &str) -> Result<(), String> {
-        let state = self.game_engine.start(&self.world.engine, room).map_err(|e| format!("Can't start there: {}", e))?;
+        let state = self.game_engine.start(&self.world.engine, room).map_err(|e| self.t("cant_start_there", &[("reason", &e.to_string())]))?;
         self.game = Some(state);
         Ok(())
     }
@@ -71,11 +68,11 @@ impl Console {
     /// edit mode is in (else the world's starting room).
     pub(super) fn play(&mut self) -> String {
         if self.mode == Mode::Play {
-            return "Already in play mode.".to_string();
+            return self.t("already_playing", &[]);
         }
         if self.game.is_none() {
             let Some(room) = self.edit_room().or_else(|| self.world.default_room()) else {
-                return "This world has no rooms to play in.".to_string();
+                return self.t("no_rooms_to_play", &[]);
             };
             if let Err(e) = self.start_game(&room) {
                 return e;
@@ -89,7 +86,7 @@ impl Console {
     /// edit mode is in, keeping what they carry (REQ-CON-12).
     pub(super) fn play_here(&mut self) -> String {
         let Some(room) = self.edit_room() else {
-            return super::session::suggest("/play here needs edit mode to be in a room. Go to one, then:", &["/play here"]);
+            return super::session::suggest(&self.t("play_here_needs_room", &[]), &["/play here"]);
         };
         match self.game.as_mut() {
             Some(state) => state.location = room,
@@ -106,7 +103,7 @@ impl Console {
     /// `/save [name]`.
     pub(super) fn save_game_as(&self, args: &[&str]) -> String {
         let Some(state) = &self.game else {
-            return "No game is in progress, so there's nothing to save.".to_string();
+            return self.t("nothing_to_save", &[]);
         };
         let name = match args {
             [] => DEFAULT_SAVE,
@@ -115,8 +112,8 @@ impl Console {
         };
         // Saves are the engine's, so every player client keeps them alike (REQ-PC-18).
         match save_named(&self.world.root, name, state) {
-            Ok(_) => format!("Saved the game as `{}`.", name),
-            Err(e) => format!("Not saved: {:#}.", e),
+            Ok(_) => self.t("game_saved", &[("name", name)]),
+            Err(e) => self.t("game_not_saved", &[("reason", &format!("{:#}", e))]),
         }
     }
 
@@ -129,24 +126,24 @@ impl Console {
         };
         let path = match save_path(&self.world.root, name) {
             Ok(path) => path,
-            Err(e) => return format!("Not loaded: {}.", e),
+            Err(e) => return self.t("game_not_loaded_name", &[("reason", &e.to_string())]),
         };
         if !path.exists() {
             let saves = list_saves(&self.world.root).unwrap_or_default();
             return if saves.is_empty() {
-                format!("There's no save called `{}`, and this world has no saves yet.", name)
+                self.t("no_save_no_saves", &[("name", name)])
             } else {
-                format!("There's no save called `{}`. Saves: {}.", name, saves.join(", "))
+                self.t("no_save_called", &[("name", name), ("saves", &saves.join(", "))])
             };
         }
         let (state, warnings) = match load_game(&path, &self.world.engine) {
             Ok(loaded) => loaded,
-            Err(e) => return format!("Not loaded: {:#}", e),
+            Err(e) => return self.t("game_not_loaded", &[("reason", &format!("{:#}", e))]),
         };
         self.game = Some(state);
         self.mode = Mode::Play;
-        let mut out = vec![format!("Loaded `{}`.", name)];
-        out.extend(warnings.iter().map(|w| format!("Author note: {}", w)));
+        let mut out = vec![self.t("game_loaded", &[("name", name)])];
+        out.extend(warnings.iter().map(|w| self.t("load_author_note", &[("note", w)])));
         out.push(String::new());
         out.push(self.play_look());
         out.join("\n")

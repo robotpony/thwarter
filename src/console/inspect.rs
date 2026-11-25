@@ -19,10 +19,10 @@ impl Console {
         }
         let (kind, id) = match self.thing_named(&typed) {
             Some(found) => found,
-            None if typed.is_empty() => return suggest("Inspect what? Name a thing, or go to one:", &["/inspect {thing}"]),
+            None if typed.is_empty() => return suggest(&self.t("inspect_what", &[]), &["/inspect {thing}"]),
             None => return self.t("nothing_called", &[("name", &typed)]),
         };
-        let Some(entity) = super::author::entity_kind(kind) else { return format!("{} can't be inspected.", id) };
+        let Some(entity) = super::author::entity_kind(kind) else { return self.t("cant_inspect", &[("id", &id)]) };
         let engine = &self.world.engine;
         let title = self.world.files.values().find(|e| e.kind == kind && e.id == id).map(|e| e.title.clone()).unwrap_or_default();
         let mut out = vec![format!("{} ({}), {}", title, id, kind.label())];

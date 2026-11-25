@@ -37,7 +37,7 @@ impl Console {
             ["room", rest @ ..] => self.new_room(rest),
             ["character", rest @ ..] => self.new_character(rest),
             ["object", rest @ ..] => self.new_object(rest),
-            _ => super::session::suggest("Usage (/help has the details):", &["/new room|character|object {id} [{title}]"]),
+            _ => super::session::suggest(&self.t("usage_details", &[]), &["/new room|character|object {id} [{title}]"]),
         }
     }
 
@@ -46,12 +46,12 @@ impl Console {
         let (direction, id, title) = match (&here, args) {
             (Some(_), [direction, id, title @ ..]) => (Some(expand_direction(direction)), *id, title),
             (Some(_), [direction]) => {
-                return super::session::suggest("Name the new room:", &[&format!("/new room {} {{id}} [{{title}}]", direction)]);
+                return super::session::suggest(&self.t("name_new_room", &[]), &[&format!("/new room {} {{id}} [{{title}}]", direction)]);
             }
             (None, [id, title @ ..]) => (None, *id, title),
             _ => {
                 return super::session::suggest(
-                    "Usage, in a room and elsewhere:",
+                    &self.t("usage_room_and_elsewhere", &[]),
                     &["/new room {direction} {id} [{title}]", "/new room {id} [{title}]"],
                 )
             }
@@ -62,7 +62,7 @@ impl Console {
         if let (Some(here), Some(direction)) = (&here, &direction) {
             if let Some(existing) = self.world.engine.get_location(here).and_then(|l| l.connections.get(direction)) {
                 return super::session::suggest(
-                    &format!("{} already has a {} exit, to {}. To change it:", here, direction, existing),
+                    &self.t("exit_already", &[("room", &here), ("direction", &direction), ("target", &existing)]),
                     &[&format!("/link {} {{room}}", direction)],
                 );
             }
@@ -121,7 +121,7 @@ impl Console {
         let named_title = named.map(|n| vec![n]).unwrap_or_default();
         let title: Vec<&str> = if title.is_empty() { named_title.iter().map(String::as_str).collect() } else { title.to_vec() };
         let title = title.as_slice();
-        if let Some(problem) = bare_id_problem(id) {
+        if let Some(problem) = bare_id_problem(&self.texts, id) {
             return problem;
         }
         let here = self.current_room();
@@ -136,7 +136,7 @@ impl Console {
 
     fn new_object(&mut self, args: &[&str]) -> String {
         let Some((typed, rest)) = args.split_first() else {
-            return "Usage: /new object <id> <type> [title], where type is free-form: tool, weapon, furniture, ...".to_string();
+            return self.t("usage_new_object", &[]);
         };
         let (typed_id, named) = id_from(typed);
         let owned: Vec<String> = std::iter::once(typed_id).chain(rest.iter().map(|s| s.to_string())).collect();
@@ -155,9 +155,9 @@ impl Console {
             _ => args,
         };
         let [id, object_type, title @ ..] = args else {
-            return "Usage: /new object <id> <type> [title], where type is free-form: tool, weapon, furniture, ...".to_string();
+            return self.t("usage_new_object", &[]);
         };
-        if let Some(problem) = bare_id_problem(id) {
+        if let Some(problem) = bare_id_problem(&self.texts, id) {
             return problem;
         }
         let here = self.current_room();
@@ -224,10 +224,10 @@ impl Console {
             return "/set changes the room, character or object you're in; go to one first.".to_string();
         };
         let [key, value @ ..] = args else {
-            return super::session::suggest("Usage, for example:", &["/set {key} {value}", "/set title The Old Well"]);
+            return super::session::suggest(&self.t("usage_for_example", &[]), &["/set {key} {value}", "/set title The Old Well"]);
         };
         if value.is_empty() {
-            return super::session::suggest(&format!("Give `{}` a value:", key), &[&format!("/set {} {{value}}", key)]);
+            return super::session::suggest(&self.t("give_a_value", &[("key", key)]), &[&format!("/set {} {{value}}", key)]);
         }
         let value = value.join(" ");
         let edit = if *key == "body" {
@@ -240,17 +240,17 @@ impl Console {
             Edit::SetScalar { key: key.to_string(), value: scalar(&value) }
         };
         match self.save(current.kind, &current.id, &[edit]) {
-            Ok(path) => self.after_writes(&[path], format!("Set {} on {}.", key, current.id)),
+            Ok(path) => self.after_writes(&[path], self.t("set_on", &[("key", key), ("id", &current.id)])),
             Err(e) => e,
         }
     }
 
     pub(super) fn link(&mut self, args: &[&str]) -> String {
         let Some(here) = self.current_room() else {
-            return "/link changes an exit of the room you're in; go to a room first.".to_string();
+            return self.t("link_needs_room", &[]);
         };
         let [direction, target] = args else {
-            return super::session::suggest("Usage, for example:", &["/link {direction} {room}", "/link north castle/great-hall"]);
+            return super::session::suggest(&self.t("usage_for_example", &[]), &["/link {direction} {room}", "/link north castle/great-hall"]);
         };
         let direction = expand_direction(direction);
         let target = self.room_id(target);
@@ -260,7 +260,7 @@ impl Console {
             value: Value::String(target.clone()),
         };
         match self.save(Kind::Room, &here, &[edit]) {
-            Ok(path) => self.after_writes(&[path], format!("Linked {} {} to {}.", here, direction, target)),
+            Ok(path) => self.after_writes(&[path], self.t("linked", &[("room", &here), ("direction", &direction), ("target", &target)])),
             Err(e) => e,
         }
     }
@@ -275,7 +275,7 @@ impl Console {
         let direction = expand_direction(direction);
         let edit = Edit::RemoveMapEntry { key: "connections".into(), subkey: direction.clone() };
         match self.save(Kind::Room, &here, &[edit]) {
-            Ok(path) => self.after_writes(&[path], format!("Removed the {} exit from {}.", direction, here)),
+            Ok(path) => self.after_writes(&[path], self.t("unlinked", &[("direction", &direction), ("room", &here)])),
             Err(e) => e,
         }
     }
@@ -300,14 +300,14 @@ impl Console {
         let (thing, target) = match args {
             [thing] => match self.current_room() {
                 Some(here) => (*thing, here),
-                None => return super::session::suggest(&format!("/add {} needs a room. Go to one, or name it:", thing), &[&format!("/add {} {{room}}", thing)]),
+                None => return super::session::suggest(&self.t("add_needs_room", &[("thing", thing)]), &[&format!("/add {} {{room}}", thing)]),
             },
             [thing, target] => (*thing, target.to_string()),
-            _ => return super::session::suggest("Usage, for example:", &["/add {thing} [{room|character|thing}]", "/add chair bedroom"]),
+            _ => return super::session::suggest(&self.t("usage_for_example", &[]), &["/add {thing} [{room|character|thing}]", "/add chair bedroom"]),
         };
         let (thing_id, named) = id_from(thing);
         let thing = thing_id.as_str();
-        if let Some(problem) = bare_id_problem(thing) {
+        if let Some(problem) = bare_id_problem(&self.texts, thing) {
             return problem;
         }
         let is_character = self.world.engine.characters.contains_key(thing);
@@ -315,11 +315,11 @@ impl Console {
         let holder = match self.holder_for(&target, &mut written) {
             Ok(Some(Holder::Room(room))) => Holder::Room(room),
             Ok(Some(_)) if is_character => {
-                return format!("{} is a character; characters go in rooms, not into things or other characters.", thing)
+                return self.t("add_character_into_thing", &[("thing", thing)])
             }
             Ok(Some(Holder::Object(id))) if id == thing => return format!("{} can't hold itself.", thing),
             Ok(Some(holder)) => holder,
-            Ok(None) => return format!("There's no room, character or object called `{}` to add {} to.", target, thing),
+            Ok(None) => return self.t("add_no_holder", &[("target", &target), ("thing", thing)]),
             Err(e) => return e,
         };
         let key = if is_character { "characters" } else { "objects" };
@@ -341,7 +341,7 @@ impl Console {
             Holder::Room(id) | Holder::Object(id) => id.clone(),
         };
         if items.iter().any(|i| i == thing) {
-            return format!("{} is already in {}.", thing, place);
+            return self.t("already_in", &[("thing", thing), ("place", &place)]);
         }
         items.push(thing.to_string());
         let card = is_character || self.world.engine.objects.contains_key(thing);
@@ -370,7 +370,7 @@ impl Console {
             Ok(path) => {
                 written.push(path);
                 self.added = Some((if is_character { Kind::Character } else { Kind::Object }, thing.to_string()));
-                self.after_writes(&written, format!("Added {} to {}{}.", thing, place, note))
+                self.after_writes(&written, self.t("added_to", &[("thing", thing), ("place", &place), ("note", &note)]))
             }
             Err(e) => self.after_writes(&written, e),
         }
@@ -382,10 +382,10 @@ impl Console {
     /// character's inventory. The thing's own file stays where it is.
     pub(super) fn move_thing(&mut self, args: &[&str]) -> String {
         let [thing, target] = args else {
-            return super::session::suggest("Usage, for example:", &["/move {thing} {room|character|thing}", "/move lantern village/well"]);
+            return super::session::suggest(&self.t("usage_for_example", &[]), &["/move {thing} {room|character|thing}", "/move lantern village/well"]);
         };
         if matches!(*target, "global" | "area" | "local" | "here") {
-            return "Changing a thing's scope with /move comes with the scope work (REQ-CON-29).".to_string();
+            return self.t("move_scope_later", &[]);
         }
         // A room moves into an area folder, which changes its id and its
         // file's path (Bruce, 2026-11-23). That waits on the writer moving
@@ -410,7 +410,7 @@ impl Console {
         }
         let (thing_id, _) = id_from(thing);
         let thing = thing_id.as_str();
-        if let Some(problem) = bare_id_problem(thing) {
+        if let Some(problem) = bare_id_problem(&self.texts, thing) {
             return problem;
         }
         let engine = &self.world.engine;
@@ -418,28 +418,28 @@ impl Console {
             || engine.loaded_locations.values().any(|l| l.characters.iter().any(|c| c == thing));
         let from = engine.placement(thing);
         if !is_character && from.is_empty() && !engine.objects.contains_key(thing) {
-            return format!("Nothing called `{}` is in the world to move.", thing);
+            return self.t("nothing_to_move", &[("thing", thing)]);
         }
         let mut written = Vec::new();
         let to = match self.holder_for(target, &mut written) {
             Ok(Some(Holder::Room(room))) => Holder::Room(room),
             Ok(Some(_)) if is_character => {
-                return format!("{} is a character; characters go to rooms, not into things or other characters.", thing)
+                return self.t("move_character_into_thing", &[("thing", thing)])
             }
             Ok(Some(Holder::Object(id))) if id == thing => return format!("{} can't hold itself.", thing),
             Ok(Some(holder)) => holder,
-            Ok(None) => return format!("There's no room, character or object called `{}` to move {} to.", target, thing),
+            Ok(None) => return self.t("move_no_holder", &[("target", target), ("thing", thing)]),
             Err(e) => return e,
         };
         let list_key = if is_character { "characters" } else { "objects" };
         let leaving: Vec<Holder> = from.iter().filter(|h| **h != to).cloned().collect();
         let already = from.contains(&to);
         if already && leaving.is_empty() {
-            return format!("{} is already {}.", thing, where_to(&to));
+            return self.t("already_there", &[("thing", thing), ("place", &where_to(&to))]);
         }
 
         let fail = |console: &mut Console, written: &Vec<PathBuf>, e: String| {
-            let report = console.after_writes(written, format!("Moving {} stopped partway.", thing));
+            let report = console.after_writes(written, console.t("move_stopped", &[("thing", thing)]));
             format!("{}\n{}", report, e)
         };
         for holder in &leaving {
@@ -469,7 +469,7 @@ impl Console {
             }
         }
         let from_text = if leaving.is_empty() { "nowhere".to_string() } else { leaving.iter().map(short_holder).collect::<Vec<_>>().join(", ") };
-        let summary = format!("Moved {}: {} → {}{}.", thing, from_text, short_holder(&to), followed);
+        let summary = self.t("moved_thing", &[("thing", thing), ("from", &from_text), ("to", &short_holder(&to)), ("followed", &followed)]);
         self.after_writes(&written, summary)
     }
 
@@ -502,7 +502,7 @@ impl Console {
         }
         let (id, named) = id_from(typed);
         let listed = self.world.engine.loaded_locations.values().any(|l| l.objects.iter().any(|o| *o == id));
-        if !listed || bare_id_problem(&id).is_some() {
+        if !listed || bare_id_problem(&self.texts, &id).is_some() {
             return Ok(None);
         }
         let title = named.unwrap_or_else(|| title_or_default(&[], &id));
@@ -547,7 +547,7 @@ impl Console {
         self.note_warnings_before();
         let report = match writer.rename_loaded(&mut self.world.engine, EntityKind::Location, old, new, false) {
             Ok(report) => report,
-            Err(e) => return format!("Not moved: {}", within(&writer, &e)),
+            Err(e) => return self.t("not_moved", &[("reason", &within(&writer, &e))]),
         };
         self.follow_rename(old, new);
 
@@ -570,7 +570,7 @@ impl Console {
             .first()
             .map(|(from, to)| format!("moved {} → {}", from.display(), to.display()))
             .unwrap_or_else(|| "nothing to move".to_string());
-        let mut summary = format!("Moved {} → {}: {}", old, new, file);
+        let mut summary = self.t("moved_room", &[("old", old), ("new", new), ("file", &file)]);
         if report.moved.len() > 1 {
             summary.push_str(&format!(" and {} more file(s) of its bundle", report.moved.len() - 1));
         }
@@ -659,7 +659,7 @@ impl Console {
     }
 
     fn writer(&self) -> Result<WorldWriter, String> {
-        WorldWriter::new(&self.world.root).map_err(|e| format!("Can't write to the world: {}", e))
+        WorldWriter::new(&self.world.root).map_err(|e| self.t("cant_write_world", &[("reason", &e.to_string())]))
     }
 
     /// Writes a new entity and adds it to the loaded world (REQ-ENG-7, 8).
@@ -668,7 +668,7 @@ impl Console {
         self.note_warnings_before();
         let report = writer
             .create_loaded(&mut self.world.engine, new, edits, false)
-            .map_err(|e| format!("Not created: {}", within(&writer, &e)))?;
+            .map_err(|e| self.t("not_created", &[("reason", &within(&writer, &e))]))?;
         self.created.push((new.kind, new.id.clone()));
         Ok(report.path)
     }
@@ -680,7 +680,7 @@ impl Console {
         self.note_warnings_before();
         let report = writer
             .edit_loaded(&mut self.world.engine, kind, id, edits, false)
-            .map_err(|e| format!("Not saved: {}", within(&writer, &e)))?;
+            .map_err(|e| self.t("not_saved", &[("reason", &within(&writer, &e))]))?;
         Ok(report.path)
     }
 
@@ -693,7 +693,7 @@ impl Console {
         let path = PathBuf::from(format!("{}.md", relative));
         let report = writer
             .replace_file_loaded(&mut self.world.engine, &path, text, expected, false)
-            .map_err(|e| format!("Not saved: {}", within(&writer, &e)))?;
+            .map_err(|e| self.t("not_saved", &[("reason", &within(&writer, &e))]))?;
         Ok(report.path)
     }
 
@@ -795,9 +795,9 @@ pub(super) fn id_from(typed: &str) -> (String, Option<String>) {
 }
 
 /// Character and object ids are bare names (`king`, not `npcs/king`).
-pub(super) fn bare_id_problem(id: &str) -> Option<String> {
+pub(super) fn bare_id_problem(texts: &crate::engines::texts::Texts, id: &str) -> Option<String> {
     id.contains('/').then(|| {
-        format!("Character and object ids are bare names, without folders: `{}`.", id.rsplit('/').next().unwrap_or(id))
+        texts.text("console", "bare_ids", &[("id", id.rsplit('/').next().unwrap_or(id))])
     })
 }
 

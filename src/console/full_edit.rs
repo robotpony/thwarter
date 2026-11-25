@@ -129,7 +129,7 @@ impl Console {
         if self.mode == Mode::Play {
             self.mode = Mode::Edit;
             self.place_at_room();
-            out.push(format!("Edit mode, at {}.", self.pwd()));
+            out.push(self.t("edit_mode_at", &[("place", &self.pwd())]));
         }
         let target = match (kind, rest) {
             (_, []) => self.edit_target_here(kind),
@@ -140,7 +140,7 @@ impl Console {
         match target {
             Err(why) => out.push(why),
             Ok(target) if !self.interactive => {
-                out.push(format!("/edit opens {}.md in a full-screen editor, which needs a terminal.", target.path))
+                out.push(self.t("edit_needs_terminal", &[("path", &target.path)]))
             }
             Ok(target) => self.pending_edit = Some(target),
         }
@@ -175,20 +175,14 @@ impl Console {
             Some(opened) => {
                 match fs::read_to_string(&file) {
                     Err(_) => {
-                        return Saved::No(format!(
-                            "{}.md is gone from disk. Copy anything you want to keep, esc, then /reload.",
-                            target.path
-                        ))
+                        return Saved::No(self.t("edit_file_gone", &[("path", &target.path)]))
                     }
                     Ok(now) if now != *opened && !force => {
-                        return Saved::Conflict(format!(
-                            "{}.md changed on disk since you opened it. Ctrl-s again overwrites that change; esc keeps it and drops yours.",
-                            target.path
-                        ))
+                        return Saved::Conflict(self.t("edit_changed_on_disk", &[("path", &target.path)]))
                     }
                     Ok(_) => {}
                 }
-                if let Err(why) = same_thing(target, text) {
+                if let Err(why) = same_thing(self, target, text) {
                     return Saved::No(why);
                 }
                 // The writer checks the file again as it writes, so a change
@@ -218,9 +212,9 @@ impl Console {
                     target.id = entry.id.clone();
                 }
                 let summary = if was_broken && target.kind != Kind::Broken {
-                    format!("Saved {}.md; it parses now, as {} `{}`.", target.path, target.kind.label(), target.id)
+                    self.t("edit_saved_parses", &[("path", &target.path), ("kind", target.kind.label()), ("id", &target.id)])
                 } else {
-                    format!("Saved {}.md.", target.path)
+                    self.t("edit_saved", &[("path", &target.path)])
                 };
                 Saved::Yes(self.after_writes(&[path], summary))
             }
@@ -231,7 +225,7 @@ impl Console {
     /// What the console prints once the editor closes.
     pub(super) fn edit_closed(&self, target: &EditTarget, closed: Closed) -> String {
         if closed.reports.is_empty() {
-            return format!("Closed {}.md without saving.", target.path);
+            return self.t("edit_closed_unsaved", &[("path", &target.path)]);
         }
         closed.reports.join("\n")
     }
@@ -344,7 +338,7 @@ impl Console {
             found if kind.is_none_or(|k| k == found) => self.open_target(found, entry.id.clone(), path.clone()),
             found => {
                 let label = kind.map(Kind::label).unwrap_or_default();
-                Err(format!("{} is a {}, not a {}: /edit opens it.", path, found.label(), label))
+                Err(self.t("edit_wrong_kind", &[("path", &path), ("found", found.label()), ("kind", label)]))
             }
         }
     }
@@ -354,10 +348,10 @@ impl Console {
     pub(super) fn edit_target_named(&self, kind: Kind, typed: &str) -> Result<EditTarget, String> {
         if kind == Kind::Room {
             let id = self.room_id(typed);
-            let path = self.world.path_of(Kind::Room, &id).ok_or_else(|| super::session::suggest(&format!("No room `{}`. To make one:", id), &[&format!("/new room {}", id)]))?;
+            let path = self.world.path_of(Kind::Room, &id).ok_or_else(|| super::session::suggest(&self.t("edit_no_room", &[("id", &id)]), &[&format!("/new room {}", id)]))?;
             return self.open_target(kind, id, path);
         }
-        if let Some(problem) = bare_id_problem(typed) {
+        if let Some(problem) = bare_id_problem(&self.texts, typed) {
             return Err(problem);
         }
         if let Some(path) = self.world.path_of(kind, typed) {
@@ -370,31 +364,28 @@ impl Console {
             return Ok(EditTarget { kind, id: typed.to_string(), path, opened: None, file });
         }
         Err(match kind {
-            Kind::Character => super::session::suggest(&format!("No character `{}`. To make one:", typed), &[&format!("/new character {}", typed)]),
-            _ => super::session::suggest(&format!("No object `{}` here or in the world. To make one:", typed), &[&format!("/new object {} {{type}}", typed)]),
+            Kind::Character => super::session::suggest(&self.t("edit_no_character", &[("id", typed)]), &[&format!("/new character {}", typed)]),
+            _ => super::session::suggest(&self.t("edit_no_object", &[("id", typed)]), &[&format!("/new object {} {{type}}", typed)]),
         })
     }
 
     /// A target for an existing file, with its text as it is now.
     pub(super) fn open_target(&self, kind: Kind, id: String, path: String) -> Result<EditTarget, String> {
         let file = self.world.root.join(format!("{}.md", path));
-        let text = fs::read_to_string(&file).map_err(|e| format!("Can't open {}.md: {}", path, e))?;
+        let text = fs::read_to_string(&file).map_err(|e| self.t("edit_cant_open", &[("path", &path), ("reason", &e.to_string())]))?;
         Ok(EditTarget { kind, id, path, opened: Some(text), file })
     }
 }
 
 /// Refuses text that no longer holds the thing the editor opened: ids
 /// can't be renamed yet, and a room can't turn into an object.
-fn same_thing(target: &EditTarget, text: &str) -> Result<(), String> {
+fn same_thing(console: &Console, target: &EditTarget, text: &str) -> Result<(), String> {
     let Some(kind) = entity_kind(target.kind) else { return Ok(()) };
-    let file = ContentFile::from_text(format!("{}.md", target.path), text).map_err(|e| format!("Not saved: {:#}", e))?;
+    let file = ContentFile::from_text(format!("{}.md", target.path), text).map_err(|e| console.t("edit_not_saved", &[("reason", &format!("{:#}", e))]))?;
     if file.type_name() != kind.type_name() || file.id() != target.id {
-        return Err(format!(
-            "Not saved: this file holds {} `{}`, and the text now says {} `{}`. Ids and types can't be changed here yet.",
-            kind.type_name(),
-            target.id,
-            file.type_name(),
-            file.id()
+        return Err(console.t(
+            "edit_not_same_thing",
+            &[("kind", kind.type_name()), ("id", &target.id), ("new_kind", file.type_name()), ("new_id", file.id())],
         ));
     }
     Ok(())

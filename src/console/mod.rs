@@ -78,7 +78,8 @@ fn drive_terminal(mut console: Console, world_path: &Path, resumed: Option<resta
     let _watching = match watch::watch(world_path, console.clone(), send.clone()) {
         Ok(handle) => Some(handle),
         Err(e) => {
-            let _ = send.try_send(format!("Can't watch the world's files ({}); use /reload after changes.", e));
+            let text = console.lock().map(|c| c.t("watch_failed", &[("reason", &e.to_string())])).unwrap_or_default();
+            let _ = send.try_send(text);
             None
         }
     };

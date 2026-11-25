@@ -26,10 +26,10 @@ impl Console {
     /// The thing edit mode is at, as (console kind, engine kind, id).
     fn thing_here(&self) -> Result<(Kind, EntityKind, String), String> {
         let Place::File(path) = &self.place else {
-            return Err(suggest("States belong to a thing. Go to one, then:", &["/state {name} [start]"]));
+            return Err(suggest(&self.t("states_need_a_thing", &[]), &["/state {name} [start]"]));
         };
-        let entry = self.world.files.get(path).ok_or_else(|| format!("{} is not in the world.", path))?;
-        let kind = entity_kind(entry.kind).ok_or_else(|| format!("{} is a {}, which has no states.", path, entry.kind.label()))?;
+        let entry = self.world.files.get(path).ok_or_else(|| self.t("not_in_world", &[("id", path)]))?;
+        let kind = entity_kind(entry.kind).ok_or_else(|| self.t("kind_has_no_states", &[("id", path), ("kind", entry.kind.label())]))?;
         Ok((entry.kind, kind, entry.id.clone()))
     }
 
@@ -47,8 +47,8 @@ impl Console {
         let mut written = Vec::new();
         let mut done = Vec::new();
         match self.make_state(kind, entity, &id, name, &mut written) {
-            Ok(true) => done.push(format!("Made the {} state", name)),
-            Ok(false) => done.push(format!("{} already has a {} state", id, name)),
+            Ok(true) => done.push(self.t("made_state", &[("state", name)])),
+            Ok(false) => done.push(self.t("state_exists", &[("id", &id), ("state", name)])),
             Err(e) => return self.after_writes(&written, e),
         }
         if start {
@@ -87,7 +87,7 @@ impl Console {
             Ok(path) => written.push(path),
             Err(e) => return self.after_writes(&written, e),
         }
-        self.after_writes(&written, format!("Set {} to {} while {} is {}.", key, value, id, state))
+        self.after_writes(&written, self.t("set_in_state", &[("key", key), ("value", &value), ("id", &id), ("state", state)]))
     }
 
     /// `/action <verb> <from> --> <to> [with <thing>]`: the action, in the
@@ -160,7 +160,7 @@ impl Console {
             ],
             ["switch", verbs, states] => {
                 let (Some((on_verb, off_verb)), Some((first, second))) = (verbs.split_once('/'), states.split_once('/')) else {
-                    return suggest("Name both verbs and both states, for example:", &["/recipe switch light/put-out unlit/lit"]);
+                    return suggest(&self.t("recipe_switch_usage", &[]), &["/recipe switch light/put-out unlit/lit"]);
                 };
                 vec![
                     format!("/state {} start", first),
@@ -177,7 +177,7 @@ impl Console {
             ],
             _ => {
                 return suggest(
-                    "The recipes:",
+                    &self.t("recipes", &[]),
                     &[
                         "/recipe fixed-until {verb} [{fixed} {free}]",
                         "/recipe locked-with {key}",
@@ -195,20 +195,20 @@ impl Console {
             let (reply, _) = self.handle(command);
             if ["Usage", "Not ", "States belong", "`"].iter().any(|p| reply.starts_with(p)) || reply.contains("which has no states") {
                 self.interactive = interactive;
-                return format!("{}\nStopped at {}: {}", out.join("\n"), command, reply);
+                return format!("{}\n{}", out.join("\n"), self.t("recipe_stopped", &[("command", command), ("reply", &reply)]));
             }
             out.push(reply);
         }
         self.interactive = interactive;
         let commands: Vec<&str> = commands.iter().map(String::as_str).collect();
-        suggest(&format!("{}\n\nThat was:", out.join("\n")), &commands)
+        suggest(&format!("{}\n\n{}", out.join("\n"), self.t("recipe_that_was", &[])), &commands)
     }
 
     /// Makes state `name` if the thing hasn't one: a one-file thing becomes
     /// a bundle first. Returns whether it made one.
     fn make_state(&mut self, kind: Kind, entity: EntityKind, id: &str, name: &str, written: &mut Vec<PathBuf>) -> Result<bool, String> {
         if name.is_empty() || name.contains(['/', '.', ' ']) {
-            return Err(format!("`{}` can't name a state: one word, without dots or slashes.", name));
+            return Err(self.t("bad_state_name", &[("name", name)]));
         }
         let writer = self.writer_for_states()?;
         let bundled = self.state_dir(entity, id).is_some();
@@ -216,7 +216,7 @@ impl Console {
             self.note_warnings_before_states();
             let report = writer
                 .make_bundle_loaded(&mut self.world.engine, entity, id, Some(name), false)
-                .map_err(|e| format!("Not made: {:#}", e))?;
+                .map_err(|e| self.t("not_made", &[("reason", &format!("{:#}", e))]))?;
             written.extend(report.created.iter().cloned());
             for (from, to) in &report.moved {
                 written.push(from.clone());
@@ -234,7 +234,7 @@ impl Console {
         self.note_warnings_before_states();
         let report = writer
             .save_bundle_loaded(&mut self.world.engine, entity, id, &[section], false)
-            .map_err(|e| format!("Not made: {:#}", e))?;
+            .map_err(|e| self.t("not_made", &[("reason", &format!("{:#}", e))]))?;
         written.extend(report.created.iter().cloned());
         let _ = kind;
         Ok(true)
@@ -243,15 +243,15 @@ impl Console {
     /// Edits state `name`'s file as text with `change`, and saves it
     /// through the writer, which refuses text that doesn't merge.
     fn edit_state_file(&mut self, entity: EntityKind, id: &str, name: &str, change: impl Fn(&str) -> String) -> Result<PathBuf, String> {
-        let dir = self.state_dir(entity, id).ok_or_else(|| format!("{} has no states yet.", id))?;
+        let dir = self.state_dir(entity, id).ok_or_else(|| self.t("no_states_yet", &[("id", id)]))?;
         let file = dir.join(format!("{}.md", name));
-        let before = std::fs::read_to_string(self.world.root.join(&file)).map_err(|e| format!("Can't read {}: {}", file.display(), e))?;
+        let before = std::fs::read_to_string(self.world.root.join(&file)).map_err(|e| self.t("cant_read", &[("file", &file.display().to_string()), ("reason", &e.to_string())]))?;
         let after = change(&before);
         let writer = self.writer_for_states()?;
         self.note_warnings_before_states();
         writer
             .save_bundle_loaded(&mut self.world.engine, entity, id, &[Section { path: file.clone(), text: after, expected: Some(before) }], false)
-            .map_err(|e| format!("Not saved: {:#}", e))?;
+            .map_err(|e| self.t("not_saved", &[("reason", &format!("{:#}", e))]))?;
         Ok(file)
     }
 
@@ -278,7 +278,7 @@ impl Console {
     }
 
     fn writer_for_states(&self) -> Result<crate::writer::WorldWriter, String> {
-        crate::writer::WorldWriter::new(&self.world.root).map_err(|e| format!("Can't write to the world: {}", e))
+        crate::writer::WorldWriter::new(&self.world.root).map_err(|e| self.t("cant_write_world", &[("reason", &e.to_string())]))
     }
 
     fn note_warnings_before_states(&mut self) {

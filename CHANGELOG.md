@@ -71,6 +71,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.76.0 (2026-11-24)
+
+### Added
+
+- The author's `config.toml` `[console]` table rewords the console's replies; an unknown key or a wrong kind is a warning in the console's greeting, and `[console.commands]` stays the command layer's (`PLAN.md` › Phase 8).
+- `tests/text_allowlist.txt`, the guard test's allowlist, with the console's entries.
+
+### Changed
+
+- The console's sentences come from `[console]` keys in `src/builtins/text/console.toml` (about 160 keys), with the default text unchanged, so the transcripts don't move.
+
 ## 0.75.0 (2026-11-24)
 
 ### Added

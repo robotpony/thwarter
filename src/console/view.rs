@@ -6,21 +6,26 @@
 use crate::engines::world_def::WorldDef;
 use crate::models::character::Character;
 use crate::models::world::GameObject;
+use crate::engines::texts::Texts;
+
+fn t(texts: &Texts, key: &str, args: &[(&str, &str)]) -> String {
+    texts.text("console", key, args)
+}
 
 /// A character as edit mode shows it. Its file and kind are in the
 /// sidebar, not here (Bruce, 2026-11-23).
-pub fn character(c: &Character) -> String {
+pub fn character(c: &Character, texts: &Texts) -> String {
     let mut out = vec![format!("{} ({})", c.name, c.id)];
     out.push(String::new());
     out.push(description(&c.description));
     out.push(String::new());
-    out.push(format!("Starts in: {}", c.default_location.as_deref().unwrap_or("nowhere")));
+    out.push(t(texts, "starts_in", &[("room", c.default_location.as_deref().unwrap_or("nowhere"))]));
     out.push(list("Carries", &c.inventory));
     tidy(out)
 }
 
 /// An object as edit mode shows it; its file and type are in the sidebar.
-pub fn object(o: &GameObject) -> String {
+pub fn object(o: &GameObject, _texts: &Texts) -> String {
     let mut out = vec![format!("{} ({})", o.title, o.id)];
     out.push(String::new());
     out.push(description(&o.description));
@@ -32,7 +37,7 @@ pub fn object(o: &GameObject) -> String {
 }
 
 /// The world's own settings, as edit mode shows any file in `world/`.
-pub fn world(def: &WorldDef, path: &str) -> String {
+pub fn world(def: &WorldDef, path: &str, texts: &Texts) -> String {
     let mut out = vec![format!("World settings, {}.md", path), String::new()];
     let or_unset = |v: &Option<String>| v.clone().unwrap_or_else(|| "not set".to_string());
     out.push(format!("Title: {}", or_unset(&def.title)));
@@ -43,7 +48,7 @@ pub fn world(def: &WorldDef, path: &str) -> String {
     if let Some(version) = &def.version {
         out.push(format!("Version: {}", version));
     }
-    out.push(format!("Starts in: {}", or_unset(&def.start)));
+    out.push(t(texts, "starts_in", &[("room", &or_unset(&def.start))]));
     out.push(String::new());
     out.push(description(&def.intro));
     let story: Vec<String> = def.story.iter().map(|(k, v)| format!("{} = {}", k, v)).collect();
