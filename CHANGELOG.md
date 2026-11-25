@@ -4,6 +4,15 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.80.0
+
+### Added
+
+- `/list rooms|characters|objects|doors` (alias `/ls`) lists every one in the world by id and title (`PLAN.md` › Phase 7).
+- `/map` at the world's root in edit mode draws the whole world: from where play starts, then each group of rooms no exit joins to those.
+- In edit mode, a command's name or alias typed without its slash (`map`, `validate strict`) runs it when the play words don't read it; a word play reads as a verb and that is also a command's name asks which was meant, offering the slash command (REQ-CON-56). An unknown slash command already suggested the nearest (since the registry).
+- `tests/transcripts/lists-and-maps.txt` covers all three.
+
 ## Unreleased
 
 ### Added

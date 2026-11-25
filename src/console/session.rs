@@ -180,6 +180,9 @@ impl Console {
         if let Some(command) = line.strip_prefix('/') {
             return self.console_command(command);
         }
+        if let Some(command) = self.bare_command_line(line) {
+            return self.console_command(&command);
+        }
         let out = match self.mode {
             Mode::Edit => self.edit_input(line),
             Mode::Play => self.play_input(line),
@@ -227,6 +230,7 @@ impl Console {
             ("validate", []) => self.validate(false),
             ("validate", ["strict"]) => self.validate(true),
             ("map", []) => self.map_command(),
+            ("list", [kind]) => self.list_command(kind),
             ("inspect", args) => self.inspect(args),
             ("remove", args) => self.remove(args),
             ("write", args) => self.write_command(args),
@@ -376,6 +380,13 @@ impl Console {
             Parsed::Action(PlayAction::Look) => self.look(),
             Parsed::Action(PlayAction::Examine(noun)) => self.examine(&noun),
             Parsed::Action(PlayAction::Go(target)) => self.go(&target),
+            // A play verb that is also a command's name (`save`): ask
+            // which was meant, since play's verb doesn't work here
+            // (REQ-CON-56).
+            Parsed::Action(_) if bare_command(first, false).is_some() => {
+                let name = bare_command(first, false).unwrap_or_default();
+                suggest(&self.t("bare_command_ask", &[("word", first)]), &[&format!("/{}", line.replacen(first, &name, 1))])
+            }
             Parsed::Action(_) => {
                 suggest(&self.t("play_command_in_edit", &[]), &["/new {kind} {id}", "/set {key} {value}", "/play here"])
             }
@@ -385,6 +396,23 @@ impl Console {
                 self.t("edit_unknown", &[("word", first)])
             }
         }
+    }
+
+    /// In edit mode, a command's name or alias typed without its slash,
+    /// when the play words don't read it, as the command to run
+    /// (REQ-CON-56).
+    fn bare_command_line(&self, line: &str) -> Option<String> {
+        let first = line.split_whitespace().next()?;
+        if self.mode != Mode::Edit || matches!(first, "cd" | "ls" | "pwd") {
+            return None;
+        }
+        let name = bare_command(first, true)?;
+        let parsed = self.game_engine.parse_command(&self.world.engine, line, &PlayState::default());
+        if !matches!(parsed, Parsed::Unknown(_)) {
+            return None;
+        }
+        let rest = line[first.len()..].trim_start();
+        Some(if rest.is_empty() { name } else { format!("{} {}", name, rest) })
     }
 
     /// `go <direction or name>`, `go back` and `go /`.
@@ -824,6 +852,17 @@ pub(super) fn split_args(command: &str) -> Vec<String> {
     words
 }
 
+/// The command `word` names exactly, by name or (with `aliases`) by
+/// alias, for a command typed without its slash. Prefixes don't count:
+/// a bare word is too easily something else.
+fn bare_command(word: &str, aliases: bool) -> Option<String> {
+    let word = word.to_lowercase();
+    registry::commands()
+        .iter()
+        .find(|c| c.name == word || (aliases && c.aliases.iter().any(|a| *a == word)))
+        .map(|c| c.name.clone())
+}
+
 /// A reply that suggests what to type: the sentence, a blank line, then
 /// each command on its own indented line (Bruce, 2026-11-24: examples go
 /// on a new line with space above).
@@ -894,7 +933,7 @@ fn parent_of(path: &str) -> String {
 /// `handler` MUST be here and each name here MUST have an entry (REQ-CON-53);
 /// a test fails on either gap.
 const HANDLERS: &[&str] = &[
-    "quit", "help", "clear", "status", "validate", "map", "inspect", "remove", "write", "start", "restart", "edit", "play", "save",
+    "quit", "help", "clear", "status", "validate", "map", "list", "inspect", "remove", "write", "start", "restart", "edit", "play", "save",
     "load", "reload", "new", "set", "state", "action", "recipe", "link", "unlink", "move", "add",
 ];
 

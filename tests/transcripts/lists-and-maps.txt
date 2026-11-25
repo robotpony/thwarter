@@ -1,0 +1,42 @@
+# world: tests/worlds/tiny
+# mode: edit
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
+> /list rooms
+Rooms (2):
+
+  village/square  Village Square
+  village/well    The Well
+> /ls objects
+Objects (1):
+
+  lantern  Brass Lantern
+> /list characters
+Characters (1):
+
+  elder  The Elder
+> /list ghosts
+There's no list of `ghosts`. Try:
+
+  /list rooms
+  /list characters
+  /list objects
+  /list doors
+> list doors
+No doors yet.
+> map
+The whole world, from village/square:
+
+[    The Well    ]
+         |
+[@ Village Square]---[ ? village/inn  ]
+> validate strict
+Problems (1):
+  village/square: connection `east` points at unknown location `village/inn`
+Validation failed: 1 problem(s), 0 warning(s)
+> save
+No game is in progress, so there's nothing to save.
+> look
+village/  area: 2 room(s)
+npcs/     Global characters: 1
+objects/  Global objects: 1

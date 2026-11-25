@@ -45,6 +45,7 @@ impl Kind {
 const KINDS: &[(&str, Kind)] = &[
     ("usage_bare", Kind::Refused),
     ("unknown_command", Kind::Error),
+    ("list_what", Kind::Refused),
     ("reload_failed", Kind::Error),
     ("reload_failed_because", Kind::Error),
     ("reloaded", Kind::Done),

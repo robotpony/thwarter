@@ -187,10 +187,62 @@ impl Console {
 
     /// `/map`: the whole map around you, as `thwart map` draws it.
     pub(super) fn map_command(&self) -> String {
+        if self.mode == Mode::Edit && matches!(&self.place, Place::Dir(dir) if dir.is_empty()) {
+            return self.whole_map();
+        }
         match self.map_room() {
             Some(room) => format!("{}\n\n{}", self.t("map_around", &[("room", &room)]), crate::render::render_map(&self.world.engine.map_layout(&room, None, None))),
             None => self.t("no_room_to_map", &[]),
         }
+    }
+
+    /// `/map` at the world's root: every room, starting from where play
+    /// starts, then each group of rooms no exit joins to those, by path.
+    fn whole_map(&self) -> String {
+        let mut rooms: Vec<String> = self.world.files.values().filter(|e| e.kind == Kind::Room).map(|e| e.id.clone()).collect();
+        if let Some(start) = self.world.default_room() {
+            rooms.retain(|r| *r != start);
+            rooms.insert(0, start);
+        }
+        if rooms.is_empty() {
+            return self.t("no_room_to_map", &[]);
+        }
+        let mut drawn = std::collections::BTreeSet::new();
+        let mut parts = Vec::new();
+        for room in rooms {
+            if drawn.contains(&room) {
+                continue;
+            }
+            let map = self.world.engine.map_layout(&room, None, None);
+            drawn.extend(map.cells.iter().map(|c| c.room.clone()));
+            drawn.insert(room.clone());
+            let heading = if parts.is_empty() { "map_whole" } else { "map_apart" };
+            parts.push(format!("{}\n\n{}", self.t(heading, &[("room", &room)]), crate::render::render_map(&map)));
+        }
+        parts.join("\n\n")
+    }
+
+    /// `/list <kind>`: every room, character, object or door, by id.
+    pub(super) fn list_command(&self, kind: &str) -> String {
+        let engine = &self.world.engine;
+        let (key, mut found): (&str, Vec<(String, String)>) = match kind.to_lowercase().as_str() {
+            "rooms" | "room" => ("list_rooms", engine.loaded_locations.iter().map(|(id, l)| (id.clone(), l.name.clone())).collect()),
+            "characters" | "character" | "people" => ("list_characters", engine.characters.iter().map(|(id, c)| (id.clone(), c.name.clone())).collect()),
+            "objects" | "object" | "things" => ("list_objects", engine.objects.iter().map(|(id, o)| (id.clone(), o.title.clone())).collect()),
+            "doors" | "door" => ("list_doors", engine.doors.iter().map(|(id, d)| (id.clone(), d.title.clone())).collect()),
+            _ => return super::session::suggest(&self.t("list_what", &[("kind", kind)]), &["/list rooms", "/list characters", "/list objects", "/list doors"]),
+        };
+        if found.is_empty() {
+            return self.t(&format!("{}_none", key), &[]);
+        }
+        found.sort();
+        let width = found.iter().map(|(id, _)| id.chars().count()).max().unwrap_or(0);
+        let mut out = self.t(key, &[("count", &found.len().to_string())]);
+        out.push('\n');
+        for (id, title) in found {
+            out.push_str(&format!("\n{}", self.t("list_row", &[("id", &format!("{:width$}", id, width = width)), ("title", &title)])));
+        }
+        out
     }
 
     /// GAME's fixed rows (where, chapter, carrying), and the rest.

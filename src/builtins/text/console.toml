@@ -122,6 +122,19 @@ watch_failed = "Can't watch the world's files ({reason}); use /reload after chan
 # /map (panels.rs).
 no_room_to_map = "There's no room to map from: go to a room, or /play to start a game."
 map_around = "Map around {room}:"
+map_whole = "The whole world, from {room}:"
+map_apart = "Rooms no exit joins to those, from {room}:"
+bare_command_ask = "In edit mode, `{word}` is a command. Did you mean:"
+list_what = "There's no list of `{kind}`. Try:"
+list_row = "  {id}  {title}"
+list_rooms = "Rooms ({count}):"
+list_rooms_none = "No rooms yet."
+list_characters = "Characters ({count}):"
+list_characters_none = "No characters yet."
+list_objects = "Objects ({count}):"
+list_objects_none = "No objects yet."
+list_doors = "Doors ({count}):"
+list_doors_none = "No doors yet."
 
 # Play mode, /play and /play here (play.rs).
 no_game_start_one = "No game is in progress. To start one in the room edit mode is in:"
