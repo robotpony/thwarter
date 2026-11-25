@@ -108,7 +108,7 @@ impl Console {
         let name = match args {
             [] => DEFAULT_SAVE,
             [name] => name,
-            _ => return super::session::suggest("Usage:", &["/save [{name}]"]),
+            _ => return super::session::suggest(&self.t("usage", &[]), &["/save [{name}]"]),
         };
         // Saves are the engine's, so every player client keeps them alike (REQ-PC-18).
         match save_named(&self.world.root, name, state) {
@@ -122,7 +122,7 @@ impl Console {
         let name = match args {
             [] => DEFAULT_SAVE,
             [name] => name,
-            _ => return super::session::suggest("Usage:", &["/load [{name}]"]),
+            _ => return super::session::suggest(&self.t("usage", &[]), &["/load [{name}]"]),
         };
         let path = match save_path(&self.world.root, name) {
             Ok(path) => path,

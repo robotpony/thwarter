@@ -99,7 +99,7 @@ impl Console {
             match load_game(game, &self.world.engine) {
                 Ok((state, warnings)) => {
                     self.game = Some(state);
-                    notes.extend(warnings.iter().map(|w| format!("Game: {}", w)));
+                    notes.extend(warnings.iter().map(|w| self.t("game_note", &[("note", w)])));
                 }
                 Err(e) => {
                     let fresh = if self.game.is_some() { self.t("game_reset_fresh", &[]) } else { String::new() };

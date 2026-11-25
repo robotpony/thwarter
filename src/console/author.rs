@@ -114,7 +114,7 @@ impl Console {
 
     fn new_character(&mut self, args: &[&str]) -> String {
         let [typed, title @ ..] = args else {
-            return super::session::suggest("Usage:", &["/new character {id} [{title}]"]);
+            return super::session::suggest(&self.t("usage", &[]), &["/new character {id} [{title}]"]);
         };
         let (id, named) = id_from(typed);
         let id = id.as_str();
@@ -270,7 +270,7 @@ impl Console {
             return "/unlink removes an exit of the room you're in; go to a room first.".to_string();
         };
         let [direction] = args else {
-            return super::session::suggest("Usage:", &["/unlink {direction}"]);
+            return super::session::suggest(&self.t("usage", &[]), &["/unlink {direction}"]);
         };
         let direction = expand_direction(direction);
         let edit = Edit::RemoveMapEntry { key: "connections".into(), subkey: direction.clone() };
@@ -722,7 +722,7 @@ impl Console {
         if !new_problems.is_empty() {
             out.push(self.t("adds_problems", &[("count", &new_problems.len().to_string()), ("problems", &new_problems.join("\n  "))]));
         }
-        out.extend(game_warnings.iter().map(|w| format!("Game: {}", w)));
+        out.extend(game_warnings.iter().map(|w| self.t("game_note", &[("note", w)])));
         out.join("\n")
     }
 

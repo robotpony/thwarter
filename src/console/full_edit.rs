@@ -134,7 +134,7 @@ impl Console {
         let target = match (kind, rest) {
             (_, []) => self.edit_target_here(kind),
             (Some(kind), [id]) => self.edit_target_named(kind, &super::author::id_from(id).0),
-            (Some(kind), _) => Err(super::session::suggest("Usage:", &[&format!("/edit {} [{{id}}]", kind.label())])),
+            (Some(kind), _) => Err(super::session::suggest(&self.t("usage", &[]), &[&format!("/edit {} [{{id}}]", kind.label())])),
             (None, words) => self.edit_target_any(&words.join(" ")),
         };
         match target {

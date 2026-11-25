@@ -1,7 +1,5 @@
 # Literals the text guard (design/ENGINE_TEXT.md › The guard test) lets
 # through, one per line: the literal, a tab, then why it's exempt.
-Play mode.	src/console/theme.rs: a prefix line_role matches to pick a colour, not printed
-Author note:	src/console/theme.rs: a prefix line_role matches to pick a colour, not printed
 Not written yet ({}):	src/engines/world_engine.rs: validate's not-written heading (REQ-CLI-19); command-line output, Phase 11
 Starts in: {}	src/render.rs: `thwart show <character>`; command-line output, Phase 11
 Chapter versions: {}	src/render.rs: `thwart show <thing>`; command-line output, Phase 11

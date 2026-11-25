@@ -90,32 +90,24 @@ fn no_colour() -> bool {
     *NO_COLOUR.get_or_init(|| std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()))
 }
 
-/// The role of a whole line of output, from what it says. Rooms and
+/// The role of a whole line of output. A `[console]` reply's comes from
+/// its key's kind, matched against the author's current wording
+/// (`kinds.rs`), so a reworded reply keeps its colour. The rest is output
+/// that isn't `[console]` text yet: validation (`PLAN.md` › Phase 11),
+/// the renderer's missing marks and edit mode's arrival lines. Rooms and
 /// things get finer styling once the renderer gives styled spans
 /// (REQ-CF-28).
-pub fn line_role(line: &str) -> Option<Role> {
-    const MESSAGES: &[&str] = &[
-        "Saved", "Reloaded", "Restarted", "Created", "Loaded", "Set ", "Linked", "Removed the", "Moved", "Play mode.",
-        "Edit mode,",
-    ];
-    const ERRORS: &[&str] =
-        &["Not ", "Reload failed", "Can't ", "Unknown command", "The editor failed", "File watching failed"];
+pub fn line_role(line: &str, kinds: &super::kinds::Kinds) -> Option<Role> {
     if line.starts_with("> ") {
         Some(Role::Input)
-    } else if line.starts_with("Author note:") || line.starts_with("Game:") {
-        Some(Role::Note)
-    } else if ERRORS.iter().any(|p| line.starts_with(p)) {
-        Some(Role::Error)
-    } else if line.starts_with("Validation failed") || line.starts_with("Problems (") {
+    } else if let Some(kind) = kinds.of_line(line) {
+        kind.role()
+    } else if line.starts_with("Validation failed") {
         Some(Role::Error)
     } else if line.starts_with("Validation passed") {
         Some(Role::Message)
-    } else if line.starts_with("This adds") || line.starts_with("Warnings (") || line.contains("warning(s)") || line.contains("isn't written yet") {
-        Some(Role::Warning)
-    } else if line.contains("(missing)") || line.contains("(no card)") {
+    } else if line.contains("(missing)") {
         Some(Role::Missing)
-    } else if MESSAGES.iter().any(|p| line.starts_with(p)) || line.starts_with("Changed on disk") {
-        Some(Role::Message)
     } else if is_arrival(line) {
         Some(Role::Title)
     } else {
@@ -458,12 +450,13 @@ mod tests {
 
     #[test]
     fn output_lines_by_what_they_say() {
-        assert_eq!(line_role("> look"), Some(Role::Input));
-        assert_eq!(line_role("Saved village/well.md."), Some(Role::Message));
-        assert_eq!(line_role("Not saved: bad YAML"), Some(Role::Error));
-        assert_eq!(line_role("Author note: the inn isn't written"), Some(Role::Note));
-        assert_eq!(line_role("The Well (room)"), Some(Role::Title));
-        assert_eq!(line_role("The Elder (character), npcs/elder.md"), Some(Role::Title));
-        assert_eq!(line_role("A mossy stone well."), None);
+        let kinds = super::super::kinds::Kinds::default();
+        assert_eq!(line_role("> look", &kinds), Some(Role::Input));
+        assert_eq!(line_role("Saved the game as `start`.", &kinds), Some(Role::Message));
+        assert_eq!(line_role("Not saved: bad YAML", &kinds), Some(Role::Error));
+        assert_eq!(line_role("Author note: the inn isn't written", &kinds), Some(Role::Note));
+        assert_eq!(line_role("The Well (room)", &kinds), Some(Role::Title));
+        assert_eq!(line_role("The Elder (character), npcs/elder.md", &kinds), Some(Role::Title));
+        assert_eq!(line_role("A mossy stone well.", &kinds), None);
     }
 }

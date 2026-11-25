@@ -236,3 +236,8 @@ editor_changed_on_disk = "Changed on disk too. Ctrl-s overwrites that change wit
 editor_reloaded = "Reloaded: changed on disk."
 editor_unsaved = "Unsaved changes. Esc again discards them; ctrl-s saves."
 editor_not_switched = "{status} Not switched; fix it, or esc to close."
+
+# Short lines many commands share.
+usage = "Usage:"
+game_note = "Game: {note}"
+editor_modified = "Modified."

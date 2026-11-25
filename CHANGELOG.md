@@ -72,6 +72,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.77.2 (2026-11-24)
+
+### Changed
+
+- A console reply's kind (done, error, warning, note, refused) comes from its `[console]` key, in `src/console/kinds.rs`, not from what it says. Output is coloured by matching each line against the author's current wording, the editor's status line keeps its kind with it, and `/recipe` stops on a step whose reply was an error or a refusal, now including "Can't" replies. Rewording a reply in `config.toml` keeps its colour and doesn't hide a failed step.
+- "Usage:" and the "Game: " note prefix are `[console]` keys.
+
 ## 0.77.1 (2026-11-24)
 
 ### Changed

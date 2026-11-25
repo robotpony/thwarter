@@ -11,7 +11,8 @@
 //! Keys and drawing are separate from the terminal, so tests drive the
 //! editor with a list of keys and ratatui's test backend.
 
-use super::theme::{highlight, is_keyword_heading, line_role, style, Lookup, Role};
+use super::kinds::Kind;
+use super::theme::{highlight, is_keyword_heading, style, Lookup, Role};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -104,6 +105,8 @@ pub struct Editor<'a> {
     /// unsaved changes.
     saved_text: String,
     status: String,
+    /// What kind of line the status is, for its colour.
+    status_kind: Option<Kind>,
     /// Esc was pressed once with unsaved changes; a second Esc discards them.
     discard_armed: bool,
     /// The last save hit a conflict; the next Ctrl-S overwrites.
@@ -120,6 +123,12 @@ impl<'a> Editor<'a> {
     pub fn with_texts(mut self, texts: crate::engines::texts::Texts) -> Self {
         self.texts = texts;
         self
+    }
+
+    /// Sets the status line to `key`'s text, with its kind.
+    fn say(&mut self, key: &str, args: &[(&str, &str)]) {
+        self.status = self.texts.text("console", key, args);
+        self.status_kind = super::kinds::kind_of(key);
     }
 
     pub fn new(document: Document) -> Self {
@@ -149,6 +158,7 @@ impl<'a> Editor<'a> {
             area,
             saved_text: text,
             status: String::new(),
+            status_kind: None,
             discard_armed: false,
             force_armed: false,
             reports: Vec::new(),
@@ -172,7 +182,7 @@ impl<'a> Editor<'a> {
     fn disk_changed(&mut self, sections: Vec<String>) {
         if self.dirty() {
             self.force_armed = true;
-            self.status = self.texts.text("console", "editor_changed_on_disk", &[]);
+            self.say("editor_changed_on_disk", &[]);
             return;
         }
         for (section, text) in self.document.sections.iter_mut().zip(&sections) {
@@ -188,7 +198,7 @@ impl<'a> Editor<'a> {
         area.move_cursor(CursorMove::Jump(row.min(u16::MAX as usize) as u16, col.min(u16::MAX as usize) as u16));
         self.area = area;
         self.saved_text = text;
-        self.status = self.texts.text("console", "editor_reloaded", &[]);
+        self.say("editor_reloaded", &[]);
     }
 
     /// Handles one key. Returns false when the editor should close.
@@ -199,7 +209,7 @@ impl<'a> Editor<'a> {
                     return false;
                 }
                 self.discard_armed = true;
-                self.status = self.texts.text("console", "editor_unsaved", &[]);
+                self.say("editor_unsaved", &[]);
             }
             Input { key: Key::Char('s'), ctrl: true, alt: false, .. } => {
                 self.discard_armed = false;
@@ -209,16 +219,22 @@ impl<'a> Editor<'a> {
                     Saved::Yes(report) => {
                         self.saved_text = text;
                         self.force_armed = false;
-                        self.status = report.lines().next().unwrap_or("Saved.").to_string();
+                        self.status = report.lines().next().unwrap_or_default().to_string();
+                        self.status_kind = Some(Kind::Done);
                         if report.lines().count() > 1 {
+                            self.status_kind = Some(Kind::Warning);
                             self.status.push_str(" (more when you close)");
                         }
                         self.reports.push(report);
                     }
-                    Saved::No(why) => self.status = one_line(&why),
+                    Saved::No(why) => {
+                        self.status = one_line(&why);
+                        self.status_kind = Some(Kind::Error);
+                    }
                     Saved::Conflict(why) => {
                         self.force_armed = true;
                         self.status = one_line(&why);
+                        self.status_kind = Some(Kind::Warning);
                     }
                 }
             }
@@ -239,7 +255,9 @@ impl<'a> Editor<'a> {
         }
         self.key(Input { key: Key::Char('s'), ctrl: true, ..Input::default() }, files);
         if self.dirty() {
-            self.status = self.texts.text("console", "editor_not_switched", &[("status", &self.status)]);
+            let status = self.status.clone();
+            self.say("editor_not_switched", &[("status", &status)]);
+            self.status_kind = Some(Kind::Error);
             return false;
         }
         true
@@ -270,8 +288,13 @@ impl<'a> Editor<'a> {
         frame.render_widget(&self.area, middle);
         let roles = highlight(self.area.lines(), lookup);
         paint(frame.buffer_mut(), middle, self.area.lines(), &roles, self.area.cursor().0);
-        let status = if self.status.is_empty() && self.dirty() { "Modified." } else { self.status.as_str() };
-        frame.render_widget(Paragraph::new(Line::from(format!(" {}", status))).style(status_style(status)), bottom);
+        let (status, kind) = if self.status.is_empty() && self.dirty() {
+            (self.texts.text("console", "editor_modified", &[]), Some(Kind::Warning))
+        } else {
+            (self.status.clone(), self.status_kind)
+        };
+        let status_style = kind.and_then(Kind::role).map(style).unwrap_or_default();
+        frame.render_widget(Paragraph::new(Line::from(format!(" {}", status))).style(status_style), bottom);
     }
 }
 
@@ -378,16 +401,6 @@ fn paint(buf: &mut Buffer, area: Rect, lines: &[String], roles: &[Vec<Option<Rol
             }
         }
     }
-}
-
-/// The editor's status line: green when saved, red when refused, yellow
-/// for anything to watch out for.
-fn status_style(status: &str) -> Style {
-    let warn = ["Unsaved", "Changed on disk too", "Modified."];
-    if warn.iter().any(|w| status.starts_with(w)) || status.contains("changed on disk since") || status.contains("more when you close") {
-        return style(Role::Warning);
-    }
-    line_role(status).map(style).unwrap_or_default()
 }
 
 /// Text compared for unsaved changes: line endings and a missing final

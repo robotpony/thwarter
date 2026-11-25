@@ -13,6 +13,7 @@ mod doors;
 mod editor;
 mod full_edit;
 mod inspect;
+mod kinds;
 pub mod registry;
 mod removing;
 mod to_write;

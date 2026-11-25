@@ -38,7 +38,7 @@ impl Console {
         let (name, start) = match args {
             [name] => (*name, false),
             [name, "start"] => (*name, true),
-            _ => return suggest("Usage:", &["/state {name} [start]"]),
+            _ => return suggest(&self.t("usage", &[]), &["/state {name} [start]"]),
         };
         let (kind, entity, id) = match self.thing_here() {
             Ok(thing) => thing,
@@ -68,11 +68,11 @@ impl Console {
     /// `/set <key> <value...> in <state>`: one key in one state's file.
     pub(super) fn set_in_state(&mut self, args: &[&str]) -> String {
         let Some(at) = args.iter().rposition(|a| *a == "in") else {
-            return suggest("Usage:", &["/set {key} {value} in {state}"]);
+            return suggest(&self.t("usage", &[]), &["/set {key} {value} in {state}"]);
         };
         let (key, value, state) = match (&args[..at], args.get(at + 1)) {
             ([key, value @ ..], Some(state)) if !value.is_empty() && at + 2 == args.len() => (*key, value.join(" "), *state),
-            _ => return suggest("Usage:", &["/set {key} {value} in {state}"]),
+            _ => return suggest(&self.t("usage", &[]), &["/set {key} {value} in {state}"]),
         };
         let (kind, entity, id) = match self.thing_here() {
             Ok(thing) => thing,
@@ -95,7 +95,7 @@ impl Console {
     /// `to` (made if it doesn't exist). With `with`, the player must hold
     /// that thing. The editor then opens on the reply.
     pub(super) fn action_command(&mut self, args: &[&str]) -> String {
-        let usage = || suggest("Usage:", &["/action {verb} {from} --> {to} [with {thing}]"]);
+        let usage = || suggest(&self.t("usage", &[]), &["/action {verb} {from} --> {to} [with {thing}]"]);
         let (verb, from, to, with) = match args {
             [verb, from, "-->", to] => (*verb, *from, *to, None),
             [verb, from, "-->", to, "with", thing] => (*verb, *from, *to, Some(*thing)),
@@ -192,8 +192,9 @@ impl Console {
         self.interactive = false;
         let mut out = Vec::new();
         for command in &commands {
+            self.said.borrow_mut().clear();
             let (reply, _) = self.handle(command);
-            if ["Usage", "Not ", "States belong", "`"].iter().any(|p| reply.starts_with(p)) || reply.contains("which has no states") {
+            if self.said.borrow().iter().any(|kind| kind.failed()) {
                 self.interactive = interactive;
                 return format!("{}\n{}", out.join("\n"), self.t("recipe_stopped", &[("command", command), ("reply", &reply)]));
             }

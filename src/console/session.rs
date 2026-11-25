@@ -65,6 +65,9 @@ pub struct Console {
     pub(super) texts: crate::engines::texts::Texts,
     /// What was wrong with the author's `[console]`, for the greeting.
     pub(super) config_warnings: Vec<String>,
+    /// The kinds of the `[console]` replies said since this was last
+    /// cleared, for `/recipe` to tell a failed step.
+    pub(super) said: std::cell::RefCell<Vec<super::kinds::Kind>>,
     /// Questions `/add` or `/new` left for the screen to ask.
     pub(super) pending_questions: Option<super::asking::Asking>,
     /// What `/add` just added, for it to open in the editor.
@@ -116,6 +119,7 @@ impl Console {
             pending_questions: None,
             texts: Default::default(),
             config_warnings: Vec::new(),
+            said: Default::default(),
             unknown_log: None,
         };
         (console.texts, console.config_warnings) = console_texts();
@@ -251,7 +255,7 @@ impl Console {
             ("move", args) => self.move_thing(args),
             ("add", args) => self.add_and_edit(args),
             // Arguments the command doesn't take: its usage, from its file.
-            _ if HANDLERS.contains(&name) => suggest("Usage:", &[&def.usage()]),
+            _ if HANDLERS.contains(&name) => suggest(&self.t("usage", &[]), &[&def.usage()]),
             _ => format!("/{} has no handler in this build.", def.name),
         };
         (out, Flow::Continue)
@@ -348,7 +352,7 @@ impl Console {
             out.push(self.t("place_gone", &[("place", &gone), ("now", &self.pwd())]));
         }
         for warning in self.reconcile_game() {
-            out.push(format!("Game: {}", warning));
+            out.push(self.t("game_note", &[("note", &warning)]));
         }
         let warnings = self.world.warnings();
         if !warnings.is_empty() {
@@ -889,6 +893,9 @@ impl Console {
 
     /// A line of the console's own text, from `[console]` (REQ-ENG-49).
     pub(super) fn t(&self, key: &str, args: &[(&str, &str)]) -> String {
+        if let Some(kind) = super::kinds::kind_of(key) {
+            self.said.borrow_mut().push(kind);
+        }
         self.texts.text("console", key, args)
     }
 }

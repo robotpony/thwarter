@@ -46,6 +46,8 @@ const CHECK_EVERY: Duration = Duration::from_millis(500);
 pub struct Screen<'a> {
     /// The screen's own lines, from `[console]`.
     words: Words,
+    /// What kind each `[console]` line is, for its colour.
+    kinds: super::kinds::Kinds,
     /// What the console has printed, one logical line each.
     output: Vec<String>,
     /// How far the output is scrolled up from the bottom, in screen rows.
@@ -96,6 +98,7 @@ impl<'a> Screen<'a> {
             quit: false,
             restart: false,
             words: Words::from(&crate::engines::texts::Texts::defaults()),
+            kinds: Default::default(),
         };
         match resumed {
             Some(resumed) => {
@@ -505,7 +508,7 @@ impl<'a> Screen<'a> {
     fn draw_output(&self, frame: &mut Frame, area: Rect) {
         let width = area.width.saturating_sub(1).max(1) as usize;
         let rows: Vec<(String, Style)> =
-            self.output.iter().flat_map(|line| wrap(line, width).into_iter().map(move |row| (row, style_of(line)))).collect();
+            self.output.iter().flat_map(|line| wrap(line, width).into_iter().map(move |row| (row, style_of(line, &self.kinds)))).collect();
         let height = area.height as usize;
         self.page.set(height);
         let bottom = rows.len().saturating_sub(self.scroll.min(rows.len().saturating_sub(height)));
@@ -740,6 +743,7 @@ pub fn run(console: Arc<Mutex<Console>>, notices: Receiver<String>, resumed: Opt
     let was_resumed = resumed.is_some();
     let mut screen = Screen::new(&greeting, resumed);
     screen.words = Words::from(&lock(&console).texts);
+    screen.kinds = super::kinds::Kinds::new(&lock(&console).texts);
     if let Some(file) = lock(&console).history_file() {
         screen.keep_history(file, was_resumed);
     }
@@ -931,8 +935,8 @@ fn paint_command(buf: &mut ratatui::buffer::Buffer, area: Rect, text: &str) {
 }
 
 /// How a line of output is drawn, from what it says (REQ-CON-38).
-fn style_of(line: &str) -> Style {
-    line_role(line).map(style).unwrap_or_default()
+fn style_of(line: &str, kinds: &super::kinds::Kinds) -> Style {
+    line_role(line, kinds).map(style).unwrap_or_default()
 }
 
 /// `line` broken into rows of at most `width` characters, at spaces where

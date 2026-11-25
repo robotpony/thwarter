@@ -45,7 +45,7 @@ impl Console {
 
     /// `/add door ...`, from the room edit mode is in.
     pub(super) fn add_door(&mut self, args: &[&str]) -> String {
-        let Some((word, rest)) = args.split_first() else { return usage() };
+        let Some((word, rest)) = args.split_first() else { return usage(self) };
         let template = template_for(word);
         let Some(here) = self.current_room() else {
             return super::session::suggest(&self.t("door_needs_room", &[]), &["/add door {direction} [{room}]"]);
@@ -69,7 +69,7 @@ impl Console {
             [] => (None, None),
             [to] => (Some(to.to_string()), None),
             [to, back] => (Some(to.to_string()), Some(back.to_string())),
-            _ => return usage(),
+            _ => return usage(self),
         };
         let Some(direction) = direction.map(|d| super::author::expand_direction(&d)) else {
             self.asked = Some(Asked::DoorDirection { template, to });
@@ -242,6 +242,6 @@ fn side_of(direction: &str, room: &str) -> String {
     }
 }
 
-fn usage() -> String {
-    super::session::suggest("Usage:", &["/add door {direction} [{room}] [{its direction}]", "/add door --({direction})--> {room}"])
+fn usage(console: &Console) -> String {
+    super::session::suggest(&console.t("usage", &[]), &["/add door {direction} [{room}] [{its direction}]", "/add door --({direction})--> {room}"])
 }
