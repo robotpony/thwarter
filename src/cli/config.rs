@@ -65,7 +65,9 @@ impl Default for ThwartConfig {
     fn default() -> Self {
         Self {
             world: WorldConfig {
-                path: "authors/mx/test-world/".to_string(),
+                // No built-in world (REQ-CLI-21): a default is only one
+                // a person sets.
+                path: String::new(),
                 default_player: "player".to_string(),
             },
             output: OutputConfig {
@@ -118,7 +120,7 @@ impl ConfigManager {
             global_config: ThwartConfig::default(),
             world_config: None,
             config_path: PathBuf::from("thwart.toml"),
-            world_path: PathBuf::from("authors/mx/test-world"),
+            world_path: PathBuf::new(),
         }
     }
     

@@ -1,8 +1,6 @@
 use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
-const DEFAULT_WORLD_PATH: &str = "authors/mx/test-world";
-
 #[derive(Parser)]
 #[command(name = "thwart")]
 #[command(about = "A Hugo-style engine for interactive fiction")]
@@ -28,20 +26,20 @@ struct Cli {
 enum Commands {
     /// Open the console in edit mode, to write a world
     Edit {
-        /// World directory (defaults to --world, then the built-in default)
+        /// World directory (defaults to --world, a configured default, then the world this folder is in)
         #[arg(value_name = "WORLD")]
         world_dir: Option<String>,
     },
     /// Open the console in play mode, to read (play) a world
     Play {
         /// World directory, or an installed world as persona/world
-        /// (defaults to --world, then the built-in default)
+        /// (defaults to --world, a configured default, then the world this folder is in)
         #[arg(value_name = "WORLD")]
         world_dir: Option<String>,
     },
     /// Package a world and its persona into one .thwarter file to share
     Package {
-        /// World directory (defaults to --world, then the built-in default)
+        /// World directory (defaults to --world, a configured default, then the world this folder is in)
         #[arg(value_name = "WORLD")]
         world_dir: Option<String>,
         #[arg(long, help = "Where to write the package (default: <persona>-<world>-<version>.thwarter here)")]
@@ -138,15 +136,32 @@ enum Commands {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let world_path = cli.world.clone().unwrap_or_else(|| DEFAULT_WORLD_PATH.to_string());
+    let here = std::env::current_dir().unwrap_or_default();
+    // No built-in default world (REQ-CLI-21): named, configured, or the
+    // one this folder is in; else the list of worlds, and stop.
+    let world = |named: Option<String>| -> anyhow::Result<String> {
+        let named = named.or_else(|| cli.world.clone());
+        Ok(thwarter::worlds::resolve_world(named.as_deref(), &here)?.to_string_lossy().into_owned())
+    };
+    let commands_world = matches!(cli.command, Commands::Validate { .. } | Commands::Show { .. } | Commands::Map { .. } | Commands::Search { .. });
+    let world_path = if commands_world {
+        match world(None) {
+            Ok(path) => path,
+            Err(e) => return report(Err(e)),
+        }
+    } else {
+        String::new()
+    };
 
     let result = match cli.command {
-        Commands::Edit { world_dir } => {
-            let path = world_dir.unwrap_or(world_path);
-            thwarter::console::run(std::path::Path::new(&path), thwarter::console::Mode::Edit)
-        },
-        Commands::Play { world_dir } => {
-            let path = world_dir.unwrap_or(world_path);
+        Commands::Edit { world_dir } => world(world_dir).and_then(|path| thwarter::console::run(std::path::Path::new(&path), thwarter::console::Mode::Edit)),
+        Commands::Play { world_dir } => (|| {
+            // An installed world by name (`persona/world`) is looked up
+            // before the folder search.
+            let path = match world_dir.or_else(|| cli.world.clone()) {
+                Some(named) => named,
+                None => world(None)?,
+            };
             // An installed world by name, when there's no such folder here.
             let path = match thwarter::settings::data_dir() {
                 Some(data) if !std::path::Path::new(&path).exists() => {
@@ -155,9 +170,9 @@ fn main() -> ExitCode {
                 _ => std::path::PathBuf::from(&path),
             };
             thwarter::console::run(&path, thwarter::console::Mode::Play)
-        },
+        })(),
         Commands::Package { world_dir, output, strip_comments, yes } => {
-            thwarter::cli::commands::package_command(world_dir.unwrap_or(world_path), output, strip_comments, yes)
+            world(world_dir).and_then(|path| thwarter::cli::commands::package_command(path, output, strip_comments, yes))
         },
         Commands::Install { package, replace } => thwarter::cli::commands::install_command(package, replace),
         Commands::Installed => thwarter::cli::commands::installed_command(),
@@ -188,8 +203,17 @@ fn main() -> ExitCode {
         },
     };
 
+    report(result)
+}
+
+fn report(result: anyhow::Result<()>) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
+        // No world: the list of worlds, as written (REQ-CLI-21).
+        Err(e) if e.is::<thwarter::worlds::WorldNotGiven>() => {
+            eprintln!("{}", e);
+            ExitCode::FAILURE
+        }
         // The command already printed its own failure; just exit non-zero.
         Err(e) if e.is::<thwarter::cli::AlreadyReported>() => ExitCode::FAILURE,
         Err(e) => {

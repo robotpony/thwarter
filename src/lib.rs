@@ -6,6 +6,7 @@ pub mod render;
 pub mod writer;
 pub mod settings;
 pub mod packaging;
+pub mod worlds;
 pub mod console;
 
 pub use models::*;

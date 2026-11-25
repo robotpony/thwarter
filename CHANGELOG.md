@@ -71,6 +71,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.75.0 (2026-11-24)
+
+### Added
+
+- `worlds::resolve_world` and `worlds::find_worlds` (REQ-CLI-21): a command finds its world from `--world`, then a default the person set (`[world] path` in `thwart.toml` here, then in `config.toml`), then the world the current folder is in. Otherwise it lists the worlds in `authors/*/*` and the installed ones, with paths and titles, says "Name a world with --world <path>." and exits non-zero. The error is `WorldNotGiven { found }`, for the console's picker.
+
+### Removed
+
+- The built-in default world, `authors/mx/test-world`: `DEFAULT_WORLD_PATH` in `src/bin/thwart.rs` and `ThwartConfig`'s default path. Recover them with `git show 14ded1a:src/bin/thwart.rs` and `git show 14ded1a:src/cli/config.rs`.
+
 ## 0.74.2 (2026-11-24)
 
 ### Fixed

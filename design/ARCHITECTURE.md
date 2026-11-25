@@ -156,7 +156,8 @@ This table exists because status claims in this repo have previously drifted fro
 | Question sets | Loader done | `engines::questions` reads each `questions/<name>.md` as a set, never a thing; `WorldEngine::questions_for(folder, template, kind)` finds the nearest whole set, then the built-in `object` set; `validate` checks them (REQ-ENG-48). The console doesn't ask them yet (`PLAN.md` › Phase 5). |
 | Text as data | In progress | `engines::texts::Texts` holds the `[play]`, `[engine]` and `[console]` tables with compiled-in defaults (`src/builtins/text/`); `[play]` reads from it. Play's and the engine's replies read from `[play]` and `[engine]`, which a world overrides in `world.toml`; console strings are moving to `[console]`. Not yet: a story section replacing an `[engine]` reply by its outcome tag, and the guard test (`PLAN.md` › Phase 8). |
 | Dialogue trees | Not implemented | `dialogue_tree` is loaded as an opaque string reference; nothing parses or executes what it points to. |
-| `ConfigManager` / `thwart.toml` | Built but unused | `src/cli/config.rs` can load and save `thwart.toml` and `world.toml`, but `src/bin/thwart.rs` never constructs a `ConfigManager`; the CLI's default world path is a hardcoded constant instead. `thwart.toml`'s `[world].path` is currently inert. |
+| `ConfigManager` / `thwart.toml` | Built but unused | `src/cli/config.rs` can load and save `thwart.toml` and `world.toml`, but `src/bin/thwart.rs` never constructs a `ConfigManager`. `thwart.toml`'s `[world] path` is read by `worlds::configured_world` instead. |
+| Finding the world | Done | No built-in default: `worlds::resolve_world` takes `--world`, a configured default (`thwart.toml`, then `config.toml`), then the world the current folder is in, else fails with `WorldNotGiven`, which lists `worlds::find_worlds` (REQ-CLI-21). The console's picker on it isn't built yet (REQ-CON-62). |
 
 ## World content layout
 
