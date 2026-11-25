@@ -123,6 +123,57 @@ pub fn find_worlds(from: &Path) -> Vec<FoundWorld> {
     out
 }
 
+/// A folder name from a title: lower case, with every run of other
+/// characters as one `-` ("Tiny Castle!" is `tiny-castle`).
+pub fn slug(title: &str) -> String {
+    title
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+/// The title a new world gets from the name it was made with: a folder
+/// name reads as words, first letter capitalized (`tiny-castle` is
+/// "Tiny castle"); a name with spaces is kept as typed.
+pub fn title_from(name: &str) -> String {
+    let words = name.trim().replace(['-', '_'], " ");
+    let words = words.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut chars = words.chars();
+    chars.next().map(|c| c.to_uppercase().collect::<String>() + chars.as_str()).unwrap_or_default()
+}
+
+/// Where `thwart new <name>` makes a world (REQ-CLI-22): a name with a
+/// `/` (or `.` first) is a path from `from`; a bare name goes in
+/// `authors/<user>/`, under the nearest `authors/` folder from `from` up,
+/// else a new one in `from`, as its slug.
+pub fn new_world_folder(name: &str, from: &Path, user: &str) -> PathBuf {
+    let name = name.trim();
+    if name.contains('/') || name.contains(std::path::MAIN_SEPARATOR) || name.starts_with('.') {
+        return from.join(name);
+    }
+    let authors = from.ancestors().map(|d| d.join("authors")).find(|d| d.is_dir()).unwrap_or_else(|| from.join("authors"));
+    authors.join(user).join(slug(name))
+}
+
+/// Makes a world in `root`, which must not exist or be empty: a
+/// `world/index.md` with its `title`, `type: world` and `authors: user`
+/// (REQ-WS-5, 7).
+pub fn create_world(root: &Path, title: &str, user: &str) -> anyhow::Result<()> {
+    if root.exists() && std::fs::read_dir(root).map_or(true, |mut d| d.next().is_some()) {
+        anyhow::bail!("{} already exists and isn't empty, so no world was made there", root.display());
+    }
+    std::fs::create_dir_all(root.join("world"))?;
+    let title = crate::writer::content_file::emit_scalar(&serde_yaml::Value::String(title.to_string()), false).unwrap_or_else(|_| title.to_string());
+    let user = crate::writer::content_file::emit_scalar(&serde_yaml::Value::String(user.to_string()), false).unwrap_or_else(|_| user.to_string());
+    std::fs::write(root.join("world/index.md"), format!("---\ntitle: {}\ntype: world\nauthors: {}\n---\n", title, user))?;
+    Ok(())
+}
+
 fn subfolders(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
     let mut dirs: Vec<PathBuf> = entries
@@ -202,6 +253,31 @@ mod tests {
         assert!(text.starts_with("No world given. Worlds you can name:\n"), "{}", text);
         assert!(text.contains("\n  authors/ann/castle  Castle\n  authors/ann/forest  forest\n"), "{}", text);
         assert!(text.ends_with("Name a world with --world <path>."), "{}", text);
+    }
+
+    #[test]
+    fn a_new_world_goes_in_the_authors_folder_with_its_author() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = std::fs::canonicalize(dir.path()).unwrap();
+        assert_eq!((slug("Tiny Castle!"), title_from("tiny-castle"), title_from("The Sunken Bell")), ("tiny-castle".into(), "Tiny castle".into(), "The Sunken Bell".into()));
+        // A bare name goes in authors/<user>/ above, or a new authors/ here.
+        assert_eq!(new_world_folder("Tiny Castle", &d, "ann"), d.join("authors/ann/tiny-castle"));
+        std::fs::create_dir_all(d.join("authors/ann/notes")).unwrap();
+        assert_eq!(new_world_folder("bell", &d.join("authors/ann/notes"), "ann"), d.join("authors/ann/bell"));
+        // A path is a path.
+        assert_eq!(new_world_folder("./mine", &d, "ann"), d.join("./mine"));
+        assert_eq!(new_world_folder("worlds/bell", &d, "ann"), d.join("worlds/bell"));
+
+        let root = d.join("authors/ann/bell");
+        create_world(&root, "The Bell: a tale", "ann").unwrap();
+        let text = std::fs::read_to_string(root.join("world/index.md")).unwrap();
+        assert_eq!(text, "---\ntitle: \"The Bell: a tale\"\ntype: world\nauthors: ann\n---\n");
+        assert!(is_world(&root));
+        let found = find_worlds(&d);
+        let bell = found.iter().find(|w| w.root == root).unwrap();
+        assert_eq!((bell.title.as_str(), bell.authors.clone()), ("The Bell: a tale", vec!["ann".to_string()]));
+        // Never over a folder with something in it.
+        assert!(create_world(&root, "Again", "ann").unwrap_err().to_string().contains("already exists"));
     }
 
     #[test]

@@ -49,6 +49,14 @@ enum Commands {
         #[arg(long, help = "Don't ask before publishing the persona's contact details")]
         yes: bool,
     },
+    /// Make a new world to write, with you as its author
+    New {
+        /// A name (made in authors/<you>/), or a path with a /
+        #[arg(value_name = "WORLD")]
+        name: String,
+        #[arg(long, help = "The world's title (default: from the name)")]
+        title: Option<String>,
+    },
     /// Install a packaged world to play
     Install {
         /// A .thwarter file
@@ -179,6 +187,7 @@ fn main() -> ExitCode {
         },
         Commands::Install { package, replace } => thwarter::cli::commands::install_command(package, replace),
         Commands::Installed => thwarter::cli::commands::installed_command(),
+        Commands::New { name, title } => thwarter::cli::commands::new_command(&name, title.as_deref(), &here),
         Commands::Validate { location, strict, output, format, fix } => {
             thwarter::cli::commands::validate_command(world_path, location, strict, output, format, fix)
         },

@@ -4,6 +4,13 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.83.0 (2026-11-25)
+
+### Added
+
+- `thwart new <world>` makes a world to write, with the machine user as its author (REQ-CLI-22, REQ-WS-5, 7). A bare name goes in `authors/<you>/<name>` under the nearest `authors/` folder, a name with a `/` is a path, and the folder gets `world/index.md` with the title (from the name, or `--title`), `type: world` and `authors: <you>`. It never writes over a folder with something in it, and says what to run next: `thwart edit <folder>`.
+- `worlds::new_world_folder`, `worlds::create_world`, `worlds::slug` and `worlds::title_from`, for any client that makes a world.
+
 ## 0.82.0 (2026-11-25)
 
 ### Added
