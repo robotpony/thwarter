@@ -290,7 +290,7 @@ impl Console {
 
 /// `text` with frontmatter `key: value` set: the line replaced if the key
 /// is there at the top level, otherwise added before the closing `---`.
-fn set_key(text: &str, key: &str, value: &str) -> String {
+pub(super) fn set_key(text: &str, key: &str, value: &str) -> String {
     let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
     let close = lines.iter().skip(1).position(|l| l.trim_end() == "---").map(|i| i + 1).unwrap_or(lines.len());
     let prefix = format!("{}:", key);

@@ -65,6 +65,18 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.71.0 (2026-11-24)
+
+### Added
+
+- `/start` makes the room you're in the world's start (REQ-CON-60, Bruce). With no `world/index.md`, it makes one: the title, `authors:` with the machine user (`THWART_USER` stands in for `$USER` in tests), and `start:`.
+- `/edit world` in a world with no `world/index.md` offers to make it (y/n) and opens it, instead of only saying it's missing.
+
+### Changed
+
+- In edit mode, an exit to a room not written yet is a TO WRITE entry only, not a problem in the sidebar (REQ-CON-61); play mode and `/validate` still show it.
+
 ## 0.70.2 (2026-11-24)
 
 ### Fixed

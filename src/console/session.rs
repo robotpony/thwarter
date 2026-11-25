@@ -165,7 +165,7 @@ impl Console {
         if let Some(asked) = self.asked.take() {
             // A yes-or-no question takes only yes or no; anything else
             // drops it and runs as typed.
-            let yes_no = matches!(asked, super::doors::Asked::MoveHere { .. } | super::doors::Asked::Remove { .. });
+            let yes_no = matches!(asked, super::doors::Asked::MoveHere { .. } | super::doors::Asked::Remove { .. } | super::doors::Asked::MakeWorldIndex);
             let answers = !line.starts_with('/')
                 && (!yes_no || matches!(line.trim().to_lowercase().as_str(), "y" | "yes" | "n" | "no"));
             if answers {
@@ -198,6 +198,7 @@ impl Console {
             ("inspect", args) => self.inspect(args),
             ("remove", args) => self.remove(args),
             ("write", args) => self.write_command(args),
+            ("start", []) => self.start_command(),
             ("validate", _) => suggest("Usage:", &["/validate [strict]"]),
             ("clear" | "status" | "map", _) => self.t("usage_bare", &[("command", name)]),
             ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
@@ -244,6 +245,7 @@ impl Console {
             "  /status         the world, where you are, the game, saves and the build".to_string(),
             "  /map            the map around you (the sidebar shows the nearest rooms)".to_string(),
             "  /validate       check the world as thwart validate does, edits included".to_string(),
+            "  /start          play starts in the room you're in".to_string(),
             "  /write [name]   make a name the world mentions but doesn't define, and open it".to_string(),
             "  /remove {name}  delete a thing, room or door and what refers to it, after asking".to_string(),
             "  /inspect [name] a thing in full: its file, where it starts, states, sections, warnings".to_string(),

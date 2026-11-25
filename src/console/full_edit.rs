@@ -118,7 +118,7 @@ impl Console {
                             Ok(target) => format!("/edit opens {}.md in a full-screen editor, which needs a terminal.", target.path),
                             Err(e) => e,
                         },
-                        None => "This world has no world/index.md yet; its settings are in world.toml.".to_string(),
+                        None => self.offer_world_index(),
                     }
                 }
                 // Anything else names what to open (Bruce, 2026-11-23).

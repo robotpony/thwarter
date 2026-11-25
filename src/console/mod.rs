@@ -15,6 +15,7 @@ mod full_edit;
 mod inspect;
 mod removing;
 mod to_write;
+mod world_index;
 mod panels;
 mod play;
 mod restart;

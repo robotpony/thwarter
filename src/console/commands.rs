@@ -43,6 +43,7 @@ pub const COMMANDS: &[Command] = &[
     command("status", "", "the world, where you are, the game, saves and the build", false),
     command("map", "", "the map around you; the sidebar shows the nearest rooms", false),
     command("validate", "[strict]", "check the world as thwart validate does", false),
+    command("start", "", "play starts in the room you're in", true),
     command("write", "[{name}]", "make a name the world mentions but doesn't define, and open it", true),
     command("remove", "{thing}", "delete a thing, room or door and what refers to it, after asking", true),
     command("inspect", "[{thing}]", "a thing in full: its file, where it starts, states, sections, warnings", false),

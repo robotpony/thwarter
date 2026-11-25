@@ -31,6 +31,8 @@ pub enum Asked {
     MoveHere { thing: String, to: String },
     /// Whether to go ahead with `/remove`, after its plan.
     Remove { kind: Kind, id: String },
+    /// Whether to make `world/index.md`, which the world doesn't have.
+    MakeWorldIndex,
 }
 
 impl Console {
@@ -94,6 +96,13 @@ impl Console {
                 }
             }
             Asked::Remove { kind, id } => self.confirm_remove(kind, &id, line),
+            Asked::MakeWorldIndex => {
+                if matches!(line.trim().to_lowercase().as_str(), "y" | "yes") {
+                    self.make_world_index(None, true)
+                } else {
+                    "Left the world without world/index.md; its settings stay in world.toml.".to_string()
+                }
+            }
         }
     }
 

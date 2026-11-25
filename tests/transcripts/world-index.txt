@@ -1,0 +1,9 @@
+# world: tests/worlds/tiny
+# mode: edit
+# copy: yes
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
+> /edit world
+This world has no world/index.md yet. Make one, with authors: author and start: village/square? (y/n)
+> n
+Left the world without world/index.md; its settings stay in world.toml.

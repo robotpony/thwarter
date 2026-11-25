@@ -699,7 +699,7 @@ impl Console {
 
     /// Keeps the world's warnings from before a command's first change, so
     /// `after_writes` can say which ones the command added.
-    fn note_warnings_before(&mut self) {
+    pub(super) fn note_warnings_before(&mut self) {
         if self.warnings_before.is_none() {
             self.warnings_before = Some(self.world.warnings());
         }

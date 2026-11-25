@@ -32,7 +32,7 @@ const DIR: &str = "tests/transcripts";
 /// run on a copy, or it would change the fixture world.
 /// (`/edit` alone only switches mode; `/edit room` and the like will
 /// write once full editing exists.)
-const CHANGES_CONTENT: &[&str] = &["/new", "/set", "/link", "/unlink", "/move", "/add", "/state", "/action", "/recipe", "/remove", "/write"];
+const CHANGES_CONTENT: &[&str] = &["/new", "/set", "/link", "/unlink", "/move", "/add", "/state", "/action", "/recipe", "/remove", "/write", "/start"];
 
 struct Transcript {
     header: String,
@@ -106,6 +106,9 @@ fn transcripts() {
     // Game saves (`/save`) go to a temp folder, never the real state folder.
     // Safe here: this is the only test in this binary.
     let state = tempfile::tempdir().expect("temp dir");
+    // The author is the machine user (REQ-CON-34); fix it so transcripts
+    // read the same on every machine.
+    std::env::set_var("THWART_USER", "author");
     std::env::set_var("XDG_STATE_HOME", state.path());
     let bless = std::env::var_os("THWART_BLESS").is_some();
     let mut paths: Vec<PathBuf> = fs::read_dir(DIR)

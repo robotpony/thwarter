@@ -148,8 +148,17 @@ impl Console {
     /// The foot of the sidebar: every problem, then every warning.
     fn warnings_panel(&self) -> Vec<Row> {
         let check = self.world.engine.validation(false);
-        let mut rows = vec![Row::Heading(format!("PROBLEMS {} · WARNINGS {}", check.problems.len(), check.warnings.len()))];
-        rows.extend(check.problems.iter().map(|p| Row::Error(format!("  {}", p))));
+        // In edit mode an exit to a room not written yet is a TO WRITE
+        // entry, not a problem (Bruce, 2026-11-24); validate and package
+        // still fail on it.
+        let rooms_to_write: Vec<String> = if self.mode == Mode::Edit {
+            check.not_written.iter().filter(|u| u.wants == crate::engines::EntityKind::Location).map(|u| format!("unknown location `{}`", u.name)).collect()
+        } else {
+            Vec::new()
+        };
+        let problems: Vec<&String> = check.problems.iter().filter(|p| !rooms_to_write.iter().any(|r| p.ends_with(r.as_str()))).collect();
+        let mut rows = vec![Row::Heading(format!("PROBLEMS {} · WARNINGS {}", problems.len(), check.warnings.len()))];
+        rows.extend(problems.iter().map(|p| Row::Error(format!("  {}", p))));
         rows.extend(check.warnings.iter().map(|w| Row::Warning(format!("  {}", w))));
         rows
     }
@@ -606,10 +615,14 @@ mod tests {
     fn problems_and_warnings_sit_at_the_foot() {
         let mut console = tiny();
         let foot = texts(&console.sidebar().warnings);
-        assert_eq!(foot[0], "# PROBLEMS 1 · WARNINGS 0");
-        assert!(foot[1].contains("village/inn"), "{:?}", foot);
+        // The exit to village/inn is a TO WRITE entry in edit mode, not a
+        // problem; /validate still fails on it, and play shows it.
+        assert_eq!(foot, vec!["# PROBLEMS 0 · WARNINGS 0"]);
+        assert!(texts(&console.sidebar().rest).iter().any(|r| r.contains("village/inn")));
         let (out, _) = console.handle("/validate");
         assert!(out.ends_with("Validation failed: 1 problem(s), 0 warning(s)"), "{}", out);
+        console.handle("/play");
+        assert_eq!(texts(&console.sidebar().warnings)[0], "# PROBLEMS 1 · WARNINGS 0");
     }
 
     #[test]
