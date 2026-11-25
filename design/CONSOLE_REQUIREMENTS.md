@@ -151,7 +151,7 @@ Decided by Bruce, 2026-11-23, except where marked as proposed.
                                        │ warnings
                                        │   east exit leads nowhere yet
   ─────────────────────────────────────┴──────────────────
-   edit village/square [global]> _
+   in village/square > _
   ```
 
 - REQ-CON-23: The sidebar MUST show the play state under GAME: where the player is, the current chapter, what they carry, every thing that has left its starting state, and the values in play. It shows the game in both modes, so an author writing in edit mode can see the playtest they are running. In edit mode it MUST also show a HERE panel for where edit mode is, like a game master's notes for the room: its exits and which aren't written, the people and things in it with their scope, and its warnings. In play mode HERE is hidden and GAME gets the space. The world's problems and warnings sit at the foot of the sidebar under a line, as an IDE keeps its problems pane (Bruce, 2026-11-23), and `/validate` runs the same check as `thwart validate` (REQ-ENG-44). Between them, MAP draws the rooms one exit out from edit mode's room (or the player's), small enough for the sidebar, and follows as you move; `/map` shows the whole map in the output (Bruce, 2026-11-23). In a folder, HERE lists what the folder holds. The edit-mode prompt is `in <place> > ` (Bruce, 2026-11-23). *Proposed*: on a terminal too narrow for both (under 100 columns), the sidebar folds into one line above the input, and `go /game` still shows everything.
@@ -183,18 +183,21 @@ Decided by Bruce, 2026-11-23, except where marked as proposed.
 
 Where a thing's file lives is its scope: global, area or local (`design/STATES.md` › Scope). Decided by Bruce, 2026-11-23, except where marked as proposed.
 
-- REQ-CON-26: `/scope global|area|local` MUST set the scope that the following `/new` commands use, and the prompt MUST show it. The default is global, since most objects and doors are expected to be global.
+- REQ-CON-26: `/scope global|area|local` MUST set the scope that the following `/new` commands use, and the prompt MUST show it when it isn't global: `in castle/hall [area] > ` or `[local]`, and plain `in castle/hall > ` for global (Bruce, 2026-11-25). The default is global, since most objects and doors are expected to be global. Local puts a thing in the current thing's bundle, in a folder for its kind (`castle/hall/objects/torch.md`), making the thing a bundle first if it isn't one (`design/STATES.md` › Scope).
 
   ```
-  in castle/hall > /scope global
-  edit castle/hall [global]> /new object lantern, rope, key tool
-  Created 3 objects in objects/, placed in castle/hall.
+  in castle/hall > /scope area
+  in castle/hall [area] > /scope global
+  in castle/hall > /new object lantern, rope, key tool
+  Created object lantern, Lantern, placed in castle/hall.
+  Created object rope, Rope, placed in castle/hall.
+  Created object key, Key, placed in castle/hall.
   ```
 
 - REQ-CON-27: A trailing `in global`, `in area` or `in here` MUST override the scope for one command. `/new object a, b, c <type>` creates several things of one type in one command.
 
   ```
-  edit castle/hall [global]> /new object torch tool in area
+  in castle/hall > /new object torch tool in area
   Created object torch in castle/objects/, placed in castle/hall.
   ```
 
@@ -202,7 +205,7 @@ Where a thing's file lives is its scope: global, area or local (`design/STATES.m
 - REQ-CON-29: `/move <id> global|area|local` MUST change a thing's scope by moving its file. References stay valid, since object, character and door ids don't include their folder. It refuses if a file is already at the target, and the file watcher reports the move as one change.
 
   ```
-  edit castle/hall [global]> /move torch global
+  in castle/hall > /move torch global
   Moved torch: castle/objects/torch.md → objects/torch.md.
   ```
 
@@ -232,7 +235,7 @@ The console restarts itself onto a new build in place, so it can be changed and 
 - REQ-CON-33: Console commands MUST follow Claude Code's conventions for slash commands, such as `/restart` to restart (Bruce, 2026-11-23). Typing `/` opens a list of the commands that work right now, each with a one-line description, which narrows as you type. Tab or Enter picks one, Esc closes the list, and `/help` lists everything. Arguments complete from the world too: after `go ` or `/edit object `, the list offers the exits, rooms and things that fit.
 
   ```
-   edit village/square [global]> /re_
+   in village/square > /re_
      /reload    reload the world from disk, staying where you are
      /restart   restart the console on the newest build
 

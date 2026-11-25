@@ -110,6 +110,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Added
 
+- `design/CONSOLE_REQUIREMENTS.md` › REQ-CON-26: the prompt shows the scope only when it isn't global, and local scope's layout (`castle/hall/objects/torch.md`), as Bruce decided on 2026-11-25. The sketches use today's `in <place> > ` prompt.
 - `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-58: the text guard covers `src/console/` too, since 1e40954.
 - `design/CONSOLE_REQUIREMENTS.md`: REQ-CON-62, a world picker for `thwart edit` and `thwart play` when no world is given, in place of a built-in default.
 - `design/CONSOLE_REQUIREMENTS.md`: the command registry is approved (REQ-CON-50 to 56), and a world command may be a Rhai `script` as well as a `run` list (REQ-CON-54). Authors are the machine user, in `authors:` (REQ-CON-34 to 36, 55).
