@@ -26,13 +26,6 @@ pub use narrative_engine::*;
 pub use game_engine::*;
 pub use player_commands::{Parsed, DIRECTIONS};
 pub use saves::{list_saves, load_named, save_named, save_path, DEFAULT_SAVE};
-/// The old id for a new door, `door-<from>-<to>-<direction>`, named from
-/// the side it was made on. Kept until the console moves to
-/// `WorldEngine::new_door_name`; use `door_id_between` instead.
-pub fn door_id(from_room: &str, to_room: &str, direction: &str) -> String {
-    id_from_parts("door", &[from_room, to_room, direction])
-}
-
 /// The id for a door joining two rooms, the same from either side
 /// (REQ-ENG-47; Bruce, 2026-11-24): `door-<room>-<room>`, the rooms sorted,
 /// with no direction, so the hallway's east exit doesn't say "west". A
@@ -69,7 +62,7 @@ fn id_from_parts(start: &str, parts: &[&str]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{door_id, door_id_between};
+    use super::door_id_between;
 
     #[test]
     fn a_door_id_is_the_same_from_either_side() {
@@ -82,9 +75,8 @@ mod tests {
 
     #[test]
     fn door_ids_are_predictable_file_names() {
-        assert_eq!(door_id("bedroom", "hallway", "west"), "door-bedroom-hallway-west");
-        assert_eq!(door_id("house/attic", "house/landing", "down"), "door-house-attic-house-landing-down");
-        assert_eq!(door_id(" Bedroom ", "Big Hall", "north east"), "door-bedroom-big-hall-north-east");
-        assert_eq!(door_id("a//b", "../c", "up"), "door-a-b-c-up");
+        assert_eq!(door_id_between(" Bedroom ", "Big Hall"), "door-bedroom-big-hall");
+        assert_eq!(door_id_between("a//b", "../c"), "door-a-b-c");
+        assert_eq!(door_id_between("Café", "x y"), "door-café-x-y");
     }
 }

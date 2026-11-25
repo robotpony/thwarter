@@ -69,6 +69,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.73.3 (2026-11-24)
+
+### Removed
+
+- `engines::door_id(from, to, direction)`, the old door id named from one side, now that `/add door` uses `WorldEngine::new_door_name` (REQ-ENG-47). Recover it with `git show faebdce:src/engines/mod.rs`.
+
 ## 0.73.2 (2026-11-24)
 
 ### Changed
