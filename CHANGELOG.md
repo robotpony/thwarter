@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.86.1 (2026-11-25)
+
+### Added
+
+- Play mode numbers the topics a talk reply ends with, and the next line picks one by its number or label, asking it as `ask <person> about <topic>` would (REQ-PC-31). Any other input drops the menu. The menu's wording is in `[console]`. Covered by a unit test in `src/console/play.rs`, since a transcript can't write the `#talk` sections it needs.
+
 ## 0.86.0 (2026-11-25)
 
 ### Added

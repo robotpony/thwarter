@@ -139,7 +139,7 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [x] A door's exit shows its state ("closed", "locked"), not "not passable", and its name before its id: the sidebar and play in 2d36b93, `thwart show <door>` in 0.81.2 [coder] (shared renderer)
 - [x] Play reads rooms and replies as the story: people right after the prose, held things on a plain look, doors named in the ways out (95ed0c9, REQ-ENG-43, 45, 46)
 - [x] `drop` and `give` (578b312) [coder] (REQ-PC-25)
-- [ ] `talk to` and `ask about`, with talk's topic menu (engine and topics in 0.86.0; the console's menu to go) [coder, console] (REQ-PC-31, 32)
+- [x] `talk to` and `ask about`, with talk's topic menu (engine and topics in 0.86.0, the console's menu in 0.86.1) [coder, console] (REQ-PC-31, 32)
 - [ ] `take all`, `wait`, `again` and `it` [coder] (REQ-PC-26 to 28)
 - [ ] Story verbs: `jump`, `run`, `kick` and `hit` with default replies; `throw`, `smash`, `break`, `stack`, `push` and `pull` with built-in effects [coder] (REQ-PC-29, 30)
 

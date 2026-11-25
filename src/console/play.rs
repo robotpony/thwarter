@@ -18,6 +18,14 @@ impl Console {
     /// every player client shares (`design/PLAYER_COMMANDS.md`, REQ-PC-1).
     /// Object actions ("light lantern") and `search` come through it too.
     pub(super) fn play_input(&mut self, line: &str) -> String {
+        let offered = std::mem::take(&mut self.topics);
+        if let Some(topic) = picked_topic(&offered, line) {
+            let action = crate::models::game::PlayAction::Ask { person: topic.person.clone(), topic: topic.topic.clone() };
+            if let Some(state) = self.game.as_mut() {
+                let result = self.game_engine.act(&self.world.engine, state, &action);
+                return self.reply(result);
+            }
+        }
         let empty = PlayState::default();
         let state = self.game.as_ref().unwrap_or(&empty);
         let action = match self.game_engine.parse_command(&self.world.engine, line, state) {
@@ -32,6 +40,24 @@ impl Console {
             return super::session::suggest(&self.t("no_game_start_one", &[]), &["/play here"]);
         };
         let result = self.game_engine.act(&self.world.engine, state, &action);
+        self.reply(result)
+    }
+
+    /// A play result as text. Topics a talk reply ends with become a
+    /// numbered menu, kept for the next line to pick from (REQ-PC-31).
+    fn reply(&mut self, mut result: ActionResult) -> String {
+        if !result.topics.is_empty() {
+            let mut lines: Vec<String> = result.text.lines().map(str::to_string).collect();
+            for (n, topic) in result.topics.iter().enumerate() {
+                if let Some(line) = lines.iter_mut().rev().find(|l| l.trim() == format!("- {}", topic.label)) {
+                    *line = self.t("topic_row", &[("number", &(n + 1).to_string()), ("label", &topic.label)]);
+                }
+            }
+            lines.push(String::new());
+            lines.push(self.t("topic_pick", &[]));
+            result.text = lines.join("\n");
+            self.topics = std::mem::take(&mut result.topics);
+        }
         // On a terminal, the author note goes to the sidebar; scripts and
         // transcripts keep it in the output.
         if self.interactive {
@@ -172,5 +198,50 @@ impl Console {
             Some(note) => self.t("reply_with_note", &[("reply", &result.text), ("note", &note)]),
             None => result.text,
         }
+    }
+}
+
+/// The offered topic `line` picks: its number, or its label in any case.
+fn picked_topic<'a>(offered: &'a [crate::models::game::Topic], line: &str) -> Option<&'a crate::models::game::Topic> {
+    let line = line.trim();
+    if let Ok(n) = line.parse::<usize>() {
+        return n.checked_sub(1).and_then(|i| offered.get(i));
+    }
+    offered.iter().find(|t| t.label.eq_ignore_ascii_case(line))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::session::Console;
+    use super::super::Mode;
+    use std::fs;
+    use std::path::Path;
+
+    #[test]
+    fn a_talk_reply_offers_numbered_topics_to_pick() {
+        let dir = tempfile::tempdir().unwrap();
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny");
+        for entry in walkdir::WalkDir::new(&fixture).into_iter().filter_map(|e| e.ok()) {
+            let to = dir.path().join(entry.path().strip_prefix(&fixture).unwrap());
+            if entry.file_type().is_dir() {
+                fs::create_dir_all(&to).unwrap();
+            } else {
+                fs::copy(entry.path(), &to).unwrap();
+            }
+        }
+        fs::write(
+            dir.path().join("npcs/elder.md"),
+            "---\nid: elder\ntitle: The Elder\ntype: character\ndefault_location: village/square\n---\nA stooped woman.\n\n## When: #talk\n\"Ask, child.\"\n\n- The well -> ask #the-well\n- The lantern -> ask @lantern\n\n## When: #ask #the-well\n\"Dry these forty years.\"\n\n## When: #ask @lantern\n\"Keep it lit.\"\n",
+        )
+        .unwrap();
+        let mut console = Console::open(dir.path(), Mode::Play).unwrap();
+        let (menu, _) = console.handle("talk to elder");
+        assert_eq!(menu, "\"Ask, child.\"\n\n  1. The well\n  2. The lantern\n\nPick a topic by its number or name.");
+        assert_eq!(console.handle("2").0, "\"Keep it lit.\"");
+        // A pick only follows the menu; after another reply, a number is
+        // ordinary input again.
+        assert_ne!(console.handle("1").0, "\"Dry these forty years.\"");
+        console.handle("talk to elder");
+        assert_eq!(console.handle("the WELL").0, "\"Dry these forty years.\"");
     }
 }

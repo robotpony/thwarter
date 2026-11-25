@@ -63,6 +63,9 @@ pub struct Console {
     pub(super) looked_at: Option<String>,
     /// The last play action's author notes, for the sidebar on a terminal.
     pub(super) notes: Vec<String>,
+    /// The topics the last talk reply offered, picked by number or label
+    /// (REQ-PC-31). Any other input drops them.
+    pub(super) topics: Vec<crate::models::game::Topic>,
     /// The console's wording: the built-in `[console]` table with the
     /// author's own over it, from their config.toml (REQ-ENG-49).
     pub(super) texts: crate::engines::texts::Texts,
@@ -116,6 +119,7 @@ impl Console {
             pending_edit: None,
             trail: Vec::new(),
             looked_at: None,
+            topics: Vec::new(),
             notes: Vec::new(),
             asked: None,
             created: Vec::new(),
