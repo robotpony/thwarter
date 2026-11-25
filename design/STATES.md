@@ -95,18 +95,18 @@ The layout of `world/`, settled by the commander for Phase 4 (2026-11-23; Bruce 
 
 ```
 world/
-  index.md      # the world: title, author, starting room; the intro is its prose
+  index.md      # the world: title, authors, starting room; the intro is its prose
   story.md      # story. values, declared with their starting values
   player.md     # the player: a character, with player. values
   styles/       # writing styles for the writing helpers
-  commands/     # the world's own console commands, for its authors in edit mode (proposed; CONTENT_FORMAT.md › type: command)
+  commands/     # the world's own console commands, for its authors in edit mode (CONTENT_FORMAT.md › type: command)
 ```
 
 ```yaml
 # world/index.md
 title: Castle Adventure
 type: world
-author: bob                      # a persona id (REQ-WS-5)
+authors: bob                     # one id or a list: machine user names, also persona ids (REQ-WS-5, REQ-WS-7)
 start: castle/courtyard
 ---
 The intro a player reads when a new game starts.

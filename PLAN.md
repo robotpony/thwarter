@@ -67,8 +67,13 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
 - [x] Removing a thing: its file or bundle deleted, and every reference to its id taken out (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, beside REQ-ENG-30)
 - [x] `/remove <thing>` deletes an object, room, character or door after the author confirms; no undo yet (Bruce, 2026-11-24) (0.68.0) [console] (`design/CONSOLE_REQUIREMENTS.md`, beside REQ-CON-5)
-- [ ] One command registry: every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (proposed, Bruce to agree) [console] (REQ-CON-50 to 56)
+- [ ] One command registry: every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
 - [ ] Forgiving play verbs: aliases, unique prefixes and did-you-mean for verbs, the way commands get them (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, to write)
+- [ ] `authors:`, one id or a list, replaces `author:` (still read); new worlds get `authors: $USER`; the author check is the machine user (Bruce, 2026-11-24) [coder, console] (REQ-WS-5, REQ-WS-7)
+- [ ] World commands MAY be Rhai scripts that read the world and run console commands, with the world scripts' limits (Bruce, 2026-11-24) [console] (`design/CONTENT_FORMAT.md` › type: command)
+- [ ] In edit mode an exit to a room nothing defines is only a TO WRITE entry, not a problem; `validate` and `package` still fail on it (Bruce, 2026-11-24) [console]
+- [ ] `/start` makes the current room the world's start (Bruce, 2026-11-24) [console]
+- [ ] A world with no `world/index.md` offers to create it (title, `authors:` with the current user, `start:`) instead of only saying it's missing (Bruce, 2026-11-24) [console]
 - [x] A name that a link or `@name` points at but nothing defines is "not written yet", grouped one per name with its mentions, not a warning; `validate` lists them apart from warnings and the engine hands the console the list (Bruce, 2026-11-24) [coder]
 - [x] (0.70.0) A TO WRITE list in the sidebar, like document tabs: each unwritten name has a key, Cmd-1, Cmd-2 and so on in list order, like browser tabs (`wallpaper [⌘1]`); pressing it makes the thing with defaults, as `/add` would, in the room whose prose names it, and opens it in the editor. The keys are configurable in `config.toml` (Bruce, 2026-11-24) [console] (`design/CONSOLE_REQUIREMENTS.md`, to write)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
