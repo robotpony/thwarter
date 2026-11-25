@@ -33,6 +33,15 @@ A line is a verb and maybe a noun. The engine turns it into an action (look, go,
 | `take <thing>` | `get`, `pick up` | Pick up an object | yes |
 | `inventory` | `i`, `inv` | List what the player carries | yes |
 | `where` | `where am i` | Name the current location | yes |
+| `drop <thing>` | | Put a carried thing down here | yes |
+| `give <thing> to <person>` | | Offer a carried thing to someone | yes |
+| `take all` | | Take every loose thing here | no |
+| `wait` | `z` | Let a turn pass | no |
+| `again` | `g` | Repeat the last command | no |
+| `talk to <person>` | | Hear what someone says, or pick a topic | no |
+| `ask <person> about <topic>` | | Ask about a thing or a topic | no |
+| `throw`, `smash`, `break`, `stack`, `push`, `pull` | | Story verbs with a built-in effect (REQ-PC-30) | no |
+| `jump`, `run`, `kick`, `hit` | | Story verbs with a default reply (REQ-PC-29) | no |
 | `<verb> <thing>` | | An object's own named action (`pull lever`) | yes |
 
 - REQ-PC-6: The verbs and aliases above MUST be accepted by every client. The aliases are a table, `src/builtins/verbs.toml`, which a world's `[verbs]` in `world.toml` adds to (built in 29592dc, 0.78.0; `design/ENGINE_REQUIREMENTS.md` › Forgiving verbs, REQ-ENG-51). The verb is the line's first word, apart from `look at` and `pick up`; multi-word verbs such as `turn on` aren't parsed (Open question 5). A client MUST NOT add story verbs of its own; a world adds them as object actions (REQ-PC-13).
@@ -73,9 +82,26 @@ From the console's unknown-input log, 2026-11-23, at Bruce's request. *Proposed*
 - REQ-PC-23: `look <direction>` and `what's <direction>` MUST say what's that way without going there: ``North: Closet.``, or the door's name and state for an exit through a door (``Down: a closed iron door.``), or ``You see no way up.`` Logged: "what's north?" *Built* in d836d0d, and in edit mode in 5993d29.
 - REQ-PC-24: An unknown verb that's one small typo from a known one (one letter added, missing, swapped or changed) MUST get `Did you mean "look"?` (plain quotes, since players see no code) instead of REQ-PC-5's reply, and still change nothing. Two equally near name both: `Did you mean "take" or "talk"?` Logged: "lookl". Built in 29592dc (REQ-ENG-53).
 
+## More verbs
+
+Bruce chose these on 2026-11-25, answering Open question 1. A thing's, room's or chapter's own `## When:` section or action for the verb always answers first (REQ-PC-13); what follows is what happens when nothing does.
+
+- REQ-PC-25: `drop <thing>` MUST put a carried thing down in the room, and `give <thing> to <person>` MUST hand it over only when a `## When: #give @thing` section says the person takes it; otherwise the player keeps it. *Built* in 578b312 (REQ-ENG-59, 60).
+- REQ-PC-26: `take all` MUST take every loose thing here, one line each, leaving scenery and people. With nothing to take: ``There's nothing here to take.``
+- REQ-PC-27: `wait` (`z`) MUST let one turn pass (``Time passes.``). `again` (`g`) MUST repeat the last line that was read as a command, not a `/` game command; with none: ``There's nothing to repeat.``
+- REQ-PC-28: `it` MUST mean the last thing the player named (`take lamp`, then `light it`). With none: ``I'm not sure what "it" means.``
+- REQ-PC-29: `jump`, `run`, `kick` and `hit` MUST be understood with or without a thing, so they never get REQ-PC-5's reply. With no section, each gets an `[engine]` reply: ``You jump on the spot.``, ``Kicking the door does nothing.`` `run` is a verb of its own, not `go` (Bruce).
+- REQ-PC-30: These verbs MUST have a built-in effect when nothing answers them (Bruce):
+  - `throw <thing>` puts a carried thing down here, as `drop` does, with its own reply (``You throw the lamp. It lands on the floor.``).
+  - `smash` and `break` move a thing into its `broken` state if it has one. A thing without one refuses: ``The chest won't break.``
+  - `stack <thing> on <thing>` puts a carried thing onto a thing that holds things, as an object that holds objects does today. Anything else refuses: ``You can't stack anything on the table.``
+  - `push` and `pull <thing> <direction>` move a thing with `pushable: true` through that exit into the next room, and the player goes with it. Without a direction, or for a thing that isn't pushable, they get a default reply. An object's own `push` or `pull` action (a lever) still answers first.
+- REQ-PC-31: `talk to <person>` MUST show the person's `## When: #talk` section, matched by state and `@` tags like any reply, so what they say changes with the story. With none: ``{Person} has nothing to say.`` The content can turn it into a menu (Bruce): *proposed*, a `#talk` section that ends with a list of topics, written like a question set (`- The lantern -> ask @lantern`, `- The war -> ask #the-war`), offers them, and picking one asks it.
+- REQ-PC-32: `ask <person> about <topic>` MUST match `## When: #ask @lantern` when the topic names a thing, or `## When: #ask #the-war` for a free-text topic by its slug. With no match: ``{Person} doesn't know anything about that.`` `ask <person>` alone: ``Ask {person} about what?`` A `#talk` or `#ask` section MAY change state with a ` ```thwarter ` block, as any reply section can (`design/SECTIONS.md` › Changing state).
+
 ## Open questions
 
-1. Which verbs come next? Candidates: `drop`, `wait` (`z`), `again` (`g`), `it` for the last thing named, `take all`, `give`, and talking to characters (`talk`, `ask`; today `talk to` someone only says they have nothing to say), which waits on the dialogue format (`design/CONTENT_FORMAT.md` › What's still open). Bruce to choose.
+1. ~~Which verbs come next?~~ Settled 2026-11-25 by Bruce: › More verbs. Still open: whether `talk`'s topic menu takes the shape REQ-PC-31 proposes.
 2. Should `search` and `look around` stay two verbs or become one? Both find faint things today; `search` has its own reply (`design/STATES.md` › Hidden things).
 3. May a world override a built-in verb for one object, such as a `take` action on a cursed idol that refuses? Proposed: yes, through a reply section on the thing, `## When: #take`, the same way a door's `## When: #go` answers a refused exit, with the take's outcome named so the idol stays put.
 4. Which game commands beyond saving does every client need: `/quit`, `/restart`, `/help`, a list of saves?

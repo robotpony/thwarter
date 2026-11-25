@@ -59,7 +59,7 @@ This project has Claude Code permissions configured in `.claude/settings.local.j
 - `anyhow` - Comprehensive error handling
 - `colored` - Terminal output formatting
 
-**CLI Interface**: The `thwart` command has five subcommands. What each one actually does today (versus what's specified in `design/CLI_DESIGN.md` but not yet built) is tracked in `design/ARCHITECTURE.md`'s implementation status table, not here, to avoid a second copy going stale.
+**CLI Interface**: The `thwart` command has its subcommands listed by `thwart --help`. What each one actually does today (versus what's specified in `design/CLI_DESIGN.md` but not yet built) is tracked in `design/ARCHITECTURE.md`'s implementation status table, not here, to avoid a second copy going stale.
 
 **World Structure**: Content is organized in `authors/<author>/<world-name>/`, see `design/CONTENT_FORMAT.md` for file format and `design/ARCHITECTURE.md` for the layout rationale.
 
