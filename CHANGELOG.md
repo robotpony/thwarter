@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.83.1 (2026-11-25)
+
+### Changed
+
+- The world picker makes a new world with `worlds::create_world`, as `thwart new` does, so there's one copy of the new `world/index.md` and `authors:` is quoted when it needs to be. An empty folder of the same name is now used rather than refused.
+
 ## 0.83.0 (2026-11-25)
 
 ### Added

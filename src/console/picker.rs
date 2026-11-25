@@ -226,24 +226,9 @@ fn authors_dir(from: &Path) -> PathBuf {
 /// Makes a world titled `title` in a new folder under `dir`, with a
 /// `world/index.md` naming `user` as its author, and returns its folder.
 fn make_world(dir: &Path, title: &str, user: &str) -> Result<PathBuf> {
-    let slug: String = title
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|p| !p.is_empty())
-        .collect::<Vec<_>>()
-        .join("-");
-    let slug = if slug.is_empty() { "world".to_string() } else { slug };
-    let root = dir.join(&slug);
-    if root.exists() {
-        anyhow::bail!("{} already exists", root.display());
-    }
-    std::fs::create_dir_all(root.join("world"))?;
-    let title = crate::writer::content_file::emit_scalar(&serde_yaml::Value::String(title.to_string()), false)
-        .unwrap_or_else(|_| title.to_string());
-    std::fs::write(root.join("world/index.md"), format!("---\ntitle: {}\ntype: world\nauthors: {}\n---\n", title, user))?;
+    let slug = crate::worlds::slug(title);
+    let root = dir.join(if slug.is_empty() { "world" } else { &slug });
+    crate::worlds::create_world(&root, title, user)?;
     Ok(root)
 }
 
