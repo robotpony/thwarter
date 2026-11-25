@@ -44,18 +44,28 @@ Rules for a `## When:` section that replaces an `[engine]` reply (from the coder
 - **Slots.** In a TOML table a slot is `{noun}`. In a section's prose it's the prose form, `{{ turn.noun }}`, `{{ turn.direction }}`, `{{ turn.door }}`, so an author learns one slot syntax per file type.
 - **Whole replies only.** A reply built from parts, such as search's "{opening}, but find nothing new.", becomes one whole reply per case, so each can be reworded on its own.
 
-Not covered: author notes (`ActionResult::note`), validation warnings and `thwart` command-line output. Those are tooling messages and may follow later if Bruce wants.
+Not covered in Phase 8: author notes (`ActionResult::note`), validation warnings and `thwart` command-line output. They're tooling messages, and they move to tables in a later phase (Bruce, 2026-11-24; `PLAN.md` › Phase 11).
 
 ## Order of work
 
 1. **The shared type.** `Texts` with the three tables and their compiled-in defaults; `[play]` moves into it unchanged. [coder]
 2. **Engine strings.** Every player-facing literal in `src/engines/` and `src/render.rs` becomes an `[engine]` key with its outcome tag and override chain, the default text unchanged so transcripts stay the same. The defaults file is the list of every use, which covers Bruce's "track all uses" route. [coder]
 3. **Console strings.** About 200 literals in `src/console/` become `[console]` keys, likewise unchanged. [console]
-4. **Guard.** A test fails on a new user-facing string literal outside the defaults files. [coder, console]
+4. **Guard.** A test fails on a new user-facing string literal outside the defaults files (› The guard test). [coder, console]
 5. **Overrides.** `world.toml`'s `[engine]` and the personal config's `[console]` replace defaults, and `validate` warns about a key nothing uses. [coder, console]
 6. **Story overrides.** A `## When:` section replaces an `[engine]` reply by its exact outcome tag along the reply's chain, the outcome names join `RESERVED_TAGS` with `validate`'s warning, and section prose fills `{{ turn.x }}` slots (› Story overrides of built-in replies). Its own step because it's a feature, not a move of strings. [coder]
 
-## Open questions
+## The guard test
 
-1. Should validation warnings and `thwart` CLI output move to tables too? Proposed: not in Phase 8; they're for authors and change with the code.
-2. A world's `[engine]` wording applies everywhere in that world. Should a chapter be able to override one key outside a `## When:` section? Proposed: no; sections already do that.
+A heuristic scan with a checked-in allowlist (Bruce, 2026-11-24). It's cheap and catches most slips, and a false positive costs one allowlist line.
+
+- **Where it looks.** String literals in `src/engines/`, `src/render.rs` and `src/console/`, outside `#[cfg(test)]` code.
+- **What it flags.** A literal that reads like a sentence: it starts with a capital letter, holds a space, and ends with `.`, `?`, `!` or `:`, with its `{placeholders}` set aside.
+- **The allowlist.** `tests/text_allowlist.txt`, one literal per line, each with a comment saying why it's exempt (a log line, a format spec). The test also fails on an allowlist line that matches no literal any more, so the list doesn't rot.
+- **Exempt by call site.** Author notes, validation warnings and `thwart` command-line output, while they stay in code (› Not covered, above). They're exempted by file or by the function they're passed to, not one by one.
+- **Who builds it.** The coder writes the test and the engine's allowlist entries. It covers `src/console/` once the console coder has moved the console's strings and added its entries, so it doesn't fail while the move is under way.
+
+## Settled questions
+
+1. Validation warnings and `thwart` command-line output don't move to tables in Phase 8. They're a later item in `PLAN.md` › Phase 11 (Bruce, 2026-11-24).
+2. A chapter doesn't override an `[engine]` key outside a `## When:` section. It rewords a built-in reply with a `## When: #outcome` section, as a thing or a room does, so there's one way to do it (Bruce, 2026-11-24).

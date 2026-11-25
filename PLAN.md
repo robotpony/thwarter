@@ -147,7 +147,7 @@ Every sentence the engine, play and the console write comes from a text table wi
 - [x] One `Texts` type for `[play]`, `[engine]` and `[console]` tables, defaults from `src/builtins/text/` [coder] (`design/ENGINE_TEXT.md` › The shape)
 - [x] Engine and play strings become `[engine]` keys, the default text unchanged [coder]
 - [ ] Console strings become `[console]` keys, the default text unchanged [console]
-- [ ] A test that fails on a new user-facing string outside the defaults [coder, console]
+- [ ] A test that fails on a new user-facing string outside the defaults: a heuristic scan with an allowlist [coder, console] (`design/ENGINE_TEXT.md` › The guard test)
 - [x] Overrides: `world.toml`'s `[play]` and `[engine]` over the defaults, with validate's warning for an unknown key [coder]
 - [ ] Overrides: the personal config's `[console]` over the defaults, with a warning for an unknown key [console]
 - [ ] Story overrides: a `## When:` section replaces an `[engine]` reply by exact outcome tag, reserved outcome names, `{{ turn.x }}` slots [coder] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies)
@@ -183,6 +183,7 @@ Built when authoring or play asks for them, most likely as console commands. Unt
 - [x] Search over locations, characters and objects [coder] (`design/CLI_DESIGN.md` › `search`)
 - [ ] `CharacterEngine` wired into `show` and `validate --strict` [coder] (`design/ARCHITECTURE.md` › Character Engine)
 - [ ] Read `thwart.toml` through `ConfigManager` [coder] (REQ-CFG-1)
+- [ ] Validation warnings, author notes and `thwart` command-line output move to text tables (Bruce, 2026-11-24) [coder] (`design/ENGINE_TEXT.md` › Settled questions)
 - [x] `validate` checks a location's `id` against its file path [coder] (`design/CONTENT_FORMAT.md` › What's still open)
 - [x] Minimal CI: `cargo build` and `cargo test` on push [coder] (`TESTING.md` › CI)
 
