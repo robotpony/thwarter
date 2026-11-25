@@ -70,6 +70,8 @@ impl GameEngine {
             PlayAction::Search => self.search(world, state, false),
             PlayAction::Drop(noun) => self.drop(world, state, noun),
             PlayAction::Give { noun, to } => self.give(world, state, noun, to),
+            PlayAction::Talk(noun) => self.talk(world, state, noun),
+            PlayAction::Ask { person, topic } => self.ask(world, state, person, topic),
             PlayAction::Where => self.where_am_i(world, state),
             PlayAction::LookToward(direction) => self.look_toward(world, state, direction),
             PlayAction::Use { verb, noun, with } => self.use_object(world, state, verb, noun, with.as_deref()),
@@ -203,7 +205,7 @@ impl GameEngine {
             Some(said) => format!("{}\n\n{}", said, self.say(world, state, "found", None, &[("list", &join_and(&names))])),
             None => self.say(world, state, if closely { "look_closely_found" } else { "search_found" }, None, &[("list", &join_and(&names))]),
         };
-        ActionResult { text, changes, note: None }
+        ActionResult { text, changes, note: None, topics: Vec::new() }
     }
 
     fn look(&self, world: &WorldEngine, state: &PlayState) -> ActionResult {
@@ -341,7 +343,7 @@ impl GameEngine {
             true => self.say(world, state, "dropped", Some((EntityKind::Object, &object.id)), &[("name", &name)]),
             false => self.say_replies(world, state, &replies),
         };
-        ActionResult { text, changes: vec![Change::Dropped { object: object.id.clone(), room }], note: None }
+        ActionResult { text, changes: vec![Change::Dropped { object: object.id.clone(), room }], note: None, topics: Vec::new() }
     }
 
     /// `give <thing> to <person>`: the person takes it only when the story
@@ -376,7 +378,137 @@ impl GameEngine {
         state.inventory.retain(|id| id != &object.id);
         state.held.entry(someone.id.clone()).or_default().push(object.id.clone());
         let text = self.say_replies(world, state, &taken);
-        ActionResult { text, changes: vec![Change::Gave { object: object.id.clone(), to: someone.id.clone() }], note: None }
+        ActionResult { text, changes: vec![Change::Gave { object: object.id.clone(), to: someone.id.clone() }], note: None, topics: Vec::new() }
+    }
+
+    /// `talk to <person>` (REQ-PC-31): the person's `## When: #talk`
+    /// sections that match, run as replies (with their blocks' mechanics),
+    /// and any topics they end with. With none, `talk_nothing`. A thing
+    /// that isn't a person answers as its own action, `talk`.
+    fn talk(&self, world: &WorldEngine, state: &mut PlayState, noun: &str) -> ActionResult {
+        if noun.trim().is_empty() {
+            return ActionResult::say(self.say(world, state, "talk_to_whom", None, &[]));
+        }
+        let Some(view) = self.view(world, state) else {
+            return ActionResult::say(self.say(world, state, "nowhere", None, &[]));
+        };
+        let someone = match resolve(noun, &view.characters, person) {
+            Ok(Some(p)) => p,
+            Ok(None) => return self.use_object(world, state, "talk", noun, None),
+            Err(which) => return ActionResult::say(self.which(world, state, "talk", noun, EntityKind::Character, &which)),
+        };
+        let target = (EntityKind::Character, someone.id.as_str());
+        let now = Outcome(self.current_state(world, state, EntityKind::Character, &someone.id).unwrap_or_else(|| "no-action".into()));
+        let replies = self.reply_sections(world, state, "talk", target, None, &now);
+        if replies.is_empty() {
+            return ActionResult::say(self.say(world, state, "talk_nothing", Some(target), &[("person", &person(&someone))]));
+        }
+        self.run_replies(world, state, "talk", &someone.id, replies)
+    }
+
+    /// `ask <person> about <topic>` (REQ-PC-32): a topic that names a
+    /// thing matches `## When: #ask @thing`, and any topic matches
+    /// `## When: #ask #<its slug>`. Sections are matched with nothing else
+    /// in hand, so `@lantern` means the lantern is what's asked about.
+    fn ask(&self, world: &WorldEngine, state: &mut PlayState, who: &str, topic: &str) -> ActionResult {
+        if who.trim().is_empty() {
+            return ActionResult::say(self.say(world, state, "ask_whom", None, &[]));
+        }
+        let Some(view) = self.view(world, state) else {
+            return ActionResult::say(self.say(world, state, "nowhere", None, &[]));
+        };
+        let someone = match resolve(who, &view.characters, person) {
+            Ok(Some(p)) => p,
+            Ok(None) => return ActionResult::say(self.say(world, state, "not_here", None, &[("noun", who.trim())])),
+            Err(which) => return ActionResult::say(self.which(world, state, "ask", who, EntityKind::Character, &which)),
+        };
+        let target = (EntityKind::Character, someone.id.as_str());
+        let topic = topic.trim();
+        if topic.is_empty() {
+            return ActionResult::say(self.say(world, state, "ask_about_what", Some(target), &[("person", &person_mid(&someone))]));
+        }
+        // The thing a topic names: `@id` exactly, else a thing here or
+        // carried by name, else any thing whose id is the topic's slug.
+        let slug = crate::worlds::slug(topic.trim_start_matches(['@', '#']));
+        let thing: Option<(EntityKind, String)> = if let Some(id) = topic.strip_prefix('@') {
+            world.thing_by_id(id).ok().map(|t| (t.kind, t.id.clone()))
+        } else if topic.starts_with('#') {
+            None
+        } else {
+            let mut things = self.carried(world, state);
+            things.extend(view.objects.iter().cloned());
+            things.extend(doors_here(&view));
+            let people: Vec<EntityRef> = view.characters.iter().cloned().collect();
+            match resolve(topic, &things, the_object).ok().flatten() {
+                Some(t) => world.thing_by_id(&t.id).ok().map(|t| (t.kind, t.id.clone())),
+                None => match resolve(topic, &people, person).ok().flatten() {
+                    Some(p) => Some((EntityKind::Character, p.id.clone())),
+                    None => world.thing_by_id(&slug).ok().map(|t| (t.kind, t.id.clone())),
+                },
+            }
+        };
+        let mut alone = state.clone();
+        alone.inventory.clear();
+        let now = Outcome(self.current_state(world, state, EntityKind::Character, &someone.id).unwrap_or_else(|| "no-action".into()));
+        let with = thing.as_ref().map(|(k, id)| (*k, id.as_str()));
+        // The topic's slugs, with and without a leading `the` (`war` and
+        // `the war` both ask `#the-war` and `#war`), and a thing's by its
+        // id's last part.
+        let mut extra = vec![format!("#{}", slug)];
+        match ["the-", "a-", "an-"].iter().find_map(|a| slug.strip_prefix(a)) {
+            Some(rest) => extra.push(format!("#{}", rest)),
+            None => extra.push(format!("#the-{}", slug)),
+        }
+        if let Some((_, id)) = &thing {
+            extra.push(format!("#{}", id.rsplit('/').next().unwrap_or(id)));
+        }
+        let replies = self.reply_sections_with(world, &alone, "ask", target, with, &now, &extra);
+        if replies.is_empty() {
+            return ActionResult::say(self.say(world, state, "ask_nothing", Some(target), &[("person", &person(&someone))]));
+        }
+        self.run_replies(world, state, "ask", &someone.id, replies)
+    }
+
+    /// Talk and ask replies: each section's block runs (`becomes:`,
+    /// `sets:`, `chapter:`, with `this` its own thing), then its prose is
+    /// the reply, with a closing list of `- Label -> ask <topic>` lines
+    /// read as topics and shown as their labels.
+    fn run_replies(&self, world: &WorldEngine, state: &mut PlayState, verb: &str, person_id: &str, replies: Vec<crate::engines::turn::Reply>) -> ActionResult {
+        let mut changes = Vec::new();
+        let mut notes = Vec::new();
+        let mut shown = Vec::new();
+        let mut topics = Vec::new();
+        for reply in replies {
+            if !reply.block.is_empty() {
+                match crate::parsers::markdown_parser::parse_action(verb, &serde_yaml::Value::Mapping(reply.block.clone()), &reply.path) {
+                    Ok(mut action) => {
+                        if let Some(to) = action.becomes.remove("this") {
+                            action.becomes.insert(reply.id.clone(), to);
+                        }
+                        self.apply_mechanics(world, state, (reply.kind, &reply.id), &action, &mut changes, &mut notes);
+                    }
+                    Err(e) => notes.push(format!("{:#}", e)),
+                }
+            }
+            let mut lines = Vec::new();
+            for line in reply.text.lines() {
+                let item = line.trim_start().strip_prefix("- ");
+                match item.and_then(|i| i.split_once("->")).map(|(l, a)| (l.trim(), a.trim())) {
+                    Some((label, act)) if act.starts_with("ask ") => {
+                        topics.push(crate::models::game::Topic { label: label.to_string(), person: person_id.to_string(), topic: act["ask ".len()..].trim().to_string() });
+                        lines.push(format!("- {}", label));
+                    }
+                    _ => lines.push(line.to_string()),
+                }
+            }
+            shown.push((reply.kind, reply.id, lines.join("\n")));
+        }
+        let text = self.say_replies(world, state, &shown);
+        let mut result = ActionResult { text, changes, note: None, topics };
+        if !notes.is_empty() {
+            result.note = Some(notes.join("; "));
+        }
+        result
     }
 
     /// `where`: the room the player is in (REQ-PC-21).
@@ -456,6 +588,7 @@ impl GameEngine {
             text: self.take_reply(world, state, &object.id).unwrap_or_else(|| self.say(world, state, "taken", Some((EntityKind::Object, &object.id)), &[("name", &name)])),
             changes: vec![Change::Took { object: object.id.clone(), from }],
             note: None,
+            topics: Vec::new(),
         }
     }
 
@@ -625,33 +758,7 @@ impl GameEngine {
             }
             acted = true;
             let before = self.current_state(world, state, this_kind, &object.id);
-            for (target, to) in &action.becomes {
-                match world.thing_by_id(target) {
-                    Ok(thing) => {
-                        let (kind, id) = (thing.kind, thing.id.clone());
-                        match state.switch_state(world, kind, &id, to) {
-                            Ok(()) => changes.push(Change::Became { type_name: kind.type_name().to_string(), id, state: to.clone() }),
-                            Err(e) => notes.push(e.to_string()),
-                        }
-                    }
-                    Err(e) => notes.push(format!("`becomes:` {}", e)),
-                }
-            }
-            for (name, value) in &action.sets {
-                let name = match name.strip_prefix("this.") {
-                    Some(rest) => format!("{}.{}", object.id, rest),
-                    None => name.clone(),
-                };
-                state.values.insert(name.clone(), value.clone());
-                changes.push(Change::Set { name, value: value.clone() });
-            }
-            if let Some(chapter) = &action.chapter {
-                let scope = world.thing(this_kind, &object.id).map(|t| t.scope.clone()).unwrap_or_default();
-                match state.enter_chapter(world, &scope, chapter) {
-                    Ok(()) => changes.push(Change::EnteredChapter { name: state.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_default() }),
-                    Err(e) => notes.push(e.to_string()),
-                }
-            }
+            self.apply_mechanics(world, state, (this_kind, &object.id), &action, &mut changes, &mut notes);
             let after = self.current_state(world, state, this_kind, &object.id);
             match after.filter(|a| Some(a) != before.as_ref()) {
                 Some(moved) => Outcome(moved),
@@ -674,11 +781,44 @@ impl GameEngine {
         } else {
             self.say_replies(world, state, &replies)
         };
-        let mut result = ActionResult { text, changes, note: None };
+        let mut result = ActionResult { text, changes, note: None, topics: Vec::new() };
         if !notes.is_empty() {
             result.note = Some(notes.join("; "));
         }
         result
+    }
+
+    /// An action's mechanics, from frontmatter or a reply section's
+    /// ` ```thwarter ` block: `becomes:`, `sets:` (`this.` is `owner`'s)
+    /// and `chapter:` (seen from `owner`'s scope).
+    fn apply_mechanics(&self, world: &WorldEngine, state: &mut PlayState, owner: (EntityKind, &str), action: &crate::models::world::ObjectAction, changes: &mut Vec<Change>, notes: &mut Vec<String>) {
+        for (target, to) in &action.becomes {
+            match world.thing_by_id(target) {
+                Ok(thing) => {
+                    let (kind, id) = (thing.kind, thing.id.clone());
+                    match state.switch_state(world, kind, &id, to) {
+                        Ok(()) => changes.push(Change::Became { type_name: kind.type_name().to_string(), id, state: to.clone() }),
+                        Err(e) => notes.push(e.to_string()),
+                    }
+                }
+                Err(e) => notes.push(format!("`becomes:` {}", e)),
+            }
+        }
+        for (name, value) in &action.sets {
+            let name = match name.strip_prefix("this.") {
+                Some(rest) => format!("{}.{}", owner.1, rest),
+                None => name.clone(),
+            };
+            state.values.insert(name.clone(), value.clone());
+            changes.push(Change::Set { name, value: value.clone() });
+        }
+        if let Some(chapter) = &action.chapter {
+            let scope = world.thing(owner.0, owner.1).map(|t| t.scope.clone()).unwrap_or_default();
+            match state.enter_chapter(world, &scope, chapter) {
+                Ok(()) => changes.push(Change::EnteredChapter { name: state.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_default() }),
+                Err(e) => notes.push(e.to_string()),
+            }
+        }
     }
 
     /// A `## When: #take` reply, which replaces the built-in one where it
@@ -1794,6 +1934,39 @@ mod tests {
         assert!(r.text.starts_with("Gold."), "{}", r.text);
         game.act(&world, &mut state, &PlayAction::Go("up".into()));
         assert_eq!(state.location, "castle/hall");
+    }
+
+    #[test]
+    fn talk_shows_what_a_person_says_and_ask_matches_a_thing_or_a_topic() {
+        let (dir, mut world) = world();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        let play = |world: &WorldEngine, state: &mut PlayState, line: &str| match game.parse_command(world, line, state) {
+            Parsed::Action(a) => game.act(world, state, &a),
+            Parsed::Reply(r) | Parsed::Unknown(r) => ActionResult::say(r),
+        };
+        assert_eq!(play(&world, &mut state, "talk").text, "Talk to whom?");
+        assert_eq!(play(&world, &mut state, "talk to the king").text, "King Aldric has nothing to say.");
+        assert_eq!(play(&world, &mut state, "ask").text, "Who do you want to ask?");
+        assert_eq!(play(&world, &mut state, "ask king").text, "Ask King Aldric about what?");
+        assert_eq!(play(&world, &mut state, "ask king about the war").text, "King Aldric doesn't know anything about that.");
+        world.set_file(
+            &dir.path().join("npcs/king.md"),
+            "---\nid: king\ntitle: King Aldric\ntype: character\n---\nAn old king.\n\n## When: #talk\n\"Speak, traveller.\"\n\n- The sword -> ask @rusty-sword\n- The war -> ask #the-war\n\n## When: #ask @rusty-sword\n```thwarter\nsets: { story.asked: \"yes\" }\n```\n\"A fine blade, once.\"\n\n## When: #ask #the-war\n\"Long over.\"\n",
+        );
+        let talk = play(&world, &mut state, "chat with king");
+        assert_eq!(talk.text, "\"Speak, traveller.\"\n\n- The sword\n- The war");
+        assert_eq!(talk.topics.iter().map(|t| (t.label.as_str(), t.person.as_str(), t.topic.as_str())).collect::<Vec<_>>(), [("The sword", "king", "@rusty-sword"), ("The war", "king", "#the-war")]);
+        // A topic by name, by a menu's id, or by its slug with or without
+        // its article.
+        assert_eq!(play(&world, &mut state, "ask king about rusty sword").text, "\"A fine blade, once.\"");
+        assert_eq!(state.values.get("story.asked").map(String::as_str), Some("yes"));
+        let menu = game.act(&world, &mut state, &PlayAction::Ask { person: "king".into(), topic: "#the-war".into() });
+        assert_eq!(menu.text, "\"Long over.\"");
+        assert_eq!(play(&world, &mut state, "ask king about war").text, "\"Long over.\"");
+        // Carrying the sword doesn't make every question about it.
+        play(&world, &mut state, "take rusty sword");
+        assert_eq!(play(&world, &mut state, "ask king about the well").text, "King Aldric doesn't know anything about that.");
     }
 
     #[test]

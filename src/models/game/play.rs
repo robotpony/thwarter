@@ -130,6 +130,12 @@ pub enum PlayAction {
     Drop(String),
     /// Hand a carried thing to a person: `give lantern to the cook`.
     Give { noun: String, to: String },
+    /// `talk to <person>` (REQ-PC-31).
+    Talk(String),
+    /// `ask <person> about <topic>` (REQ-PC-32): a topic as typed, or
+    /// `@id` for a thing and `#slug` for a free topic, as a talk menu
+    /// gives them.
+    Ask { person: String, topic: String },
     /// Name the room the player is in (REQ-PC-21).
     Where,
     /// Say what's one way, without going (REQ-PC-23).
@@ -150,11 +156,24 @@ pub struct ActionResult {
     /// For the author playtesting, such as an exit to a room that doesn't
     /// exist yet. The console shows it apart from `text`.
     pub note: Option<String>,
+    /// Topics a person's `#talk` reply offers (REQ-PC-31), for a client to
+    /// show as a menu; picking one is `PlayAction::Ask`. `text` lists
+    /// their labels too, for a client without menus.
+    pub topics: Vec<Topic>,
+}
+
+/// One topic a talk reply offers: `- The lantern -> ask @lantern`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Topic {
+    pub label: String,
+    /// The person's id, and the topic as `PlayAction::Ask` takes it.
+    pub person: String,
+    pub topic: String,
 }
 
 impl ActionResult {
     pub fn say(text: impl Into<String>) -> Self {
-        Self { text: text.into(), changes: Vec::new(), note: None }
+        Self { text: text.into(), changes: Vec::new(), note: None, topics: Vec::new() }
     }
 
     pub fn with_note(mut self, note: impl Into<String>) -> Self {

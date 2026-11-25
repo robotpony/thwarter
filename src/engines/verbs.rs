@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 /// The verbs the parser itself knows. Every other verb is a thing's.
-pub const BUILT_IN: &[&str] = &["look", "examine", "go", "take", "inventory", "search", "where", "drop", "give"];
+pub const BUILT_IN: &[&str] = &["look", "examine", "go", "take", "inventory", "search", "where", "drop", "give", "talk", "ask"];
 
 /// The compiled-in aliases.
 pub const DEFAULTS: &str = include_str!("../builtins/verbs.toml");

@@ -205,6 +205,26 @@ fn parse_words(line: &str, say: &Say) -> Words {
         },
         "examine" => done(with_noun(rest, Examine, ask("examine_what"))),
         "drop" => done(with_noun(rest, Drop, ask("drop_what"))),
+        // `talk to the cook` (REQ-PC-31).
+        "talk" => {
+            let rest = match rest {
+                ["to" | "with", more @ ..] => more,
+                _ => rest,
+            };
+            done(with_noun(rest, Talk, ask("talk_to_whom")))
+        }
+        // `ask the cook about the war` (REQ-PC-32); the topic keeps its
+        // words as typed, articles too, since a topic's slug may hold them.
+        "ask" => {
+            let (who, topic) = match rest.iter().position(|w| *w == "about") {
+                Some(at) => (strip_article(&rest[..at]), rest[at + 1..].to_vec()),
+                None => (strip_article(rest), Vec::new()),
+            };
+            done(match who.is_empty() {
+                true => Parsed::Reply(ask("ask_whom")),
+                false => Parsed::Action(Ask { person: who.join(" "), topic: topic.join(" ") }),
+            })
+        }
         // `give lantern to the cook`.
         "give" => {
             let (thing, to) = match rest.iter().position(|w| *w == "to") {
@@ -333,7 +353,9 @@ mod tests {
         assert_eq!(parse("hit the window with a stick"), act(Use { verb: "hit".into(), noun: "window".into(), with: Some("stick".into()) }));
         assert_eq!(parse("hit window with"), act(Use { verb: "hit".into(), noun: "window".into(), with: None }));
         assert_eq!(parse("listen to the chest"), act(Use { verb: "listen".into(), noun: "chest".into(), with: None }));
-        assert_eq!(parse("talk to captain"), act(Use { verb: "talk".into(), noun: "captain".into(), with: None }));
+        assert_eq!(parse("talk to captain"), act(Talk("captain".into())));
+        assert_eq!(parse("ask the captain about the war"), act(Ask { person: "captain".into(), topic: "the war".into() }));
+        assert_eq!(parse("ask captain"), act(Ask { person: "captain".into(), topic: String::new() }));
         assert_eq!(parse("stare at a wall"), act(Use { verb: "stare".into(), noun: "wall".into(), with: None }));
         // Other prepositions change the meaning and stay.
         assert_eq!(parse("peer into the well"), act(Use { verb: "peer".into(), noun: "into the well".into(), with: None }));

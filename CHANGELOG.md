@@ -4,6 +4,19 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.86.0 (2026-11-25)
+
+### Added
+
+- `talk to <person>` (also `speak`, `chat`) shows the person's matching `## When: #talk` sections, by state and `@` tags, else "King Aldric has nothing to say." A talk reply that ends with `- Label -> ask <topic>` lines offers those topics: `ActionResult::topics` lists them for a client's menu, and the text shows their labels (REQ-PC-31, REQ-ENG-61).
+- `ask <person> about <topic>` matches `## When: #ask @thing` when the topic names a thing (here, carried, or by id), and `## When: #ask #slug` for any topic, with or without a leading "the". No match: "King Aldric doesn't know anything about that."; `ask king` alone: "Ask King Aldric about what?". `PlayAction::Ask` takes a menu's `@id` or `#slug` too (REQ-PC-32, REQ-ENG-62).
+- A talk or ask section's ` ```thwarter ` block runs its mechanics when shown: `becomes:` (with `this`), `sets:` and `chapter:`, as an action's do.
+- `[engine]` keys `talk_to_whom`, `ask_whom`, `ask_about_what` and `ask_nothing`; `talk` and `ask` join the built-in verbs, with `speak` and `chat` as aliases.
+
+### Changed
+
+- The mechanics of an action (`becomes:`, `sets:`, `chapter:`) are applied in one place, `GameEngine::apply_mechanics`, shared by frontmatter actions and reply blocks; `turn::reply_sections` gives each matching reply section with its block.
+
 ## 0.85.0 (2026-11-25)
 
 ### Added

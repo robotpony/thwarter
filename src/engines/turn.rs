@@ -120,6 +120,10 @@ pub const OUTCOMES: &[(&str, &str, Chain)] = &[
     ("acted", "#acted", Chain::Thing),
     ("refused", "#refused", Chain::Thing),
     ("talk_nothing", "#talk #nothing", Chain::Thing),
+    ("talk_to_whom", "#talk #no-person", Chain::World),
+    ("ask_whom", "#ask #no-person", Chain::World),
+    ("ask_about_what", "#ask #no-noun", Chain::Thing),
+    ("ask_nothing", "#ask #nothing", Chain::Thing),
     ("cant_verb_person", "#person", Chain::Thing),
 ];
 
@@ -142,6 +146,17 @@ fn rewords_a_reply(section: &Section) -> bool {
         want.sort();
         want == hashes && want.iter().any(|t| crate::engines::layers::RESERVED_TAGS.contains(t) && *t != "#ambiguous")
     })
+}
+
+/// One matching reply section: the thing it's in, its prose, and its
+/// ` ```thwarter ` block (empty for none), with the file it came from.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Reply {
+    pub kind: EntityKind,
+    pub id: String,
+    pub text: String,
+    pub block: serde_yaml::Mapping,
+    pub path: std::path::PathBuf,
 }
 
 /// What an action turn did to its target: the state it moved into, or
@@ -194,10 +209,7 @@ impl GameEngine {
         parts.join("\n\n")
     }
 
-    /// The replies to `verb` on `target`, used with `with`, after the
-    /// action, given its outcome: the matching sections naming `#<verb>`
-    /// in the target, then in what's used, then in the room, every match
-    /// in that order. Each is the thing it came from and its text.
+    /// `reply_sections`, each as the thing it came from and its text.
     pub(crate) fn replies(
         &self,
         world: &WorldEngine,
@@ -207,11 +219,44 @@ impl GameEngine {
         with: Option<(EntityKind, &str)>,
         outcome: &Outcome,
     ) -> Vec<(EntityKind, String, String)> {
+        self.reply_sections(world, state, verb, target, with, outcome).into_iter().filter(|r| !r.text.is_empty()).map(|r| (r.kind, r.id, r.text)).collect()
+    }
+
+    /// The replies to `verb` on `target`, used with `with`, after the
+    /// action, given its outcome: the matching sections naming `#<verb>`
+    /// in the target, then in what's used, then in the room, every match
+    /// in that order, each with its ` ```thwarter ` block.
+    pub(crate) fn reply_sections(
+        &self,
+        world: &WorldEngine,
+        state: &PlayState,
+        verb: &str,
+        target: (EntityKind, &str),
+        with: Option<(EntityKind, &str)>,
+        outcome: &Outcome,
+    ) -> Vec<Reply> {
+        self.reply_sections_with(world, state, verb, target, with, outcome, &[])
+    }
+
+    /// `reply_sections`, with `extra` tags true this turn too, such as
+    /// the topic asked about (`#the-war`).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn reply_sections_with(
+        &self,
+        world: &WorldEngine,
+        state: &PlayState,
+        verb: &str,
+        target: (EntityKind, &str),
+        with: Option<(EntityKind, &str)>,
+        outcome: &Outcome,
+        extra: &[String],
+    ) -> Vec<Reply> {
         let action = format!("#{}", verb.trim().to_lowercase().replace(' ', "-"));
         let outcome_tag = format!("#{}", outcome.0);
         let mut tags = self.turn_tags(state);
         tags.insert(action.clone());
         tags.insert(format!("@{}", target.1));
+        tags.extend(extra.iter().cloned());
         if let Some((_, id)) = with {
             tags.insert(format!("@{}", id));
         }
@@ -235,7 +280,7 @@ impl GameEngine {
                 }
                 t == outcome_tag || tags.contains(t)
             };
-            let mut matched: Vec<(Vec<String>, bool, String)> = Vec::new();
+            let mut matched: Vec<(Vec<String>, bool, String, serde_yaml::Mapping, std::path::PathBuf)> = Vec::new();
             for found in sections(thing, current.as_deref()) {
                 let section = found.section;
                 if section.unless || !section.tags.iter().any(|t| *t == action) {
@@ -275,18 +320,18 @@ impl GameEngine {
                 }
                 key.sort();
                 key.dedup();
-                if let Some(text) = prose_of(section) {
-                    matched.push((key, found.own, text));
+                if let Some(text) = prose_of(section).or_else(|| (!section.layer.metadata.is_empty()).then(String::new)) {
+                    matched.push((key, found.own, text, section.layer.metadata.clone(), section.layer.path.clone()));
                 }
             }
             // A thing's own reply replaces its template's for the same
             // action and outcome.
             let own_keys: Vec<Vec<String>> = matched.iter().filter(|m| m.1).map(|m| m.0.clone()).collect();
-            for (key, own, text) in matched {
+            for (key, own, text, block, path) in matched {
                 if !own && own_keys.contains(&key) {
                     continue;
                 }
-                out.push((kind, id.to_string(), text));
+                out.push(Reply { kind, id: id.to_string(), text, block, path });
             }
         }
         out

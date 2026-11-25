@@ -523,7 +523,7 @@ impl MarkdownParser {
 /// has: ... }`. Its reply is the prose of the state it reaches
 /// (`design/SECTIONS.md` › Replies); an empty value is an action with no
 /// mechanics of its own.
-fn parse_action(name: &str, value: &serde_yaml::Value, path: &Path) -> Result<ObjectAction> {
+pub(crate) fn parse_action(name: &str, value: &serde_yaml::Value, path: &Path) -> Result<ObjectAction> {
     use serde_yaml::Value;
     let bad = |what: &str| anyhow!("{:?}: action `{}`: {}", path, name, what);
     let text_of = |v: &Value| -> Option<String> {
