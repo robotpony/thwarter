@@ -106,6 +106,26 @@ Built in f84f5d5 (REQ-ENG-36), following Bruce's answers: an action's turn has o
 
 A thing's own reply is the story's content, so it replaces any default content: a template's or a built-in's reply for the same action and outcome (Bruce).
 
+### Rewording a built-in reply
+
+Built in 5cc7a33 (0.77.0, REQ-ENG-57). Every built-in reply has an outcome tag, given after its key in `src/builtins/text/engine.toml`, and a section headed with exactly those tags rewords it:
+
+````markdown
+## When: #take #immovable
+The chest is bolted to the floor. You'd need a crowbar.
+
+## When: #go #no-exit
+Brambles block the way {{ turn.direction }}.
+````
+
+- **Exact tags.** `## When: #take` rewords a successful take only; it doesn't swallow `#take #immovable` or `#take #person`. `@` tags MAY narrow it further, and they must all hold.
+- **Where it can live.** A reply about a thing (marked `thing` in `engine.toml`) can be reworded by the thing (its own sections over its template's), then its room, then the chapter, innermost first, then `world.toml`'s `[engine]`. A reply with no thing (`world`: "Take what?", "You can't go west from here.", "I don't understand") can be reworded only by the chapter or `[engine]`. The first place along that chain with a match wins; within a place, the section with the most tags.
+- **Slots.** Prose fills `{{ turn.noun }}`, `{{ turn.verb }}`, `{{ turn.direction }}` and the reply's other slots. The same slots are `{noun}` and so on in `engine.toml`.
+- **Reserved names.** Outcome names (`#no-noun`, `#no-exit`, `#immovable`, `#not-here` and the rest) are reserved, and `validate` warns about a state named like one. `#locked` and `#closed` are the exception: they're also door states, and `## When: #go #locked` in a door means the same thing either way.
+- **Never description.** A section with an outcome tag is only ever a reply; it never shows as part of a room or thing.
+
+A chapter changes a built-in reply only this way; there's no chapter `[engine]` table (Bruce, 2026-11-24).
+
 ### States
 
 States come from bundles (Bruce: "bundles are simpler"). A state exists because its file does (`objects/window/broken.md`), or because frontmatter's `state:` or a `becomes:` names it. A heading only reads states; `## When: #broken` is shown while the window is broken, and never makes `broken` exist. `validate` warns about a heading tag that can never be true: no state, action, thing or chapter has that name, so `## When: #lockd` is a warning.

@@ -162,6 +162,8 @@ Play writes rooms and the inventory as plain sentences, each from a template in 
 
 `{list}` joins with "and", `{or}` with "or", and both work in any template. An unknown key, or a value of the wrong kind, is a warning.
 
+The built-in replies ("Take what?", "The chest won't budge.") are `world.toml`'s `[engine]` table in the same shape, with each default in `src/builtins/text/engine.toml`. `[engine]` rewords a reply across the whole world. To reword it for one thing, room or chapter, write a `## When:` section headed with the reply's outcome tags instead (`design/SECTIONS.md` › Rewording a built-in reply).
+
 ## What the loader does today
 
 `WorldEngine::load_world` walks a world directory, parses every `.md` file, and:
