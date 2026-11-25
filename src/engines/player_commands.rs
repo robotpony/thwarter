@@ -204,6 +204,19 @@ fn parse_words(line: &str, say: &Say) -> Words {
             _ => done(unknown(line, say)),
         },
         "examine" => done(with_noun(rest, Examine, ask("examine_what"))),
+        "drop" => done(with_noun(rest, Drop, ask("drop_what"))),
+        // `give lantern to the cook`.
+        "give" => {
+            let (thing, to) = match rest.iter().position(|w| *w == "to") {
+                Some(at) => (strip_article(&rest[..at]), strip_article(&rest[at + 1..])),
+                None => (strip_article(rest), Vec::new()),
+            };
+            done(match (thing.is_empty(), to.is_empty()) {
+                (true, _) => Parsed::Reply(ask("give_what")),
+                (false, true) => Parsed::Reply(say("give_to_whom", &[("noun", &thing.join(" "))])),
+                (false, false) => Parsed::Action(Give { noun: thing.join(" "), to: to.join(" ") }),
+            })
+        }
         "inventory" if rest.is_empty() => done(Parsed::Action(Inventory)),
         // `where`, `where am i` (REQ-PC-21).
         "where" => match rest {

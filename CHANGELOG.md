@@ -4,6 +4,14 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.84.0 (2026-11-25)
+
+### Added
+
+- `drop <thing>` puts a carried thing down in the room. Dropped where it was taken, it's back as written; dropped elsewhere, it shows there until taken again. A `## When: #drop` section rewords the reply, else "You drop the lantern." (REQ-ENG-59).
+- `give <thing> to <person>` hands a carried thing over only when the story says the person takes it, with a `## When: #give @thing` section in the person, the thing or the room; the person then holds it. Otherwise they refuse, "King Aldric doesn't want the rusty sword.", which `## When: #give #refused` rewords, and the player keeps it. `give sword` asks "Give the sword to whom?" (REQ-ENG-60).
+- `[engine]` keys `drop_what`, `not_carried`, `dropped`, `give_what`, `give_to_whom` and `give_refused`; `#not-carried` and `#no-person` join the reserved tags. `drop` and `give` join the built-in verbs.
+
 ## 0.83.1 (2026-11-25)
 
 ### Changed

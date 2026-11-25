@@ -44,6 +44,14 @@ take_person = "You can't take people."             # #take #person, thing
 take_scenery = "You can't take the {name}."        # #take #scenery, thing
 immovable = "The {name} won't budge."              # #take #immovable, thing
 
+# Dropping and giving
+drop_what = "Drop what?"                           # #drop #no-noun, world
+not_carried = "You aren't carrying any {noun}."    # #not-carried, world
+dropped = "You drop the {name}."                   # #drop, thing
+give_what = "Give what?"                           # #give #no-noun, world
+give_to_whom = "Give the {noun} to whom?"          # #give #no-person, world
+give_refused = "{Person} doesn't want the {name}."  # #give #refused, thing
+
 # Looking
 nothing_special = "You see nothing special about {thing}."  # #examine #nothing, thing
 search_nothing = "You search carefully, but find nothing new."  # #search #nothing, world

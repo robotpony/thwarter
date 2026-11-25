@@ -40,7 +40,8 @@ pub struct PlayState {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub noticed: BTreeMap<String, std::collections::BTreeSet<String>>,
     /// What things hold, by the holder's id: a key left in a lock
-    /// (`keep(turn.used)`), until the player takes it back.
+    /// (`keep(turn.used)`), a thing dropped in a room (by the room's id)
+    /// or given to a person (by theirs), until the player takes it back.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub held: BTreeMap<String, Vec<String>>,
 }
@@ -125,6 +126,10 @@ pub enum PlayAction {
     Inventory,
     /// Look closely around the room, finding faint things.
     Search,
+    /// Put a carried thing down in the room.
+    Drop(String),
+    /// Hand a carried thing to a person: `give lantern to the cook`.
+    Give { noun: String, to: String },
     /// Name the room the player is in (REQ-PC-21).
     Where,
     /// Say what's one way, without going (REQ-PC-23).
@@ -162,6 +167,10 @@ impl ActionResult {
 pub enum Change {
     Moved { from: String, to: String },
     Took { object: String, from: String },
+    /// A carried thing was put down in `room`.
+    Dropped { object: String, room: String },
+    /// A carried thing was handed to a person, who now holds it.
+    Gave { object: String, to: String },
     /// A thing switched state; `type_name` is `location`, `object` or `character`.
     Became { type_name: String, id: String, state: String },
     EnteredChapter { name: String },

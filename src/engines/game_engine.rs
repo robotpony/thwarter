@@ -68,6 +68,8 @@ impl GameEngine {
             PlayAction::Examine(noun) => self.examine(world, state, noun),
             PlayAction::Inventory => self.inventory(world, state),
             PlayAction::Search => self.search(world, state, false),
+            PlayAction::Drop(noun) => self.drop(world, state, noun),
+            PlayAction::Give { noun, to } => self.give(world, state, noun, to),
             PlayAction::Where => self.where_am_i(world, state),
             PlayAction::LookToward(direction) => self.look_toward(world, state, direction),
             PlayAction::Use { verb, noun, with } => self.use_object(world, state, verb, noun, with.as_deref()),
@@ -120,6 +122,13 @@ impl GameEngine {
         }
         view.objects
             .retain(|o| !state.was_taken(&state.location, &o.id) && !state.inventory.contains(&o.id));
+        // What the player dropped here.
+        for id in state.held.get(&state.location).into_iter().flatten() {
+            if !view.objects.iter().any(|o| &o.id == id) {
+                let at = At::play(state);
+                view.objects.push(EntityRef { id: id.clone(), name: world.object_at(id, at).map(|o| o.title), state: world.state_at(EntityKind::Object, id, at) });
+            }
+        }
         Some(view)
     }
 
@@ -304,6 +313,70 @@ impl GameEngine {
             [one] => Some(one.clone()),
             _ => None,
         }
+    }
+
+    /// `drop <thing>`: a carried thing goes down in this room, back where
+    /// it was if it was taken from here. A `## When: #drop` section
+    /// rewords the reply.
+    fn drop(&self, world: &WorldEngine, state: &mut PlayState, noun: &str) -> ActionResult {
+        if noun.trim().is_empty() {
+            return ActionResult::say(self.say(world, state, "drop_what", None, &[]));
+        }
+        let object = match resolve(noun, &self.carried(world, state), the_object) {
+            Ok(Some(o)) => o,
+            Ok(None) => return ActionResult::say(self.say(world, state, "not_carried", None, &[("noun", noun.trim())])),
+            Err(which) => return ActionResult::say(self.which(world, state, "drop", noun, EntityKind::Object, &which)),
+        };
+        let name = object_name(&object);
+        state.inventory.retain(|id| id != &object.id);
+        let room = state.location.clone();
+        let back_home = state.taken.get_mut(&room).and_then(|list| list.iter().position(|x| x == &object.id).map(|i| list.remove(i))).is_some();
+        state.taken.retain(|_, l| !l.is_empty());
+        if !back_home {
+            state.held.entry(room.clone()).or_default().push(object.id.clone());
+        }
+        let stays = Outcome(self.current_state(world, state, EntityKind::Object, &object.id).unwrap_or_else(|| "no-action".into()));
+        let replies = self.replies(world, state, "drop", (EntityKind::Object, &object.id), None, &stays);
+        let text = match replies.is_empty() {
+            true => self.say(world, state, "dropped", Some((EntityKind::Object, &object.id)), &[("name", &name)]),
+            false => self.say_replies(world, state, &replies),
+        };
+        ActionResult { text, changes: vec![Change::Dropped { object: object.id.clone(), room }], note: None }
+    }
+
+    /// `give <thing> to <person>`: the person takes it only when the story
+    /// says they do, with a `## When: #give @thing` section in them, the
+    /// thing or the room; else they refuse (`give_refused`, which a
+    /// `## When: #give #refused` section rewords) and the player keeps it.
+    fn give(&self, world: &WorldEngine, state: &mut PlayState, noun: &str, to: &str) -> ActionResult {
+        let Some(view) = self.view(world, state) else {
+            return ActionResult::say(self.say(world, state, "nowhere", None, &[]));
+        };
+        let object = match resolve(noun, &self.carried(world, state), the_object) {
+            Ok(Some(o)) => o,
+            Ok(None) => return ActionResult::say(self.say(world, state, "not_carried", None, &[("noun", noun.trim())])),
+            Err(which) => return ActionResult::say(self.which(world, state, "give", noun, EntityKind::Object, &which)),
+        };
+        let someone = match resolve(to, &view.characters, person) {
+            Ok(Some(p)) => p,
+            Ok(None) => return ActionResult::say(self.say(world, state, "not_here", None, &[("noun", to.trim())])),
+            Err(which) => return ActionResult::say(self.which(world, state, "give", to, EntityKind::Character, &which)),
+        };
+        // Matched with only the given thing in hand, so `@lantern` means
+        // what's given, not anything else the player carries.
+        let mut after = state.clone();
+        after.inventory.clear();
+        let target = (EntityKind::Character, someone.id.as_str());
+        let with = Some((EntityKind::Object, object.id.as_str()));
+        let taken = self.replies(world, &after, "give", target, with, &Outcome("given".into()));
+        if taken.is_empty() {
+            // A `## When: #give #refused` section rewords this one (`say`).
+            return ActionResult::say(self.say(world, state, "give_refused", Some(target), &[("person", &person_mid(&someone)), ("name", &object_name(&object))]));
+        }
+        state.inventory.retain(|id| id != &object.id);
+        state.held.entry(someone.id.clone()).or_default().push(object.id.clone());
+        let text = self.say_replies(world, state, &taken);
+        ActionResult { text, changes: vec![Change::Gave { object: object.id.clone(), to: someone.id.clone() }], note: None }
     }
 
     /// `where`: the room the player is in (REQ-PC-21).
@@ -1721,6 +1794,47 @@ mod tests {
         assert!(r.text.starts_with("Gold."), "{}", r.text);
         game.act(&world, &mut state, &PlayAction::Go("up".into()));
         assert_eq!(state.location, "castle/hall");
+    }
+
+    #[test]
+    fn drop_puts_a_thing_down_here_and_give_needs_the_story_to_say_yes() {
+        let (dir, mut world) = world();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        let play = |world: &WorldEngine, state: &mut PlayState, line: &str| match game.parse_command(world, line, state) {
+            Parsed::Action(a) => game.act(world, state, &a).text,
+            Parsed::Reply(r) | Parsed::Unknown(r) => r,
+        };
+        assert_eq!(play(&world, &mut state, "drop"), "Drop what?");
+        assert_eq!(play(&world, &mut state, "drop the lamp"), "You aren't carrying any lamp.");
+        play(&world, &mut state, "take rusty sword");
+        // Dropped where it was taken, it's back as written.
+        assert_eq!(play(&world, &mut state, "drop sword"), "You drop the rusty sword.");
+        assert!(state.inventory.is_empty() && state.taken.is_empty() && state.held.is_empty(), "{:?}", state);
+        // Dropped elsewhere, it's there and not here.
+        play(&world, &mut state, "take rusty sword");
+        play(&world, &mut state, "north");
+        play(&world, &mut state, "drop sword");
+        assert_eq!(state.held["castle/hall"], ["rusty-sword"]);
+        assert!(play(&world, &mut state, "look").contains("You see a rusty sword."));
+        assert!(play(&world, &mut state, "take sword").starts_with("You take"));
+        assert!(state.held.is_empty());
+        play(&world, &mut state, "south");
+        assert!(!play(&world, &mut state, "look").contains("rusty sword"));
+
+        // Give: the king refuses until the story says he takes it.
+        assert_eq!(play(&world, &mut state, "give"), "Give what?");
+        assert_eq!(play(&world, &mut state, "give sword"), "Give the sword to whom?");
+        assert_eq!(play(&world, &mut state, "give sword to the cook"), "There's no cook here.");
+        assert_eq!(play(&world, &mut state, "give sword to king"), "King Aldric doesn't want the rusty sword.");
+        assert_eq!(state.inventory, ["rusty-sword"]);
+        play(&world, &mut state, "take old sword");
+        world.set_file(&dir.path().join("npcs/king.md"), "---\nid: king\ntitle: King Aldric\ntype: character\n---\nAn old king.\n\n## When: #give @rusty-sword\nHe takes it gravely.\n\n## When: #give #refused\nHe waves it away.\n");
+        // Carrying the rusty sword doesn't make the old one welcome.
+        assert_eq!(play(&world, &mut state, "give old sword to king"), "He waves it away.");
+        assert_eq!(play(&world, &mut state, "give rusty sword to king"), "He takes it gravely.");
+        assert_eq!(state.inventory, ["old-sword"]);
+        assert_eq!(state.held["king"], ["rusty-sword"]);
     }
 
     #[test]
