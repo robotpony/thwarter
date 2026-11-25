@@ -593,7 +593,10 @@ The sky is clear.
 ```
 
   Rooms show it with `{{ weather.title }}` or a link. A heading tests it with `@thing:state`: `## When: @weather:rain` matches while the weather is in its rain state, from any thing or room (Bruce; `design/SECTIONS.md` › Open question 1).
-- **Randomness in prose.** A response MAY have several blocks with the same name, and play picks one each time with the game's seed, so "Ow." doesn't repeat word for word.
+- **Randomness in prose.** A thing MAY have several `## When:` sections with the same tags, and play shows one of them, picked with the game's seed, so "Ow." doesn't repeat word for word. Prose that just runs on stays as written.
+- **When clocks run.** After each turn's action, so the turn's reply reads the world as it was before the clock moved. A range's point is picked on entry from the seed, the thing's id and the entry turn, so a loaded game fires on the same turn.
+- **What the player sees.** Nothing, unless the author writes it (Bruce, 2026-11-25). A state MAY have a `## When: #arrive` section ("Rain begins to fall."), shown at the end of the turn the thing enters that state by a clock, when the player is in the thing's room or the thing is world-wide (in `world/`). Otherwise the change shows the next time the player looks.
+- **World-wide things.** A bundle in `world/` other than `index.md`, `story.md`, `player.md` and `styles/` loads as a thing of its own `type:`, with its folder's name as its id (`weather`, not `world/weather`). Weather is `type: object` with `visibility: absent`, so it's never listed in a room.
 
 ## Validation
 
