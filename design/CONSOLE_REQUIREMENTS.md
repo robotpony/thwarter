@@ -310,12 +310,12 @@ Bruce, 2026-11-24. A name the prose mentions but nothing defines (`[[hole]]`, `@
 
   ```
   TO WRITE
-    ⌘1  wallpaper  ×3
-    ⌘2  hole
+    ⌃1  wallpaper  ×3
+    ⌃2  hole
   ```
 
 - REQ-CON-58: Picking an entry MUST make it with defaults and open it in the editor, as `/add` would but without the question picker: the card REQ-CF-8 makes (scenery, title from the id), listed in the first room whose prose names it. A name an exit leads to becomes a room instead. Changing it afterwards is a normal `/set`.
-- REQ-CON-59: Each of the first nine entries MUST have its own key, Cmd-1 to Cmd-9 in list order, like browser tabs (Bruce, 2026-11-24): no leader, no letter. Entries past nine have no key; `/write <name>` reaches them, and `/write [<name>]` does the same for any entry from the prompt. Cmd-9 is the ninth entry, not the last. Cmd keys reach the console only through the kitty keyboard protocol, and kitty, iTerm2 and Ghostty keep Cmd-1 to Cmd-9 for their own tabs until the author unbinds them, so `config.toml` MAY set another modifier (Alt) for a terminal that doesn't pass Cmd; the sidebar shows the key that's set.
+- REQ-CON-59: Each of the first nine entries MUST have its own key, Ctrl-1 to Ctrl-9 in list order, like browser tabs (Bruce, 2026-11-24: Ctrl, not Cmd): no leader, no letter. Alt-1 to Alt-9 MUST do the same. Entries past nine have no key; `/write <name>` reaches them, and `/write [<name>]` does the same for any entry from the prompt. Ctrl-9 is the ninth entry, not the last. Ctrl-digits arrive as themselves only through the kitty keyboard protocol (iTerm2 3.5+, Ghostty, kitty, WezTerm). Other terminals, such as Terminal.app, send NUL, Esc, control codes or plain digits instead, which MUST NOT be read as TO WRITE keys; Esc stays Esc. In those terminals Alt is the key. The sidebar shows Ctrl's (⌃1 on macOS).
 
 ## Command registry
 

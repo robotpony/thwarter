@@ -1,6 +1,6 @@
 //! TO WRITE (REQ-CON-57 to 59, Bruce, 2026-11-24): each name the world
 //! mentions but doesn't define, once, from the engine's `not_written()`.
-//! Cmd-1 to Cmd-9 (or Alt) and `/write <name>` make one with defaults and
+//! Ctrl-1 to Ctrl-9 (or Alt) and `/write <name>` make one with defaults and
 //! open it in the editor.
 
 use super::full_edit::scenery_card;
@@ -12,7 +12,7 @@ use crate::writer::{Edit, NewEntity};
 
 /// The key label for entry `n` (1-based), as the sidebar shows it.
 pub fn key_label(n: usize) -> String {
-    if cfg!(target_os = "macos") { format!("⌘{}", n) } else { format!("alt-{}", n) }
+    if cfg!(target_os = "macos") { format!("⌃{}", n) } else { format!("ctrl-{}", n) }
 }
 
 impl Console {

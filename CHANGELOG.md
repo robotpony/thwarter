@@ -62,6 +62,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.70.1 (2026-11-24)
+
+### Changed
+
+- TO WRITE keys are Ctrl-1 to Ctrl-9, shown ⌃1 (Bruce, 2026-11-24), with Alt-1 to 9 still working; Cmd-digits go back to the terminal. A terminal without the kitty keyboard protocol sends control codes for Ctrl-digits, which are never read as these keys, so Ctrl-3 stays Esc there. REQ-CON-59 updated.
+
 ## 0.70.0 (2026-11-24)
 
 ### Added

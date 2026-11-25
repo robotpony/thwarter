@@ -778,8 +778,11 @@ fn input_of(key: ratatui::crossterm::event::KeyEvent) -> Input {
     if key.modifiers.contains(KeyModifiers::SUPER) && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S')) {
         return Input { key: Key::Char('s'), ctrl: true, ..Input::default() };
     }
-    // Command-1 to 9 pick a TO WRITE entry, as Alt-1 to 9 do (REQ-CON-59).
-    if key.modifiers.contains(KeyModifiers::SUPER) {
+    // Ctrl-1 to 9 pick a TO WRITE entry, as Alt-1 to 9 do (REQ-CON-59,
+    // Bruce, 2026-11-24). Only a real Ctrl-digit from the kitty protocol
+    // counts: a terminal without it sends NUL, Esc or a control code,
+    // which crossterm never reports as a digit, so Esc stays Esc.
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
         if let KeyCode::Char(c @ '1'..='9') = key.code {
             return Input { key: Key::Char(c), alt: true, ..Input::default() };
         }
@@ -1259,12 +1262,15 @@ mod tests {
         let console = Mutex::new(console);
         let mut screen = Screen::new("", None);
         use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-        screen.key(input_of(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::SUPER)), &console);
+        screen.key(input_of(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::CONTROL)), &console);
         assert!(screen.editing.is_some(), "the new card opens: {:?}", screen.output);
         assert!(root.join("objects/hole.md").exists());
         let hall = std::fs::read_to_string(root.join("hall.md")).unwrap();
         assert!(hall.contains("hole"), "listed in the room that names it: {}", hall);
         assert!(lock(&console).to_write().iter().all(|e| e.name != "hole"));
+        // Cmd-digits are the terminal's again, and Esc is never a key here.
+        assert_eq!(input_of(KeyEvent::new(KeyCode::Char('1'), KeyModifiers::SUPER)).alt, false);
+        assert_eq!(input_of(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)).key, Key::Esc);
     }
 
     #[test]
