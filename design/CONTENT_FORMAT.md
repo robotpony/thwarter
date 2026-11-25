@@ -143,6 +143,19 @@ Puts a thing in a room and opens its card to write.
 - **World commands.** `run` is a list of console commands with the `{param}` slots from `args`, run in order as if the author typed them. A world command MAY instead have `script`, a Rhai script, which can read the world and run console commands, and has the world scripts' limits: no files, no network (Bruce, 2026-11-24). A world command works only in edit mode, for the world's authors (`design/CONTENT_REQUIREMENTS.md` › REQ-WS-7 to 9), and it can't do more than they could by typing. The console's REQ-CON-54 lists the commands it may not run. A world command named like a built-in is a load warning, and the built-in wins.
 - `validate` warns about a world command whose `run` names an unknown command, uses a slot `args` doesn't have, or has a `handler`.
 
+## Time: `after:`, `at:` and game time
+
+Built in 0.93.0 and 0.94.0 (REQ-ENG-66 to 69); the design is `design/STATES.md` › Clocks.
+
+| Key | Where | Meaning |
+|---|---|---|
+| `after: { turns: 20, becomes: stale }` | A state's frontmatter | 20 turns after the thing enters this state, it moves to `stale`. `turns: 15-25` picks a point in the range with the game's seed. |
+| `at: { turn: 50, becomes: ringing }` | A thing's frontmatter | At turn 50 the thing moves to `ringing`, whatever its state, once. |
+| `at: { time: "12:00", becomes: ringing }` | A thing's frontmatter | The same at that time each day, when the world sets game time. |
+| `start_time: "08:00"`, `minutes_per_turn: 5` | `world/index.md` | Game time, giving `game.time` and `game.day` from the turn count. Without them, a world has turns only. |
+
+A clock change is silent unless the new state has a `## When: #arrive` section (`#arrive #<state>` outside the state's own file), which shows after that turn's reply when the player can see the thing or it's world-wide. A bundle in `world/` other than `index.md`, `story.md`, `player.md` and `styles/` is a world-wide thing of its own `type:`, with its folder's name as its id: `world/weather/` is `weather`, and a heading tests it with `## When: @weather:rain`. `validate` warns about a malformed `after:` or `at:`.
+
 ## How play words a room: `[play]` in `world.toml`
 
 Play writes rooms and the inventory as plain sentences, each from a template in `world.toml`'s `[play]` table (REQ-ENG-43). A world MAY change any of them. The full list, with each default, is `src/builtins/text/play.toml`; copy a line from there into a world's `[play]` to reword it.
