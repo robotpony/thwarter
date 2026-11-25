@@ -50,6 +50,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.95.0 (2026-11-25)
+
+### Added
+
+- The console's quick menu (REQ-CON-63 to 67): Ctrl-Space or `/menu` in edit mode opens a menu for the room, thing or door you're at, with add action, add state, hide or reveal, starting state, link to, add a thing or door here, recipes and play from here. An entry asks its questions one at a time at the bottom of the console, runs the commands it stands for and prints them. The NUL older terminals send for Ctrl-Space opens it too. Outside a terminal, `/menu` lists the entries. Add a reply and add chapter version aren't offered yet, since their commands aren't built.
+
 ## 0.94.0 (2026-11-25)
 
 ### Added

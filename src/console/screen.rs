@@ -8,6 +8,7 @@
 //! transcripts don't come here: they stay line-based (REQ-CON-9).
 
 use super::asking::{needs, Answer, Asking, Needs};
+use super::quick_menu::{Ask, QuickMenu};
 use super::commands::Completion;
 use crate::engines::questions::Choice;
 use super::editor::Editor;
@@ -62,6 +63,8 @@ pub struct Screen<'a> {
     /// Questions about a thing just made, while they're being asked
     /// (REQ-CON-46); the editor opens on the thing after them.
     picker: Option<Picker<'a>>,
+    /// The quick menu, while it's open (REQ-CON-63).
+    quick: Option<Quick<'a>>,
     /// The line Esc closed the menu on; it stays closed until the line changes.
     menu_dismissed: Option<String>,
     sidebar_scroll: usize,
@@ -88,6 +91,7 @@ impl<'a> Screen<'a> {
             editing: None,
             menu: None,
             picker: None,
+            quick: None,
             menu_dismissed: None,
             sidebar_scroll: 0,
             page: Cell::new(20),
@@ -151,6 +155,17 @@ impl<'a> Screen<'a> {
         }
         if self.picker.is_some() {
             self.picker_key(input, console);
+            return;
+        }
+        if self.quick.is_some() {
+            self.quick_key(input, console);
+            return;
+        }
+        // Ctrl-Space, or the NUL a terminal without the kitty protocol
+        // sends for it (and Terminal.app for Ctrl-2), opens the quick menu
+        // (REQ-CON-63).
+        if matches!(input, Input { key: Key::Char(' '), ctrl: true, .. } | Input { key: Key::Null, .. }) {
+            self.open_quick(console);
             return;
         }
         if self.menu.is_some() && self.menu_key(&input, console) {
@@ -295,6 +310,16 @@ impl<'a> Screen<'a> {
             }
             Flow::Continue => {}
         }
+        self.after_command(console);
+    }
+
+    /// What a command left for the screen: questions, the editor, or the
+    /// quick menu.
+    fn after_command(&mut self, console: &Mutex<Console>) {
+        if lock(console).take_pending_menu() {
+            self.open_quick(console);
+            return;
+        }
         let mut console = lock(console);
         // Questions come first; the editor opens on the thing after them.
         if let Some(asking) = console.take_pending_questions() {
@@ -306,6 +331,49 @@ impl<'a> Screen<'a> {
             let document = console.edit_document(&target);
             self.editing = Some((Editor::new(document).with_texts(console.texts.clone()), target));
         }
+    }
+
+    /// Opens the quick menu for where edit mode is, or says why not.
+    fn open_quick(&mut self, console: &Mutex<Console>) {
+        let menu = lock(console).quick_menu();
+        match menu {
+            Ok(menu) if !menu.entries.is_empty() => self.quick = Some(Quick::new(menu)),
+            Ok(_) => {}
+            Err(why) => {
+                self.push(&why);
+                self.output.push(String::new());
+            }
+        }
+    }
+
+    /// A key while the quick menu is open.
+    fn quick_key(&mut self, input: Input, console: &Mutex<Console>) {
+        let Some(quick) = self.quick.as_mut() else { return };
+        if input.key == Key::Esc || matches!(input, Input { key: Key::Char('c'), ctrl: true, .. }) {
+            self.quick = None;
+            return;
+        }
+        if !quick.key(input) {
+            return;
+        }
+        let quick = self.quick.take().expect("checked");
+        let commands = quick.commands();
+        for command in &commands {
+            self.push(&format!("> {}", command));
+            self.output.push(String::new());
+            let (text, flow) = lock(console).handle(command);
+            if !text.is_empty() {
+                self.push(&text);
+                self.output.push(String::new());
+            }
+            if flow == Flow::Quit {
+                self.quit = true;
+            }
+        }
+        let typed = lock(console).quick_menu_typed(&commands);
+        self.push(&typed);
+        self.output.push(String::new());
+        self.after_command(console);
     }
 
     /// A key while questions are being asked.
@@ -488,6 +556,8 @@ impl<'a> Screen<'a> {
                 self.draw_output(frame, output_area);
                 if let Some(picker) = &self.picker {
                     picker.draw(frame, output_area, &self.words);
+                } else if let Some(quick) = &self.quick {
+                    quick.draw(frame, output_area, &self.words);
                 } else if let Some(menu) = &self.menu {
                     draw_menu(frame, output_area, menu, &self.words);
                 }
@@ -553,6 +623,162 @@ impl<'a> Screen<'a> {
             lines.push(Line::styled(self.words.text("side_more", &[]), style(Role::Note)));
         }
         frame.render_widget(Paragraph::new(lines), bottom);
+    }
+}
+
+/// The quick menu: choosing an entry, then asking its questions one at a
+/// time (REQ-CON-65).
+struct Quick<'a> {
+    menu: QuickMenu,
+    /// The entry chosen in the list, or being asked.
+    selected: usize,
+    /// Whether the entry's questions are being asked.
+    asking: bool,
+    /// Which question, and the answers so far.
+    at: usize,
+    answers: Vec<String>,
+    /// The option chosen in a choice question.
+    choice: usize,
+    area: TextArea<'a>,
+}
+
+impl<'a> Quick<'a> {
+    fn new(menu: QuickMenu) -> Self {
+        Quick { menu, selected: 0, asking: false, at: 0, answers: Vec::new(), choice: 0, area: input_line() }
+    }
+
+    fn entry(&self) -> &super::quick_menu::Entry {
+        &self.menu.entries[self.selected]
+    }
+
+    /// Starts the chosen entry's questions; returns whether it has none left.
+    fn start(&mut self) -> bool {
+        self.asking = true;
+        self.at = 0;
+        self.ready()
+    }
+
+    /// Gets the next question ready; returns whether they're all answered.
+    fn ready(&mut self) -> bool {
+        self.area = input_line();
+        match self.entry().asks.get(self.at) {
+            None => true,
+            Some(Ask::Choose { default, .. }) => {
+                self.choice = *default;
+                false
+            }
+            Some(Ask::Text { .. }) => false,
+        }
+    }
+
+    /// One key. Returns whether the entry is answered and should run.
+    fn key(&mut self, input: Input) -> bool {
+        let count = self.menu.entries.len();
+        if !self.asking {
+            return match input.key {
+                Key::Up => {
+                    self.selected = (self.selected + count - 1) % count;
+                    false
+                }
+                Key::Down => {
+                    self.selected = (self.selected + 1) % count;
+                    false
+                }
+                Key::Enter => self.start(),
+                Key::Char(c) if !input.ctrl && !input.alt => match self.menu.entries.iter().position(|e| e.letter == c) {
+                    Some(i) => {
+                        self.selected = i;
+                        self.start()
+                    }
+                    None => false,
+                },
+                _ => false,
+            };
+        }
+        let ask = self.entry().asks[self.at].clone();
+        let answer = match ask {
+            Ask::Choose { options, .. } => match input.key {
+                Key::Up => {
+                    self.choice = (self.choice + options.len() - 1) % options.len();
+                    None
+                }
+                Key::Down => {
+                    self.choice = (self.choice + 1) % options.len();
+                    None
+                }
+                Key::Enter => Some(options[self.choice].clone()),
+                _ => None,
+            },
+            Ask::Text { required, .. } => match input.key {
+                Key::Enter => {
+                    let typed = self.area.lines().join(" ").trim().to_string();
+                    (!required || !typed.is_empty()).then_some(typed)
+                }
+                _ => {
+                    self.area.input(input);
+                    None
+                }
+            },
+        };
+        let Some(answer) = answer else { return false };
+        self.answers.push(answer);
+        self.at += 1;
+        self.ready()
+    }
+
+    fn commands(&self) -> Vec<String> {
+        self.entry().commands(&self.answers)
+    }
+
+    /// Drawn on the output's last rows, just above the input.
+    fn draw(&self, frame: &mut Frame, area: Rect, words: &Words) {
+        let heading = words.text("qm_heading", &[("id", &self.menu.id), ("kind", self.menu.kind.label())]);
+        let mut lines = vec![Line::styled(heading, style(Role::Chrome))];
+        let reversed = Style::default().add_modifier(ratatui::style::Modifier::REVERSED);
+        let keys;
+        if !self.asking {
+            let width = self.menu.entries.iter().map(|e| words.text(e.label, &[]).chars().count()).max().unwrap_or(0);
+            for (i, e) in self.menu.entries.iter().enumerate() {
+                let text = format!(" {}  {:<width$}  {}", e.letter, words.text(e.label, &[]), e.stands_for, width = width);
+                let line = Line::from(text);
+                lines.push(if i == self.selected { line.style(reversed) } else { line });
+            }
+            keys = words.text("qm_keys_menu", &[]);
+        } else {
+            let entry = self.entry();
+            lines.push(Line::styled(format!(" {}", words.text(entry.label, &[])), style(Role::Title)));
+            for (ask, answer) in entry.asks.iter().zip(&self.answers) {
+                lines.push(Line::styled(format!(" {} {}", words.text(ask_key(ask), &[]), answer), style(Role::Note)));
+            }
+            match &entry.asks[self.at] {
+                Ask::Choose { key, options, .. } => {
+                    lines.push(Line::from(format!(" {}", words.text(key, &[]))));
+                    for (i, option) in options.iter().enumerate() {
+                        let line = Line::from(format!("   {}", option));
+                        lines.push(if i == self.choice { line.style(reversed) } else { line });
+                    }
+                    keys = words.text("qm_keys_choose", &[]);
+                }
+                Ask::Text { key, .. } => {
+                    lines.push(Line::from(format!(" {} {}▏", words.text(key, &[]), self.area.lines().join(" "))));
+                    keys = words.text("qm_keys_typing", &[]);
+                }
+            }
+        }
+        let height = (lines.len() as u16 + 2).min(area.height);
+        let popup = Rect { x: area.x, y: area.bottom().saturating_sub(height), width: area.width, height };
+        frame.render_widget(ratatui::widgets::Clear, popup);
+        let block = Block::default()
+            .borders(Borders::TOP | Borders::BOTTOM)
+            .border_style(style(Role::Chrome))
+            .title_bottom(Line::styled(keys, style(Role::Chrome)).right_aligned());
+        frame.render_widget(Paragraph::new(lines).block(block), popup);
+    }
+}
+
+fn ask_key(ask: &Ask) -> &'static str {
+    match ask {
+        Ask::Text { key, .. } | Ask::Choose { key, .. } => key,
     }
 }
 
@@ -1302,6 +1528,54 @@ mod tests {
         let well = std::fs::read_to_string(root.join("village/well.md")).unwrap();
         assert!(well.contains("desk"), "{}", well);
         assert!(!square.contains("desk"), "not in edit mode's room too: {}", square);
+    }
+
+    #[test]
+    fn the_quick_menu_asks_at_the_bottom_then_runs_and_shows_the_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny");
+        let root = dir.path().join("tiny");
+        for entry in walkdir::WalkDir::new(&from) {
+            let entry = entry.unwrap();
+            let to = root.join(entry.path().strip_prefix(&from).unwrap());
+            if entry.file_type().is_dir() {
+                std::fs::create_dir_all(&to).unwrap();
+            } else {
+                std::fs::copy(entry.path(), &to).unwrap();
+            }
+        }
+        let mut console = Console::open(&root, super::super::Mode::Edit).unwrap();
+        console.interactive = true;
+        let console = Mutex::new(console);
+        let mut screen = Screen::new("", None);
+        // Nowhere to be yet: it says so rather than opening.
+        screen.key(Input { key: Key::Char(' '), ctrl: true, ..Input::default() }, &console);
+        assert!(screen.quick.is_none());
+        typed(&mut screen, &console, "go /village/square");
+        // Ctrl-Space opens it; so does /menu, and the NUL older terminals send.
+        screen.key(Input { key: Key::Char(' '), ctrl: true, ..Input::default() }, &console);
+        let text = screen_text(&screen, &console, 110, 30);
+        assert!(text.contains("Quick menu: village/square") && text.contains("add a door here"), "{}", text);
+        press(&mut screen, &console, Key::Esc);
+        press(&mut screen, &console, Key::Null);
+        assert!(screen.quick.is_some(), "NUL opens it too");
+        press(&mut screen, &console, Key::Esc);
+        typed(&mut screen, &console, "/menu");
+        assert!(screen.quick.is_some(), "/menu opens it");
+        // l: link to, then a direction and a room, one question at a time.
+        keys(&mut screen, &console, "l");
+        assert!(screen_text(&screen, &console, 110, 30).contains("Which direction?"));
+        press(&mut screen, &console, Key::Enter);
+        assert!(screen.quick.is_some(), "a required answer can't be blank");
+        keys(&mut screen, &console, "south");
+        press(&mut screen, &console, Key::Enter);
+        keys(&mut screen, &console, "well");
+        press(&mut screen, &console, Key::Enter);
+        assert!(screen.quick.is_none());
+        let square = std::fs::read_to_string(root.join("village/square.md")).unwrap();
+        assert!(square.contains("south"), "{}", square);
+        let out = screen.output.join("\n");
+        assert!(out.contains("Typed, that was:") && out.contains("  /link south well"), "{}", out);
     }
 
     #[test]

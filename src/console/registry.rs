@@ -31,6 +31,7 @@ const BUILTIN: &[(&str, &str)] = &[
     ("validate", include_str!("../builtins/commands/validate.md")),
     ("start", include_str!("../builtins/commands/start.md")),
     ("write", include_str!("../builtins/commands/write.md")),
+    ("menu", include_str!("../builtins/commands/menu.md")),
     ("remove", include_str!("../builtins/commands/remove.md")),
     ("inspect", include_str!("../builtins/commands/inspect.md")),
     ("clear", include_str!("../builtins/commands/clear.md")),

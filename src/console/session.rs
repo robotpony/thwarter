@@ -80,6 +80,8 @@ pub struct Console {
     pub(super) said: std::cell::RefCell<Vec<super::kinds::Kind>>,
     /// Questions `/add` or `/new` left for the screen to ask.
     pub(super) pending_questions: Option<super::asking::Asking>,
+    /// Whether `/menu` left the quick menu for the screen to open.
+    pub(super) pending_menu: bool,
     /// What `/add` just added, for it to open in the editor.
     pub(super) added: Option<(Kind, String)>,
     /// What the current command created, as (kind, id), for `/new` to open.
@@ -131,6 +133,7 @@ impl Console {
             created: Vec::new(),
             added: None,
             pending_questions: None,
+            pending_menu: false,
             texts,
             config_warnings,
             said: Default::default(),
@@ -274,6 +277,7 @@ impl Console {
             ("unlink", args) => self.unlink(args),
             ("move", args) => self.move_thing(args),
             ("add", args) => self.add_and_edit(args),
+            ("menu", []) => self.menu_command(),
             // Arguments the command doesn't take: its usage, from its file.
             _ if HANDLERS.contains(&name) => suggest(&self.t("usage", &[]), &[&def.usage()]),
             _ => self.t("no_handler", &[("command", &def.name)]),
@@ -988,7 +992,7 @@ fn parent_of(path: &str) -> String {
 /// a test fails on either gap.
 const HANDLERS: &[&str] = &[
     "quit", "help", "clear", "status", "validate", "map", "list", "scope", "inspect", "remove", "write", "start", "restart", "edit", "play", "save",
-    "load", "reload", "new", "set", "state", "action", "recipe", "link", "unlink", "move", "add",
+    "load", "reload", "new", "set", "state", "action", "recipe", "link", "unlink", "move", "add", "menu",
 ];
 
 #[cfg(test)]

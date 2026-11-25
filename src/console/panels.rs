@@ -118,6 +118,11 @@ impl Console {
         if self.mode == Mode::Edit {
             rest.push(Row::Blank);
             rest.extend(self.here_panel());
+            // How to open the quick menu, where there's one (REQ-CON-63).
+            if self.quick_menu().is_ok() {
+                rest.push(Row::Blank);
+                rest.push(Row::Dim(self.t("side_quick_menu", &[])));
+            }
         } else if let Some(game) = &self.game {
             // Play's text is the player's; the detail an author needs goes
             // here instead (Bruce, 2026-11-23).

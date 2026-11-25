@@ -85,6 +85,7 @@ Console commands (/help <command> for one in full):
   /validate [strict]                        check the world as thwart validate does
   /start                                    play starts in the room you're in
   /write [{name}]                           make a name the world mentions but doesn't define, and open it
+  /menu                                     the quick menu for where you are; Ctrl-Space opens it too
   /remove {thing}                           delete a thing, room or door and what refers to it, after asking
   /inspect [{thing}]                        a thing in full: its file, where it starts, states, sections, warnings
   /clear                                    empty the output

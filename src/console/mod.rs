@@ -23,6 +23,7 @@ mod panels;
 mod picker;
 pub use picker::run_or_pick;
 mod play;
+mod quick_menu;
 mod restart;
 mod scope;
 mod screen;

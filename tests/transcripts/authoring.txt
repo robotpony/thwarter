@@ -37,6 +37,16 @@ Removed the up exit from village/cellar.
 Not saved: `connections` has no entry `up`
 > go /village/square
 Village Square (room)
+> /menu
+Quick menu: village/square (room)
+  a  add action (/action)
+  s  add state (/state)
+  v  hide or reveal (/set visibility)
+  l  link to (/link)
+  n  add a thing here (/add)
+  d  add a door here (/add door)
+  p  recipes (/recipe)
+  g  play from here (/play here)
 > go bench
 `bench` is scenery, with no card yet. To give it one:
 
