@@ -6,6 +6,8 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 
 ## Open
 
+- [ ] **A ```rhai block below a `## When:` heading is dropped silently**: the script runs only from above the first heading (`layers.rs` › `take_script` sees the description alone), so a block written after a section never runs, and `validate` passes. It should either count anywhere in the file or warn (found 2026-11-25 writing `design/CONTENT_FORMAT.md` › Adding a verb to an object) [coder]
+- [ ] **`#refused` and `#acted` can't be told apart by verb**: `## When: #spin #refused` never matches, only a bare `## When: #refused`, so a thing with two verbs gated by `requires:` gives both the same refusal. `## When: #take #immovable` names its verb, so these should too (found 2026-11-25, same place) [coder]
 - [ ] **An unknown question construct does nothing, silently**: `validate` checks only a world's own question sets, so a built-in like `src/builtins/questions/object.md` with an answer such as `-> location in room` (not one of `set`, `recipe`, `ask thing`, `ask value`) gets no warning. Built-in and world sets should both warn (`validate` does since 0.81.3); the console will also say when a picked answer does nothing (2026-11-24) [console] (`design/CONTENT_FORMAT.md` › type: questions)
 - [ ] **One compiler warning left**, `narrative_engine`'s unused `conditions` in a stub; it goes when narrative state uses that code. The two in `world_graph::find_path` went with the map in 0.37.0. Down from 11 in 0.7.0 (2026-08-23)
 

@@ -82,7 +82,7 @@ Object content is far more varied than location or character content (compare a 
 | `objects` | no | List of object `id`s this object holds, such as photos on a wall (REQ-CF-31). |
 | `holds` | no | The word play uses for what this object holds: `on` (the default) or `in`, as in "Coins (in the chest)". |
 | `pushable` | no | `true` lets `push` and `pull <thing> <direction>` move it into the next room, the player with it (`design/PLAYER_COMMANDS.md` › REQ-PC-30). |
-| `actions` | no | Map of action name to its mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`). The text a player reads is in the body, in a `## When: #wield` reply section, never here. See `design/SECTIONS.md`. |
+| `actions` | no | Map of action name to its mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`). The text a player reads is in the body, in a `## When: #wield` reply section, never here. See › Adding a verb to an object, and `design/SECTIONS.md`. |
 | anything else | no | Preserved verbatim (e.g. `properties`, `stats`, `effects`, `contents`, `security` in the sample world). Not validated. |
 
 ## Example: a room with objects and states
@@ -295,6 +295,141 @@ Some things the example doesn't do:
 - Lighting the lamp changes the study wherever the lamp is, even if the player has carried it into the hallway. Only `requires:` limits an action today, and it can't test where the lamp is.
 - `look in desk` doesn't parse yet, since it waits on multi-word verbs (`PLAN.md` › Phase 6). `x desk` lists what it holds.
 - `thwart show study` lists the safe while it's still hidden, because `show` is the author's view.
+
+## Adding a verb to an object
+
+A thing gains a verb when one of its files uses the verb: in a `## When: #verb` heading, as a key under `actions:`, or as a function in its script. There's no list of verbs to register. Once any thing in the world has a verb, in any state or chapter, the parser knows the word everywhere: a bare `read` asks "What do you want to read?", and `read wind` says "There's no wind here." (`design/PLAYER_COMMANDS.md` › REQ-PC-4, REQ-PC-14).
+
+Start with the simplest form that does the job:
+
+| You want | Write | Example |
+|---|---|---|
+| A reply, with nothing changing | A `## When: #verb` section | `read letter` |
+| A reply, and something changes | `actions:` in frontmatter, plus a reply section | `spin safe` |
+| A different reply when used with something | `@thing` in the heading | `knock safe with lamp` |
+| Logic that YAML can't express | A Rhai function named after the verb | `shake safe` |
+| Other words for the verb | `[verbs]` in `world.toml` | `twist` for `spin` |
+
+Here is the safe from the example above, with four verbs added. Every file was checked against 0.94.0 (2026-11-25).
+
+**A reply only.** A section is a whole verb. The letter answers `read` and nothing changes:
+
+```markdown
+<!-- objects/letter.md -->
+---
+id: letter
+title: Folded letter
+type: object
+object_type: paper
+---
+"The safe opens on her birthday," it says, in a cramped hand.
+
+## When: #read
+The ink is smudged, but one word is clear: "June".
+```
+
+**A verb that changes something.** Its mechanics go under `actions:`, and each takes `becomes:` (set states), `sets:` (set values), `chapter:` (move the story) and `requires:` (`{ has: <id> }`, something the player must hold). The words never go in frontmatter. They go in reply sections, and the reply goes where the thing ends up, so the reply for a successful spin is in `unlocked.md`.
+
+````markdown
+<!-- study/objects/safe/index.md -->
+---
+id: safe
+title: Wall safe
+type: object
+object_type: container
+weight: immovable
+state: hidden
+actions:
+  spin: { requires: { has: letter }, becomes: { safe: unlocked } }
+---
+A small steel safe set into the wall, with a brass dial.
+
+```rhai
+fn shake(safe, turn) {
+    if safe.state == "unlocked" { return "empty"; }
+    "rattles"
+}
+```
+
+## When: #knock @lamp
+The lamp rings against the steel.
+
+## When: #knock
+It sounds hollow.
+
+## When: #refused
+The dial spins freely. You'd need the combination.
+
+## When: #shake #rattles
+Something small slides around inside.
+
+## When: #shake #empty
+Nothing moves.
+````
+
+```markdown
+<!-- study/objects/safe/unlocked.md -->
+---
+inherits: index
+visibility: visible
+---
+The safe door hangs open.
+
+## When: #spin
+You turn the dial to six, then back to one. The door swings open.
+
+## When: #acted
+The door is already open.
+```
+
+Two built-in replies cover the cases with no reply of the author's. Each can be reworded on the thing with a section named for its tag:
+- `## When: #refused` replaces "Not yet: you can't spin the wall safe.", shown when `requires:` fails.
+- `## When: #acted` replaces "You spin the wall safe. Something changes.", shown when the action runs but no reply matches, such as spinning a safe that's already open.
+
+**Used with something.** `knock safe with lamp` adds the lamp to the turn, so `## When: #knock @lamp` matches. Every section whose tags all hold is shown, in file order, so `#knock` shows too. Write the general reply so it reads well after the specific one.
+
+**A script.** When the answer depends on something YAML can't test, write a Rhai function named after the verb (a hyphen becomes an underscore). It returns a state (`become("open")`) or a reason, and a reply section names the reason: `## When: #shake #rattles`. A script never returns text. Put it in a ` ```rhai ` block above the first `## When:` heading, or in a bundle's `actions.rhai`. The script rules are in `design/SECTIONS.md` › Scripts.
+
+**Other words.** `world.toml` maps more words onto a verb, for the whole world:
+
+```toml
+[verbs]
+twist = "spin"
+```
+
+Playing it, after lighting the lamp and pulling the portrait:
+
+```
+> read
+What do you want to read?
+> read letter
+The ink is smudged, but one word is clear: "June".
+> spin safe
+The dial spins freely. You'd need the combination.
+> knock safe
+It sounds hollow.
+> take lamp
+You take the oil lamp.
+> knock safe with lamp
+The lamp rings against the steel. It sounds hollow.
+> shake safe
+Something small slides around inside.
+> take letter
+You take the folded letter.
+> twist safe
+You turn the dial to six, then back to one. The door swings open.
+> spin safe
+The door is already open.
+> shake safe
+Nothing moves.
+```
+
+Limits today:
+- A verb is one word. `turn on` and `look under` wait on multi-word verbs (`PLAN.md` › Phase 6).
+- A world's verb can't replace a built-in (`take`, `go`, `look` and the rest, `design/PLAYER_COMMANDS.md`) for one thing. A `## When: #take` section rewords the built-in reply but doesn't change what happens. `refuse: true` is planned for that (`design/PLAYER_COMMANDS.md` › Open question 3). `search <thing>` is the exception, and goes to the thing's own action.
+- `#refused` and `#acted` can't name the verb, so a thing with two verbs that can be refused gives both the same refusal (`BUGS.md`).
+- A ` ```rhai ` block below a `## When:` heading is ignored without a warning (`BUGS.md`).
+- Before it's revealed, a hidden thing still answers a verb without `requires:` if the player names it exactly (`design/STATES.md` › Hidden things). Here, `knock safe` works before the portrait falls, and `spin safe` doesn't.
 
 ## `type: questions`
 

@@ -177,6 +177,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 ### Added
 
 - `design/CONTENT_FORMAT.md` › Example: a room with objects and states: a dark study with room states, local and global objects, a portrait whose action changes two things, a hidden safe and a heading on another thing's state, with its play-through. Checked against 0.94.0; `README.md` and `design/STATES.md` point to it.
+- `design/CONTENT_FORMAT.md` › Adding a verb to an object: the five ways, from a reply section alone to `actions:`, `@thing` headings, Rhai functions and `[verbs]` aliases, with `#refused` and `#acted` rewording and today's limits. Checked against 0.94.0. Two defects it found are in `BUGS.md`.
 - `design/CONSOLE_REQUIREMENTS.md` › REQ-CON-26: the prompt shows the scope only when it isn't global, and local scope's layout (`castle/hall/objects/torch.md`), as Bruce decided on 2026-11-25. The sketches use today's `in <place> > ` prompt.
 - `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-58: the text guard covers `src/console/` too, since 1e40954.
 - `design/CONSOLE_REQUIREMENTS.md`: REQ-CON-62, a world picker for `thwart edit` and `thwart play` when no world is given, in place of a built-in default.
