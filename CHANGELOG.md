@@ -68,6 +68,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.73.2 (2026-11-24)
+
+### Changed
+
+- `/add door` names a door with the engine's `new_door_name` (the coder's faebdce): `door-<room>-<room>`, the same from either side, numbered when taken, and titled from the far room ("Hall door"). Existing doors keep their ids. REQ-CON-42 updated; transcripts reblessed.
+
 ## 0.73.1 (2026-11-24)
 
 ### Changed

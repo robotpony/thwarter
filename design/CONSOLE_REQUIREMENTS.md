@@ -72,7 +72,7 @@ bedroom already has a west exit, to door-bedroom-west. To change it:
   Added chair to bedroom, as scenery with no card yet (/edit object chair gives it one).
   ```
 
-- REQ-CON-42: `/add door` MUST make a door from the room edit mode is in, with its exits, so authors don't write door files by hand (Bruce, 2026-11-23; `design/STATES.md` › Adding a door from the console). The far side faces the opposite way unless given, a far room that doesn't exist yet is made, the id is the engine's `door_id`, and a state hint in the door word picks another template (`door(locked)` is `locked-door`). Without a direction it asks, and the next line answers. `/add <room> <door>` gives a one-sided door its other side.
+- REQ-CON-42: `/add door` MUST make a door from the room edit mode is in, with its exits, so authors don't write door files by hand (Bruce, 2026-11-23; `design/STATES.md` › Adding a door from the console). The far side faces the opposite way unless given, a far room that doesn't exist yet is made, The id and title are the engine's `new_door_name` (REQ-ENG-47): `door-<room>-<room>` the same from either side, numbered when taken, and titled from the far room ("Hall door") unless the template names it. A state hint in the door word picks another template (`door(locked)` is `locked-door`). Without a direction it asks, and the next line answers. `/add <room> <door>` gives a one-sided door its other side.
 
   ```
   in village/square > /add door west village/hallway

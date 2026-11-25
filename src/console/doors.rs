@@ -11,13 +11,13 @@
 //! ```
 //!
 //! The far side faces the opposite way unless it's given. A far room that
-//! doesn't exist yet is made. The id is the engine's `door_id`, so every
-//! client names a door the same way.
+//! doesn't exist yet is made. The id and title are the engine's
+//! `new_door_name`, so every client names a door the same way.
 
 use super::author::{id_from, opposite, title_or_default};
 use super::session::Console;
 use super::world::Kind;
-use crate::engines::{door_id, EntityKind};
+use crate::engines::EntityKind;
 use crate::writer::{Edit, NewEntity};
 use serde_yaml::Value;
 use std::path::PathBuf;
@@ -149,10 +149,9 @@ impl Console {
             },
             (None, _) => None,
         };
-        let id = door_id(here, to.as_deref().unwrap_or(""), direction);
-        if self.world.engine.doors.contains_key(&id) {
-            return super::session::suggest(&format!("There's a door called {} already. To change it:", id), &[&format!("/edit {}", id)]);
-        }
+        // The same id and title from either side (the coder's faebdce):
+        // `door-<room>-<room>`, numbered when taken, titled from the far room.
+        let (id, title) = self.world.engine.new_door_name(here, to.as_deref(), template);
         let mut written: Vec<PathBuf> = Vec::new();
         if let Some(to) = &to {
             if let Err(e) = self.ensure_room(to, &mut written) {
@@ -163,8 +162,9 @@ impl Console {
         if let (Some(to), Some(back)) = (&to, &back) {
             sides.push_str(&format!("  {}: {{ direction: {} }}\n", to, back));
         }
-        let text = format!("---\nid: {}\ntitle: Door\ntype: door\ninherits: {}\nsides:\n{}---\n", id, template, sides);
-        let new = NewEntity { kind: EntityKind::Door, id: id.clone(), title: "Door".to_string(), object_type: None };
+        let shown = crate::writer::content_file::emit_scalar(&Value::String(title.clone()), false).unwrap_or_else(|_| title.clone());
+        let text = format!("---\nid: {}\ntitle: {}\ntype: door\ninherits: {}\nsides:\n{}---\n", id, shown, template, sides);
+        let new = NewEntity { kind: EntityKind::Door, id: id.clone(), title: title.clone(), object_type: None };
         match self.create(&new, &[Edit::ReplaceAll(text)]) {
             Ok(path) => written.push(path),
             Err(e) => return self.after_writes(&written, e),

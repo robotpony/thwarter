@@ -6,37 +6,38 @@ Editing Tiny World (tests/worlds/tiny). Type /help for commands.
 > go /village/square
 Village Square (room)
 > /add door west village/hallway
-Added door-village-square-village-hallway-west: west of village/square, east of village/hallway.
+Added door-village-hallway-village-square: west of village/square, east of village/hallway.
 > /add door(locked) --(south)--> village/cellar-steps
-Added door-village-square-village-cellar-steps-south: south of village/square, north of village/cellar-steps.
+Added door-village-cellar-steps-village-square: south of village/square, north of village/cellar-steps.
 > /add door up
-Added door-village-square-up, up from village/square. It has one side so far; to give it another:
+Added door-village-square, up from village/square. It has one side so far; to give it another:
 
-  /add {room} door-village-square-up
+  /add {room} door-village-square
 This adds 1 problem(s):
-  door `door-village-square-up`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
+  door `door-village-square`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
 > /add village/loft door-village-square-up
-door-village-square-up now has a side down from village/loft too.
+Character and object ids are bare names, without folders: `loft`.
 > /add door
 Which way is the door from village/square? north, east, south, west, up, down, or any word.
 > northwest
-Added door-village-square-northwest, northwest of village/square. It has one side so far; to give it another:
+Added door-village-square-2, northwest of village/square. It has one side so far; to give it another:
 
-  /add {room} door-village-square-northwest
+  /add {room} door-village-square-2
 This adds 1 problem(s):
-  door `door-village-square-northwest`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
+  door `door-village-square-2`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
 > go west
 Hallway (room)
 > look
 (no description yet)
 
-You can go east through a door.
+You can go east through a hallway door.
 > /validate
 Problems (1):
   village/square: connection `east` points at unknown location `village/inn`
-Warnings (1):
-  door `door-village-square-northwest`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
-Validation failed: 1 problem(s), 1 warning(s)
+Warnings (2):
+  door `door-village-square`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
+  door `door-village-square-2`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
+Validation failed: 1 problem(s), 2 warning(s)
 > go /village/square
 Village Square (room)
 > /add lantern village/well

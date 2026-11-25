@@ -650,7 +650,7 @@ mod tests {
         let (_dir, root) = tiny_copy();
         let mut console = console_at(&root, "/village/square");
         console.handle("/add door west village/hallway");
-        assert_eq!(console.take_pending_edit().map(|t| t.path), Some("doors/door-village-square-village-hallway-west".to_string()));
+        assert_eq!(console.take_pending_edit().map(|t| t.path), Some("doors/door-village-hallway-village-square".to_string()));
         console.handle("/add chair village/well");
         let target = console.take_pending_edit().expect("scenery opens as a new card");
         assert_eq!(target.path, "objects/chair");
