@@ -67,6 +67,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.73.0 (2026-11-24)
+
+### Added
+
+- `engines::door_id_between(room, other)` and `WorldEngine::new_door_name(here, to, template)`: a new door's id is `door-<room>-<room>`, the rooms sorted so either side makes the same id, with `-2` and on for a second door between them, and its title comes from the template when it gives a real one ("Iron door"), else from the far room ("Bedroom door") (REQ-ENG-47). Existing doors keep their ids.
+
+### Changed
+
+- `engines::door_id(from, to, direction)` is kept only until the console's `/add door` moves to `new_door_name`.
+
 ## 0.72.1 (2026-11-24)
 
 ### Changed

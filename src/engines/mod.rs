@@ -26,14 +26,28 @@ pub use narrative_engine::*;
 pub use game_engine::*;
 pub use player_commands::{Parsed, DIRECTIONS};
 pub use saves::{list_saves, load_named, save_named, save_path, DEFAULT_SAVE};
-/// The id for a new door joining two rooms (Bruce, 2026-11-24): every
-/// client names doors the same predictable way, `door-bedroom-hallway-west`,
-/// and the id is a safe file name. A room's area becomes part of the name
-/// (`house/attic` is `house-attic`); anything not a letter or digit
-/// becomes one `-` (REQ-ENG-47).
+/// The old id for a new door, `door-<from>-<to>-<direction>`, named from
+/// the side it was made on. Kept until the console moves to
+/// `WorldEngine::new_door_name`; use `door_id_between` instead.
 pub fn door_id(from_room: &str, to_room: &str, direction: &str) -> String {
-    let mut id = String::from("door");
-    for part in [from_room, to_room, direction] {
+    id_from_parts("door", &[from_room, to_room, direction])
+}
+
+/// The id for a door joining two rooms, the same from either side
+/// (REQ-ENG-47; Bruce, 2026-11-24): `door-<room>-<room>`, the rooms sorted,
+/// with no direction, so the hallway's east exit doesn't say "west". A
+/// room's area becomes part of the name (`house/attic` is `house-attic`);
+/// anything not a letter or digit becomes one `-`, so the id is a safe
+/// file name. `WorldEngine::new_door_name` adds a suffix when it's taken.
+pub fn door_id_between(room: &str, other: &str) -> String {
+    let mut rooms = [id_from_parts("", &[room]), id_from_parts("", &[other])];
+    rooms.sort();
+    id_from_parts("door", &[rooms[0].as_str(), rooms[1].as_str()])
+}
+
+fn id_from_parts(start: &str, parts: &[&str]) -> String {
+    let mut id = String::from(start);
+    for part in parts {
         let mut word = String::new();
         for c in part.trim().to_lowercase().chars() {
             if c.is_alphanumeric() {
@@ -44,7 +58,9 @@ pub fn door_id(from_room: &str, to_room: &str, direction: &str) -> String {
         }
         let word = word.trim_end_matches('-');
         if !word.is_empty() {
-            id.push('-');
+            if !id.is_empty() {
+                id.push('-');
+            }
             id.push_str(word);
         }
     }
@@ -53,7 +69,16 @@ pub fn door_id(from_room: &str, to_room: &str, direction: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::door_id;
+    use super::{door_id, door_id_between};
+
+    #[test]
+    fn a_door_id_is_the_same_from_either_side() {
+        assert_eq!(door_id_between("bedroom", "hallway"), "door-bedroom-hallway");
+        assert_eq!(door_id_between("hallway", "bedroom"), "door-bedroom-hallway");
+        assert_eq!(door_id_between("house/landing", "house/attic"), "door-house-attic-house-landing");
+        assert_eq!(door_id_between(" Big Hall ", "../c"), "door-big-hall-c");
+        assert_eq!(door_id_between("bedroom", ""), "door-bedroom");
+    }
 
     #[test]
     fn door_ids_are_predictable_file_names() {

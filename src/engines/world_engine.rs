@@ -346,6 +346,34 @@ impl WorldEngine {
             && self.world_root.as_deref().map_or(true, |root| crate::packaging::installed_id(root).is_none())
     }
 
+    /// The id and title for a new door from room `here` to `to` (none for
+    /// a door with one side so far), made from `template` (REQ-ENG-47).
+    /// The id is `door_id_between`, with `-2`, `-3` and on when a thing
+    /// already has it, as when two doors join the same rooms. The title is
+    /// the template's when it gives a real one (anything but `Door`), else
+    /// the far room's name as seen from `here` ("Bedroom door"), else `Door`.
+    pub fn new_door_name(&self, here: &str, to: Option<&str>, template: &str) -> (String, String) {
+        let base = super::door_id_between(here, to.unwrap_or(""));
+        let mut id = base.clone();
+        let mut n = 2;
+        while !self.kinds_with_id(&id).is_empty() || self.doors.contains_key(&id) {
+            id = format!("{}-{}", base, n);
+            n += 1;
+        }
+        let from_template = self
+            .find_template(template, Path::new(""))
+            .and_then(|t| t.str_key("title").map(str::to_string))
+            .filter(|t| !t.trim().is_empty() && !t.trim().eq_ignore_ascii_case("door"));
+        let title = from_template.unwrap_or_else(|| match to {
+            Some(room) => {
+                let name = self.get_location(room).map(|l| l.name.clone()).unwrap_or_else(|| super::title_from_id(room));
+                format!("{} door", name)
+            }
+            None => "Door".to_string(),
+        });
+        (id, title)
+    }
+
     /// The template `name` means, seen from `scope` (a folder relative to
     /// the world root; empty for the root): a path from the root, or a
     /// bare name in `templates/` folders from `scope` outward, then a
@@ -1888,6 +1916,24 @@ mod tests {
         let mut engine = WorldEngine::new();
         let report = engine.load_world(dir.path()).unwrap();
         (dir, engine, report)
+    }
+
+    #[test]
+    fn a_new_door_is_named_the_same_from_either_side() {
+        let (dir, mut engine, _) = small_world();
+        // Made in the yard, it's named for the far room, the hall.
+        assert_eq!(engine.new_door_name("castle/yard", Some("castle/hall"), "door"), ("door-castle-hall-castle-yard".to_string(), "Hall door".to_string()));
+        assert_eq!(engine.new_door_name("castle/hall", Some("castle/yard"), "door").0, "door-castle-hall-castle-yard");
+        // A far room not made yet takes its title from its id.
+        assert_eq!(engine.new_door_name("castle/yard", Some("castle/cellar"), "door").1, "Cellar door");
+        assert_eq!(engine.new_door_name("castle/yard", None, "door"), ("door-castle-yard".to_string(), "Door".to_string()));
+        // A template with a real title gives it.
+        assert_eq!(engine.new_door_name("castle/yard", Some("castle/hall"), "portal").1, "Portal");
+        write(dir.path(), "templates/iron.md", "---\ntitle: Iron door\ntype: door\n---\n");
+        write(dir.path(), "doors/door-castle-hall-castle-yard.md", "---\nid: door-castle-hall-castle-yard\ntitle: Hall door\ntype: door\nsides:\n  castle/yard: { direction: north }\n  castle/hall: { direction: south }\n---\n");
+        engine.load_world(dir.path()).unwrap();
+        // A second door between the same rooms gets a suffix.
+        assert_eq!(engine.new_door_name("castle/hall", Some("castle/yard"), "iron"), ("door-castle-hall-castle-yard-2".to_string(), "Iron door".to_string()));
     }
 
     #[test]
