@@ -4,6 +4,13 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.94.0 (2026-11-25)
+
+### Added
+
+- World-wide things: a bundle in `world/` other than `index.md`, `story.md`, `player.md` and `styles/` loads as a thing of its own `type:`, its id its folder's name when it gives none (`world/weather/` is `weather`). Weather is one, `type: object` with `visibility: absent`, changing by `after:` like anything else (`design/STATES.md` › Clocks).
+- `## When: #arrive` in a state: shown at the end of the turn a clock moves the thing into that state, when the player is in its room, can see or carries it, or it's world-wide. Otherwise the change is silent until the player looks. `#arrive` joins the reserved tags.
+
 ## 0.93.0 (2026-11-25)
 
 ### Added

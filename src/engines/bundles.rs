@@ -514,7 +514,17 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], scripts: &BTreeMap<PathBu
         match classify(&rel(&file.path), &bundle_dirs) {
             Role::Excluded => {}
             Role::Invalid(reason) => built.problems.push(format!("{}: {}", shown, reason)),
-            Role::Entity { bundle } => entities.push((layer, bundle)),
+            Role::Entity { bundle } => {
+                // A world-wide thing in world/ is named by its folder.
+                if let (Some(b), true) = (&bundle, parts.first().map(String::as_str) == Some("world")) {
+                    if !layer.metadata.contains_key("id") {
+                        if let Some(name) = b.file_name() {
+                            layer.metadata.insert(Value::from("id"), Value::from(name.to_string_lossy().into_owned()));
+                        }
+                    }
+                }
+                entities.push((layer, bundle))
+            }
             Role::State { bundle, name } => {
                 strip_identity(&mut layer, "a state file", &mut built.problems);
                 match layer.metadata.get("inherits") {

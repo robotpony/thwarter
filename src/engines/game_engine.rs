@@ -55,7 +55,12 @@ impl GameEngine {
         let mut result = self.act_raw(world, state, action);
         // The clocks run after the turn's action (`design/STATES.md` › Clocks).
         if state.turn > before {
-            result.changes.extend(self.run_clocks(world, state));
+            let (changes, arrived) = self.run_clocks_shown(world, state);
+            result.changes.extend(changes);
+            if !arrived.is_empty() {
+                let arrived = crate::render::clean_text(&arrived.join("\n\n"));
+                result.text = if result.text.trim().is_empty() { arrived } else { format!("{}\n\n{}", result.text, arrived) };
+            }
         }
         result.text = crate::render::clean_text(&result.text);
         result.note = result.note.map(|n| crate::render::clean_text(&n));
@@ -67,6 +72,44 @@ impl GameEngine {
     /// state, in a stable order, and an `after:` on the new state counts
     /// from when the old one ran out, so a chain keeps time.
     pub fn run_clocks(&self, world: &WorldEngine, state: &mut PlayState) -> Vec<Change> {
+        self.run_clocks_shown(world, state).0
+    }
+
+    /// `run_clocks`, with the `## When: #arrive` text of each state a clock
+    /// moved a thing into, when the player can see it: the thing is here
+    /// (the room, or in its view) or world-wide, in `world/`.
+    fn run_clocks_shown(&self, world: &WorldEngine, state: &mut PlayState) -> (Vec<Change>, Vec<String>) {
+        let changes = self.run_clocks_only(world, state);
+        let view = self.view(world, state);
+        let here = |kind: EntityKind, id: &str| -> bool {
+            if kind == EntityKind::Location {
+                return id == state.location;
+            }
+            let Some(view) = &view else { return false };
+            view.objects.iter().any(|o| o.id == id)
+                || view.characters.iter().any(|c| c.id == id)
+                || view.held.iter().any(|h| h.thing.id == id)
+                || doors_here(view).iter().any(|d| d.id == id)
+                || state.inventory.iter().any(|x| x == id)
+        };
+        let mut shown = Vec::new();
+        for change in &changes {
+            let Change::Became { type_name, id, state: to } = change else { continue };
+            let Some(kind) = EntityKind::from_type_name(type_name) else { continue };
+            let Some(thing) = world.thing(kind, id) else { continue };
+            let world_wide = thing.bundle.as_deref().map_or(false, |b| b.starts_with("world"));
+            if !(world_wide || here(kind, id)) {
+                continue;
+            }
+            if let Some(text) = self.arrival(world, state, thing, to) {
+                let text = world.fill(&text, &Scope { at: At::play(state), this: Some((kind, id)), here: None });
+                shown.push(prose(world, crate::engines::layers::strip_comments(&text).trim()));
+            }
+        }
+        (changes, shown)
+    }
+
+    fn run_clocks_only(&self, world: &WorldEngine, state: &mut PlayState) -> Vec<Change> {
         use crate::engines::clock::{after_of, at_of, When};
         let mut changes = Vec::new();
         let from = state.clocked;
@@ -2238,6 +2281,41 @@ mod tests {
         assert!((5..=7).contains(&first.unwrap()));
         // The bell rang once.
         assert_eq!(state.state_of("object", "bell"), Some("ringing"));
+    }
+
+    #[test]
+    fn weather_is_a_world_wide_thing_whose_arrival_shows_anywhere() {
+        let dir = tempfile::tempdir().unwrap();
+        let w = |rel: &str, text: &str| {
+            let p = dir.path().join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, text).unwrap();
+        };
+        w("world/index.md", "---\ntype: world\ntitle: Town\nstart: market\n---\n");
+        w("world/weather/index.md", "---\ntitle: Weather\ntype: object\nobject_type: weather\nvisibility: absent\nstate: clear\n---\n");
+        w("world/weather/clear.md", "---\ninherits: index\nafter: { turns: 2, becomes: rain }\n---\n");
+        w("world/weather/rain.md", "---\ninherits: index\nafter: { turns: 2, becomes: clear }\n---\n## When: #arrive\nRain begins to fall.\n");
+        w("market.md", "---\nid: market\ntitle: Market\ntype: location\nobjects: [bread]\n---\nStalls.\n\n## When: @weather:rain\nPuddles form.\n");
+        w("objects/bread/index.md", "---\nid: bread\ntitle: Bread\ntype: object\nobject_type: food\nstate: fresh\n---\n");
+        w("objects/bread/fresh.md", "---\ninherits: index\nafter: { turns: 1, becomes: stale }\n---\n");
+        w("objects/bread/stale.md", "---\ninherits: index\n---\n## When: #arrive\nThe bread has gone hard.\n");
+        w("lane.md", "---\nid: lane\ntitle: Lane\ntype: location\n---\nQuiet.\n");
+        let mut world = WorldEngine::new();
+        world.load_world(dir.path()).unwrap();
+        assert!(world.current_problems(true).is_empty(), "{:?}", world.current_problems(true));
+        assert!(world.thing(EntityKind::Object, "weather").is_some());
+        let game = GameEngine::new();
+        // In the lane, the bread's arrival isn't seen; the weather's is.
+        let mut state = game.start(&world, "lane").unwrap();
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Wait).text, "Time passes.");
+        assert_eq!(state.state_of("object", "bread"), Some("stale"));
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Wait).text, "Time passes.\n\nRain begins to fall.");
+        // In the market, the bread's is, and the room shows the rain.
+        let mut state = game.start(&world, "market").unwrap();
+        assert_eq!(game.act(&world, &mut state, &PlayAction::Wait).text, "Time passes.\n\nThe bread has gone hard.");
+        game.act(&world, &mut state, &PlayAction::Wait);
+        let look = game.act(&world, &mut state, &PlayAction::Look).text;
+        assert!(look.contains("Puddles form.") && !look.contains("Weather"), "{}", look);
     }
 
     #[test]

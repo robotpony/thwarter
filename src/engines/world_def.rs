@@ -60,6 +60,11 @@ pub(crate) fn world_file(parts: &[String]) -> Option<WorldFile> {
     if parts.first().map(String::as_str) != Some("world") || parts.len() < 2 {
         return None;
     }
+    // A bundle in world/ is a world-wide thing (`weather`), loaded as any
+    // other (`design/STATES.md` › Clocks).
+    if parts.len() >= 3 && parts[1] != "styles" {
+        return None;
+    }
     Some(match parts[1..].iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["index.md"] => WorldFile::Index,
         ["story.md"] => WorldFile::Story,

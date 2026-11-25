@@ -215,6 +215,26 @@ impl GameEngine {
         tags
     }
 
+    /// What's shown when a clock moves `thing` into `new` (`design/STATES.md`
+    /// › Clocks): its `## When: #arrive` sections in that state's files,
+    /// or elsewhere with `#arrive #<new>`, whose other tags hold.
+    pub(crate) fn arrival(&self, world: &WorldEngine, state: &PlayState, thing: &Thing, new: &str) -> Option<String> {
+        let mut tags = self.turn_tags_in(world, state);
+        tags.insert("#arrive".to_string());
+        tags.insert(format!("#{}", new));
+        let mut layers: Vec<(&crate::engines::layers::Layer, bool)> = thing.templates.iter().map(|l| (l, false)).collect();
+        layers.extend(thing.template_states.get(new).into_iter().flatten().map(|l| (l, true)));
+        layers.push((&thing.index, false));
+        layers.extend(thing.states.get(new).map(|l| (l, true)));
+        let said: Vec<String> = layers
+            .into_iter()
+            .flat_map(|(layer, in_state)| layer.sections.iter().map(move |s| (s, in_state)))
+            .filter(|(s, in_state)| s.tags.iter().any(|t| t == "#arrive") && (*in_state || s.tags.iter().any(|t| *t == format!("#{}", new))) && s.matches(|t| tags.contains(t)))
+            .filter_map(|(s, _)| prose_of(s))
+            .collect();
+        (!said.is_empty()).then(|| said.join("\n\n"))
+    }
+
     /// A thing's current state in play.
     pub(crate) fn current_state(&self, world: &WorldEngine, state: &PlayState, kind: EntityKind, id: &str) -> Option<String> {
         let thing = world.thing(kind, id)?;
