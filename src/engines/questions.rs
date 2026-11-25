@@ -156,6 +156,30 @@ pub fn parse(name: &str, scope: Option<PathBuf>, path: &Path, body: &str, shown:
     (QuestionSet { name: name.to_string(), scope, path: path.to_path_buf(), questions }, warnings)
 }
 
+/// What's odd about the built-in sets a world still asks (an answer
+/// that does something unknown, say), as `parse` warns about a world's
+/// own: every built-in but one that a set of the same name at the
+/// world's root replaces.
+pub fn builtin_warnings(sets: &[QuestionSet]) -> Vec<String> {
+    builtin_warnings_in(BUILTIN_QUESTIONS, sets)
+}
+
+fn builtin_warnings_in(builtins: &[(&str, &str)], sets: &[QuestionSet]) -> Vec<String> {
+    let mut out = Vec::new();
+    for (name, text) in builtins {
+        if sets.iter().any(|s| s.name == *name && s.scope.as_deref() == Some(Path::new(""))) {
+            continue;
+        }
+        let path = PathBuf::from(format!("<built-in>/questions/{}.md", name));
+        let shown = path.to_string_lossy().into_owned();
+        match crate::engines::layers::Layer::parse(&path, text) {
+            Ok(layer) => out.extend(parse(name, None, &path, &layer.body, &shown).1),
+            Err(e) => out.push(format!("{}: doesn't parse, so it isn't asked: {}", shown, e)),
+        }
+    }
+    out
+}
+
 /// The built-in set `name`, if there is one.
 pub fn builtin(name: &str) -> Option<QuestionSet> {
     let (_, text) = BUILTIN_QUESTIONS.iter().find(|(n, _)| *n == name)?;
@@ -200,6 +224,19 @@ pub fn question_file(rel: &Path) -> Option<(PathBuf, String)> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_built_in_set_warns_as_a_world_set_does_unless_the_world_replaces_it() {
+        let builtins = [("object", "---\ntype: questions\n---\n## Where is it?\n- Loose (default)\n- A fixture -> location in room\n")];
+        let warnings = builtin_warnings_in(&builtins, &[]);
+        assert_eq!(warnings, ["<built-in>/questions/object.md: \"A fixture\" under \"Where is it?\" does `location in room`, which isn't set, recipe, ask thing or ask value"]);
+        // A world's own object set at its root replaces the built-in, so
+        // the built-in isn't asked and doesn't warn; one in a folder doesn't.
+        let own = |scope: &str| QuestionSet { name: "object".into(), scope: Some(PathBuf::from(scope)), path: PathBuf::new(), questions: Vec::new() };
+        assert!(builtin_warnings_in(&builtins, &[own("")]).is_empty());
+        assert_eq!(builtin_warnings_in(&builtins, &[own("castle")]).len(), 1);
+    }
+
     use super::*;
 
     const LAMP: &str = "## Where does it start?\nPick one.\n- Loose, it can be taken (default)\n- Hanging on a wall, pulled free -> recipe fixed-until pull\n- On something here -> ask thing, then move into it\n\n## How bright?\n- Dim → set brightness\n- Preset -> set title Brass  lantern\n- Ask me -> ask value brightness 3\n- Glowing (default)\n- Wobbly (default) -> dance about\n";

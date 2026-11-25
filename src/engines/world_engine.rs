@@ -635,6 +635,8 @@ impl WorldEngine {
         self.question_sets = std::mem::take(&mut built.questions);
         self.file_problems = built.problems;
         self.file_warnings = built.warnings;
+        // The built-in question sets warn as the world's own do.
+        self.file_warnings.extend(crate::engines::questions::builtin_warnings(&self.question_sets));
         if let Some(w) = &self.world_toml_warning {
             self.file_warnings.insert(0, w.clone());
         }

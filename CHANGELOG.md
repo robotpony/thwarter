@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.81.3 (2026-11-25)
+
+### Fixed
+
+- `validate` warns about the built-in question sets as it does about a world's own, so an answer that does something unknown, like `-> location in room` in `src/builtins/questions/object.md`, is reported as `<built-in>/questions/object.md: ...`. A built-in that a world's own set of the same name at its root replaces isn't asked, so it doesn't warn (`BUGS.md`).
+
 ## 0.81.2 (2026-11-25)
 
 ### Changed
