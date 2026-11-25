@@ -19,6 +19,8 @@ mod removing;
 mod to_write;
 mod world_index;
 mod panels;
+mod picker;
+pub use picker::run_or_pick;
 mod play;
 mod restart;
 mod screen;

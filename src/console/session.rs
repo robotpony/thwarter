@@ -846,7 +846,7 @@ pub(super) fn suggest(text: &str, commands: &[&str]) -> String {
 /// The `[console]` text table: the built-in defaults, with the author's
 /// `[console]` from `config.toml` laid over them, and a warning for each
 /// problem in it. A problem keeps the default for that key.
-fn console_texts() -> (crate::engines::texts::Texts, Vec<String>) {
+pub(super) fn console_texts() -> (crate::engines::texts::Texts, Vec<String>) {
     with_personal(crate::engines::texts::Texts::defaults())
 }
 

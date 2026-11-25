@@ -265,3 +265,12 @@ created_object_place_failed = "Created object {id}, {title}\nBut placing it in {
 # /help's rows under each mode's heading (session.rs).
 help_edit_rows = "  north, n, go up, ...  follow an exit from this room\n  go <name>             go to a room, area, folder, character or object\n  go back               back to where you were;  go /  goes to the world root\n  look                  show where you are: a room, a thing, or a folder\n  examine <thing>, x    show a person or thing here without going to it"
 help_play_rows = "  look, l                   look around\n  go <direction>, north, n  go somewhere (ne, up, u, ...)\n  take <thing>, get         pick something up\n  examine <thing>, x        look closely (also: look at)\n  inventory, i              what you're carrying"
+
+# The world picker, when no world is given (picker.rs, REQ-CON-62).
+pick_heading = "Which world?"
+pick_installed = "installed"
+pick_keys = "↑↓ choose · enter opens · esc quits"
+pick_make = "Make a new world in {folder}/"
+pick_name = "Name the new world: {name}"
+pick_naming_keys = "type a name · enter makes it · esc back"
+pick_none_to_play = "There are no worlds to play here. Install one with:\n\n  thwart install <package>"

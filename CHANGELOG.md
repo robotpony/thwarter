@@ -72,6 +72,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.79.0 (2026-11-24)
+
+### Added
+
+- The world picker, `console::run_or_pick` (REQ-CON-62). When no world is given, a terminal shows the worlds `worlds::find_worlds` sees: ↑ and ↓ choose, Enter opens, Esc quits. Edit lists only the worlds you can write, and with none offers to make one in `authors/<you>/`. Play lists installed worlds too, and with none says how to install one. Without a terminal, the list goes back to the caller to print, as before. Its text is `[console]`'s `pick_*` keys.
+
 ## 0.78.0 (2026-11-24)
 
 ### Added

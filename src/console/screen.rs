@@ -791,7 +791,7 @@ where
 /// console in terminals that can send it (the kitty keyboard protocol:
 /// kitty, WezTerm, Ghostty, iTerm2 3.5+; others ignore the request), and a
 /// clear screen, since after a /restart it still shows the last build's frame.
-fn enter_terminal() -> std::io::Result<ratatui::DefaultTerminal> {
+pub(super) fn enter_terminal() -> std::io::Result<ratatui::DefaultTerminal> {
     use ratatui::crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
     let terminal = ratatui::try_init()?;
     let _ = ratatui::crossterm::execute!(
@@ -803,14 +803,14 @@ fn enter_terminal() -> std::io::Result<ratatui::DefaultTerminal> {
 }
 
 /// Gives the terminal back as it was.
-fn leave_terminal() {
+pub(super) fn leave_terminal() {
     let _ = ratatui::crossterm::execute!(std::io::stdout(), ratatui::crossterm::event::PopKeyboardEnhancementFlags);
     ratatui::restore();
 }
 
 /// A key as the console takes it. Command-S, which a Mac user saves with,
 /// is Ctrl-S; other Command keys stay with the terminal (copy, paste).
-fn input_of(key: ratatui::crossterm::event::KeyEvent) -> Input {
+pub(super) fn input_of(key: ratatui::crossterm::event::KeyEvent) -> Input {
     use ratatui::crossterm::event::{KeyCode, KeyModifiers};
     if key.modifiers.contains(KeyModifiers::SUPER) && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S')) {
         return Input { key: Key::Char('s'), ctrl: true, ..Input::default() };
