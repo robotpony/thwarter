@@ -6,6 +6,7 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 
 ## Open
 
+- [ ] **TO WRITE keys don't work in the editor**: Ctrl-1 to 9 open an entry from the console prompt but do nothing in the full-screen editor, where switching documents like tabs matters most (Bruce, 2026-11-24) [console] (REQ-CON-59)
 - [ ] **An unknown question construct does nothing, silently**: `validate` checks only a world's own question sets, so a built-in like `src/builtins/questions/object.md` with an answer such as `-> location in room` (not one of `set`, `recipe`, `ask thing`, `ask value`) gets no warning. Built-in and world sets should both warn; the console will also say when a picked answer does nothing (2026-11-24) [coder, console] (`design/CONTENT_FORMAT.md` › type: questions)
 - [ ] **One compiler warning left**, `narrative_engine`'s unused `conditions` in a stub; it goes when narrative state uses that code. The two in `world_graph::find_path` went with the map in 0.37.0. Down from 11 in 0.7.0 (2026-08-23)
 
