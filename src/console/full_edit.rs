@@ -115,7 +115,7 @@ impl Console {
                                 self.pending_edit = Some(target);
                                 String::new()
                             }
-                            Ok(target) => format!("/edit opens {}.md in a full-screen editor, which needs a terminal.", target.path),
+                            Ok(target) => self.t("edit_needs_terminal_for", &[("path", &target.path)]),
                             Err(e) => e,
                         },
                         None => self.offer_world_index(),
@@ -154,14 +154,16 @@ impl Console {
 
     /// What the editor opens for `target`.
     pub(super) fn edit_document(&self, target: &EditTarget) -> Document {
-        let mut heading = format!("/edit {}  {}.md", target.kind.label(), target.path);
-        if target.opened.is_none() {
-            heading.push_str(" (new card)");
+        let key = if target.opened.is_none() {
+            "edit_heading_new_card"
         } else if target.kind == Kind::Broken {
-            heading = format!("/edit  {}.md (doesn't parse)", target.path);
+            "edit_heading_broken"
         } else if target.kind == Kind::World {
-            heading = format!("/edit  {}.md (world settings)", target.path);
-        }
+            "edit_heading_world"
+        } else {
+            "edit_heading"
+        };
+        let heading = self.t(key, &[("kind", target.kind.label()), ("path", &target.path)]);
         let text = target.opened.clone().unwrap_or_else(|| scenery_card(&target.id, &title_or_default(&[], &target.id)));
         Document::single(heading, text)
     }
@@ -237,10 +239,10 @@ impl Console {
             return Err(match kind {
                 Some(kind) => {
                     let label = kind.label();
-                    super::session::suggest(&format!("/edit {} edits the {} you're in. Go to one, or name it:", label, label), &[&format!("/edit {} {{id}}", label)])
+                    super::session::suggest(&self.t("edit_kind_here", &[("kind", label)]), &[&format!("/edit {} {{id}}", label)])
                 }
                 None => super::session::suggest(
-                    &format!("{} is a folder, with nothing to edit. Go to a room or thing, or name one:", self.pwd()),
+                    &self.t("edit_folder", &[("place", &self.pwd())]),
                     &["/edit {name}"],
                 ),
             });
@@ -322,7 +324,7 @@ impl Console {
 
     /// The file at `path`, if it fits `kind` (any kind for `None`).
     fn target_for_file(&self, path: &String, kind: Option<Kind>) -> Result<EditTarget, String> {
-        let entry = self.world.files.get(path).ok_or_else(|| format!("{} is not in the world.", path))?;
+        let entry = self.world.files.get(path).ok_or_else(|| self.t("not_in_world", &[("id", path)]))?;
         match entry.kind {
             // Any kind opens a file that doesn't parse: what it holds is
             // what the author is fixing.
@@ -330,11 +332,7 @@ impl Console {
             // World settings aren't a room, character or object; any kind
             // word opens them.
             Kind::World => self.open_target(Kind::World, entry.id.clone(), path.clone()),
-            found if !found.is_thing() => Err(format!(
-                "{}.md is a {}. Editing those comes with bundle editing; look shows it for now.",
-                path,
-                found.label()
-            )),
+            found if !found.is_thing() => Err(self.t("edit_not_a_thing", &[("path", path), ("kind", found.label())])),
             found if kind.is_none_or(|k| k == found) => self.open_target(found, entry.id.clone(), path.clone()),
             found => {
                 let label = kind.map(Kind::label).unwrap_or_default();

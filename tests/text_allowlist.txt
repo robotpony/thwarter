@@ -4,3 +4,65 @@ Not written yet ({}):	src/engines/world_engine.rs: validate's not-written headin
 Starts in: {}	src/render.rs: `thwart show <character>`; command-line output, Phase 11
 Chapter versions: {}	src/render.rs: `thwart show <thing>`; command-line output, Phase 11
 Shown in chapter: {}	src/render.rs: `thwart show <thing> --chapter`; command-line output, Phase 11
+
+# Found by the wider guard (two words or more), 2026-11-24. Engine and render; the coder's.
+`{}` is a reserved name and can't be a state of {}/	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+a bundle is a leaf: {}/ may hold only its state files and one `chapters/` folder	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+`{}` is a reserved name here	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+a state file	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+; overlays are named without the chapter's number (`{}.md`)	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+everything in the world	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+everything in {}/	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+a chapter overlay	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+no file {}.md	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+no templates/ folder from here to the root has it, and no built-in does	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+`inherits: {}` names no template: {}	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+no state file {}/{}.md exists	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+a one-file thing has no states; it becomes a bundle when it gets its first	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+in state `{}`	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+in chapter `{}`	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+its index	src/engines/game_engine.rs: part of a load warning or error; tooling, Phase 11
+the root	src/engines/game_engine.rs: part of a load warning or error; tooling, Phase 11
+; they are {}	src/engines/texts.rs: part of a text-table warning; tooling, Phase 11
+needs a level, like `story.` or `player.`	src/engines/variables.rs: a variable problem for validate, built in a helper; tooling, Phase 11
+`this.` only means something in a thing's own file	src/engines/variables.rs: a variable problem for validate, built in a helper; tooling, Phase 11
+the game has only {}	src/engines/variables.rs: a variable problem for validate, built in a helper; tooling, Phase 11
+story values are declared in world/story.md's `vars:`	src/engines/variables.rs: a variable problem for validate, built in a helper; tooling, Phase 11
+player values are declared in world/player.md's `vars:`	src/engines/variables.rs: a variable problem for validate, built in a helper; tooling, Phase 11
+`{}` isn't in the `vars:` it names	src/engines/variables.rs: a variable problem for validate, built in a helper; tooling, Phase 11
+{}: `{{{{ {} }}}}` isn't declared: {}	src/engines/variables.rs: a variable problem for validate, built in a helper; tooling, Phase 11
+character `{}`'s inventory	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+Validation passed: no problems or warnings	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+Validation passed: no problems, {} warning(s)	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+Validation failed: {} problem(s), {} warning(s)	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+isn't part of the world as loaded	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+{}: the state `{}` has a reserved name, so `## When: #{}` rewords a built-in reply instead of matching it; rename the state	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+{}: `[verbs] {}` is a direction, which is read first, so the alias never applies	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+{}: `[verbs] {}` is a built-in verb, which is read first, so the alias never applies	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+{}: `[verbs] {} = "{}"`: nothing in the world answers to `{}`	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+object `{}`: `holds:` is empty; say how it holds things, like `holds: in`	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+door `{}`: `holds:` is empty; say how it holds things, like `holds: in`	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+`{}` matches more than one file: {}	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+{}: names no `authors:`, so no one is its author and features for authors stay off; add `authors: <your user name>`	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+id `{}` is used by more than one kind ({}); give each a different id	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+object `{}`, action `{}`	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+ids can't contain a dot, which splits a variable's name	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+it's reserved as a variable level	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+(no rooms to map)	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
+ (through the {}{})	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
+ (not written yet)	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
+(no description yet)	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
+moves to chapter {}	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
+ (leads nowhere)	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
+Not passable	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
+Carries: nothing	src/render.rs: `thwart show` or `thwart map` output; command-line output, Phase 11
+# Console literals the wider guard finds that stay in code.
+unknown location `{}`	src/console/panels.rs: matches the engine's problem wording to find rooms to write, so it follows the engine's text
+restarting in place needs a Unix terminal	src/console/restart.rs: a low-level error reason, wrapped in [console] restart_failed; tooling, Phase 11
+Validation failed	src/console/theme.rs: a prefix line_role matches on validate's output, which is tooling until Phase 11
+Validation passed	src/console/theme.rs: a prefix line_role matches on validate's output, which is tooling until Phase 11
+(world settings)	src/console/theme.rs: is_arrival matches it on edit mode's arrival line to colour it as a title
+doesn't parse	src/console/world.rs: Kind::label, a label people also type (/edit room); moves with a label_in(&Texts), follow-up
+world settings	src/console/world.rs: Kind::label, a label people also type; moves with a label_in(&Texts), follow-up
+chapter overlay	src/console/world.rs: Kind::label, a label people also type; moves with a label_in(&Texts), follow-up
+game start	src/console/world.rs: Kind::label, a label people also type; moves with a label_in(&Texts), follow-up

@@ -99,7 +99,8 @@ pub(super) const COMPASS_ALIASES: &[(&str, &str)] = &[
 
 impl Console {
     pub fn open(world_path: &Path, mode: Mode) -> Result<Console> {
-        let world = World::load(world_path)?;
+        let (texts, config_warnings) = console_texts();
+        let world = World::load_with(world_path, texts.clone())?;
         let mut console = Console {
             world,
             mode,
@@ -117,12 +118,11 @@ impl Console {
             created: Vec::new(),
             added: None,
             pending_questions: None,
-            texts: Default::default(),
-            config_warnings: Vec::new(),
+            texts,
+            config_warnings,
             said: Default::default(),
             unknown_log: None,
         };
-        (console.texts, console.config_warnings) = console_texts();
         if mode == Mode::Play {
             if let Some(room) = console.world.default_room() {
                 console.start_game(&room).map_err(anyhow::Error::msg)?;
@@ -136,26 +136,21 @@ impl Console {
     /// keeps `play village/square> `. The status bar names the mode.
     pub fn prompt(&self) -> String {
         match self.mode {
-            Mode::Edit => format!("in {} > ", self.pwd()),
-            Mode::Play => format!(
-                "play {}> ",
-                self.game.as_ref().map(|g| g.location.clone()).unwrap_or_else(|| "nowhere".to_string())
+            Mode::Edit => self.t("prompt_edit", &[("place", &self.pwd())]),
+            Mode::Play => self.t(
+                "prompt_play",
+                &[("place", &self.game.as_ref().map(|g| g.location.clone()).unwrap_or_else(|| self.t("nowhere", &[])))],
             ),
         }
     }
 
     /// What the console says when it opens.
     pub fn greeting(&self) -> String {
-        let verb = match self.mode {
-            Mode::Edit => "Editing",
-            Mode::Play => "Playing",
+        let key = match self.mode {
+            Mode::Edit => "greeting_edit",
+            Mode::Play => "greeting_play",
         };
-        let mut out = vec![format!(
-            "{} {} ({}). Type /help for commands.",
-            verb,
-            self.world.display_name(),
-            self.world.root.display()
-        )];
+        let mut out = vec![self.t(key, &[("world", &self.world.display_name()), ("path", &self.world.root.display().to_string())])];
         out.extend(self.problem_summary());
         out.extend(self.config_warnings.iter().cloned());
         if self.mode == Mode::Play {
@@ -205,7 +200,7 @@ impl Console {
             registry::Lookup::Ambiguous(list) => {
                 let names: Vec<String> = list.iter().map(|c| format!("/{}", c.name)).collect();
                 let names: Vec<&str> = names.iter().map(String::as_str).collect();
-                return (suggest(&format!("/{} could be:", typed), &names), Flow::Continue);
+                return (suggest(&self.t("command_could_be", &[("command", typed)]), &names), Flow::Continue);
             }
             registry::Lookup::Unknown(near) => {
                 self.log_unknown("command", &format!("/{}", command));
@@ -219,15 +214,15 @@ impl Console {
             }
         };
         if def.edit_only() && self.mode != Mode::Edit {
-            return (format!("/{} changes content, so it only works in edit mode. Type /edit to switch.", def.name), Flow::Continue);
+            return (self.t("edit_only_command", &[("command", &def.name)]), Flow::Continue);
         }
         let name = def.handler.as_str();
         let out = match (name, rest.as_slice()) {
-            ("quit", _) => return ("Bye.".to_string(), Flow::Quit),
+            ("quit", _) => return (self.t("bye", &[]), Flow::Quit),
             ("help", []) => self.help(),
             ("help", [one]) => self.help_for(one),
             ("clear", []) if self.interactive => return (String::new(), Flow::Clear),
-            ("clear", []) => "/clear empties the screen's output, which needs a terminal.".to_string(),
+            ("clear", []) => self.t("clear_needs_terminal", &[]),
             ("status", []) => self.status_report(),
             ("validate", []) => self.validate(false),
             ("validate", ["strict"]) => self.validate(true),
@@ -237,7 +232,7 @@ impl Console {
             ("write", args) => self.write_command(args),
             ("start", []) => self.start_command(),
             ("restart", []) if self.interactive => return (String::new(), Flow::Restart),
-            ("restart", []) => "/restart restarts the console on the newest build, which needs a terminal.".to_string(),
+            ("restart", []) => self.t("restart_needs_terminal", &[]),
             ("edit", args) => self.full_edit(args),
             ("play", []) => self.play(),
             ("play", ["here"]) => self.play_here(),
@@ -256,7 +251,7 @@ impl Console {
             ("add", args) => self.add_and_edit(args),
             // Arguments the command doesn't take: its usage, from its file.
             _ if HANDLERS.contains(&name) => suggest(&self.t("usage", &[]), &[&def.usage()]),
-            _ => format!("/{} has no handler in this build.", def.name),
+            _ => self.t("no_handler", &[("command", &def.name)]),
         };
         (out, Flow::Continue)
     }
@@ -310,17 +305,14 @@ impl Console {
     /// (REQ-CON-7). Keeps the old world if a file fails to parse or the
     /// player's room is gone.
     pub(crate) fn reload(&mut self) -> String {
-        let fresh = match World::load(&self.world.root) {
+        let fresh = match World::load_with(&self.world.root, self.texts.clone()) {
             Ok(world) => world,
             Err(e) => return self.t("reload_failed_because", &[("reason", &e.to_string())]),
         };
         let mut blockers: Vec<String> = fresh.blocking_problems();
         if let Some(game) = &self.game {
             if fresh.engine.get_location(&game.location).is_none() {
-                blockers.push(format!(
-                    "the player's room `{}` no longer exists (/play here from another room moves the player)",
-                    game.location
-                ));
+                blockers.push(self.t("player_room_gone", &[("room", &game.location)]));
             }
         }
         if !blockers.is_empty() {
@@ -348,7 +340,7 @@ impl Console {
         }
         let warnings = self.world.warnings();
         if !warnings.is_empty() {
-            out.push(format!("{} warning(s):", warnings.len()));
+            out.push(self.t("reload_warnings", &[("count", &warnings.len().to_string())]));
             out.extend(warnings.iter().map(|w| format!("  {}", w)));
         }
         out.join("\n")
@@ -358,12 +350,12 @@ impl Console {
         let mut out = Vec::new();
         let errors = self.world.blocking_problems();
         if !errors.is_empty() {
-            out.push(format!("{} file(s) don't parse:", errors.len()));
+            out.push(self.t("files_dont_parse", &[("count", &errors.len().to_string())]));
             out.extend(errors.iter().map(|e| format!("  {}", e)));
         }
         let warnings = self.world.warnings();
         if !warnings.is_empty() {
-            out.push(format!("{} warning(s), such as exits to rooms not written yet. /validate lists them.", warnings.len()));
+            out.push(self.t("warnings_summary", &[("count", &warnings.len().to_string())]));
         }
         out
     }
@@ -427,8 +419,8 @@ impl Console {
     fn arrival(&self) -> String {
         match &self.place {
             Place::File(path) => match self.world.files.get(path) {
-                Some(entry) if entry.kind == Kind::Room => format!("{} (room)", entry.title),
-                Some(entry) if entry.kind == Kind::Broken => format!("{}.md (doesn't parse)", path),
+                Some(entry) if entry.kind == Kind::Room => self.t("arrival_room", &[("title", &entry.title)]),
+                Some(entry) if entry.kind == Kind::Broken => self.t("arrival_broken", &[("path", path)]),
                 Some(entry) => format!("{} ({})", entry.title, entry.kind.label()),
                 None => self.pwd(),
             },
@@ -444,17 +436,18 @@ impl Console {
                 let mut names: Vec<String> = folders.iter().map(|f| format!("{}/", f)).collect();
                 names.extend(files.iter().map(|(n, _)| n.clone()));
                 if names.is_empty() {
-                    return format!("{}  nothing here yet", self.pwd());
+                    return self.t("folder_empty", &[("place", &self.pwd())]);
                 }
+                // One whole line per case, so each can be reworded.
                 let noun = if folders.is_empty() && files.iter().all(|(_, k)| *k == Kind::Room) {
-                    "room"
+                    "rooms"
                 } else if folders.is_empty() && files.iter().all(|(_, k)| matches!(k, Kind::Object | Kind::Character)) {
-                    "thing"
+                    "things"
                 } else {
-                    "item"
+                    "items"
                 };
-                let plural = if names.len() == 1 { "" } else { "s" };
-                format!("{}  {} {}{}: {}", self.pwd(), names.len(), noun, plural, names.join(", "))
+                let key = format!("folder_{}{}", noun, if names.len() == 1 { "_one" } else { "" });
+                self.t(&key, &[("place", &self.pwd()), ("count", &names.len().to_string()), ("names", &names.join(", "))])
             }
         }
     }
@@ -544,12 +537,12 @@ impl Console {
         for sub in &folders {
             let full = format!("{}{}", prefix, sub);
             let count = self.world.files.keys().filter(|p| p.starts_with(&format!("{}/", full))).count();
-            rows.push((format!("{}/", sub), format!("{} file(s)", count)));
+            rows.push((format!("{}/", sub), self.t("folder_files", &[("count", &count.to_string())])));
         }
         for (path, entry) in &self.world.files {
             if let Some(name) = child(path) {
                 let note = if entry.kind == Kind::Broken {
-                    "(doesn't parse)".to_string()
+                    self.t("doesnt_parse", &[])
                 } else {
                     format!("{}  ({})", entry.title, entry.kind.label())
                 };
@@ -586,7 +579,7 @@ impl Console {
         };
         let mut rows: Vec<(String, String)> = Vec::new();
         for (path, entry) in self.world.files.iter().filter(|(p, _)| !p.contains('/')) {
-            let note = if entry.kind == Kind::Broken { "(doesn't parse)".to_string() } else { format!("{}  ({})", entry.title, entry.kind.label()) };
+            let note = if entry.kind == Kind::Broken { self.t("doesnt_parse", &[]) } else { format!("{}  ({})", entry.title, entry.kind.label()) };
             rows.push((path.clone(), note));
         }
         const OWN: &[&str] = &["objects", "npcs", "doors", "world", "questions", "templates", "chapters", "game"];
@@ -602,7 +595,7 @@ impl Console {
                 "questions" => self.t("root_questions", &[("count", &in_folder(folder, None).to_string())]),
                 "templates" => self.t("root_templates", &[("count", &in_folder(folder, None).to_string())]),
                 "chapters" => self.t("root_chapters", &[("count", &in_folder(folder, None).to_string())]),
-                _ => format!("{} file(s)", in_folder(folder, None)),
+                _ => self.t("folder_files", &[("count", &in_folder(folder, None).to_string())]),
             };
             rows.push((format!("{}/", folder), label));
         }
@@ -617,7 +610,7 @@ impl Console {
     fn view_of(&self, path: &str) -> String {
         let path = path.to_string();
         let Some(entry) = self.world.files.get(&path) else {
-            return format!("{} is not in the world.", path);
+            return self.t("not_in_world", &[("id", &path)]);
         };
         match entry.kind {
             Kind::Room => match self.world.engine.describe_location(&entry.id) {
@@ -634,14 +627,14 @@ impl Console {
             },
             Kind::World => view::world(self.world.engine.world(), &path, &self.texts),
             Kind::Broken => {
-                let reason = if entry.title.is_empty() { "it doesn't parse" } else { entry.title.as_str() };
-                format!("{}.md isn't part of the world: {}", path, reason)
+                let reason = if entry.title.is_empty() { self.t("it_doesnt_parse", &[]) } else { entry.title.clone() };
+                self.t("not_part_of_world", &[("path", &path), ("reason", &reason)])
             }
             // A part of a thing or of the world: shown as written, until
             // bundle editing shows it in place (`design/STATES.md` › Console).
             _ => {
                 let text = std::fs::read_to_string(self.world.root.join(format!("{}.md", path))).unwrap_or_default();
-                format!("{} ({}), {}.md\n\n{}", entry.title, entry.kind.label(), path, text.trim_end())
+                self.t("part_as_written", &[("title", &entry.title), ("kind", entry.kind.label()), ("path", &path), ("text", text.trim_end())])
             }
         }
     }
@@ -739,12 +732,12 @@ impl Console {
                 self.world
                     .path_of(Kind::Character, target)
                     .map(Place::File)
-                    .ok_or_else(|| format!("`{}` is here but has no character card.", target)),
+                    .ok_or_else(|| self.t("no_character_card", &[("id", target)])),
             );
         }
         if location.objects.iter().any(|o| o == target) {
             return Some(self.world.path_of(Kind::Object, target).map(Place::File).ok_or_else(|| {
-                suggest(&format!("`{}` is scenery, with no card yet. To give it one:", target), &[&format!("/edit object {}", target)])
+                suggest(&self.t("scenery_no_card", &[("id", target)]), &[&format!("/edit object {}", target)])
             }));
         }
         None

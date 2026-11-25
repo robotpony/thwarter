@@ -27,13 +27,13 @@ impl Console {
         let mut out = vec![self.t("remove_ask", &[("id", &id), ("kind", kind.label())])];
         let others: Vec<String> = plan.removed.iter().skip(1).map(|(_, i)| i.clone()).collect();
         if !others.is_empty() {
-            out.push(format!("  also removes  {}", others.join(", ")));
+            out.push(self.t("remove_also", &[("ids", &others.join(", "))]));
         }
         for path in &plan.deleted {
-            out.push(format!("  deletes  {}", path.display()));
+            out.push(self.t("remove_deletes", &[("path", &path.display().to_string())]));
         }
         for (path, what) in &plan.changed {
-            out.push(format!("  changes  {}  {}", path.display(), what));
+            out.push(self.t("remove_changes", &[("path", &path.display().to_string()), ("what", &what.to_string())]));
         }
         if !plan.by_hand.is_empty() {
             out.push(String::new());

@@ -17,54 +17,55 @@ fn t(texts: &Texts, key: &str, args: &[(&str, &str)]) -> String {
 pub fn character(c: &Character, texts: &Texts) -> String {
     let mut out = vec![format!("{} ({})", c.name, c.id)];
     out.push(String::new());
-    out.push(description(&c.description));
+    out.push(description(&c.description, texts));
     out.push(String::new());
-    out.push(t(texts, "starts_in", &[("room", c.default_location.as_deref().unwrap_or("nowhere"))]));
-    out.push(list("Carries", &c.inventory));
+    let nowhere = t(texts, "nowhere", &[]);
+    out.push(t(texts, "starts_in", &[("room", c.default_location.as_deref().unwrap_or(&nowhere))]));
+    out.push(list(&t(texts, "view_carries", &[]), &c.inventory));
     tidy(out)
 }
 
 /// An object as edit mode shows it; its file and type are in the sidebar.
-pub fn object(o: &GameObject, _texts: &Texts) -> String {
+pub fn object(o: &GameObject, texts: &Texts) -> String {
     let mut out = vec![format!("{} ({})", o.title, o.id)];
     out.push(String::new());
-    out.push(description(&o.description));
+    out.push(description(&o.description, texts));
     let mut actions: Vec<&String> = o.actions.keys().collect();
     actions.sort();
     out.push(String::new());
-    out.push(list("Actions", &actions.into_iter().cloned().collect::<Vec<_>>()));
+    out.push(list(&t(texts, "view_actions", &[]), &actions.into_iter().cloned().collect::<Vec<_>>()));
     tidy(out)
 }
 
 /// The world's own settings, as edit mode shows any file in `world/`.
 pub fn world(def: &WorldDef, path: &str, texts: &Texts) -> String {
-    let mut out = vec![format!("World settings, {}.md", path), String::new()];
-    let or_unset = |v: &Option<String>| v.clone().unwrap_or_else(|| "not set".to_string());
-    out.push(format!("Title: {}", or_unset(&def.title)));
+    let mut out = vec![t(texts, "view_world_heading", &[("path", path)]), String::new()];
+    let or_unset = |v: &Option<String>| v.clone().unwrap_or_else(|| t(texts, "view_not_set", &[]));
+    out.push(t(texts, "view_title", &[("title", &or_unset(&def.title))]));
     if !def.authors.is_empty() {
-        let label = if def.authors.len() == 1 { "Author" } else { "Authors" };
-        out.push(format!("{}: {}", label, def.authors.join(", ")));
+        let key = if def.authors.len() == 1 { "view_author" } else { "view_authors" };
+        out.push(t(texts, key, &[("authors", &def.authors.join(", "))]));
     }
     if let Some(version) = &def.version {
-        out.push(format!("Version: {}", version));
+        out.push(t(texts, "view_version", &[("version", version)]));
     }
     out.push(t(texts, "starts_in", &[("room", &or_unset(&def.start))]));
     out.push(String::new());
-    out.push(description(&def.intro));
+    out.push(description(&def.intro, texts));
     let story: Vec<String> = def.story.iter().map(|(k, v)| format!("{} = {}", k, v)).collect();
     out.push(String::new());
-    out.push(list("Story values", &story));
+    out.push(list(&t(texts, "view_story_values", &[]), &story));
     if let Some(player) = &def.player {
         let vars: Vec<String> = player.vars.iter().map(|(k, v)| format!("{} = {}", k, v)).collect();
-        out.push(format!("Player: {}", player.title));
-        out.push(list("Player values", &vars));
+        out.push(t(texts, "view_player", &[("player", &player.title)]));
+        out.push(list(&t(texts, "view_player_values", &[]), &vars));
     }
     tidy(out)
 }
 
-fn description(text: &str) -> String {
+fn description(text: &str, texts: &Texts) -> String {
     match text.trim() {
-        "" => "(no description yet)".to_string(),
+        "" => t(texts, "view_no_description", &[]),
         text => text.to_string(),
     }
 }

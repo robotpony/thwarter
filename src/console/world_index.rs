@@ -40,7 +40,7 @@ impl Console {
     /// there: an offer, which the next line answers.
     pub(super) fn offer_world_index(&mut self) -> String {
         self.asked = Some(Asked::MakeWorldIndex);
-        let start = self.current_room().or_else(|| self.world.default_room()).unwrap_or_else(|| "(no room yet)".to_string());
+        let start = self.current_room().or_else(|| self.world.default_room()).unwrap_or_else(|| self.t("no_room_yet", &[]));
         self.t("offer_world_index", &[("author", &machine_user()), ("room", &start)])
     }
 
@@ -68,7 +68,7 @@ impl Console {
             .title
             .clone()
             .or_else(|| self.world.root.file_name().map(|n| super::author::title_or_default(&[], &n.to_string_lossy())))
-            .unwrap_or_else(|| "Untitled world".to_string());
+            .unwrap_or_else(|| self.t("untitled_world", &[]));
         let title = crate::writer::content_file::emit_scalar(&serde_yaml::Value::String(title.clone()), false).unwrap_or(title);
         let mut text = format!("---\ntitle: {}\ntype: world\nauthors: {}\n", title, machine_user());
         if let Some(start) = &start {

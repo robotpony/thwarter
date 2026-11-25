@@ -45,23 +45,28 @@ impl Console {
             Err(e) => return e,
         };
         let mut written = Vec::new();
-        let mut done = Vec::new();
-        match self.make_state(kind, entity, &id, name, &mut written) {
-            Ok(true) => done.push(self.t("made_state", &[("state", name)])),
-            Ok(false) => done.push(self.t("state_exists", &[("id", &id), ("state", name)])),
+        let mut started = false;
+        let made = match self.make_state(kind, entity, &id, name, &mut written) {
+            Ok(made) => made,
             Err(e) => return self.after_writes(&written, e),
-        }
+        };
         if start {
             let edit = Edit::SetScalar { key: "state".into(), value: Value::String(name.to_string()) };
             match self.save(kind, &id, &[edit]) {
                 Ok(path) => {
                     written.push(path);
-                    done.push("it's where the thing starts".to_string());
+                    started = true;
                 }
                 Err(e) => return self.after_writes(&written, e),
             }
         }
-        let summary = format!("{}.", done.join("; "));
+        let key = match (made, started) {
+            (true, false) => "made_state",
+            (true, true) => "made_state_start",
+            (false, false) => "state_exists",
+            (false, true) => "state_exists_start",
+        };
+        let summary = self.t(key, &[("id", &id), ("state", name)]);
         self.after_writes(&written, summary)
     }
 
@@ -135,7 +140,10 @@ impl Console {
                 }
             }
         }
-        let summary = format!("{}: {} → {}{}. The reply is under `{}`.", verb, from, to, with.map(|t| format!(", with {} held", t)).unwrap_or_default(), heading);
+        let summary = match with {
+            Some(key) => self.t("action_made_with", &[("verb", verb), ("from", from), ("to", to), ("key", key), ("heading", &heading)]),
+            None => self.t("action_made", &[("verb", verb), ("from", from), ("to", to), ("heading", &heading)]),
+        };
         self.after_writes(&written, summary)
     }
 

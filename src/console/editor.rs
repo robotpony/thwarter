@@ -91,9 +91,10 @@ pub struct Closed {
     pub reports: Vec<String>,
 }
 
-/// What the heading bar says about keys. A Mac saves with Command-S, where
-/// the terminal passes it on (`screen::input_of`).
-const KEYS_HINT: &str = if cfg!(target_os = "macos") { "⌘s or ctrl-s save · esc close" } else { "ctrl-s save · esc close" };
+/// The `[console]` key for what the heading bar says about keys. A Mac
+/// saves with Command-S, where the terminal passes it on
+/// (`screen::input_of`).
+const KEYS_HINT: &str = if cfg!(target_os = "macos") { "editor_keys_mac" } else { "editor_keys" };
 
 /// The editor's state between keys.
 pub struct Editor<'a> {
@@ -223,7 +224,8 @@ impl<'a> Editor<'a> {
                         self.status_kind = Some(Kind::Done);
                         if report.lines().count() > 1 {
                             self.status_kind = Some(Kind::Warning);
-                            self.status.push_str(" (more when you close)");
+                            let first = std::mem::take(&mut self.status);
+                            self.status = self.texts.text("console", "editor_saved_more", &[("status", &first)]);
                         }
                         self.reports.push(report);
                     }
@@ -282,8 +284,9 @@ impl<'a> Editor<'a> {
         let [top, middle, bottom] =
             Layout::vertical([Constraint::Length(1), Constraint::Min(1), Constraint::Length(1)]).areas(area);
         let width = top.width as usize;
-        let gap = width.saturating_sub(self.document.heading.chars().count() + KEYS_HINT.chars().count() + 1).max(2);
-        let heading = format!(" {}{}{}", self.document.heading, " ".repeat(gap), KEYS_HINT);
+        let keys = self.texts.text("console", KEYS_HINT, &[]);
+        let gap = width.saturating_sub(self.document.heading.chars().count() + keys.chars().count() + 1).max(2);
+        let heading = format!(" {}{}{}", self.document.heading, " ".repeat(gap), keys);
         frame.render_widget(Paragraph::new(Line::from(heading)).style(style(Role::Bar)), top);
         frame.render_widget(&self.area, middle);
         let roles = highlight(self.area.lines(), lookup);

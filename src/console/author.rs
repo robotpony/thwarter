@@ -227,7 +227,7 @@ impl Console {
 
     pub(super) fn set(&mut self, args: &[&str]) -> String {
         let Some(current) = self.current_file() else {
-            return "/set changes the room, character or object you're in; go to one first.".to_string();
+            return self.t("set_needs_a_thing", &[]);
         };
         let [key, value @ ..] = args else {
             return super::session::suggest(&self.t("usage_for_example", &[]), &["/set {key} {value}", "/set title The Old Well"]);
@@ -273,7 +273,7 @@ impl Console {
 
     pub(super) fn unlink(&mut self, args: &[&str]) -> String {
         let Some(here) = self.current_room() else {
-            return "/unlink removes an exit of the room you're in; go to a room first.".to_string();
+            return self.t("unlink_needs_room", &[]);
         };
         let [direction] = args else {
             return super::session::suggest(&self.t("usage", &[]), &["/unlink {direction}"]);
@@ -323,7 +323,7 @@ impl Console {
             Ok(Some(_)) if is_character => {
                 return self.t("add_character_into_thing", &[("thing", thing)])
             }
-            Ok(Some(Holder::Object(id))) if id == thing => return format!("{} can't hold itself.", thing),
+            Ok(Some(Holder::Object(id))) if id == thing => return self.t("cant_hold_itself", &[("thing", thing)]),
             Ok(Some(holder)) => holder,
             Ok(None) => return self.t("add_no_holder", &[("target", &target), ("thing", thing)]),
             Err(e) => return e,
@@ -333,7 +333,7 @@ impl Console {
         // move it rather than add a second (REQ-CF-31, Bruce, 2026-11-24).
         let elsewhere: Vec<Holder> = self.world.engine.placement(thing).into_iter().filter(|h| *h != holder).collect();
         if !elsewhere.is_empty() && !self.held_by(&holder, key).iter().any(|i| i == thing) {
-            let places: Vec<String> = elsewhere.iter().map(short_holder).collect();
+            let places: Vec<String> = elsewhere.iter().map(|h| short_holder(&self.texts, h)).collect();
             let to = match &holder {
                 Holder::Room(id) => format!("/{}", id),
                 Holder::Character(id) | Holder::Object(id) => id.clone(),
@@ -410,8 +410,11 @@ impl Console {
             let name = room.rsplit('/').next().unwrap_or(&room);
             let current = room.rsplit_once('/').map(|(a, _)| a).unwrap_or("");
             if current == area {
-                let shown = if area.is_empty() { "the world's root".to_string() } else { format!("{}/", area) };
-                return format!("{} is already in {}, as {} is.", room, shown, target);
+                return if area.is_empty() {
+                    self.t("room_already_at_root", &[("room", &room), ("target", &target)])
+                } else {
+                    self.t("room_already_in_area", &[("room", &room), ("area", &area), ("target", &target)])
+                };
             }
             let to = if area.is_empty() { name.to_string() } else { format!("{}/{}", area, name) };
             return self.move_room(&room, &to);
@@ -434,7 +437,7 @@ impl Console {
             Ok(Some(_)) if is_character => {
                 return self.t("move_character_into_thing", &[("thing", thing)])
             }
-            Ok(Some(Holder::Object(id))) if id == thing => return format!("{} can't hold itself.", thing),
+            Ok(Some(Holder::Object(id))) if id == thing => return self.t("cant_hold_itself", &[("thing", thing)]),
             Ok(Some(holder)) => holder,
             Ok(None) => return self.t("move_no_holder", &[("target", target), ("thing", thing)]),
             Err(e) => return e,
@@ -443,7 +446,7 @@ impl Console {
         let leaving: Vec<Holder> = from.iter().filter(|h| **h != to).cloned().collect();
         let already = from.contains(&to);
         if already && leaving.is_empty() {
-            return self.t("already_there", &[("thing", thing), ("place", &where_to(&to))]);
+            return self.t("already_there", &[("thing", thing), ("place", &where_to(&self.texts, &to))]);
         }
 
         let fail = |console: &mut Console, written: &Vec<PathBuf>, e: String| {
@@ -465,19 +468,24 @@ impl Console {
                 Err(e) => return fail(self, &written, e),
             }
         }
-        let mut followed = "";
+        let mut followed = false;
         if let (true, Holder::Room(room)) = (is_character && self.world.engine.characters.contains_key(thing), &to) {
             let edit = Edit::SetScalar { key: "default_location".into(), value: Value::String(room.clone()) };
             match self.save(Kind::Character, thing, &[edit]) {
                 Ok(path) => {
                     written.push(path);
-                    followed = " (and its default_location)";
+                    followed = true;
                 }
                 Err(e) => return fail(self, &written, e),
             }
         }
-        let from_text = if leaving.is_empty() { "nowhere".to_string() } else { leaving.iter().map(short_holder).collect::<Vec<_>>().join(", ") };
-        let summary = self.t("moved_thing", &[("thing", thing), ("from", &from_text), ("to", &short_holder(&to)), ("followed", &followed)]);
+        let from_text = if leaving.is_empty() {
+            self.t("from_nowhere", &[])
+        } else {
+            leaving.iter().map(|h| short_holder(&self.texts, h)).collect::<Vec<_>>().join(", ")
+        };
+        let key = if followed { "moved_character_and_location" } else { "moved_thing" };
+        let summary = self.t(key, &[("thing", thing), ("from", &from_text), ("to", &short_holder(&self.texts, &to))]);
         self.after_writes(&written, summary)
     }
 
@@ -689,7 +697,7 @@ impl Console {
 
     /// Writes edits to an entity's file and applies them to the loaded world.
     pub(super) fn save(&mut self, kind: Kind, id: &str, edits: &[Edit]) -> Result<PathBuf, String> {
-        let kind = entity_kind(kind).ok_or_else(|| format!("{} can't be changed.", id))?;
+        let kind = entity_kind(kind).ok_or_else(|| self.t("cant_be_changed", &[("id", id)]))?;
         let writer = self.writer()?;
         self.note_warnings_before();
         let report = writer
@@ -834,17 +842,17 @@ fn split_list(typed: &str) -> Vec<String> {
 /// "1 file" or "3 files".
 
 /// "in village/well", "carried by elder" or "in walls".
-fn where_to(holder: &Holder) -> String {
+fn where_to(texts: &crate::engines::texts::Texts, holder: &Holder) -> String {
     match holder {
-        Holder::Character(who) => format!("carried by {}", who),
-        Holder::Room(id) | Holder::Object(id) => format!("in {}", id),
+        Holder::Character(who) => texts.text("console", "carried_by", &[("who", who)]),
+        Holder::Room(id) | Holder::Object(id) => texts.text("console", "in_place", &[("place", id)]),
     }
 }
 
 /// "village/well", "carried by elder" or "walls", for a move's report.
-fn short_holder(holder: &Holder) -> String {
+fn short_holder(texts: &crate::engines::texts::Texts, holder: &Holder) -> String {
     match holder {
-        Holder::Character(who) => format!("carried by {}", who),
+        Holder::Character(who) => texts.text("console", "carried_by", &[("who", who)]),
         Holder::Room(id) | Holder::Object(id) => id.clone(),
     }
 }

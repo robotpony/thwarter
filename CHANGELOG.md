@@ -72,6 +72,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.79.2 (2026-11-24)
+
+### Changed
+
+- The text guard flags any literal with two or more words of letters once `{placeholders}` are set aside, in place of the sentence rule (capital first, final punctuation). Not text: a file template starting `---`, a command line like `/set holds in`, a literal after a `// text-guard: not text` comment, and panics. The engine's and renderer's tooling text is allowlisted for Phase 11.
+- The console's remaining labels, views and short replies are `[console]` keys, about 180 of them, with the default text unchanged: the sidebar and status bar, `/status`, the `/` menu's hints, the new-thing questions, edit mode's views and arrival lines, `/inspect`, the greeting and prompts, the problem summary, and the replies that started with a placeholder or `/`. `/move`, `/state` and `/action` say one whole reply per case. Counted nouns ("1 warning", "2 warnings") have `_one` and `_many` keys.
+- `World::load_with` takes the console's texts, so the folder index's part titles follow the author's wording.
+
 ## 0.79.1 (2026-11-24)
 
 ### Changed

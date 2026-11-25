@@ -3,9 +3,11 @@
 //! one comes from a text table in `src/builtins/text/`.
 //!
 //! A heuristic scan: string literals in the files below, outside
-//! `#[cfg(test)]` code, that read like a sentence (a capital letter first,
-//! a space, and `.`, `?`, `!` or `:` last, once `{placeholders}` are set
-//! aside). Author notes, validation messages, errors and command-line
+//! `#[cfg(test)]` code, that read as text, two or more words of letters
+//! once `{placeholders}` are set aside. File templates (a literal starting
+//! `---` and a newline, the frontmatter of a card the console writes) and
+//! a literal on the line after a `// text-guard: not text` comment are
+//! not text, nor is a command line (`/set holds in`, a recipe's step). Author notes, validation messages, errors and command-line
 //! output stay in code for now (`PLAN.md` › Phase 11), so a literal passed
 //! to one of their call sites is exempt. Anything else goes in
 //! `tests/text_allowlist.txt` with why, and a line there that matches no
@@ -39,6 +41,8 @@ const TOOLING: &[&str] = &[
     "expect(",
     "panic!(",
     "unreachable!(",
+    "unimplemented!(",
+    "todo!(",
     "eprintln!(",
     "assert",
 ];
@@ -51,7 +55,12 @@ struct Literal {
     line: usize,
     /// The code before it, back to the start of its statement.
     before: String,
+    /// Marked `// text-guard: not text` on the line before.
+    marked: bool,
 }
+
+/// The comment that marks the next literal as not text.
+const MARKER: &str = "text-guard: not text";
 
 /// Every string literal in `source` outside `#[cfg(test)]` items and
 /// comments.
@@ -64,6 +73,8 @@ fn literals(file: &Path, source: &str) -> Vec<Literal> {
     let mut statement = String::new();
     // Inside a `#[cfg(test)]` item: the brace depth, once its `{` is seen.
     let mut skipping: Option<Option<usize>> = None;
+    // The line a marker comment covers.
+    let mut marked_line: Option<usize> = None;
     let starts = |i: usize, s: &str| s.chars().enumerate().all(|(k, c)| chars.get(i + k) == Some(&c));
     while i < chars.len() {
         let c = chars[i];
@@ -72,8 +83,13 @@ fn literals(file: &Path, source: &str) -> Vec<Literal> {
         }
         // Comments.
         if starts(i, "//") {
+            let mut comment = String::new();
             while i < chars.len() && chars[i] != '\n' {
+                comment.push(chars[i]);
                 i += 1;
+            }
+            if comment.contains(MARKER) {
+                marked_line = Some(line + 1);
             }
             continue;
         }
@@ -179,7 +195,8 @@ fn literals(file: &Path, source: &str) -> Vec<Literal> {
                 }
             }
             if skipping.is_none() {
-                out.push(Literal { text, file: file.to_path_buf(), line: start_line, before: statement.clone() });
+                let marked = marked_line == Some(start_line);
+                out.push(Literal { text, file: file.to_path_buf(), line: start_line, before: statement.clone(), marked });
             }
             statement.push_str("\"\"");
             continue;
@@ -218,9 +235,18 @@ fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-/// Whether a literal reads like a sentence: a capital letter first, a
-/// space, and `.`, `?`, `!` or `:` last, with `{placeholders}` set aside.
-fn sentence_like(text: &str) -> bool {
+/// Whether a literal reads as text: two or more words of letters, with
+/// `{placeholders}` set aside. A file template isn't text.
+fn reads_as_text(text: &str) -> bool {
+    if text.starts_with("---\n") {
+        return false;
+    }
+    // A command line the person types, like a recipe's steps.
+    // Prose that opens with a command ("/play here needs a room.") ends
+    // like a sentence; a command line doesn't.
+    if text.starts_with('/') && text[1..].starts_with(|c: char| c.is_ascii_lowercase()) && !text.trim_end().ends_with(['.', '?', '!', ':']) {
+        return false;
+    }
     let mut plain = String::new();
     let mut depth = 0;
     for c in text.chars() {
@@ -228,13 +254,17 @@ fn sentence_like(text: &str) -> bool {
             '{' => depth += 1,
             '}' if depth > 0 => depth -= 1,
             _ if depth == 0 => plain.push(c),
-            _ => {}
+            _ => plain.push(' '),
         }
     }
-    let plain = plain.trim();
-    plain.chars().next().map_or(false, |c| c.is_uppercase())
-        && plain.contains(' ')
-        && plain.ends_with(['.', '?', '!', ':'])
+    // A word is letters (an apostrophe or hyphen inside is fine) with any
+    // punctuation around it; `no_exit`, `door/open.md` and `#not-here`
+    // are ids and paths, not words.
+    let word = |w: &str| {
+        let w = w.trim_matches(|c: char| ",.;:!?()[]`\"'«»…".contains(c));
+        w.chars().filter(|c| c.is_alphabetic()).count() >= 2 && w.chars().all(|c| c.is_alphabetic() || c == '\'' || c == '-')
+    };
+    plain.split_whitespace().filter(|w| word(w)).count() >= 2
 }
 
 fn rust_files(root: &Path, rel: &str) -> Vec<PathBuf> {
@@ -292,7 +322,7 @@ fn no_sentence_is_written_in_the_source() {
             let source = std::fs::read_to_string(&file).unwrap();
             let shown = file.strip_prefix(root).unwrap_or(&file).to_path_buf();
             for lit in literals(&shown, &source) {
-                if !sentence_like(&lit.text) {
+                if lit.marked || !reads_as_text(&lit.text) {
                     continue;
                 }
                 if let Some(k) = allowed.iter().position(|a| a.literal == lit.text) {
@@ -338,8 +368,17 @@ fn the_scan_reads_literals_and_skips_tests_and_comments() {
             ("After {n} tests.".to_string(), 6, false),
         ]
     );
-    assert!(sentence_like("You see {list}."));
-    assert!(!sentence_like("{}: {}"));
-    assert!(!sentence_like("door"));
-    assert!(!sentence_like("Brass lantern"));
+    assert!(reads_as_text("You see {list}."));
+    assert!(reads_as_text("{} can't hold itself"));
+    assert!(reads_as_text("no game yet"));
+    assert!(!reads_as_text("{}: {}"));
+    assert!(!reads_as_text("door"));
+    assert!(!reads_as_text("  {}  {}"));
+    assert!(!reads_as_text("no_exit"));
+    assert!(!reads_as_text("/set holds in"));
+    assert!(reads_as_text("/play here needs a room."), "a command line is code; this one's prose isn't");
+    assert!(!reads_as_text("../builtins/door/actions.rhai"));
+    assert!(!reads_as_text("---\nid: {}\ntitle: {}\n---\n"));
+    let marked = literals(Path::new("x.rs"), "fn a() {\n    // text-guard: not text\n    k(\"two words\");\n    k(\"two more\");\n}\n");
+    assert_eq!(marked.iter().map(|l| l.marked).collect::<Vec<_>>(), [true, false], "the marker covers the next line only");
 }

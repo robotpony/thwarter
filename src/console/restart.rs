@@ -49,7 +49,7 @@ pub struct Resumed {
 impl Console {
     /// Writes the session to a resume file in `dir` and returns its path.
     pub(super) fn write_snapshot(&self, history: &[String], scrollback: &[String], dir: &Path) -> Result<PathBuf> {
-        std::fs::create_dir_all(dir).with_context(|| format!("can't create {}", dir.display()))?;
+        std::fs::create_dir_all(dir).with_context(|| self.t("cant_create", &[("path", &dir.display().to_string())]))?;
         let stem = format!("restart-{}", std::process::id());
         let game = match &self.game {
             Some(state) => {
@@ -72,7 +72,7 @@ impl Console {
             game,
         };
         let path = dir.join(format!("{}.yaml", stem));
-        std::fs::write(&path, serde_yaml::to_string(&snapshot)?).with_context(|| format!("can't write {}", path.display()))?;
+        std::fs::write(&path, serde_yaml::to_string(&snapshot)?).with_context(|| self.t("cant_write", &[("path", &path.display().to_string())]))?;
         Ok(path)
     }
 
@@ -189,7 +189,7 @@ fn restarted_on(console: &Console) -> String {
         .ok()
         .and_then(|exe| std::fs::metadata(exe).ok())
         .and_then(|m| m.modified().ok())
-        .map(|time| chrono::DateTime::<chrono::Local>::from(time).format(" (built %H:%M)").to_string())
+        .map(|time| console.t("built_at", &[("time", &chrono::DateTime::<chrono::Local>::from(time).format("%H:%M").to_string())]))
         .unwrap_or_default();
     console.t("restarted_on", &[("version", env!("CARGO_PKG_VERSION")), ("built", &built)])
 }

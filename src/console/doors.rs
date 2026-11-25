@@ -142,7 +142,7 @@ impl Console {
                 Some(b) => Some(b.to_string()),
                 None => {
                     return super::session::suggest(
-                        &format!("`{}` has no opposite, so say which way the door is from {}:", direction, to),
+                        &self.t("door_no_opposite", &[("direction", &direction.to_string()), ("room", &to.to_string())]),
                         &[&format!("/add door {} {} {{direction}}", direction, to)],
                     )
                 }

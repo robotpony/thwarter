@@ -11,6 +11,9 @@ use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+/// Stands for the files a rescan didn't name.
+const MISSED: &str = "\0missed";
+
 /// Long enough that an editor's save (often a write, then a rename) is
 /// one change, short enough to feel immediate.
 const SETTLE: Duration = Duration::from_millis(300);
@@ -26,7 +29,9 @@ pub fn watch(root: &Path, console: Arc<Mutex<Console>>, notices: SyncSender<Stri
                 let paths: Vec<PathBuf> = events.into_iter().map(|e| e.path).collect();
                 content_files(&paths, &shown_root)
             }
-            Ok(DebouncedEventBatch::Rescan) => vec!["(changes were missed)".to_string()],
+            // A rescan names no files; MISSED stands for them until the
+            // notice is worded.
+            Ok(DebouncedEventBatch::Rescan) => vec![MISSED.to_string()],
             Ok(_) => return,
             Err(e) => {
                 let text = console.lock().map(|c| c.t("watching_failed", &[("reason", &e.to_string())])).unwrap_or_default();
@@ -40,14 +45,16 @@ pub fn watch(root: &Path, console: Arc<Mutex<Console>>, notices: SyncSender<Stri
             // world's `ignore` list) doesn't reload the world.
             let changed: Vec<String> = changed
                 .into_iter()
-                .filter(|p| p.starts_with('(') || !console.world.engine.is_ignored(std::path::Path::new(p)))
+                .filter(|p| p == MISSED || !console.world.engine.is_ignored(std::path::Path::new(p)))
                 .collect();
             let changed = console.not_own_writes(changed);
             if changed.is_empty() {
                 return;
             }
             let report = console.reload();
-            console.t("changed_on_disk", &[("files", &changed.join(", ")), ("report", &report)])
+            let missed = console.t("changes_were_missed", &[]);
+            let files: Vec<&str> = changed.iter().map(|p| if p == MISSED { missed.as_str() } else { p.as_str() }).collect();
+            console.t("changed_on_disk", &[("files", &files.join(", ")), ("report", &report)])
         };
         // Sent with the console unlocked: while the full-screen editor is
         // open, nothing reads notices, and a full channel must not stop

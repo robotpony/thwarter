@@ -103,11 +103,11 @@ impl Console {
             ("edit", ["object"]) => self.things_of(Kind::Object),
             ("edit", ["character"]) => self.things_of(Kind::Character),
             ("new", []) => kinds(),
-            ("play", []) => vec![plain("here", "the room edit mode is in", false)],
+            ("play", []) => vec![plain("here", &self.t("hint_play_here", &[]), false)],
             ("load" | "save", []) => list_saves(&self.world.root)
                 .unwrap_or_default()
                 .into_iter()
-                .map(|name| plain(&name, "a saved game", false))
+                .map(|name| plain(&name, &self.t("hint_saved_game", &[]), false))
                 .collect(),
             ("link", []) => directions(),
             ("link", [_]) => self.rooms(),
@@ -144,13 +144,13 @@ impl Console {
         if self.mode == Mode::Play {
             return out;
         }
-        out.push(plain("back", "where you were before", false));
+        out.push(plain("back", &self.t("hint_back", &[]), false));
         out.extend(self.things_here());
         let here = self.room_here();
         out.extend(self.rooms().into_iter().filter(|s| Some(&s.text) != here.as_ref()));
         out.extend(self.things_of(Kind::Character));
         out.extend(self.things_of(Kind::Object));
-        out.extend(self.world.dirs.iter().filter(|d| !d.is_empty()).map(|d| plain(&format!("{}/", d), "folder", false)));
+        out.extend(self.world.dirs.iter().filter(|d| !d.is_empty()).map(|d| plain(&format!("{}/", d), &self.t("hint_folder", &[]), false)));
         dedupe(out)
     }
 
@@ -161,10 +161,10 @@ impl Console {
         let mut out: Vec<Suggestion> = location
             .characters
             .iter()
-            .map(|id| plain(id, &self.title_of(Kind::Character, id).unwrap_or_else(|| "no card".to_string()), false))
+            .map(|id| plain(id, &self.title_of(Kind::Character, id).unwrap_or_else(|| self.t("hint_no_card", &[])), false))
             .collect();
         out.extend(location.objects.iter().map(|id| {
-            plain(id, &self.title_of(Kind::Object, id).unwrap_or_else(|| "scenery, no card".to_string()), false)
+            plain(id, &self.title_of(Kind::Object, id).unwrap_or_else(|| self.t("hint_scenery_no_card", &[])), false)
         }));
         out
     }
@@ -181,7 +181,7 @@ impl Console {
             .iter()
             .map(|(d, t)| {
                 let room = engine.doors.get(t).and_then(|door| door.leads_to(&location.id)).unwrap_or(t).to_string();
-                let shown = if engine.get_location(&room).is_some() { room } else { format!("{} (not written)", room) };
+                let shown = if engine.get_location(&room).is_some() { room } else { self.t("hint_not_written", &[("room", &room)]) };
                 (d.clone(), shown)
             })
             .collect();

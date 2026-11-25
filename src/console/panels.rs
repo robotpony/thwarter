@@ -51,16 +51,16 @@ impl Console {
         let mut left = vec![
             self.world.display_name(),
             self.mode.name().to_string(),
-            format!("{} warning{}", warnings, if warnings == 1 { "" } else { "s" }),
+            self.counted("warning", warnings),
         ];
         if let Some(game) = &self.game {
-            let chapter = game.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_else(|| "none".to_string());
-            left.push(format!("chapter {}", chapter));
-            left.push(format!("turn {}", game.turn));
+            let chapter = game.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_else(|| self.t("no_chapter", &[]));
+            left.push(self.t("bar_chapter", &[("chapter", &chapter)]));
+            left.push(self.t("bar_turn", &[("turn", &game.turn.to_string())]));
         }
-        let mut right = format!("thwart {}", env!("CARGO_PKG_VERSION"));
+        let mut right = self.t("bar_build", &[("version", env!("CARGO_PKG_VERSION"))]);
         if newer_build {
-            right = format!("newer build: /restart · {}", right);
+            right = self.t("bar_newer_build", &[("build", &right)]);
         }
         Status { left: left.join(" · "), right }
     }
@@ -77,38 +77,32 @@ impl Console {
 
     /// `/status`: the world, where you are, the game, saves and the build.
     pub(super) fn status_report(&self) -> String {
-        let mut out = vec![format!("{}, at {}", self.world.display_name(), self.world.root.display())];
-        out.push(format!("Mode: {}; edit mode is at {}", self.mode.name(), self.pwd()));
+        let mut out = vec![self.t("status_world", &[("world", &self.world.display_name()), ("path", &self.world.root.display().to_string())])];
+        out.push(self.t("status_mode", &[("mode", self.mode.name()), ("place", &self.pwd())]));
         out.push(match &self.game {
             Some(game) => {
-                let chapter = game.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_else(|| "none".to_string());
-                let carrying = game.inventory.len();
-                format!(
-                    "Game: at {}, chapter {}, turn {}, carrying {} thing{}",
-                    game.location,
-                    chapter,
-                    game.turn,
-                    carrying,
-                    if carrying == 1 { "" } else { "s" }
+                let chapter = game.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_else(|| self.t("no_chapter", &[]));
+                self.t(
+                    "status_game",
+                    &[
+                        ("room", &game.location),
+                        ("chapter", &chapter),
+                        ("turn", &game.turn.to_string()),
+                        ("things", &self.counted("thing", game.inventory.len())),
+                    ],
                 )
             }
-            None => "Game: none yet (/play here starts one)".to_string(),
+            None => self.t("status_no_game", &[]),
         });
         let saves = crate::engines::list_saves(&self.world.root).unwrap_or_default();
-        out.push(if saves.is_empty() { "Saves: none".to_string() } else { format!("Saves: {}", saves.join(", ")) });
+        out.push(if saves.is_empty() { self.t("status_no_saves", &[]) } else { self.t("status_saves", &[("saves", &saves.join(", "))]) });
         let broken = self.world.files.values().filter(|e| e.kind == Kind::Broken).count();
         let warnings = self.world.warnings().len();
-        out.push(format!(
-            "Problems: {} file{} that don't load, {} warning{}",
-            broken,
-            if broken == 1 { "" } else { "s" },
-            warnings,
-            if warnings == 1 { "" } else { "s" }
-        ));
-        out.push(format!("Build: thwart {}", env!("CARGO_PKG_VERSION")));
+        out.push(self.t("status_problems", &[("files", &self.counted("file", broken)), ("warnings", &self.counted("warning", warnings))]));
+        out.push(self.t("status_build", &[("version", env!("CARGO_PKG_VERSION"))]));
         if let Some(log) = &self.unknown_log {
             let lines = std::fs::read_to_string(log).map(|t| t.lines().count()).unwrap_or(0);
-            out.push(format!("Unknown input: {} ({} logged)", log.display(), lines));
+            out.push(self.t("status_unknown_input", &[("log", &log.display().to_string()), ("count", &lines.to_string())]));
         }
         out.join("\n")
     }
@@ -129,10 +123,10 @@ impl Console {
             // here instead (Bruce, 2026-11-23).
             rest.push(Row::Blank);
             let title = self.world.engine.get_location(&game.location).map(|l| l.name.clone()).unwrap_or_default();
-            rest.push(Row::Heading(format!("ROOM  {} ({})", title, game.location)));
+            rest.push(Row::Heading(self.t("side_room", &[("title", &title), ("id", &game.location)])));
             rest.extend(self.room_rows(&game.location));
             if !self.notes.is_empty() {
-                rest.push(Row::Heading("author notes".to_string()));
+                rest.push(Row::Heading(self.t("side_author_notes", &[])));
                 rest.extend(self.notes.iter().map(|n| Row::Warning(format!("  {}", n))));
             }
         }
@@ -158,7 +152,7 @@ impl Console {
             Vec::new()
         };
         let problems: Vec<&String> = check.problems.iter().filter(|p| !rooms_to_write.iter().any(|r| p.ends_with(r.as_str()))).collect();
-        let mut rows = vec![Row::Heading(format!("PROBLEMS {} · WARNINGS {}", problems.len(), check.warnings.len()))];
+        let mut rows = vec![Row::Heading(self.t("side_problems", &[("problems", &problems.len().to_string()), ("warnings", &check.warnings.len().to_string())]))];
         rows.extend(problems.iter().map(|p| Row::Error(format!("  {}", p))));
         rows.extend(check.warnings.iter().map(|w| Row::Warning(format!("  {}", w))));
         rows
@@ -181,7 +175,7 @@ impl Console {
         if map.cells.is_empty() {
             return Vec::new();
         }
-        let mut rows = vec![Row::Heading(format!("MAP  around {}", room))];
+        let mut rows = vec![Row::Heading(self.t("side_map", &[("room", &room)]))];
         rows.extend(mini_map(&map).into_iter().map(Row::Map));
         for b in &map.beside {
             let missing = if b.written { "" } else { " ?" };
@@ -203,17 +197,17 @@ impl Console {
     fn game_panel(&self) -> (Vec<Row>, Vec<Row>) {
         let Some(game) = &self.game else {
             return (
-                vec![Row::Heading("GAME".to_string()), Row::Dim("no game yet: /play here starts one".to_string())],
+                vec![Row::Heading(self.t("side_game", &[])), Row::Dim(self.t("side_no_game", &[]))],
                 Vec::new(),
             );
         };
-        let chapter = game.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_else(|| "none".to_string());
+        let chapter = game.chapter.as_ref().map(|c| c.name().to_string()).unwrap_or_else(|| self.t("no_chapter", &[]));
         let carrying: Vec<String> = game.inventory.iter().map(|id| self.object_title(id)).collect();
         let fixed = vec![
-            Row::Heading("GAME".to_string()),
-            Row::Text(format!("at  {}", game.location)),
-            Row::Text(format!("chapter  {}", chapter)),
-            Row::Text(format!("carrying  {}", if carrying.is_empty() { "nothing".to_string() } else { carrying.join(", ") })),
+            Row::Heading(self.t("side_game", &[])),
+            Row::Text(self.t("side_at", &[("room", &game.location)])),
+            Row::Text(self.t("side_chapter", &[("chapter", &chapter)])),
+            Row::Text(self.t("side_carrying", &[("things", &if carrying.is_empty() { self.t("side_carrying_nothing", &[]) } else { carrying.join(", ") })])),
         ];
         let mut rest = Vec::new();
         let changed: Vec<String> = game
@@ -223,12 +217,12 @@ impl Console {
             .collect();
         if !changed.is_empty() {
             rest.push(Row::Blank);
-            rest.push(Row::Heading("changed".to_string()));
+            rest.push(Row::Heading(self.t("side_changed", &[])));
             rest.extend(changed.into_iter().map(Row::Text));
         }
         if !game.values.is_empty() {
             rest.push(Row::Blank);
-            rest.push(Row::Heading("values".to_string()));
+            rest.push(Row::Heading(self.t("side_values", &[])));
             rest.extend(game.values.iter().map(|(k, v)| Row::Text(format!("  {} = {}", k, v))));
         }
         (fixed, rest)
@@ -240,10 +234,10 @@ impl Console {
         // what the player reads (Bruce, 2026-11-24).
         let heading = match &self.place {
             Place::File(path) => match self.world.files.get(path) {
-                Some(entry) if entry.kind == Kind::Room => format!("HERE  {} ({})", entry.title, entry.id),
-                _ => format!("HERE  {}", self.pwd()),
+                Some(entry) if entry.kind == Kind::Room => self.t("side_here_room", &[("title", &entry.title), ("id", &entry.id)]),
+                _ => self.t("side_here", &[("place", &self.pwd())]),
             },
-            Place::Dir(_) => format!("HERE  {}", self.pwd()),
+            Place::Dir(_) => self.t("side_here", &[("place", &self.pwd())]),
         };
         let mut rows = vec![Row::Heading(heading)];
         let room = match &self.place {
@@ -266,13 +260,13 @@ impl Console {
                     for (path, entry) in &self.world.files {
                         if let Some(name) = child(path) {
                             rows.push(match entry.kind {
-                                Kind::Broken => Row::Warning(format!("  {}  doesn't load", name)),
+                                Kind::Broken => Row::Warning(self.t("side_doesnt_load", &[("name", &name)])),
                                 kind => Row::Text(format!("  {}  {}", name, kind.label())),
                             });
                         }
                     }
                     if rows.len() == 1 {
-                        rows.push(Row::Dim("  nothing here yet".to_string()));
+                        rows.push(Row::Dim(self.t("side_nothing_here_yet", &[])));
                     }
                 }
             }
@@ -302,9 +296,9 @@ impl Console {
         let room = room.to_string();
         let Some(location) = self.world.engine.get_location(&room) else { return rows };
 
-        rows.push(Row::Heading("exits".to_string()));
+        rows.push(Row::Heading(self.t("side_exits", &[])));
         if location.connections.is_empty() {
-            rows.push(Row::Dim("  none".to_string()));
+            rows.push(Row::Dim(self.t("side_no_exits", &[])));
         }
         let mut exits: Vec<(&String, &String)> = location.connections.iter().collect();
         exits.sort();
@@ -321,8 +315,8 @@ impl Console {
                 };
                 let written = self.world.engine.get_location(&room).is_some();
                 let note = match (written, blocked) {
-                    (false, _) => "(not written)".to_string(),
-                    (true, Some(state)) => format!("{} door", state),
+                    (false, _) => self.t("side_not_written", &[]),
+                    (true, Some(state)) => self.t("side_door_state", &[("state", &state)]),
                     (true, None) => String::new(),
                 };
                 let arrow = format!("{}>", "-".repeat(column - direction.chars().count()));
@@ -350,7 +344,7 @@ impl Console {
             }
         };
         if !location.characters.is_empty() {
-            rows.push(Row::Heading("people".to_string()));
+            rows.push(Row::Heading(self.t("side_people", &[])));
             for id in &location.characters {
                 rows.push(named(id, self.world.path_of(Kind::Character, id)));
             }
@@ -367,15 +361,15 @@ impl Console {
             out
         };
         if !things.is_empty() {
-            rows.push(Row::Heading("things".to_string()));
+            rows.push(Row::Heading(self.t("side_things", &[])));
             rows.extend(with_held(things));
         }
         if !scenery.is_empty() {
-            rows.push(Row::Heading("scenery".to_string()));
+            rows.push(Row::Heading(self.t("side_scenery", &[])));
             rows.extend(with_held(scenery));
         }
         if let Some(path) = &self.looked_at {
-            rows.push(Row::Heading("looked at".to_string()));
+            rows.push(Row::Heading(self.t("side_looked_at", &[])));
             rows.extend(self.file_rows(path));
         }
 
@@ -435,7 +429,13 @@ impl Console {
             return "local".to_string();
         }
         let area = parent.trim_end_matches("/objects").trim_end_matches("/npcs").trim_end_matches("/doors");
-        format!("area {}/", area)
+        self.t("side_area_scope", &[("area", area)])
+    }
+
+    /// "1 warning" or "3 warnings": `noun`'s `[console]` counted forms.
+    fn counted(&self, noun: &str, n: usize) -> String {
+        let key = if n == 1 { format!("count_{}_one", noun) } else { format!("count_{}_many", noun) };
+        self.t(&key, &[("count", &n.to_string())])
     }
 
     fn object_title(&self, id: &str) -> String {

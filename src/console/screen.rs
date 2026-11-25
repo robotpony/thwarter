@@ -395,7 +395,7 @@ impl<'a> Screen<'a> {
             let earlier: Vec<String> = earlier[earlier.len().saturating_sub(HISTORY)..].to_vec();
             if !earlier.is_empty() {
                 self.output.push(String::new());
-                self.output.push(self.words.last_time.clone());
+                self.output.push(self.words.text("last_time", &[]));
                 for line in &earlier[earlier.len().saturating_sub(LAST_SHOWN)..] {
                     self.output.push(format!("  > {}", line));
                 }
@@ -487,9 +487,9 @@ impl<'a> Screen<'a> {
             None => {
                 self.draw_output(frame, output_area);
                 if let Some(picker) = &self.picker {
-                    picker.draw(frame, output_area, &self.words.which_one);
+                    picker.draw(frame, output_area, &self.words);
                 } else if let Some(menu) = &self.menu {
-                    draw_menu(frame, output_area, menu);
+                    draw_menu(frame, output_area, menu, &self.words);
                 }
             }
         }
@@ -534,7 +534,7 @@ impl<'a> Screen<'a> {
         let mut lines: Vec<Line> = foot.iter().take(shown).map(row_line).collect();
         if foot.len() > shown && shown > 0 {
             lines.pop();
-            lines.push(Line::styled(format!(" … {} more: /validate", foot.len() - shown + 1), style(Role::Note)));
+            lines.push(Line::styled(self.words.text("side_foot_more", &[("count", &(foot.len() - shown + 1).to_string())]), style(Role::Note)));
         }
         frame.render_widget(Paragraph::new(lines), foot_inner);
         // Long rows wrap within the sidebar, keeping their indent.
@@ -550,7 +550,7 @@ impl<'a> Screen<'a> {
         let mut lines: Vec<Line> = rest.iter().skip(start).take(height).map(row_line).collect();
         if rest.len() > start + height && height > 0 {
             lines.pop();
-            lines.push(Line::styled(" ↓ more (alt-↓)", style(Role::Note)));
+            lines.push(Line::styled(self.words.text("side_more", &[]), style(Role::Note)));
         }
         frame.render_widget(Paragraph::new(lines), bottom);
     }
@@ -611,12 +611,20 @@ impl<'a> Picker<'a> {
         }
     }
 
-    fn draw(&self, frame: &mut Frame, area: Rect, which_one: &str) {
+    fn draw(&self, frame: &mut Frame, area: Rect, words: &Words) {
         let set = &self.asking.set;
         let Some(question) = set.questions.get(self.at) else { return };
         let mut lines = vec![
             Line::styled(
-                format!(" A new {}, with the questions in {}   {} of {}", self.asking.id, self.asking.shown_path, self.at + 1, set.questions.len()),
+                words.text(
+                    "asking_heading",
+                    &[
+                        ("id", &self.asking.id),
+                        ("path", &self.asking.shown_path),
+                        ("at", &(self.at + 1).to_string()),
+                        ("of", &set.questions.len().to_string()),
+                    ],
+                ),
                 style(Role::Chrome),
             ),
             Line::from(""),
@@ -641,7 +649,7 @@ impl<'a> Picker<'a> {
                 lines.push(Line::from(format!(" {} {}", prompt, area.lines().join(" "))));
             }
             Step::Picking { things, selected, .. } => {
-                lines.push(Line::styled(format!(" {}", which_one), style(Role::Note)));
+                lines.push(Line::styled(format!(" {}", words.text("which_one", &[])), style(Role::Note)));
                 for (i, thing) in things.iter().enumerate() {
                     let mark = if i == *selected { "▸" } else { " " };
                     let mut line = Line::from(format!(" {} {}", mark, thing));
@@ -653,9 +661,9 @@ impl<'a> Picker<'a> {
             }
         }
         let keys = match self.step {
-            Step::Choose => " ↑↓ choose · enter pick · esc use defaults for the rest ",
-            Step::Typing { .. } => " type · enter done · esc back ",
-            Step::Picking { .. } => " ↑↓ choose · enter pick · esc back ",
+            Step::Choose => words.text("asking_keys_choose", &[]),
+            Step::Typing { .. } => words.text("asking_keys_typing", &[]),
+            Step::Picking { .. } => words.text("asking_keys_picking", &[]),
         };
         let height = (lines.len() as u16 + 2).min(area.height);
         let popup = Rect { x: area.x, y: area.bottom().saturating_sub(height), width: area.width, height };
@@ -684,7 +692,7 @@ struct Menu {
 const MENU_ROWS: usize = 8;
 
 /// The menu, drawn over the bottom of the output, just above the input.
-fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu) {
+fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu, words: &Words) {
     let items = &menu.completion.suggestions;
     let shown = items.len().min(MENU_ROWS);
     let start = menu.selected.saturating_sub(MENU_ROWS - 1).min(items.len().saturating_sub(shown));
@@ -711,7 +719,7 @@ fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu) {
         lines.push(line);
     }
     if items.len() > start + shown {
-        lines.push(Line::styled(format!(" ↓ {} more", items.len() - start - shown), style(Role::Note)));
+        lines.push(Line::styled(words.text("menu_more", &[("count", &(items.len() - start - shown).to_string())]), style(Role::Note)));
     }
     // The menu sits on the output's last rows, between two rules; the keys
     // ride on the lower rule at the right, just above the prompt.
@@ -719,20 +727,26 @@ fn draw_menu(frame: &mut Frame, area: Rect, menu: &Menu) {
     let popup = Rect { x: area.x, y: area.bottom().saturating_sub(height), width: area.width, height };
     frame.render_widget(ratatui::widgets::Clear, popup);
     let block = Block::default().borders(Borders::TOP | Borders::BOTTOM).border_style(style(Role::Chrome));
-    let keys = if items.is_empty() { " esc close " } else { " ↑↓ choose · tab or enter pick · esc close " };
+    let keys = if items.is_empty() { words.text("menu_keys_empty", &[]) } else { words.text("menu_keys", &[]) };
     let block = block.title_bottom(Line::styled(keys, style(Role::Chrome)).right_aligned());
     frame.render_widget(Paragraph::new(lines).block(block), popup);
 }
 
 /// The screen's own lines, read from `[console]` when the screen opens.
 struct Words {
-    last_time: String,
-    which_one: String,
+    texts: crate::engines::texts::Texts,
+}
+
+impl Words {
+    /// `key`'s `[console]` text with `args` filled.
+    fn text(&self, key: &str, args: &[(&str, &str)]) -> String {
+        self.texts.text("console", key, args)
+    }
 }
 
 impl From<&crate::engines::texts::Texts> for Words {
     fn from(texts: &crate::engines::texts::Texts) -> Self {
-        Words { last_time: texts.text("console", "last_time", &[]), which_one: texts.text("console", "which_one", &[]) }
+        Words { texts: texts.clone() }
     }
 }
 

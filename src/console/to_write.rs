@@ -27,11 +27,11 @@ impl Console {
         if list.is_empty() {
             return Vec::new();
         }
-        let mut rows = vec![Row::Heading("TO WRITE".to_string())];
+        let mut rows = vec![Row::Heading(self.t("side_to_write", &[]))];
         for (i, entry) in list.iter().enumerate() {
             let key = if i < 9 { format!("{:<5}", key_label(i + 1)) } else { "     ".to_string() };
             let count = if entry.mentions.len() > 1 { format!("  ×{}", entry.mentions.len()) } else { String::new() };
-            let room = if entry.wants == EntityKind::Location { "  room" } else { "" };
+            let room = if entry.wants == EntityKind::Location { self.t("side_to_write_room", &[]) } else { String::new() };
             rows.push(Row::Text(format!("  {} {}{}{}", key, entry.name, room, count)));
         }
         rows

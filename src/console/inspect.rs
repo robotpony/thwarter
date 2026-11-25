@@ -29,22 +29,22 @@ impl Console {
         let row = |out: &mut Vec<String>, label: &str, text: String| out.push(format!("  {:<10} {}", label, text));
 
         if let Some(path) = self.world.path_of(kind, &id) {
-            row(&mut out, "file", format!("{}.md", path));
+            row(&mut out, &self.t("inspect_file", &[]), format!("{}.md", path));
         }
         if let Some(thing) = engine.thing(entity, &id) {
             self.thing_rows(thing, &mut out, &row);
         }
         if entity != EntityKind::Location {
             let starts: Vec<String> = engine.placement(&id).iter().map(|h| h.to_string()).collect();
-            row(&mut out, "starts in", if starts.is_empty() { "nowhere".to_string() } else { starts.join(", ") });
+            row(&mut out, &self.t("inspect_starts_in", &[]), if starts.is_empty() { self.t("nowhere", &[]) } else { starts.join(", ") });
         }
         if let Some(door) = engine.doors.get(&id) {
-            let sides: Vec<String> = door.sides.iter().map(|s| format!("{} from {}", s.direction, s.room)).collect();
-            row(&mut out, "sides", sides.join("; "));
+            let sides: Vec<String> = door.sides.iter().map(|s| self.t("inspect_side", &[("direction", &s.direction), ("room", &s.room)])).collect();
+            row(&mut out, &self.t("inspect_sides", &[]), sides.join("; "));
         }
         if let Some(game) = &self.game {
             if let Some(state) = game.states.values().find_map(|m| m.get(&id)) {
-                row(&mut out, "in play", format!("{} now", state));
+                row(&mut out, &self.t("inspect_in_play", &[]), self.t("inspect_state_now", &[("state", state)]));
             }
         }
         let check = engine.validation(false);
@@ -76,8 +76,8 @@ impl Console {
             Some(door) => (door.leads_to(&room).unwrap_or("?").to_string(), Some(to.clone())),
             None => (to.clone(), None),
         };
-        let written = if engine.get_location(&beyond).is_some() { "" } else { " (not written)" };
-        let mut out = vec![format!("{} from {}, to {}{}", direction, room, beyond, written)];
+        let key = if engine.get_location(&beyond).is_some() { "inspect_exit" } else { "inspect_exit_not_written" };
+        let mut out = vec![self.t(key, &[("direction", &direction), ("room", &room), ("to", &beyond)])];
         if let Some(door) = door {
             out.push(String::new());
             out.push(self.inspect(&[door.as_str()]));
@@ -88,23 +88,23 @@ impl Console {
     /// The rows from a thing's layers: scope, templates, states, sections, actions.
     fn thing_rows(&self, thing: &Thing, out: &mut Vec<String>, row: &dyn Fn(&mut Vec<String>, &str, String)) {
         let scope = thing.scope.to_string_lossy().replace('\\', "/");
-        row(out, "scope", if scope.is_empty() || ["objects", "npcs", "doors"].contains(&scope.as_str()) { "global".to_string() } else { scope });
+        row(out, &self.t("inspect_scope", &[]), if scope.is_empty() || ["objects", "npcs", "doors"].contains(&scope.as_str()) { self.t("inspect_global", &[]) } else { scope });
         if !thing.templates.is_empty() {
             let names: Vec<String> = thing
                 .templates
                 .iter()
                 .map(|l| l.path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default())
-                .map(|n| if n == "index" { "(bundle)".to_string() } else { n })
+                .map(|n| if n == "index" { self.t("inspect_bundle", &[]) } else { n })
                 .collect();
-            row(out, "templates", names.join(" ← "));
+            row(out, &self.t("inspect_templates", &[]), names.join(" ← "));
         }
         if !thing.states.is_empty() {
             let states: Vec<String> = thing
                 .states
                 .keys()
-                .map(|s| if thing.starting_state.as_deref() == Some(s) { format!("{} (starting)", s) } else { s.clone() })
+                .map(|s| if thing.starting_state.as_deref() == Some(s) { self.t("inspect_starting_state", &[("state", s)]) } else { s.clone() })
                 .collect();
-            row(out, "states", states.join(", "));
+            row(out, &self.t("inspect_states", &[]), states.join(", "));
         }
         let layers = std::iter::once(("", &thing.index)).chain(thing.states.iter().map(|(n, l)| (n.as_str(), l)));
         let mut sections = Vec::new();
@@ -116,15 +116,15 @@ impl Console {
             }
             if let Some(map) = layer.metadata.get("actions").and_then(|a| a.as_mapping()) {
                 for verb in map.keys().filter_map(|k| k.as_str()) {
-                    actions.push(if state.is_empty() { verb.to_string() } else { format!("{} (in {})", verb, state) });
+                    actions.push(if state.is_empty() { verb.to_string() } else { self.t("inspect_action_in", &[("verb", verb), ("state", state)]) });
                 }
             }
         }
         if !actions.is_empty() {
-            row(out, "actions", actions.join(", "));
+            row(out, &self.t("inspect_actions", &[]), actions.join(", "));
         }
         if !sections.is_empty() {
-            row(out, "sections", sections.join("; "));
+            row(out, &self.t("inspect_sections", &[]), sections.join("; "));
         }
     }
 

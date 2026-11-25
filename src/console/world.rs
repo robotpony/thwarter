@@ -2,6 +2,7 @@
 //! index of the files on disk, so edit mode can navigate the world as
 //! folders (REQ-CON-4).
 
+use crate::engines::texts::Texts;
 use crate::engines::bundles::FileRole;
 use crate::engines::{EntityKind, WorldEngine, WorldLoadReport};
 use anyhow::{bail, Result};
@@ -85,10 +86,20 @@ pub struct World {
     /// Every folder that holds content, relative to the root, without a
     /// trailing slash. The root itself is `""`.
     pub dirs: BTreeSet<String>,
+    /// The console's wording, for the titles of a thing's parts.
+    texts: Texts,
 }
 
 impl World {
+    /// `load_with` the default wording, for tests.
+    #[cfg(test)]
     pub fn load(root: &Path) -> Result<World> {
+        World::load_with(root, Texts::defaults())
+    }
+
+    /// `load`, with the console's `[console]` wording for the index's
+    /// titles ("Notes for this area").
+    pub fn load_with(root: &Path, texts: Texts) -> Result<World> {
         if !root.is_dir() {
             bail!("World directory `{}` not found", root.display());
         }
@@ -98,8 +109,8 @@ impl World {
         // engine falls back by itself).
         let title = engine.world().title.clone();
         let starting_location = engine.world().start.clone();
-        let (files, dirs) = index_files(root, &engine);
-        Ok(World { root: root.to_path_buf(), engine, report, title, starting_location, files, dirs })
+        let (files, dirs) = index_files(root, &engine, &texts);
+        Ok(World { root: root.to_path_buf(), engine, report, title, starting_location, files, dirs, texts })
     }
 
     /// Problems that make a reload unsafe: files that fail to parse, whose
@@ -125,7 +136,7 @@ impl World {
 
     /// Rebuilds the folder index after files were written.
     pub fn refresh_index(&mut self) {
-        let (files, dirs) = index_files(&self.root, &self.engine);
+        let (files, dirs) = index_files(&self.root, &self.engine, &self.texts);
         self.files = files;
         self.dirs = dirs;
         // A saved world/ file can change these too.
@@ -157,7 +168,7 @@ impl World {
 /// come from the engine's record of where it loaded them
 /// (`WorldEngine::sources`). A `.md` file the engine has no record of
 /// failed to parse.
-fn index_files(root: &Path, engine: &WorldEngine) -> (BTreeMap<String, FileEntry>, BTreeSet<String>) {
+fn index_files(root: &Path, engine: &WorldEngine, texts: &Texts) -> (BTreeMap<String, FileEntry>, BTreeSet<String>) {
     let mut files = BTreeMap::new();
     let mut dirs = BTreeSet::new();
     dirs.insert(String::new());
@@ -181,14 +192,15 @@ fn index_files(root: &Path, engine: &WorldEngine) -> (BTreeMap<String, FileEntry
             dirs.insert(dir.to_string_lossy().replace('\\', "/"));
             parent = dir.parent();
         }
-        files.insert(key.clone(), entry_for_role(engine, engine.file_role(rel), &key));
+        files.insert(key.clone(), entry_for_role(engine, engine.file_role(rel), &key, texts));
     }
     (files, dirs)
 }
 
 /// What edit mode shows for a file, from the role the engine gave it.
-fn entry_for_role(engine: &WorldEngine, role: Option<&FileRole>, key: &str) -> FileEntry {
+fn entry_for_role(engine: &WorldEngine, role: Option<&FileRole>, key: &str, texts: &Texts) -> FileEntry {
     let part = |kind: Kind, id: &str, title: String| FileEntry { kind, id: id.to_string(), title };
+    let t = |key: &str, args: &[(&str, &str)]| texts.text("console", key, args);
     match role {
         Some(FileRole::Thing { kind: EntityKind::Location, id }) => {
             entry_for(Kind::Room, id, engine.get_location(id).map(|l| &l.name))
@@ -202,26 +214,26 @@ fn entry_for_role(engine: &WorldEngine, role: Option<&FileRole>, key: &str) -> F
         Some(FileRole::Thing { kind: EntityKind::Door, id }) => {
             entry_for(Kind::Door, id, engine.doors.get(id).map(|d| &d.title))
         }
-        Some(FileRole::State { id, name, .. }) => part(Kind::State, id, format!("State `{}` of {}", name, id)),
+        Some(FileRole::State { id, name, .. }) => part(Kind::State, id, t("part_state", &[("state", name), ("id", id)])),
         Some(FileRole::Overlay { id, chapter, .. }) => {
-            part(Kind::Overlay, id, format!("{} in chapter {}", id, chapter.name()))
+            part(Kind::Overlay, id, t("part_overlay", &[("id", id), ("chapter", &chapter.name())]))
         }
         Some(FileRole::AreaOverlay { area, chapter }) => part(
             Kind::Overlay,
             key,
-            format!("Everything in {}/ in chapter {}", area.to_string_lossy().replace('\\', "/"), chapter.name()),
+            t("part_area_overlay", &[("area", &area.to_string_lossy().replace('\\', "/")), ("chapter", &chapter.name())]),
         ),
-        Some(FileRole::Chapter(chapter)) => part(Kind::Chapter, key, format!("Chapter {}", chapter.name())),
-        Some(FileRole::Area) => part(Kind::Area, key, "Notes for this area".to_string()),
+        Some(FileRole::Chapter(chapter)) => part(Kind::Chapter, key, t("part_chapter", &[("chapter", &chapter.name())])),
+        Some(FileRole::Area) => part(Kind::Area, key, t("part_area", &[])),
         Some(FileRole::World) => {
             // `world/index.md` is the world itself; other files are named
             // for what they hold (`world/player.md`).
             let stem = key.rsplit('/').next().unwrap_or(key);
-            let title = if stem == "index" { "World".to_string() } else { title_case(stem) };
+            let title = if stem == "index" { t("part_world", &[]) } else { title_case(stem) };
             part(Kind::World, key, title)
         }
         Some(FileRole::Template) => part(Kind::Template, key, title_case(key.rsplit('/').next().unwrap_or(key))),
-        Some(FileRole::Game) => part(Kind::Game, key, "How a new game starts".to_string()),
+        Some(FileRole::Game) => part(Kind::Game, key, t("part_game", &[])),
         // The title holds the reason, for `look`.
         Some(FileRole::Problem(why)) => part(Kind::Broken, key, why.clone()),
         None => part(Kind::Broken, key, String::new()),
