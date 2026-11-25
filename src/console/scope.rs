@@ -39,10 +39,6 @@ impl Scope {
     }
 }
 
-/// Whether the engine loads things from a bundle's own kind folders
-/// (`castle/hall/objects/torch.md`); until it does, local scope refuses.
-const LOCAL_LOADS: bool = false;
-
 /// The folder a kind's things go in at the root, an area or a bundle.
 fn kind_folder(kind: EntityKind) -> &'static str {
     match kind {
@@ -83,10 +79,6 @@ impl Console {
                 let area = self.area_here().ok_or_else(|| self.t("scope_no_area", &[]))?;
                 Ok(Some(Path::new(&area).join(kind_folder(kind))))
             }
-            // The engine reads a bundle as a leaf, with only state files
-            // and `chapters/` (`a bundle is a leaf`), so local things wait
-            // until it also takes kind folders (asked of the coder).
-            Scope::Local if !LOCAL_LOADS => Err(self.t("scope_local_waits", &[])),
             Scope::Local => {
                 let room = self.current_room().ok_or_else(|| self.t("scope_local_needs_room", &[]))?;
                 let bundle = match self.bundle_dir(EntityKind::Location, &room) {

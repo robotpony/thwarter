@@ -27,7 +27,8 @@ Its file is in village/objects/.
 > /scope global
 New things go in the world's own folders (objects/, npcs/), the global scope.
 > /new object bucket tool in here
-Local scope isn't ready: a room's bundle can't hold things' files yet. Use area or global for now.
+Created object bucket, Bucket, placed in village/square.
+Its file is in village/square/objects/.
 > /new character guard in area
 Created character guard, Guard, placed in village/square.
 Its file is in village/npcs/.
@@ -35,7 +36,7 @@ Its file is in village/npcs/.
 A small square of packed earth. An old well stands to the north.
 The Elder and Guard are here.
 
-You see a brass lantern, a torch, a rope, and a hook.
+You see a brass lantern, a torch, a rope, a hook, and a bucket.
 
 You can go north or east.
 > /move torch global
@@ -43,14 +44,15 @@ Moved torch: village/objects/torch.md → objects/torch.md. Its id and every ref
 > /move hook global
 Moved hook: village/objects/hook.md → objects/hook.md. Its id and every reference stay as they are.
 > /move guard local
-Local scope isn't ready: a room's bundle can't hold things' files yet. Use area or global for now.
+Moved guard: village/npcs/guard.md → village/square/npcs/guard.md. Its id and every reference stay as they are.
 > /move village/well global
 village/well is a room, and a room's id is its path. /move village/well <area> moves it into an area.
 > /move torch global
 torch wasn't moved: object torch is already in objects/
 > /list objects
-Objects (4):
+Objects (5):
 
+  bucket   Bucket
   hook     Hook
   lantern  Brass Lantern
   rope     Rope
@@ -59,6 +61,40 @@ Objects (4):
 Hook (hook), object
   file       objects/hook.md
   scope      global
+  starts in  room `village/square`
+> /validate
+Problems (1):
+  village/square: connection `east` points at unknown location `village/inn`
+Validation failed: 1 problem(s), 0 warning(s)
+> /scope local
+New things go in this room's bundle, in its own objects/ and npcs/ folders. The prompt shows [local].
+> /new object pail tool
+Created object pail, Pail, placed in village/square.
+Its file is in village/square/objects/.
+> look
+A small square of packed earth. An old well stands to the north.
+The Elder and Guard are here.
+
+You see a brass lantern, a torch, a rope, a hook, a bucket, and a pail.
+
+You can go north or east.
+> /move hook local
+Moved hook: objects/hook.md → village/square/objects/hook.md. Its id and every reference stay as they are.
+> /scope global
+New things go in the world's own folders (objects/, npcs/), the global scope.
+> /list objects
+Objects (6):
+
+  bucket   Bucket
+  hook     Hook
+  lantern  Brass Lantern
+  pail     Pail
+  rope     Rope
+  torch    Torch
+> /inspect pail
+Pail (pail), object
+  file       village/square/objects/pail.md
+  scope      village/square/objects
   starts in  room `village/square`
 > /validate
 Problems (1):

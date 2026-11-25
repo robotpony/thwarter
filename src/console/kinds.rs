@@ -48,7 +48,6 @@ const KINDS: &[(&str, Kind)] = &[
     ("list_what", Kind::Refused),
     ("scope_what", Kind::Refused),
     ("scope_no_area", Kind::Refused),
-    ("scope_local_waits", Kind::Refused),
     ("scope_local_needs_room", Kind::Refused),
     ("scope_move_not_a_thing", Kind::Refused),
     ("scope_not_moved", Kind::Error),

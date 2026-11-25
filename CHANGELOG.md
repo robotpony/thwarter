@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.92.0 (2026-11-25)
+
+### Added
+
+- Local scope, now that a room's bundle can hold its own things (e8377fd): `/scope local`, `/new ... in here` and `/move <thing> local` put a thing in the current room's bundle, in `objects/` or `npcs/` (`village/square/objects/pail.md`), making the room a bundle first if it isn't one (REQ-CON-26 to 29, `design/STATES.md` › Scope). Covered by `tests/transcripts/scope.txt`.
+
 ## 0.91.0 (2026-11-25)
 
 ### Added
