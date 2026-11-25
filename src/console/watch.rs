@@ -34,7 +34,7 @@ pub fn watch(root: &Path, console: Arc<Mutex<Console>>, notices: SyncSender<Stri
                 return;
             }
         };
-        let (changed, report) = {
+        let report = {
             let Ok(mut console) = console.lock() else { return };
             // What the loader ignores (dot-names, Hugo's folders, the
             // world's `ignore` list) doesn't reload the world.
@@ -47,12 +47,12 @@ pub fn watch(root: &Path, console: Arc<Mutex<Console>>, notices: SyncSender<Stri
                 return;
             }
             let report = console.reload();
-            (changed, report)
+            console.t("changed_on_disk", &[("files", &changed.join(", ")), ("report", &report)])
         };
         // Sent with the console unlocked: while the full-screen editor is
         // open, nothing reads notices, and a full channel must not stop
         // the editor's saves from taking the lock.
-        let _ = notices.send(format!("Changed on disk: {}.\n{}", changed.join(", "), report));
+        let _ = notices.send(report);
     })?;
     debouncer.watcher().watch(root, RecursiveMode::Recursive)?;
     Ok(debouncer)

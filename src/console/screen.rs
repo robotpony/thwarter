@@ -301,7 +301,7 @@ impl<'a> Screen<'a> {
         }
         if let Some(target) = console.take_pending_edit() {
             let document = console.edit_document(&target);
-            self.editing = Some((Editor::new(document), target));
+            self.editing = Some((Editor::new(document).with_texts(console.texts.clone()), target));
         }
     }
 
@@ -370,7 +370,7 @@ impl<'a> Screen<'a> {
                 if let Some(path) = guard.world.path_of(kind, &picker.asking.id) {
                     if let Ok(target) = guard.open_target(kind, picker.asking.id.clone(), path) {
                         let document = guard.edit_document(&target);
-                        self.editing = Some((Editor::new(document), target));
+                        self.editing = Some((Editor::new(document).with_texts(guard.texts.clone()), target));
                     }
                 }
             }

@@ -96,6 +96,8 @@ const KEYS_HINT: &str = if cfg!(target_os = "macos") { "⌘s or ctrl-s save · e
 
 /// The editor's state between keys.
 pub struct Editor<'a> {
+    /// The editor's status lines, from `[console]`.
+    texts: crate::engines::texts::Texts,
     document: Document,
     area: TextArea<'a>,
     /// The text as last saved (or opened), to know whether there are
@@ -113,6 +115,13 @@ impl<'a> Editor<'a> {
     /// Opens with the cursor after what's written (Bruce, 2026-11-23): at
     /// the end of the last line of prose, or on a fresh line after the
     /// frontmatter when there's no prose yet.
+    /// The editor with the console's `[console]` wording, the author's
+    /// overrides included.
+    pub fn with_texts(mut self, texts: crate::engines::texts::Texts) -> Self {
+        self.texts = texts;
+        self
+    }
+
     pub fn new(document: Document) -> Self {
         let text = document.combined();
         let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
@@ -135,6 +144,7 @@ impl<'a> Editor<'a> {
         area.set_line_number_style(style(Role::Chrome));
         area.set_cursor_line_style(Style::default());
         Editor {
+            texts: crate::engines::texts::Texts::defaults(),
             document,
             area,
             saved_text: text,
@@ -162,7 +172,7 @@ impl<'a> Editor<'a> {
     fn disk_changed(&mut self, sections: Vec<String>) {
         if self.dirty() {
             self.force_armed = true;
-            self.status = "Changed on disk too. Ctrl-s overwrites that change with yours; esc keeps it.".to_string();
+            self.status = self.texts.text("console", "editor_changed_on_disk", &[]);
             return;
         }
         for (section, text) in self.document.sections.iter_mut().zip(&sections) {
@@ -178,7 +188,7 @@ impl<'a> Editor<'a> {
         area.move_cursor(CursorMove::Jump(row.min(u16::MAX as usize) as u16, col.min(u16::MAX as usize) as u16));
         self.area = area;
         self.saved_text = text;
-        self.status = "Reloaded: changed on disk.".to_string();
+        self.status = self.texts.text("console", "editor_reloaded", &[]);
     }
 
     /// Handles one key. Returns false when the editor should close.
@@ -189,7 +199,7 @@ impl<'a> Editor<'a> {
                     return false;
                 }
                 self.discard_armed = true;
-                self.status = "Unsaved changes. Esc again discards them; ctrl-s saves.".to_string();
+                self.status = self.texts.text("console", "editor_unsaved", &[]);
             }
             Input { key: Key::Char('s'), ctrl: true, alt: false, .. } => {
                 self.discard_armed = false;
@@ -229,7 +239,7 @@ impl<'a> Editor<'a> {
         }
         self.key(Input { key: Key::Char('s'), ctrl: true, ..Input::default() }, files);
         if self.dirty() {
-            self.status = format!("{} Not switched; fix it, or esc to close.", self.status);
+            self.status = self.texts.text("console", "editor_not_switched", &[("status", &self.status)]);
             return false;
         }
         true

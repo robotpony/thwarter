@@ -220,3 +220,19 @@ offer_world_index = "This world has no world/index.md yet. Make one, with author
 last_time = "Last time:"
 which_one = "Which one?"
 watching_failed = "File watching failed: {reason}. /reload still works."
+
+# Replies built around another reply (author.rs, play.rs, watch.rs).
+but_linking_failed = "{report}\nBut linking it from {place} failed: {reason}"
+but_placing_failed = "{report}\nBut placing it in {place} failed: {reason}"
+now_at = "{report}\nNow at {place}."
+still_naming = "\nStill naming {id}, to fix by hand:"
+adds_problems = "This adds {count} problem(s):\n  {problems}"
+play_mode = "Play mode.\n\n{view}"
+reply_with_note = "{reply}\nAuthor note: {note}"
+changed_on_disk = "Changed on disk: {files}.\n{report}"
+
+# The full-screen editor's status line (editor.rs).
+editor_changed_on_disk = "Changed on disk too. Ctrl-s overwrites that change with yours; esc keeps it."
+editor_reloaded = "Reloaded: changed on disk."
+editor_unsaved = "Unsaved changes. Esc again discards them; ctrl-s saves."
+editor_not_switched = "{status} Not switched; fix it, or esc to close."

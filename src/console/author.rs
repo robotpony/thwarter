@@ -93,7 +93,7 @@ impl Console {
                 Ok(path) => written.push(path),
                 Err(e) => {
                     let report = self.after_writes(&written, summary);
-                    return format!("{}\nBut linking it from {} failed: {}", report, here, e);
+                    return self.t("but_linking_failed", &[("report", &report), ("place", &here.to_string()), ("reason", &e.to_string())]);
                 }
             }
             summary.push_str(&format!(", through the {} exit of {}", direction, here));
@@ -106,7 +106,7 @@ impl Console {
         match self.world.path_of(Kind::Room, &id) {
             Some(path) => {
                 self.place = Place::File(path);
-                format!("{}\nNow at {}.", report, self.pwd())
+                self.t("now_at", &[("report", &report), ("place", &self.pwd())])
             }
             None => report,
         }
@@ -210,7 +210,7 @@ impl Console {
                     }
                     Err(e) => {
                         let report = self.after_writes(&written, summary);
-                        return format!("{}\nBut placing it in {} failed: {}", report, here, e);
+                        return self.t("but_placing_failed", &[("report", &report), ("place", &here.to_string()), ("reason", &e.to_string())]);
                     }
                 }
             }
@@ -579,7 +579,7 @@ impl Console {
         }
         summary.push('.');
         if !report.by_hand.is_empty() {
-            summary.push_str(&format!("\nStill naming {}, to fix by hand:", old));
+            summary.push_str(&self.t("still_naming", &[("id", &old.to_string())]));
             for place in &report.by_hand {
                 summary.push_str(&format!("\n  {}", place));
             }
@@ -720,7 +720,7 @@ impl Console {
         let new_problems: Vec<String> = self.world.warnings().into_iter().filter(|w| !before.contains(w)).collect();
         let mut out = vec![summary];
         if !new_problems.is_empty() {
-            out.push(format!("This adds {} problem(s):\n  {}", new_problems.len(), new_problems.join("\n  ")));
+            out.push(self.t("adds_problems", &[("count", &new_problems.len().to_string()), ("problems", &new_problems.join("\n  "))]));
         }
         out.extend(game_warnings.iter().map(|w| format!("Game: {}", w)));
         out.join("\n")

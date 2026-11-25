@@ -147,7 +147,7 @@ Every sentence the engine, play and the console write comes from a text table wi
 - [x] One `Texts` type for `[play]`, `[engine]` and `[console]` tables, defaults from `src/builtins/text/` [coder] (`design/ENGINE_TEXT.md` › The shape)
 - [x] Engine and play strings become `[engine]` keys, the default text unchanged [coder]
 - [x] Console strings become `[console]` keys, the default text unchanged [console]
-- [ ] A test that fails on a new user-facing string outside the defaults: a heuristic scan with an allowlist [coder, console] (`design/ENGINE_TEXT.md` › The guard test)
+- [x] A test that fails on a new user-facing string outside the defaults: a heuristic scan with an allowlist [coder, console] (`design/ENGINE_TEXT.md` › The guard test)
 - [x] Overrides: `world.toml`'s `[play]` and `[engine]` over the defaults, with validate's warning for an unknown key [coder]
 - [x] Overrides: the personal config's `[console]` over the defaults, with a warning for an unknown key [console]
 - [x] Story overrides: a `## When:` section replaces an `[engine]` reply by exact outcome tag, reserved outcome names, `{{ turn.x }}` slots [coder] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies)

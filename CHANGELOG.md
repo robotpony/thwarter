@@ -71,6 +71,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.77.1 (2026-11-24)
+
+### Changed
+
+- The text guard scans `src/console/` too. The 13 console lines it still found (replies built around another reply, play mode's heading, the full-screen editor's status line, the watcher's notice) are `[console]` keys now, their default text unchanged.
+
 ## 0.77.0 (2026-11-24)
 
 ### Added

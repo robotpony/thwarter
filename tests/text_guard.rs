@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 /// The folders and files scanned. `src/console/` joins once its last
 /// sentences have moved to `[console]`.
-const SCANNED: &[&str] = &["src/engines", "src/render.rs"];
+const SCANNED: &[&str] = &["src/engines", "src/render.rs", "src/console"];
 
 /// Call sites whose messages are tooling, not story: author notes,
 /// validation and load messages, errors, and assertions. A literal in

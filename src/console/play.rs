@@ -38,7 +38,7 @@ impl Console {
             self.notes = result.note.iter().cloned().collect();
             return result.text;
         }
-        show(result)
+        self.show(result)
     }
 
     /// The player's room, as the player sees it.
@@ -79,7 +79,7 @@ impl Console {
             }
         }
         self.mode = Mode::Play;
-        format!("Play mode.\n\n{}", self.play_look())
+        self.t("play_mode", &[("view", &self.play_look())])
     }
 
     /// `/play here`: starts the game in, or moves the player to, the room
@@ -97,7 +97,7 @@ impl Console {
             }
         }
         self.mode = Mode::Play;
-        format!("Play mode.\n\n{}", self.play_look())
+        self.t("play_mode", &[("view", &self.play_look())])
     }
 
     /// `/save [name]`.
@@ -165,10 +165,12 @@ impl Console {
     }
 }
 
-/// An action's reply, then its author note on a line of its own.
-fn show(result: ActionResult) -> String {
-    match result.note {
-        Some(note) => format!("{}\nAuthor note: {}", result.text, note),
-        None => result.text,
+impl Console {
+    /// An action's reply, then its author note on a line of its own.
+    fn show(&self, result: ActionResult) -> String {
+        match result.note {
+            Some(note) => self.t("reply_with_note", &[("reply", &result.text), ("note", &note)]),
+            None => result.text,
+        }
     }
 }
