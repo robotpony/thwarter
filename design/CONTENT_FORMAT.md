@@ -164,6 +164,8 @@ Play writes rooms and the inventory as plain sentences, each from a template in 
 
 The built-in replies ("Take what?", "The chest won't budge.") are `world.toml`'s `[engine]` table in the same shape, with each default in `src/builtins/text/engine.toml`. `[engine]` rewords a reply across the whole world. To reword it for one thing, room or chapter, write a `## When:` section headed with the reply's outcome tags instead (`design/SECTIONS.md` › Rewording a built-in reply).
 
+A world adds its own words for verbs in `world.toml`'s `[verbs]` table, `alias = "verb"` (`yank = "pull"`), on top of the built-in aliases in `src/builtins/verbs.toml` (`l`, `x`, `get`, `i` and the rest). `validate` warns about an alias that is a direction or a built-in verb, or whose verb nothing knows (`design/PLAYER_COMMANDS.md` › REQ-PC-6).
+
 ## What the loader does today
 
 `WorldEngine::load_world` walks a world directory, parses every `.md` file, and:

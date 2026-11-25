@@ -10,137 +10,51 @@ Authoring comes first, play second (Bruce, 2026-11-23). Each phase from 4 on say
 
 ## Phase 2 · Console shell
 
-- [x] `thwart edit <world>` and `thwart play <world>`, handing off to `src/console/` [coder] (REQ-CON-1)
-- [x] The console loop: `/edit`, `/play`, `/reload`, `/help`, `/quit` [console] (REQ-CON-2, REQ-CON-3, REQ-CON-7)
-- [x] Edit-mode navigation by area and room, like folders [console] (REQ-CON-4)
-- [x] Room view in the console, from the same renderer as `thwart show` [console, coder] (REQ-CON-8)
-- [x] Transcript test runner [console] (REQ-CON-9)
-- [x] Parser tests, before any writer work starts [coder] (`design/UNIT_TESTS.md` › 1)
+- [x] Done (squashed): 6 items, from `thwart edit` and `thwart play` handing off to the console to the transcript runner and parser tests; the full list is `git show a33296b:PLAN.md`.
 
 ## Phase 3 · Authoring
 
-- [x] Round-trip file writer: change one field and keep everything else as it was [coder] (REQ-ENG-7)
-- [x] The loader records which file each `id` came from, and `validate` reports an `id` defined in two files [coder] (REQ-ENG-7)
-- [x] `validate` warns about a key that differs only in case from a known one, such as `Inventory:` [coder] (`design/CONTENT_FORMAT.md` › Keys, order and file locations)
-- [x] Changes to the loaded world in memory, checked after each one [coder] (REQ-ENG-8)
-- [x] `validate` warns when two kinds share an `id`, such as a location and an object [coder] (`design/CONTENT_FORMAT.md` › Keys, order and file locations)
-- [x] `/new room <direction>`, `/new object`, `/new character` [console] (REQ-CON-5)
-- [x] `/set` and `/link` for single fields and exits [console] (REQ-CON-5)
-- [x] `/edit room`, `/edit object`, `/edit character`: full editing in the terminal [console] (REQ-CON-6)
-- [x] An object without a card gets one on its first edit [console, coder] (REQ-CF-8)
-- [x] File watching for `/reload` [console] (REQ-CON-7)
-- [x] Line editing and history at the console prompt (arrow keys) [console] (REQ-CON-2)
+- [x] Done (squashed): 11 items, from the round-trip writer to line editing at the prompt; the full list is `git show a33296b:PLAN.md`.
 
 ## Phase 4 · World model
 
 The engine side of `design/STATES.md` (run by the commander with the coder). Done when `validate` and `show` handle every construct in `design/STATES.md` except doors.
 
-- [x] Done (squashed; 0.7.0 to 0.14.0, f987904 to e4e87e6): play verbs, action effects, and save and load from the console; the states, bundles and chapters design, agreed with Bruce; bundle loading, layers and merging with key sources; current versions on request, play state v2 and saves v2; actions as a map of mechanics with responses as body blocks, and the 9 object cards migrated. The old Phase 4 list is in `git show e4e87e6:PLAN.md`.
-- [x] The `world/` folder: `index.md`, `story.md`, `player.md`, and the test world moved off `world.toml` [coder] (REQ-CF-20)
-- [x] The loader ignores other tools' files: dot-folders and Hugo's own [coder] (REQ-CF-24)
-- [x] Obsidian links wherever frontmatter takes an id, as a file path or an id [coder] (REQ-CF-25)
-- [x] Variables by level, with warnings for undeclared ones [coder] (REQ-CF-16)
-- [x] Templates and built-ins, with `scenery` the first built-in [coder] (REQ-CF-15, REQ-CF-21)
-- [x] `visibility:` in play: faint, hidden and absent [coder] (REQ-CF-18)
-- [x] `reply ambiguous` from the candidates' shared template, else an in-world default [coder] (`design/STATES.md` › Ambiguity)
-- [x] Links in prose, Markdown rendered in play, and tags [coder] (REQ-CF-28 to 30)
-- [x] `design/STATES.md` › Engine rules written as REQ-ENG items [coder] (`design/ENGINE_REQUIREMENTS.md`)
-
-- [x] `thwart show` for any thing (objects, characters, templates and built-ins), not only locations [coder] (`design/CLI_REQUIREMENTS.md`)
-- [x] `thwart show` for the `world/` definition and the chapters [coder] (`design/CLI_REQUIREMENTS.md`)
+- [x] Done (squashed): play verbs, states, bundles and chapters, the `world/` folder, variables, templates and built-ins, visibility, ambiguity, links and tags, and `thwart show` for every kind of thing. The 0.7.0 to 0.14.0 list is in `git show e4e87e6:PLAN.md`; the rest is in `git show a33296b:PLAN.md`.
 
 ## Phase 5 · Authoring the model
 
 The console side (Bruce with the console coder). Done when an author can build a bundle with states and a chapter, and run the world, without touching a file by hand.
 
-- [x] `/restart` onto a new build, keeping the session (0.15.0, 3818dfe) [console] (REQ-CON-30, REQ-CON-31)
-- [x] Edit mode moves with play words (go, go back, look, examine), replacing cd, ls and pwd (0.17.0) [console] (REQ-CON-4)
-- [x] Full-screen console: status bar, output, a sidebar with GAME and HERE, the editor inside it (0.25.0) [console] (REQ-CON-22, REQ-CON-23)
-- [x] The `/` command menu with argument completion (0.38.0) [console] (REQ-CON-33)
-- [x] The `game/` folder, and `/set` in it changing only the running game (0.82.0) [console] (REQ-CON-24, REQ-CON-25)
+- [x] Done (squashed): 24 items, among them `/restart`, the full-screen console, the `/` menu, the `game/` folder, renaming and removing with every reference updated, forgiving verbs, the world picker, doors named from both sides, `/start`, TO WRITE, objects that hold objects and question sets, to 0.88.0; the full list is `git show a33296b:PLAN.md`.
 - [ ] Scope: a sticky default, per-command overrides, `/move` (global and area in 0.89.0; local waits on bundles holding kind folders) [console] (REQ-CON-26 to 29)
-- [x] Turning a one-file thing into a bundle, and saving a bundle's sections together [coder] (REQ-ENG-28, REQ-ENG-29)
 - [ ] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
-- [x] Renaming an id with every reference updated: file or bundle moved, exits, lists, `default_location`, `start:`, prose links and variables (0.30.0, 318144e) [coder] (REQ-ENG-30)
-- [x] Renaming also rewrites references inside actions (`becomes:`, `requires:`), which are reported for now [coder] (REQ-ENG-30)
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
-- [x] Removing a thing: its file or bundle deleted, and every reference to its id taken out (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, beside REQ-ENG-30)
-- [x] `/remove <thing>` deletes an object, room, character or door after the author confirms; no undo yet (Bruce, 2026-11-24) (0.68.0) [console] (`design/CONSOLE_REQUIREMENTS.md`, beside REQ-CON-5)
 - [ ] One command registry (built-ins, aliases, prefixes and did-you-mean done in 0.74.0; world commands and the config layer to go): every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
-- [x] Forgiving play verbs: aliases, unique prefixes and did-you-mean for verbs, the way commands get them (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, to write)
-- [x] No built-in default world: with no `--world`, no configured default and no world around the current folder, `thwart` lists the worlds it can find and stops with an error; `edit` and `play` offer them as a picker (Bruce, 2026-11-24) [coder, console] (REQ-CLI-2)
-- [x] (0.73.1) The sidebar's exits read as aligned columns with arrow leaders (`east -----> bedroom    closed door`); a door shows only as its state when it blocks the way, and its title and id move to `/inspect` (Bruce, 2026-11-24) [console]
-- [x] A new door's id and title read from both sides (faebdce, 5aa92db, b878529): `door-bedroom-hallway`, titled from its rooms ("Bedroom door"), not the template's "Door" (Bruce, 2026-11-24) [coder, console]
-- [ ] `authors:`, one id or a list, replaces `author:` (still read); new worlds get `authors: $USER`; the author check is the machine user (Bruce, 2026-11-24) [coder, console] (REQ-WS-5, REQ-WS-7)
+- [ ] Author-only console features check `WorldEngine::is_author`; `authors:`, `thwart new` and the picker's `authors: $USER` are built (0.72.0 to 0.83.1) [console] (REQ-CON-55, REQ-WS-7)
 - [ ] World commands MAY be Rhai scripts that read the world and run console commands, with the world scripts' limits (Bruce, 2026-11-24) [console] (`design/CONTENT_FORMAT.md` › type: command)
-- [x] (0.71.0) In edit mode an exit to a room nothing defines is only a TO WRITE entry, not a problem; `validate` and `package` still fail on it (Bruce, 2026-11-24) [console]
-- [x] (0.71.0) `/start` makes the current room the world's start (Bruce, 2026-11-24) [console]
-- [x] (0.71.0) A world with no `world/index.md` offers to create it (title, `authors:` with the current user, `start:`) instead of only saying it's missing (Bruce, 2026-11-24) [console]
-- [x] A name that a link or `@name` points at but nothing defines is "not written yet", grouped one per name with its mentions, not a warning; `validate` lists them apart from warnings and the engine hands the console the list (Bruce, 2026-11-24) [coder]
-- [x] (0.70.0) A TO WRITE list in the sidebar, like document tabs: each unwritten name has a key, Cmd-1, Cmd-2 and so on in list order, like browser tabs (`wallpaper [⌘1]`); pressing it makes the thing with defaults, as `/add` would, in the room whose prose names it, and opens it in the editor. The keys are configurable in `config.toml` (Bruce, 2026-11-24) [console] (`design/CONSOLE_REQUIREMENTS.md`, to write)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 - [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
-- [x] Objects hold objects: loading, scope, examine lists, one place per thing, unified with `keep()` [coder] (REQ-CF-31)
 - [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
-- [x] Question sets: the loader reads `questions/` folders and built-ins, and `validate` checks them [coder] (REQ-CF-32, `design/CONTENT_FORMAT.md` › `type: questions`)
-- [x] `/new` and `/add` ask a set's questions, run the answers and print the commands they stood for, with the four recipes (0.60.0, 0.61.0) [console] (REQ-CF-32)
-- [x] Question sets chosen by id, then template, then kind, with no warning for a set whose name matches nothing yet (d2665a8) [coder] (REQ-CF-32)
-- [x] Question sets: `set <key> <value>` with the value written in, sequenced with the console's `Construct::Set` (dc66a64, 0.62.1) [coder, console] (REQ-CF-32)
 - [ ] Review the built-in question content with Bruce, once the mechanics work [commander, Bruce]
 
 ## Phase 6 · Doors and play
 
 Done when a locked-door puzzle plays from both sides.
 
-- [x] Doors as their own type, with sides, `passable:` and `transparent:` [coder] (REQ-CF-19, `design/STATES.md` › Doors)
-- [x] Door built-ins: `door` and `portal` [coder] (REQ-CF-21)
-- [x] The engine matches `## When:` sections against each turn's game state, and stops reading markers (0.46.0) [coder] (`design/SECTIONS.md` › The model)
-- [x] `@name` in prose shows the thing's name in play [coder] (`design/SECTIONS.md` › Prefixes, links and names)
-- [x] Rewrite the `door` and `portal` built-ins and the test world's marker files as sections [coder] (`design/SECTIONS.md` › What changes)
-- [x] The editor draws keyword headings and colours `@`, `#` and `thwarter` blocks (0.44.0) [console] (`design/SECTIONS.md`)
+- [x] Done (squashed): 17 items, from doors as their own type and `## When:` sections to Rhai scripts, keys, `/add door`, `/validate` and the parser in the engine; the full list is `git show a33296b:PLAN.md`.
 - [ ] Try sections on real content with Bruce, then fold `design/SECTIONS.md` into the content requirements [commander, Bruce]
-- [x] Rhai scripts: `actions.rhai` and ```rhai blocks, functions as actions, outcomes, keep and the owned scope [coder] (`design/SECTIONS.md` › Scripts, Outcomes and replies)
-- [x] The `locked-door` built-in as the vault door example shows [coder] (REQ-CF-21, `design/STATES.md` › Keys)
-- [x] Connections between things for scripts (`connects:`) [coder] (`design/STATES.md` › One thing affecting another)
-- [x] `/add door west hallway`: doors made from the console, with `door_id` from the engine (28692c1, 66a1b27) [console, coder] (`design/STATES.md` › Adding a door from the console, REQ-CON-42)
-- [x] `/validate` in the console, on the engine's one validation call (74681d1) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [x] The world's problems in a pane at the sidebar's foot, like an IDE (74681d1) [console] (REQ-CON-23)
-- [x] Keys for locked doors: designed with Bruce as a scripted built-in [commander] (`design/STATES.md` › Keys)
 - [ ] Clocks and game values: time, weather, randomness [commander, coder] (`design/STATES.md` › Open questions)
-- [x] The player command parser moves into the engine as `parse_command` [coder] (REQ-PC-1)
-- [x] An unknown verb with a noun no thing answers to says it doesn't understand [coder] (REQ-PC-14)
-- [x] Play mode parses through the engine and runs object actions (0.42.1) [console] (REQ-PC-1, REQ-PC-13)
-- [x] Save paths and the save and load calls move into the engine (0.43.2) [coder, console] (REQ-PC-18)
 - [ ] Settle the player command open questions with Bruce [commander] (`design/PLAYER_COMMANDS.md` › Open questions)
 
 ## Phase 7 · A real sample world
 
 Bruce authors it with the console coder, starting now, using what exists and growing as features land. Done when it plays start to finish and has a transcript test.
 
+- [x] Done (squashed): 18 items, the test world restarted and every playtest ask so far: `where`, `enter`, `look <direction>`, typo suggestions, `/list`, `/map` of the whole world, bare command names, prose room views, door states, `drop`, `give`, `talk`, `ask`, `take all`, `wait`, `again` and `it`, to 0.88.0; the full list is `git show a33296b:PLAN.md`.
 - [ ] Write the world: a short story that uses states, chapters, templates and a door [Bruce, console]
-- [x] The old test content removed, and the test world restarted from Bruce's rooms (0.50.2, 37a5c49) [Bruce, coder]
 - [ ] A transcript that plays it through [console] (REQ-CON-9)
-
-Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce playtests edit and play modes before any of these start.
-
-- [x] `where` and `where am i` (play in 0.81.0, edit mode in 0.81.1) [coder, console] (REQ-PC-21)
-- [x] `enter <place>` as `go` (0.81.0) [coder] (REQ-PC-22)
-- [x] `look <direction>` and `what's <direction>` (0.81.0) [coder] (REQ-PC-23)
-- [x] Typo suggestions for verbs [coder] (REQ-PC-24)
-- [x] `/list objects|rooms|characters` in edit mode (0.80.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [x] `/map` from the world's root draws the whole world, instead of asking for a room (0.80.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [x] A bare console command name in edit mode (`edit`) runs it or asks "Did you mean /edit?" (0.80.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [x] An unknown slash command suggests the nearest one (built with the registry; covered by 0.80.0's transcripts) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [x] At the world's root, edit mode lists `objects/` and `world/` below the rooms with labels ("World settings", "Global objects: 4"), and `/edit world` opens `world/index.md` (Bruce, 2026-11-24; 0.62.1) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [x] Edit mode's room view introduces exits, people and things with prose from `[play]` and `[console]`, not headings (Bruce, 2026-11-24) [coder] (shared renderer; `design/ENGINE_TEXT.md` › Where tables live)
-- [x] One blank line before and after every block of output, the prompt included; the screen's tests check it, since transcripts are compact (881fe90, Bruce, 2026-11-24) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [x] Sidebar fixes from Bruce's playtest: the problems pane's wrap and literal backticks (881fe90) [console]
-- [x] A door's exit shows its state ("closed", "locked"), not "not passable", and its name before its id: the sidebar and play in 2d36b93, `thwart show <door>` in 0.81.2 [coder] (shared renderer)
-- [x] Play reads rooms and replies as the story: people right after the prose, held things on a plain look, doors named in the ways out (95ed0c9, REQ-ENG-43, 45, 46)
-- [x] `drop` and `give` (578b312) [coder] (REQ-PC-25)
-- [x] `talk to` and `ask about`, with talk's topic menu (engine and topics in 0.86.0, the console's menu in 0.86.1) [coder, console] (REQ-PC-31, 32)
-- [x] `take all`, `wait`, `again` and `it` (0.87.0) [coder] (REQ-PC-26 to 28)
 - [ ] Story verbs: `jump`, `run`, `kick` and `hit` with default replies; `throw`, `smash`, `break`, `stack`, `push` and `pull` with built-in effects [coder] (REQ-PC-29, 30)
 
 ## Phase 8 · Text as data
@@ -162,25 +76,18 @@ AI tools for prose in edit mode. Done when an author can review and rewrite a ro
 
 Done when a persona can package a world, and someone else can install it and play it.
 
-- [x] Persona files, and `author:` in `world/index.md` naming one [coder] (REQ-WS-4, REQ-WS-5)
-- [x] Personal settings in `~/.config/thwarter/config.toml` [coder] (REQ-CFG-4)
+- [x] Done (squashed): 4 items: personas, personal settings, packaging and installing, and play data kept apart; the full list is `git show a33296b:PLAN.md`.
 - [ ] First run asks who's writing; `/author` switches persona; the status bar shows it; packaging says which contact details ship [console] (REQ-CON-34 to 37, REQ-WS-4)
-- [x] Packaging a world with its persona, and installing one to play [coder] (REQ-CFG-5, REQ-CFG-7)
-- [x] Play data for installed worlds kept apart from them (0.36.1) [coder, console] (REQ-CFG-6)
 
 ## Phase 11 · Tooling, as needed
 
-
 Built when authoring or play asks for them, most likely as console commands. Until then they stay as they are.
 
-- [x] `WorldGraph::find_path` and a map [coder] (`design/CLI_DESIGN.md` › `map`)
-- [x] Search over locations, characters and objects [coder] (`design/CLI_DESIGN.md` › `search`)
+- [x] Done (squashed): 4 items: the map, search, the location id check and CI; the full list is `git show a33296b:PLAN.md`.
 - [ ] `CharacterEngine` wired into `show` and `validate --strict` [coder] (`design/ARCHITECTURE.md` › Character Engine)
 - [ ] Read `thwart.toml` through `ConfigManager` [coder] (REQ-CFG-1)
 - [ ] Validation warnings, author notes and `thwart` command-line output move to text tables (Bruce, 2026-11-24) [coder] (`design/ENGINE_TEXT.md` › Settled questions)
 - [ ] The console's thing-kind labels ("world settings", "chapter overlay" and the rest in `world.rs`) move to `[console]`; they double as words authors type (`/edit room`), so this needs a text-aware label at six call sites (Bruce, 2026-11-25) [console] (`design/ENGINE_TEXT.md` › Settled questions)
-- [x] `validate` checks a location's `id` against its file path [coder] (`design/CONTENT_FORMAT.md` › What's still open)
-- [x] Minimal CI: `cargo build` and `cargo test` on push [coder] (`TESTING.md` › CI)
 
 ## Open questions
 

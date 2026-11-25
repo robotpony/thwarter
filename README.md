@@ -48,6 +48,13 @@ cargo build --release
 World content lives at `authors/<your-name>/<world-name>/` (see World Structure below). There's no built-in default world: a command uses `--world`, then `[world] path` in `thwart.toml` (or your personal `config.toml`), then the world the current folder is in. With none of those, it lists the worlds it can find and stops (REQ-CLI-21).
 
 ```bash
+# Start a world: authors/<you>/tiny-castle, with you as its author
+thwart new tiny-castle
+
+# Write it, or play it, in the console
+thwart edit authors/mx/tiny-castle
+thwart play authors/mx/tiny-castle
+
 # Validate a world's files (broken connections, parse errors)
 thwart validate --world authors/mx/test-world
 
