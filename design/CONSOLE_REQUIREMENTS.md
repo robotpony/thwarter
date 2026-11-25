@@ -301,6 +301,22 @@ Bruce, 2026-11-24: console commands should solve common problems easily, through
   ```
 
 
+
+## To write
+
+*Proposed (Bruce, 2026-11-24; the key scheme is the commander's, not yet seen by Bruce).* A name the prose mentions but nothing defines (`[[hole]]`, `@wallpaper`) is a warning per mention today, so hallway.md's three `wallpaper` mentions make three warnings.
+
+- REQ-CON-57: The sidebar MUST show a TO WRITE list: each name the world mentions but doesn't define, once, with how many times it's mentioned when that's more than once, and its key. It comes from the engine's not-written-yet list (grouped by name, each mention's file), not from warning text.
+
+  ```
+  TO WRITE                      alt-1
+    a  wallpaper  ×3
+    b  hole
+  ```
+
+- REQ-CON-58: Picking an entry MUST make it with defaults and open it in the editor, as `/add` would but without the question picker: the card REQ-CF-8 makes (scenery, title from the id), listed in the first room whose prose names it. A name an exit leads to becomes a room instead. Changing it afterwards is a normal `/set`.
+- REQ-CON-59: A leader key opens the list, then a to z picks in list order, so `1a` is list 1, item a. Other lists (open documents) MAY take other numbers later. The default leader MUST work in every terminal, Alt-1 (Option-1), since kitty, iTerm2 and Ghostty keep Cmd-1 for their own tabs; `config.toml` MAY set another, and the sidebar shows the key that's set. `/write [<name>]` does the same from the prompt.
+
 ## Command registry
 
 *Proposed (Bruce, 2026-11-24; the author rule is the commander's REQ-WS-7 to 9, also proposed).* Today one command is written in five places (the `/` menu table, the dispatch `match`, `/help`, the transcripts' list of commands that change content, and the handler's own usage text), and they drift: 23 menu entries, 31 help lines, 34 dispatch arms. This section replaces them with one registry.
