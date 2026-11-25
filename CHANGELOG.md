@@ -9,6 +9,46 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 ### Added
 
 - `design/CONSOLE_REQUIREMENTS.md` › Quick menu (REQ-CON-63 to 68): a sidebar menu for where edit mode is, opened with Ctrl-Space or `/menu`, whose entries ask their questions at the bottom of the console and print the command they stood for (Bruce, 2026-11-25).
+- `design/CONTENT_FORMAT.md` › Example: a room with objects and states: a dark study with room states, local and global objects, a portrait whose action changes two things, a hidden safe and a heading on another thing's state, with its play-through. Checked against 0.94.0; `README.md` and `design/STATES.md` point to it.
+- `design/CONTENT_FORMAT.md` › Adding a verb to an object: the five ways, from a reply section alone to `actions:`, `@thing` headings, Rhai functions and `[verbs]` aliases, with `#refused` and `#acted` rewording and today's limits. Checked against 0.94.0. Two defects it found are in `BUGS.md`.
+- `design/SECTIONS.md` › States: the `validate` warning for a heading tag that can never be true is marked not built, with a `BUGS.md` entry.
+- `design/CONSOLE_REQUIREMENTS.md` › REQ-CON-26: the prompt shows the scope only when it isn't global, and local scope's layout (`castle/hall/objects/torch.md`), as Bruce decided on 2026-11-25. The sketches use today's `in <place> > ` prompt.
+- `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-58: the text guard covers `src/console/` too, since 1e40954.
+- `design/CONSOLE_REQUIREMENTS.md`: REQ-CON-62, a world picker for `thwart edit` and `thwart play` when no world is given, in place of a built-in default.
+- `design/CONSOLE_REQUIREMENTS.md`: the command registry is approved (REQ-CON-50 to 56), and a world command may be a Rhai `script` as well as a `run` list (REQ-CON-54). Authors are the machine user, in `authors:` (REQ-CON-34 to 36, 55).
+- `design/CONSOLE_REQUIREMENTS.md` › To write, REQ-CON-57 to 59: a TO WRITE list in the sidebar, one entry per unwritten name, made with defaults from Cmd-1 to Cmd-9 or `/write`.
+- `design/ENGINE_REQUIREMENTS.md` › Forgiving verbs: REQ-ENG-51 to 54, proposed, for aliases in a `[verbs]` table, the order a typed verb resolves in, unique prefixes that never beat an exact match, and did-you-mean for verbs only.
+- `design/CONSOLE_REQUIREMENTS.md` › Command registry, REQ-CON-50 to 56, *Proposed*: one `type: command` Markdown file per command, loaded built-in, then world, then personal config; world commands as macros for the world's authors only; forgiving names.
+- `LICENSE`: the MIT licence text, matching `Cargo.toml`'s `license = "MIT"`, copyright Bruce Alderson, 2025 to 2026.
+- `design/SECTIONS.md`: agreed in outline by Bruce, to be tested; content is shown when a `## When:` heading's tags match the game state, reply sections replace actions and response markers, `@` names characters and `#` tags, and the marker comments retire.
+- `design/ENGINE_TEXT.md`: every sentence the engine, play and the console write moves out of code into TOML text tables (`[play]`, `[engine]`, `[console]`) with compiled-in defaults, the same shape everywhere, at Bruce's request; planned as `PLAN.md` › Phase 8, which shifts the later phases up by one.
+- `design/PLAYER_COMMANDS.md`: the player command language every client shares, REQ-PC-1 to 19, drafted from the console's play mode as built, at Bruce's request.
+- `.github/workflows/ci.yml`: GitHub Actions builds every target and runs every test, with the lock file as committed, on each push and pull request.
+- `design/CLI_REQUIREMENTS.md` › Packaging and installing worlds: REQ-CLI-12 to 16, for `thwart package`, `thwart install`, `thwart installed` and playing an installed world, agreed with the commander.
+- `PLAN.md`, the phased work queue, and `BUGS.md`, the defect log, both in Space Command's task format.
+- This changelog.
+- `design/ENGINE_REQUIREMENTS.md` gains REQ-ENG-10 to 29, the engine rules settled during the states design (loading, chapters, building a version, ids and values, play and saves, writing bundles), and REQ-ENG-7 the writer's rule for files that name a template.
+- `design/STATES.md`, a draft design for states, bundles and chapters. It replaces the earlier idea of conditional text in shortcodes and conditions on exits, which was never written into a doc.
+- `.claude/hooks/check-commit-message.sh`, which refuses a commit that credits Claude as a co-author. Copied from warped-space-command.
+
+### Changed
+
+- Doc pass, at Bruce's request: `design/STATES.md`, `design/CONTENT_REQUIREMENTS.md` (REQ-CF-3, REQ-CF-17) and principle 7 describe `## When:` reply sections, not the retired marker comments; `design/CLI_DESIGN.md` matches the commands that exist and marks `do`, `test` and `create` not planned; `design/UNIT_TESTS.md` describes the tests as they are (the 2026-08 plan is `git show 2d36b93:design/UNIT_TESTS.md`); `TESTING.md` and `design/DESIGN.md` are current.
+- The phase plan: authoring first, then play, in one console with an edit and a play mode; engine work only as they need it (Bruce, 2026-11-23). `map`, `search` and the remaining `validate` checks moved to a "Tooling, as needed" phase, and tests moved into each phase.
+- `REQUIREMENTS.md` gains §4.6 Console (REQ-CON-1 to 11), the file writer and in-memory changes (REQ-ENG-7 to 9), and objects without cards as allowed scenery (REQ-CF-8). The separate P1 play REPL and P2 editing REPL are now one console.
+- `tasks/unit-testing-plan.md` moved to `design/UNIT_TESTS.md`.
+- `tasks/ISSUES.md` became `BUGS.md`. Its open items that are missing features, not defects (no tests, `map`/`search`/`debug`, `CharacterEngine` and `ConfigManager` not wired in), moved to `PLAN.md`.
+
+### Removed
+
+- `design/STATES.md` › Engine rules' text, now `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-10 to 29 so there's one copy. Recover with `git show 1e2af89:design/STATES.md`.
+- `REQUIREMENTS.md` › 4.1 to 4.4, split into one requirements document per component: `design/CONTENT_REQUIREMENTS.md` (REQ-CF, REQ-WS), `design/ENGINE_REQUIREMENTS.md` (REQ-ENG) and `design/CLI_REQUIREMENTS.md` (REQ-CLI), with ids unchanged; the principles moved from `design/STATES.md` to `REQUIREMENTS.md` › 4 (Bruce, 2026-11-23). Recover the old sections with `git show 1620350:REQUIREMENTS.md`.
+- `PLAN.md`'s old Phase 4 (Play) and Phase 5 (Tooling), regrouped into Phases 4 to 9 with a "done when" each (Bruce, 2026-11-23). Recover with `git show e4e87e6:PLAN.md`.
+- `REQUIREMENTS.md` › 4.6 Console, moved to `design/CONSOLE_REQUIREMENTS.md` with the console's open questions from `PLAN.md` (Bruce, 2026-11-23). The REQ-CON ids are unchanged. Recover the old section with `git show 7a10a8d:REQUIREMENTS.md`.
+- `tasks/cli-first-pass-TODO.md`, the original 20-day, six-phase plan. It described a `src/lib/` layout that never existed. Replaced by `PLAN.md`; recover with `git show 884ae96:tasks/cli-first-pass-TODO.md`.
+- The tooling-first phase order (Tests, Static-world tooling, Game loop), replaced the same day by authoring first. Recover with `git show e43fbbf:PLAN.md`.
+- `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
+- The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
 ## 0.94.0 (2026-11-25)
 
@@ -177,78 +217,6 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `/map` at the world's root in edit mode draws the whole world: from where play starts, then each group of rooms no exit joins to those.
 - In edit mode, a command's name or alias typed without its slash (`map`, `validate strict`) runs it when the play words don't read it; a word play reads as a verb and that is also a command's name asks which was meant, offering the slash command (REQ-CON-56). An unknown slash command already suggested the nearest (since the registry).
 - `tests/transcripts/lists-and-maps.txt` covers all three.
-
-## Unreleased
-
-### Added
-
-- `design/CONTENT_FORMAT.md` › Example: a room with objects and states: a dark study with room states, local and global objects, a portrait whose action changes two things, a hidden safe and a heading on another thing's state, with its play-through. Checked against 0.94.0; `README.md` and `design/STATES.md` point to it.
-- `design/CONTENT_FORMAT.md` › Adding a verb to an object: the five ways, from a reply section alone to `actions:`, `@thing` headings, Rhai functions and `[verbs]` aliases, with `#refused` and `#acted` rewording and today's limits. Checked against 0.94.0. Two defects it found are in `BUGS.md`.
-- `design/SECTIONS.md` › States: the `validate` warning for a heading tag that can never be true is marked not built, with a `BUGS.md` entry.
-- `design/CONSOLE_REQUIREMENTS.md` › REQ-CON-26: the prompt shows the scope only when it isn't global, and local scope's layout (`castle/hall/objects/torch.md`), as Bruce decided on 2026-11-25. The sketches use today's `in <place> > ` prompt.
-- `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-58: the text guard covers `src/console/` too, since 1e40954.
-- `design/CONSOLE_REQUIREMENTS.md`: REQ-CON-62, a world picker for `thwart edit` and `thwart play` when no world is given, in place of a built-in default.
-- `design/CONSOLE_REQUIREMENTS.md`: the command registry is approved (REQ-CON-50 to 56), and a world command may be a Rhai `script` as well as a `run` list (REQ-CON-54). Authors are the machine user, in `authors:` (REQ-CON-34 to 36, 55).
-- `design/CONSOLE_REQUIREMENTS.md` › To write, REQ-CON-57 to 59: a TO WRITE list in the sidebar, one entry per unwritten name, made with defaults from Cmd-1 to Cmd-9 or `/write`.
-- `design/ENGINE_REQUIREMENTS.md` › Forgiving verbs: REQ-ENG-51 to 54, proposed, for aliases in a `[verbs]` table, the order a typed verb resolves in, unique prefixes that never beat an exact match, and did-you-mean for verbs only.
-- `design/CONSOLE_REQUIREMENTS.md` › Command registry, REQ-CON-50 to 56, *Proposed*: one `type: command` Markdown file per command, loaded built-in, then world, then personal config; world commands as macros for the world's authors only; forgiving names.
-- `LICENSE`: the MIT licence text, matching `Cargo.toml`'s `license = "MIT"`, copyright Bruce Alderson, 2025 to 2026.
-- `design/SECTIONS.md`: agreed in outline by Bruce, to be tested; content is shown when a `## When:` heading's tags match the game state, reply sections replace actions and response markers, `@` names characters and `#` tags, and the marker comments retire.
-- `design/ENGINE_TEXT.md`: every sentence the engine, play and the console write moves out of code into TOML text tables (`[play]`, `[engine]`, `[console]`) with compiled-in defaults, the same shape everywhere, at Bruce's request; planned as `PLAN.md` › Phase 8, which shifts the later phases up by one.
-- `design/PLAYER_COMMANDS.md`: the player command language every client shares, REQ-PC-1 to 19, drafted from the console's play mode as built, at Bruce's request.
-- `.github/workflows/ci.yml`: GitHub Actions builds every target and runs every test, with the lock file as committed, on each push and pull request.
-- `design/CLI_REQUIREMENTS.md` › Packaging and installing worlds: REQ-CLI-12 to 16, for `thwart package`, `thwart install`, `thwart installed` and playing an installed world, agreed with the commander.
-- `PLAN.md`, the phased work queue, and `BUGS.md`, the defect log, both in Space Command's task format.
-- This changelog.
-- `design/ENGINE_REQUIREMENTS.md` gains REQ-ENG-10 to 29, the engine rules settled during the states design (loading, chapters, building a version, ids and values, play and saves, writing bundles), and REQ-ENG-7 the writer's rule for files that name a template.
-- `design/STATES.md`, a draft design for states, bundles and chapters. It replaces the earlier idea of conditional text in shortcodes and conditions on exits, which was never written into a doc.
-- `.claude/hooks/check-commit-message.sh`, which refuses a commit that credits Claude as a co-author. Copied from warped-space-command.
-
-### Changed
-
-- Doc pass, at Bruce's request: `design/STATES.md`, `design/CONTENT_REQUIREMENTS.md` (REQ-CF-3, REQ-CF-17) and principle 7 describe `## When:` reply sections, not the retired marker comments; `design/CLI_DESIGN.md` matches the commands that exist and marks `do`, `test` and `create` not planned; `design/UNIT_TESTS.md` describes the tests as they are (the 2026-08 plan is `git show 2d36b93:design/UNIT_TESTS.md`); `TESTING.md` and `design/DESIGN.md` are current.
-- The phase plan: authoring first, then play, in one console with an edit and a play mode; engine work only as they need it (Bruce, 2026-11-23). `map`, `search` and the remaining `validate` checks moved to a "Tooling, as needed" phase, and tests moved into each phase.
-- `REQUIREMENTS.md` gains §4.6 Console (REQ-CON-1 to 11), the file writer and in-memory changes (REQ-ENG-7 to 9), and objects without cards as allowed scenery (REQ-CF-8). The separate P1 play REPL and P2 editing REPL are now one console.
-- `tasks/unit-testing-plan.md` moved to `design/UNIT_TESTS.md`.
-- `tasks/ISSUES.md` became `BUGS.md`. Its open items that are missing features, not defects (no tests, `map`/`search`/`debug`, `CharacterEngine` and `ConfigManager` not wired in), moved to `PLAN.md`.
-
-### Removed
-
-- `design/STATES.md` › Engine rules' text, now `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-10 to 29 so there's one copy. Recover with `git show 1e2af89:design/STATES.md`.
-- `REQUIREMENTS.md` › 4.1 to 4.4, split into one requirements document per component: `design/CONTENT_REQUIREMENTS.md` (REQ-CF, REQ-WS), `design/ENGINE_REQUIREMENTS.md` (REQ-ENG) and `design/CLI_REQUIREMENTS.md` (REQ-CLI), with ids unchanged; the principles moved from `design/STATES.md` to `REQUIREMENTS.md` › 4 (Bruce, 2026-11-23). Recover the old sections with `git show 1620350:REQUIREMENTS.md`.
-- `PLAN.md`'s old Phase 4 (Play) and Phase 5 (Tooling), regrouped into Phases 4 to 9 with a "done when" each (Bruce, 2026-11-23). Recover with `git show e4e87e6:PLAN.md`.
-- `REQUIREMENTS.md` › 4.6 Console, moved to `design/CONSOLE_REQUIREMENTS.md` with the console's open questions from `PLAN.md` (Bruce, 2026-11-23). The REQ-CON ids are unchanged. Recover the old section with `git show 7a10a8d:REQUIREMENTS.md`.
-- `tasks/cli-first-pass-TODO.md`, the original 20-day, six-phase plan. It described a `src/lib/` layout that never existed. Replaced by `PLAN.md`; recover with `git show 884ae96:tasks/cli-first-pass-TODO.md`.
-- The tooling-first phase order (Tests, Static-world tooling, Game loop), replaced the same day by authoring first. Recover with `git show e43fbbf:PLAN.md`.
-- `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
-- The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## 0.79.2 (2026-11-24)
 
