@@ -265,6 +265,20 @@ impl Console {
     }
 
     /// A bundled thing's folder, relative to the world root.
+    /// A thing's bundle folder, from the world root, if it is a bundle.
+    pub(super) fn bundle_dir(&self, entity: EntityKind, id: &str) -> Option<PathBuf> {
+        self.state_dir(entity, id)
+    }
+
+    /// After a room becomes a bundle, edit mode follows it to its index.
+    pub(super) fn follow_room_bundle(&mut self, id: &str) {
+        self.follow_bundle(Kind::Room, id);
+    }
+
+    pub(super) fn note_scope_warnings(&mut self) {
+        self.note_warnings_before_states();
+    }
+
     fn state_dir(&self, entity: EntityKind, id: &str) -> Option<PathBuf> {
         let source = self.world.engine.source_path(entity, id).ok()?;
         if source.file_name()? != "index.md" {

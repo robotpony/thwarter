@@ -103,6 +103,7 @@ impl Console {
             ("edit", ["object"]) => self.things_of(Kind::Object),
             ("edit", ["character"]) => self.things_of(Kind::Character),
             ("new", []) => kinds(),
+            ("scope", []) => ["global", "area", "local"].iter().map(|k| plain(k, "", false)).collect(),
             ("list", []) => ["rooms", "characters", "objects", "doors"].iter().map(|k| plain(k, "", false)).collect(),
             ("play", []) => vec![plain("here", &self.t("hint_play_here", &[]), false)],
             ("load" | "save", []) => list_saves(&self.world.root)

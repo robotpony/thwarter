@@ -183,7 +183,7 @@ Decided by Bruce, 2026-11-23, except where marked as proposed.
 
 Where a thing's file lives is its scope: global, area or local (`design/STATES.md` › Scope). Decided by Bruce, 2026-11-23, except where marked as proposed.
 
-- REQ-CON-26: `/scope global|area|local` MUST set the scope that the following `/new` commands use, and the prompt MUST show it when it isn't global: `in castle/hall [area] > ` or `[local]`, and plain `in castle/hall > ` for global (Bruce, 2026-11-25). The default is global, since most objects and doors are expected to be global. Local puts a thing in the current thing's bundle, in a folder for its kind (`castle/hall/objects/torch.md`), making the thing a bundle first if it isn't one (`design/STATES.md` › Scope).
+- REQ-CON-26: `/scope global|area|local` MUST set the scope that the following `/new` commands use, and the prompt MUST show it when it isn't global: `in castle/hall [area] > ` or `[local]`, and plain `in castle/hall > ` for global (Bruce, 2026-11-25). The default is global, since most objects and doors are expected to be global. Local puts a thing in the current thing's bundle, in a folder for its kind (`castle/hall/objects/torch.md`), making the thing a bundle first if it isn't one (`design/STATES.md` › Scope). Global and area built in 0.89.0; local waits on the engine letting a bundle hold kind folders.
 
   ```
   in castle/hall > /scope area

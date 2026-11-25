@@ -81,6 +81,7 @@ Console commands (/help <command> for one in full):
   /status                                   the world, where you are, the game, saves and the build
   /map                                      the map around you; the sidebar shows the nearest rooms
   /list {kind}                              every room, character, object or door in the world
+  /scope global|area|local                  where /new puts things: global, area or local
   /validate [strict]                        check the world as thwart validate does
   /start                                    play starts in the room you're in
   /write [{name}]                           make a name the world mentions but doesn't define, and open it

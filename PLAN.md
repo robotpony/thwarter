@@ -58,7 +58,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [x] Full-screen console: status bar, output, a sidebar with GAME and HERE, the editor inside it (0.25.0) [console] (REQ-CON-22, REQ-CON-23)
 - [x] The `/` command menu with argument completion (0.38.0) [console] (REQ-CON-33)
 - [x] The `game/` folder, and `/set` in it changing only the running game (0.82.0) [console] (REQ-CON-24, REQ-CON-25)
-- [ ] Scope: a sticky default, per-command overrides, `/move` [console] (REQ-CON-26 to 29)
+- [ ] Scope: a sticky default, per-command overrides, `/move` (global and area in 0.89.0; local waits on bundles holding kind folders) [console] (REQ-CON-26 to 29)
 - [x] Turning a one-file thing into a bundle, and saving a bundle's sections together [coder] (REQ-ENG-28, REQ-ENG-29)
 - [ ] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)

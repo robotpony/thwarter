@@ -33,6 +33,35 @@ struct Current {
 
 impl Console {
     pub(super) fn new_entity(&mut self, args: &[&str]) -> String {
+        // A trailing `in global|area|here` is the scope for this one
+        // command (REQ-CON-27).
+        let (args, scope) = match args {
+            [rest @ .., "in", word] if super::scope::Scope::from_word(word).is_some() => (rest, super::scope::Scope::from_word(word).unwrap_or_default()),
+            _ => (args, self.scope),
+        };
+        let kind = match args.first() {
+            Some(&"character") => Some(EntityKind::Character),
+            Some(&"object") => Some(EntityKind::Object),
+            _ => None,
+        };
+        self.new_folder = None;
+        if let Some(kind) = kind.filter(|_| args.len() > 1) {
+            match self.scope_folder(scope, kind) {
+                Ok(folder) => self.new_folder = folder,
+                Err(message) => return message,
+            }
+        }
+        let before = self.created.len();
+        let mut out = self.new_entity_in_scope(args);
+        if let Some(folder) = self.new_folder.take() {
+            if self.created.len() > before {
+                out.push_str(&format!("\n{}", self.t("created_in_folder", &[("folder", &folder.to_string_lossy().replace('\\', "/"))])));
+            }
+        }
+        out
+    }
+
+    fn new_entity_in_scope(&mut self, args: &[&str]) -> String {
         match args {
             ["room", rest @ ..] => self.new_room(rest),
             ["character", rest @ ..] => self.new_character(rest),
@@ -407,8 +436,8 @@ impl Console {
         let [thing, target] = args else {
             return super::session::suggest(&self.t("usage_for_example", &[]), &["/move {thing} {room|character|thing}", "/move lantern village/well"]);
         };
-        if matches!(*target, "global" | "area" | "local" | "here") {
-            return self.t("move_scope_later", &[]);
+        if let Some(scope) = super::scope::Scope::from_word(target) {
+            return self.move_scope(thing, scope);
         }
         // A room moves into an area folder, which changes its id and its
         // file's path (Bruce, 2026-11-23). That waits on the writer moving
@@ -705,7 +734,7 @@ impl Console {
         let writer = self.writer()?;
         self.note_warnings_before();
         let report = writer
-            .create_loaded(&mut self.world.engine, new, edits, false)
+            .create_loaded_in(&mut self.world.engine, new, self.new_folder.as_deref(), edits, false)
             .map_err(|e| self.t("not_created", &[("reason", &within(&writer, &e))]))?;
         self.created.push((new.kind, new.id.clone()));
         Ok(report.path)

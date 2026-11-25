@@ -125,7 +125,7 @@ elder is a character; characters go to rooms, not into things or other character
 > /move ghost village/well
 Nothing called `ghost` is in the world to move.
 > /move lantern global
-Changing a thing's scope with /move comes with the scope work (REQ-CON-29).
+lantern wasn't moved: object lantern is already in objects/
 > /move lantern
 Usage, for example:
 

@@ -66,6 +66,10 @@ pub struct Console {
     /// The topics the last talk reply offered, picked by number or label
     /// (REQ-PC-31). Any other input drops them.
     pub(super) topics: Vec<crate::models::game::Topic>,
+    /// The scope `/new` puts things in (REQ-CON-26).
+    pub(super) scope: super::scope::Scope,
+    /// The folder the `/new` being run writes into, from its scope.
+    pub(super) new_folder: Option<std::path::PathBuf>,
     /// The console's wording: the built-in `[console]` table with the
     /// author's own over it, from their config.toml (REQ-ENG-49).
     pub(super) texts: crate::engines::texts::Texts,
@@ -120,6 +124,8 @@ impl Console {
             trail: Vec::new(),
             looked_at: None,
             topics: Vec::new(),
+            scope: Default::default(),
+            new_folder: None,
             notes: Vec::new(),
             asked: None,
             created: Vec::new(),
@@ -143,6 +149,9 @@ impl Console {
     /// keeps `play village/square> `. The status bar names the mode.
     pub fn prompt(&self) -> String {
         match self.mode {
+            Mode::Edit if self.scope != super::scope::Scope::Global => {
+                self.t("prompt_edit_scoped", &[("place", &self.pwd()), ("scope", self.scope.word())])
+            }
             Mode::Edit => self.t("prompt_edit", &[("place", &self.pwd())]),
             Mode::Play => self.t(
                 "prompt_play",
@@ -238,6 +247,7 @@ impl Console {
             ("validate", ["strict"]) => self.validate(true),
             ("map", []) => self.map_command(),
             ("list", [kind]) => self.list_command(kind),
+            ("scope", [word]) => self.scope_command(word),
             ("inspect", args) => self.inspect(args),
             ("remove", args) => self.remove(args),
             ("write", args) => self.write_command(args),
@@ -977,7 +987,7 @@ fn parent_of(path: &str) -> String {
 /// `handler` MUST be here and each name here MUST have an entry (REQ-CON-53);
 /// a test fails on either gap.
 const HANDLERS: &[&str] = &[
-    "quit", "help", "clear", "status", "validate", "map", "list", "inspect", "remove", "write", "start", "restart", "edit", "play", "save",
+    "quit", "help", "clear", "status", "validate", "map", "list", "scope", "inspect", "remove", "write", "start", "restart", "edit", "play", "save",
     "load", "reload", "new", "set", "state", "action", "recipe", "link", "unlink", "move", "add",
 ];
 

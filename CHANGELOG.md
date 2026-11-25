@@ -4,6 +4,17 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.89.0 (2026-11-25)
+
+### Added
+
+- Scope, on the writer's `create_loaded_in` and `move_loaded` (a33296b). `/scope global|area|local` sets where `/new` puts characters and objects, and the edit prompt shows it when it isn't global: `in village/square [area] > ` (REQ-CON-26). A trailing `in global`, `in area` or `in here` sets it for one command (REQ-CON-27). Area things go in the area's `objects/` or `npcs/` (REQ-CON-28). `/move <thing> global|area|local` moves the file and keeps the id (REQ-CON-29). Covered by `tests/transcripts/scope.txt` and a prompt test.
+- Local scope refuses for now: the engine reads a bundle as a leaf, so a room's bundle can't hold `objects/` or `npcs/` yet. Asked of the coder.
+
+### Removed
+
+- The "comes with the scope work" reply to `/move <thing> global`.
+
 ## 0.88.0 (2026-11-25)
 
 ### Added

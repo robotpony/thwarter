@@ -24,6 +24,7 @@ mod picker;
 pub use picker::run_or_pick;
 mod play;
 mod restart;
+mod scope;
 mod screen;
 mod session;
 mod states;

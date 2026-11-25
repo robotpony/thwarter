@@ -1,0 +1,66 @@
+# world: tests/worlds/tiny
+# mode: edit
+# copy: yes
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
+> /scope area
+New things go in the area's own folders, such as castle/objects/ and castle/npcs/ in castle/. The prompt shows [area].
+> /new object torch tool
+There's no area here: the world's root isn't in one. Go to a room or folder in an area, or use global.
+> /scope nowhere
+There's no scope `nowhere`. Try:
+
+  /scope global
+  /scope area
+  /scope local
+> go /village/square
+Village Square (room)
+> /scope area
+New things go in the area's own folders, such as castle/objects/ and castle/npcs/ in castle/. The prompt shows [area].
+> /new object torch tool
+Created object torch, Torch, placed in village/square.
+Its file is in village/objects/.
+> /new object rope, hook tool
+Created object rope, Rope, placed in village/square.
+Created object hook, Hook, placed in village/square.
+Its file is in village/objects/.
+> /scope global
+New things go in the world's own folders (objects/, npcs/), the global scope.
+> /new object bucket tool in here
+Local scope isn't ready: a room's bundle can't hold things' files yet. Use area or global for now.
+> /new character guard in area
+Created character guard, Guard, placed in village/square.
+Its file is in village/npcs/.
+> look
+A small square of packed earth. An old well stands to the north.
+The Elder and Guard are here.
+
+You see a brass lantern, a torch, a rope, and a hook.
+
+You can go north or east.
+> /move torch global
+Moved torch: village/objects/torch.md → objects/torch.md. Its id and every reference stay as they are.
+> /move hook global
+Moved hook: village/objects/hook.md → objects/hook.md. Its id and every reference stay as they are.
+> /move guard local
+Local scope isn't ready: a room's bundle can't hold things' files yet. Use area or global for now.
+> /move village/well global
+village/well is a room, and a room's id is its path. /move village/well <area> moves it into an area.
+> /move torch global
+torch wasn't moved: object torch is already in objects/
+> /list objects
+Objects (4):
+
+  hook     Hook
+  lantern  Brass Lantern
+  rope     Rope
+  torch    Torch
+> /inspect hook
+Hook (hook), object
+  file       objects/hook.md
+  scope      global
+  starts in  room `village/square`
+> /validate
+Problems (1):
+  village/square: connection `east` points at unknown location `village/inn`
+Validation failed: 1 problem(s), 0 warning(s)
