@@ -381,7 +381,7 @@ fn rewrite_prose(body: &str, old: &[String], new: &str) -> String {
 
 /// The nearest folder at or above `path` that exists, for the inside-the-
 /// world check before anything is created.
-fn nearest_existing(path: &Path) -> PathBuf {
+pub(crate) fn nearest_existing(path: &Path) -> PathBuf {
     let mut p = path.to_path_buf();
     while !p.exists() {
         match p.parent() {

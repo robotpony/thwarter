@@ -121,6 +121,7 @@ enum Edit { SetScalar, SetList, SetMapEntry, RemoveMapEntry, RemoveKey, SetBody,
 - It refuses changes to `id` or `type`, and edits to an id defined in more than one file. An id can't contain `..`, empty, hidden or absolute segments, backslashes or colons, and any path that resolves outside the world is refused, symlinks included.
 - The engine records which file each id came from (`WorldEngine::sources`, `source_path`, `EntityKind`). Ids are unique within a kind; a location and an object may share one, with a warning (`WorldEngine::shared_ids`).
 - `WorldWriter::edit_loaded` and `create_loaded` write the file, apply the same text to the loaded engine (REQ-ENG-8, `WorldEngine::set_file`), and return `ChangeReport { path, problems, added, resolved }`: the problems the change added and the ones it resolved. Nothing re-reads the world from disk. There's no writer-side delete yet.
+- `WorldWriter::create_loaded_in` makes a thing in a chosen folder (an area's `castle/objects/`), and `move_loaded` moves a thing's file or bundle to another folder keeping its id (REQ-CON-28, 29). The loader finds things anywhere by their `type:`, so an area's `objects/` and `npcs/`, or loose in the area, all load.
 
 ## Implementation status
 

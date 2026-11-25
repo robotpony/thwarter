@@ -4,6 +4,13 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.88.0 (2026-11-25)
+
+### Added
+
+- `WorldWriter::create_loaded_in(engine, new, folder, edits, strict)` makes a new thing in a folder of the author's choosing, relative to the root, such as an area's `castle/objects/torch.md`; `None` keeps `objects/`, `npcs/` and `doors/`, and a room's path stays its id (REQ-CON-28). `writer::new_entity_relative_path_in` gives the path.
+- `WorldWriter::move_loaded(engine, kind, id, to_folder, strict)` moves a thing's file, or its bundle folder whole, to another folder with its id unchanged, leaving references as they are. It refuses a room (moving one is a rename), a target that's taken, and a folder outside the world (REQ-CON-29).
+
 ## 0.87.0 (2026-11-25)
 
 ### Added

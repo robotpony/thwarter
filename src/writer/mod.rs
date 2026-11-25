@@ -9,6 +9,7 @@ pub mod content_file;
 pub mod rename;
 pub mod remove;
 pub mod bundle;
+pub mod move_thing;
 
 pub use content_file::{ContentFile, Edit};
 pub use rename::RenameReport;
@@ -30,6 +31,28 @@ pub fn new_entity_relative_path(kind: EntityKind, id: &str) -> PathBuf {
         EntityKind::Object => Path::new("objects").join(format!("{}.md", id)),
         EntityKind::Door => Path::new("doors").join(format!("{}.md", id)),
     }
+}
+
+/// Where a new `(kind, id)` goes in `folder` (relative to the root), or
+/// where its kind gives with none (REQ-CON-28). A room's id is its path,
+/// so a room ignores `folder`.
+pub fn new_entity_relative_path_in(kind: EntityKind, id: &str, folder: Option<&Path>) -> PathBuf {
+    match (kind, folder) {
+        (EntityKind::Location, _) | (_, None) => new_entity_relative_path(kind, id),
+        (_, Some(folder)) => folder.join(format!("{}.md", id)),
+    }
+}
+
+/// A folder given relative to the world root: plain names only, no `..`,
+/// no root.
+pub(crate) fn check_folder(folder: &Path) -> Result<()> {
+    if folder.as_os_str().is_empty() {
+        return Ok(());
+    }
+    if folder.components().any(|c| !matches!(c, Component::Normal(_))) || folder.to_string_lossy().contains(['\\', ':']) {
+        bail!("{} must be a folder inside the world, relative to its root", folder.display());
+    }
+    Ok(())
 }
 
 /// A new entity: the fields every file of its kind must have.
@@ -115,12 +138,20 @@ impl WorldWriter {
     /// `edits` to it before writing. Refuses an existing file and any
     /// path outside the world. Returns the path written.
     pub fn create(&self, new: &NewEntity, edits: &[Edit]) -> Result<PathBuf> {
-        Ok(self.create_text(new, edits)?.0)
+        Ok(self.create_text(new, None, edits)?.0)
     }
 
-    /// `create`, returning the path and the exact text written.
-    fn create_text(&self, new: &NewEntity, edits: &[Edit]) -> Result<(PathBuf, String)> {
-        let path = self.new_entity_path(new.kind, &new.id)?;
+    /// `create`, returning the path and the exact text written, in
+    /// `folder` when one is given (`new_entity_relative_path_in`).
+    fn create_text(&self, new: &NewEntity, folder: Option<&Path>, edits: &[Edit]) -> Result<(PathBuf, String)> {
+        let path = match folder {
+            Some(folder) if new.kind != EntityKind::Location => {
+                check_id(&new.id)?;
+                check_folder(folder)?;
+                self.root.join(new_entity_relative_path_in(new.kind, &new.id, Some(folder)))
+            }
+            _ => self.new_entity_path(new.kind, &new.id)?,
+        };
         if path.exists() {
             bail!("{} already exists", path.display());
         }
@@ -175,13 +206,27 @@ impl WorldWriter {
         edits: &[Edit],
         strict: bool,
     ) -> Result<ChangeReport> {
+        self.create_loaded_in(engine, new, None, edits, strict)
+    }
+
+    /// `create_loaded`, in `folder` (relative to the root) rather than
+    /// where the kind gives: an area's `castle/objects` for a torch made
+    /// there (REQ-CON-28). `None` is `create_loaded`.
+    pub fn create_loaded_in(
+        &self,
+        engine: &mut WorldEngine,
+        new: &NewEntity,
+        folder: Option<&Path>,
+        edits: &[Edit],
+        strict: bool,
+    ) -> Result<ChangeReport> {
         let engine_root = engine
             .world_root
             .clone()
             .ok_or_else(|| anyhow!("the engine has no loaded world to add `{}` to", new.id))?;
         let before = engine.current_problems(strict);
-        let (_, text) = self.create_text(new, edits)?;
-        let path = engine_root.join(new_entity_relative_path(new.kind, &new.id));
+        let (_, text) = self.create_text(new, folder, edits)?;
+        let path = engine_root.join(new_entity_relative_path_in(new.kind, &new.id, folder));
         engine.set_file(&path, &text);
         Ok(ChangeReport::new(path, before, engine.current_problems(strict)))
     }
