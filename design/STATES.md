@@ -27,6 +27,8 @@ Review status: reviewed with Bruce group by group, all six groups done. Files an
 
 ## Files
 
+For a whole room built this way, with its states, local objects and a hidden safe, as files and as play, see `design/CONTENT_FORMAT.md` › Example: a room with objects and states.
+
 ### Bundles
 
 ```

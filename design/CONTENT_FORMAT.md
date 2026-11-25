@@ -85,6 +85,217 @@ Object content is far more varied than location or character content (compare a 
 | `actions` | no | Map of action name to its mechanics (`becomes:`, `sets:`, `chapter:`, `requires:`). The text a player reads is in the body, in a `## When: #wield` reply section, never here. See `design/SECTIONS.md`. |
 | anything else | no | Preserved verbatim (e.g. `properties`, `stats`, `effects`, `contents`, `security` in the sample world). Not validated. |
 
+## Example: a room with objects and states
+
+A dark study you light with a lamp. Pulling down a portrait reveals a safe. The room, the portrait and the safe each have states, and the room's text follows the portrait's state. Every file below was checked against 0.94.0 with `thwart validate` and `thwart play` (2026-11-25).
+
+```
+world/index.md                   # start: study
+study/                           # the room is a bundle: it has states
+  index.md                       # what every state shares; starts dark
+  dark.md
+  lit.md                         # adds an exit north
+  objects/                       # local things: they belong to this room
+    lamp.md                      # one file: no states
+    portrait/                    # a bundle: hanging, then fallen
+      index.md
+      hanging.md
+      fallen.md
+    safe/                        # a bundle: hidden, then revealed
+      index.md
+      hidden.md
+      revealed.md
+objects/                         # global things
+  desk.md                        # holds the letter
+  letter.md
+closet.md, hallway.md            # the rooms next door
+```
+
+The room names its objects and its starting state. Its `## When: @portrait:fallen` section is a description section: while the portrait is fallen, the line is added to whichever state's description applies.
+
+```markdown
+<!-- study/index.md -->
+---
+id: study
+title: Study
+type: location
+state: dark
+connections:
+  east: hallway
+objects: [desk, lamp, portrait, safe]
+---
+A narrow study that smells of pipe smoke and old paper.
+
+## When: @portrait:fallen
+A pale square on the wallpaper marks where the portrait hung.
+```
+
+Each state file replaces the description. Frontmatter in a state file merges over the index, so `lit` keeps the east exit and adds one to the north.
+
+```markdown
+<!-- study/dark.md -->
+---
+inherits: index
+---
+It's too dark to make out more than shapes. Something brass glints on the desk.
+```
+
+```markdown
+<!-- study/lit.md -->
+---
+inherits: index
+connections:
+  north: closet
+---
+Lamplight shows a narrow study, a writing desk against one wall, and a low
+door to the north you hadn't noticed.
+```
+
+The lamp is one file with no states of its own. Its action changes the room's state, and its `## When: #light` section is the reply the player reads.
+
+```markdown
+<!-- study/objects/lamp.md -->
+---
+id: lamp
+title: Oil lamp
+type: object
+object_type: light
+actions:
+  light: { becomes: { study: lit } }
+---
+A brass oil lamp, its wick trimmed short.
+
+## When: #light
+The wick catches. Warm light spreads across the room.
+```
+
+The portrait's action changes two things at once: the portrait falls and the safe is revealed. The reply sits in `fallen.md`, because a reply goes where the thing ends up (`design/SECTIONS.md` › Outcomes and replies).
+
+```markdown
+<!-- study/objects/portrait/index.md -->
+---
+id: portrait
+title: Portrait
+type: object
+object_type: furniture
+weight: immovable
+state: hanging
+actions:
+  pull: { becomes: { portrait: fallen, safe: revealed } }
+---
+A portrait of a stern woman in grey.
+```
+
+```markdown
+<!-- study/objects/portrait/hanging.md -->
+---
+inherits: index
+---
+A portrait of a stern woman in grey. The frame sits a little crooked.
+```
+
+```markdown
+<!-- study/objects/portrait/fallen.md -->
+---
+inherits: index
+---
+The portrait lies face down on the floor.
+
+## When: #pull
+The frame comes away in your hands and crashes to the floor.
+```
+
+The safe's states differ only in `visibility:` (`design/STATES.md` › Hidden things), so they need no prose. Both take the index's description.
+
+```markdown
+<!-- study/objects/safe/index.md -->
+---
+id: safe
+title: Wall safe
+type: object
+object_type: container
+weight: immovable
+state: hidden
+---
+A small steel safe set into the wall, with a brass dial.
+```
+
+```markdown
+<!-- study/objects/safe/hidden.md -->
+---
+inherits: index
+visibility: hidden
+---
+```
+
+```markdown
+<!-- study/objects/safe/revealed.md -->
+---
+inherits: index
+visibility: visible
+---
+```
+
+The desk is a global object that holds the letter, and `holds: in` makes play say "in the writing desk" rather than "on" it.
+
+```markdown
+<!-- objects/desk.md -->
+---
+id: desk
+title: Writing desk
+type: object
+object_type: furniture
+weight: immovable
+holds: in
+objects: [letter]
+---
+A walnut writing desk with one shallow drawer.
+```
+
+```markdown
+<!-- objects/letter.md -->
+---
+id: letter
+title: Folded letter
+type: object
+object_type: paper
+---
+"The safe opens on her birthday," it says, in a cramped hand.
+```
+
+Playing it:
+
+```
+It's too dark to make out more than shapes. Something brass glints on the desk.
+
+You see a writing desk, an oil lamp, and a portrait.
+There's a folded letter in the writing desk.
+
+You can go east.
+> n
+You can't go north from here.
+> light lamp
+The wick catches. Warm light spreads across the room.
+> pull portrait
+The frame comes away in your hands and crashes to the floor.
+> look
+Lamplight shows a narrow study, a writing desk against one wall, and a low
+door to the north you hadn't noticed.
+
+A pale square on the wallpaper marks where the portrait hung.
+
+You see a writing desk, an oil lamp, a portrait, and a wall safe.
+There's a folded letter in the writing desk.
+
+You can go north or east.
+```
+
+Some things the example doesn't do:
+- Darkness here is only prose. The dark room still lists its objects, and nothing stops the player from taking things in the dark. To hide them, give each object a state with `visibility: faint` or `hidden`.
+- Lighting the lamp changes the study wherever the lamp is, even if the player has carried it into the hallway. Only `requires:` limits an action today, and it can't test where the lamp is.
+- `look in desk` doesn't parse yet, since it waits on multi-word verbs (`PLAN.md` › Phase 6). `x desk` lists what it holds.
+- `thwart show study` lists the safe while it's still hidden, because `show` is the author's view.
+
 ## `type: questions`
 
 A question set tells the console what to ask when an author makes a thing with `/new` or `/add`, the way Claude Code asks a question with options (Bruce, 2026-11-24; REQ-CF-32). It's a file of its own, not frontmatter in a template.

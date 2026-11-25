@@ -87,7 +87,7 @@ thwart.toml                     # CLI preferences, including an optional default
 
 ### Example Location File
 
-See `design/CONTENT_FORMAT.md` for the full field-by-field spec across locations, characters, and objects. A minimal location:
+See `design/CONTENT_FORMAT.md` for the full field-by-field spec across locations, characters, and objects, and its › Example: a room with objects and states for a whole room with states, local objects and a hidden thing. A minimal location:
 
 ```markdown
 ---
