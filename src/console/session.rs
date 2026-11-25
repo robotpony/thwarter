@@ -295,20 +295,12 @@ impl Console {
             Mode::Edit => lines.extend([
                 String::new(),
                 self.t("help_edit_heading", &[]),
-                "  north, n, go up, ...  follow an exit from this room".to_string(),
-                "  go <name>             go to a room, area, folder, character or object".to_string(),
-                "  go back               back to where you were;  go /  goes to the world root".to_string(),
-                "  look                  show where you are: a room, a thing, or a folder".to_string(),
-                "  examine <thing>, x    show a person or thing here without going to it".to_string(),
+                self.t("help_edit_rows", &[]),
             ]),
             Mode::Play => lines.extend([
                 String::new(),
                 self.t("help_play_heading", &[]),
-                "  look, l                   look around".to_string(),
-                "  go <direction>, north, n  go somewhere (ne, up, u, ...)".to_string(),
-                "  take <thing>, get         pick something up".to_string(),
-                "  examine <thing>, x        look closely (also: look at)".to_string(),
-                "  inventory, i              what you're carrying".to_string(),
+                self.t("help_play_rows", &[]),
             ]),
         }
         lines.join("\n")

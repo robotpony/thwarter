@@ -82,7 +82,7 @@ impl Console {
             Ok(path) => vec![path],
             Err(e) => return e,
         };
-        let mut summary = format!("Created {}, {}", id, title);
+        let mut summary = self.t("created_room", &[("id", &id), ("title", &title)]);
         if let (Some(here), Some(direction)) = (&here, &direction) {
             let link = Edit::SetMapEntry {
                 key: "connections".into(),
@@ -92,16 +92,13 @@ impl Console {
             match self.save(Kind::Room, here, &[link]) {
                 Ok(path) => written.push(path),
                 Err(e) => {
-                    let report = self.after_writes(&written, summary);
-                    return self.t("but_linking_failed", &[("report", &report), ("place", &here.to_string()), ("reason", &e.to_string())]);
+                    let failed = self.t("created_room_link_failed", &[("id", &id), ("title", &title), ("room", here), ("reason", &e.to_string())]);
+                    return self.after_writes(&written, failed);
                 }
             }
-            summary.push_str(&format!(", through the {} exit of {}", direction, here));
-            if let Some(back) = back {
-                summary.push_str(&format!(", with a {} exit back", back));
-            }
+            let args = [("id", id.as_str()), ("title", title.as_str()), ("direction", direction.as_str()), ("room", here.as_str()), ("back", back.unwrap_or(""))];
+            summary = self.t(if back.is_some() { "created_room_linked" } else { "created_room_linked_one_way" }, &args);
         }
-        summary.push('.');
         let report = self.after_writes(&written, summary);
         match self.world.path_of(Kind::Room, &id) {
             Some(path) => {
@@ -131,7 +128,7 @@ impl Console {
         }
         let title = title_or_default(title, id);
         let new = NewEntity { kind: EntityKind::Character, id: id.to_string(), title: title.clone(), object_type: None };
-        self.create_and_place(&new, &edits, "characters", here, format!("Created character {}, {}", id, title))
+        self.create_and_place(&new, &edits, "characters", here)
     }
 
     fn new_object(&mut self, args: &[&str]) -> String {
@@ -172,7 +169,7 @@ impl Console {
             object_type: Some(object_type.to_string()),
         };
         let edits = if scenery { vec![Edit::ReplaceAll(super::full_edit::scenery_card(id, &title))] } else { Vec::new() };
-        self.create_and_place(&new, &edits, "objects", here, format!("Created object {}, {}", id, title))
+        self.create_and_place(&new, &edits, "objects", here)
     }
 
     /// Creates a character or object card and, in a room, adds it to the
@@ -185,8 +182,18 @@ impl Console {
         edits: &[Edit],
         list_key: &str,
         here: Option<String>,
-        mut summary: String,
     ) -> String {
+        // One whole reply per case, so each can be reworded on its own.
+        let kind = if list_key == "characters" { "character" } else { "object" };
+        let key = |case: &str| format!("created_{}{}", kind, case);
+        let args = |room: &str| -> Vec<(&str, String)> { vec![("id", new.id.clone()), ("title", new.title.clone()), ("room", room.to_string())] };
+        let say = |console: &Self, case: &str, room: &str, extra: &[(&str, &str)]| {
+            let owned = args(room);
+            let mut all: Vec<(&str, &str)> = owned.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            all.extend_from_slice(extra);
+            console.t(&key(case), &all)
+        };
+        let mut summary = say(self, "", "", &[]);
         let mut written = match self.create(new, edits) {
             Ok(path) => vec![path],
             Err(e) => return e,
@@ -199,23 +206,22 @@ impl Console {
                 .map(|l| if list_key == "characters" { l.characters.clone() } else { l.objects.clone() })
                 .unwrap_or_default();
             if listed.contains(&new.id) {
-                summary.push_str(&format!("; {} already lists it, and now it has a card", here));
+                summary = say(self, "_listed", &here, &[]);
             } else {
                 let mut items = listed;
                 items.push(new.id.clone());
                 match self.save(Kind::Room, &here, &[Edit::SetList { key: list_key.into(), items }]) {
                     Ok(path) => {
                         written.push(path);
-                        summary.push_str(&format!(", placed in {}", here));
+                        summary = say(self, "_placed", &here, &[]);
                     }
                     Err(e) => {
-                        let report = self.after_writes(&written, summary);
-                        return self.t("but_placing_failed", &[("report", &report), ("place", &here.to_string()), ("reason", &e.to_string())]);
+                        let failed = say(self, "_place_failed", &here, &[("reason", &e.to_string())]);
+                        return self.after_writes(&written, failed);
                     }
                 }
             }
         }
-        summary.push('.');
         self.after_writes(&written, summary)
     }
 
@@ -337,7 +343,7 @@ impl Console {
         }
         let mut items = self.held_by(&holder, key);
         let place = match &holder {
-            Holder::Character(who) => format!("{}'s inventory", who),
+            Holder::Character(who) => self.t("inventory_of", &[("who", who)]),
             Holder::Room(id) | Holder::Object(id) => id.clone(),
         };
         if items.iter().any(|i| i == thing) {
@@ -347,7 +353,8 @@ impl Console {
         let card = is_character || self.world.engine.objects.contains_key(thing);
         // A name typed with spaces or capitals ("old shirt") would be lost
         // in a bare id, so it gets a scenery card holding it as the title.
-        let mut note = String::new();
+        let mut added = "added_to";
+        let mut titled = String::new();
         if !card {
             match &named {
                 Some(name) => {
@@ -361,16 +368,17 @@ impl Console {
                         Ok(path) => written.push(path),
                         Err(e) => return e,
                     }
-                    note = format!(", with a scenery card titled \"{}\"", name);
+                    added = "added_with_scenery_card";
+                    titled = name.clone();
                 }
-                None => note = format!(", as scenery with no card yet (/edit object {} gives it one)", thing),
+                None => added = "added_as_scenery",
             }
         }
         match self.save_list(&holder, key, items) {
             Ok(path) => {
                 written.push(path);
                 self.added = Some((if is_character { Kind::Character } else { Kind::Object }, thing.to_string()));
-                self.after_writes(&written, self.t("added_to", &[("thing", thing), ("place", &place), ("note", &note)]))
+                self.after_writes(&written, self.t(added, &[("thing", thing), ("place", &place), ("title", &titled)]))
             }
             Err(e) => self.after_writes(&written, e),
         }
@@ -568,16 +576,22 @@ impl Console {
         let file = report
             .moved
             .first()
-            .map(|(from, to)| format!("moved {} → {}", from.display(), to.display()))
-            .unwrap_or_else(|| "nothing to move".to_string());
-        let mut summary = self.t("moved_room", &[("old", old), ("new", new), ("file", &file)]);
-        if report.moved.len() > 1 {
-            summary.push_str(&format!(" and {} more file(s) of its bundle", report.moved.len() - 1));
-        }
-        if !updated.is_empty() {
-            summary.push_str(&format!(", updated {} ({})", plural(updated.len(), "file"), updated.join(", ")));
-        }
-        summary.push('.');
+            .map(|(from, to)| {
+                let (from, to) = (from.display().to_string(), to.display().to_string());
+                match report.moved.len() {
+                    1 => self.t("moved_file", &[("from", &from), ("to", &to)]),
+                    n => self.t("moved_bundle", &[("from", &from), ("to", &to), ("more", &(n - 1).to_string())]),
+                }
+            })
+            .unwrap_or_else(|| self.t("no_file_to_move", &[]));
+        let key = match updated.len() {
+            0 => "moved_room",
+            1 => "moved_room_updated_one",
+            _ => "moved_room_updated",
+        };
+        let count = updated.len().to_string();
+        let files = updated.join(", ");
+        let mut summary = self.t(key, &[("old", old), ("new", new), ("file", &file), ("count", &count), ("files", &files)]);
         if !report.by_hand.is_empty() {
             summary.push_str(&self.t("still_naming", &[("id", &old.to_string())]));
             for place in &report.by_hand {
@@ -818,9 +832,6 @@ fn split_list(typed: &str) -> Vec<String> {
 
 
 /// "1 file" or "3 files".
-fn plural(n: usize, noun: &str) -> String {
-    format!("{} {}{}", n, noun, if n == 1 { "" } else { "s" })
-}
 
 /// "in village/well", "carried by elder" or "in walls".
 fn where_to(holder: &Holder) -> String {

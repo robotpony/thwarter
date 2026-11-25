@@ -152,7 +152,7 @@ Every sentence the engine, play and the console write comes from a text table wi
 - [x] Overrides: the personal config's `[console]` over the defaults, with a warning for an unknown key [console]
 - [x] Story overrides: a `## When:` section replaces an `[engine]` reply by exact outcome tag, reserved outcome names, `{{ turn.x }}` slots [coder] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies)
 - [x] A console reply carries its kind (saved, refused, usage), so a reworded reply keeps its colour in `theme.rs` and `/recipe` in `states.rs` still sees a failed step; today both match the reply's text [console] (`design/ENGINE_TEXT.md` › The shape)
-- [ ] The built-up `/new` and `/add` replies in `author.rs` become one whole `[console]` reply per case, and the `/help` rows move to `[console]` [console] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies, "Whole replies only")
+- [x] The built-up `/new` and `/add` replies in `author.rs` become one whole `[console]` reply per case, and the `/help` rows move to `[console]` [console] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies, "Whole replies only")
 - [x] Edit mode's room view reads as play's plus its title line; ids, targets and door states go to the console as a `LocationView` [coder] (`design/ENGINE_TEXT.md` › Where tables live)
 - [x] The sidebar shows the current room's ids, exits and doors, and `/inspect <thing>` shows one in full (0.65.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [x] Edit mode's room view drops its title line (f17588d, 0.66.2); `show_room_names` decides in both modes, and the room's title and id show in the sidebar [coder, console] (`design/ENGINE_TEXT.md` › Where tables live)

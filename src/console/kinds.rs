@@ -109,6 +109,20 @@ const KINDS: &[(&str, Kind)] = &[
     ("editor_modified", Kind::Warning),
     ("usage", Kind::Refused),
     ("game_note", Kind::Note),
+    ("created_room", Kind::Done),
+    ("created_room_linked", Kind::Done),
+    ("created_room_linked_one_way", Kind::Done),
+    ("created_character", Kind::Done),
+    ("created_character_placed", Kind::Done),
+    ("created_character_listed", Kind::Done),
+    ("created_object", Kind::Done),
+    ("created_object_placed", Kind::Done),
+    ("created_object_listed", Kind::Done),
+    ("moved_room_updated_one", Kind::Done),
+    ("moved_room_updated", Kind::Done),
+    ("created_room_link_failed", Kind::Error),
+    ("created_character_place_failed", Kind::Error),
+    ("created_object_place_failed", Kind::Error),
 ];
 
 /// `key`'s kind, if it has one.

@@ -72,6 +72,16 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.77.3 (2026-11-24)
+
+### Changed
+
+- `/new`, `/add` and moving a room no longer build their replies from pieces: each case is one whole `[console]` reply (`created_room_linked`, `created_object_placed`, `added_as_scenery`, `moved_room_updated` and the rest), so each can be reworded on its own. `/help`'s rows under each mode are `[console]` keys too. The default text is unchanged, except that when linking or placing fails, its line now comes before any new problems instead of after them.
+
+### Removed
+
+- The `[console]` keys `but_linking_failed` and `but_placing_failed`, replaced by whole replies per case. `added_to` no longer takes `{note}`.
+
 ## 0.77.2 (2026-11-24)
 
 ### Changed
