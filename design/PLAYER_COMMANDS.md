@@ -28,9 +28,11 @@ A line is a verb and maybe a noun. The engine turns it into an action (look, go,
 | `look around` | `examine room`, `x here`, the room's name | Examine the room, finding faint things | yes |
 | `search` | | Search the room, finding faint things | yes |
 | `search <thing>` | | An object's own `search` action, if it has one (a desk) | yes |
-| `go <direction>` | `walk`, `move`, a bare direction | Move through an exit | yes |
+| `look <direction>` | `what's <direction>`, `what is <direction>` | Say what's that way without going | yes |
+| `go <direction>` | `walk`, `move`, `enter`, a bare direction, the room it leads to (`go closet`) | Move through an exit | yes |
 | `take <thing>` | `get`, `pick up` | Pick up an object | yes |
 | `inventory` | `i`, `inv` | List what the player carries | yes |
+| `where` | `where am i` | Name the current location | yes |
 | `<verb> <thing>` | | An object's own named action (`pull lever`) | yes |
 
 - REQ-PC-6: The verbs and aliases above MUST be accepted by every client. The aliases are a table, `src/builtins/verbs.toml`, which a world's `[verbs]` in `world.toml` adds to (built in 29592dc, 0.78.0; `design/ENGINE_REQUIREMENTS.md` › Forgiving verbs, REQ-ENG-51). The verb is the line's first word, apart from `look at` and `pick up`; multi-word verbs such as `turn on` aren't parsed (Open question 5). A client MUST NOT add story verbs of its own; a world adds them as object actions (REQ-PC-13).
@@ -66,9 +68,9 @@ Commands about the game rather than in the story start with `/`, so a world's ve
 
 From the console's unknown-input log, 2026-11-23, at Bruce's request. *Proposed*, queued behind his playtest of both modes.
 
-- REQ-PC-21: `where` and `where am i` MUST name the current location, in play and in the console's edit mode. Logged: "where am i?"
-- REQ-PC-22: `enter <place>` MUST be an alias of `go <place>`. Logged: "enter closet".
-- REQ-PC-23: `look <direction>` and `what's <direction>` MUST say what's that way without going there: ``North: Closet.``, or the door's name for an exit through a door. Logged: "what's north?"
+- REQ-PC-21: `where` and `where am i` MUST name the current location, in play and in the console's edit mode. Logged: "where am i?" *Built*: play in d836d0d (0.81.0), edit mode in 5993d29 (0.81.1).
+- REQ-PC-22: `enter <place>` MUST be an alias of `go <place>`, and `go` also finds an exit by the room it leads to (`enter the vault`). Logged: "enter closet". *Built* in d836d0d.
+- REQ-PC-23: `look <direction>` and `what's <direction>` MUST say what's that way without going there: ``North: Closet.``, or the door's name and state for an exit through a door (``Down: a closed iron door.``), or ``You see no way up.`` Logged: "what's north?" *Built* in d836d0d, and in edit mode in 5993d29.
 - REQ-PC-24: An unknown verb that's one small typo from a known one (one letter added, missing, swapped or changed) MUST get `Did you mean "look"?` (plain quotes, since players see no code) instead of REQ-PC-5's reply, and still change nothing. Two equally near name both: `Did you mean "take" or "talk"?` Logged: "lookl". Built in 29592dc (REQ-ENG-53).
 
 ## Open questions
