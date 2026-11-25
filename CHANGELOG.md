@@ -66,6 +66,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.72.1 (2026-11-24)
+
+### Changed
+
+- The world settings view lists every author from `authors:` (the coder's 14ce024), and the console takes the machine user from `settings::current_user()`. The `/start` transcript is back now the persona problem is gone.
+
 ## 0.72.0 (2026-11-24)
 
 ### Added

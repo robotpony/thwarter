@@ -36,8 +36,9 @@ pub fn world(def: &WorldDef, path: &str) -> String {
     let mut out = vec![format!("World settings, {}.md", path), String::new()];
     let or_unset = |v: &Option<String>| v.clone().unwrap_or_else(|| "not set".to_string());
     out.push(format!("Title: {}", or_unset(&def.title)));
-    if let Some(author) = &def.author {
-        out.push(format!("Author: {}", author));
+    if !def.authors.is_empty() {
+        let label = if def.authors.len() == 1 { "Author" } else { "Authors" };
+        out.push(format!("{}: {}", label, def.authors.join(", ")));
     }
     if let Some(version) = &def.version {
         out.push(format!("Version: {}", version));

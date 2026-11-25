@@ -7,3 +7,11 @@ Editing Tiny World (tests/worlds/tiny). Type /help for commands.
 This world has no world/index.md yet. Make one, with authors: author and start: village/square? (y/n)
 > n
 Left the world without world/index.md; its settings stay in world.toml.
+> go /village/well
+The Well (room)
+> /start
+Made world/index.md: authors author, play starts in village/well.
+> /start
+Play starts in village/well now.
+> /edit world
+/edit opens world/index.md in a full-screen editor, which needs a terminal.

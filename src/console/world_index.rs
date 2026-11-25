@@ -9,10 +9,10 @@ use super::world::Kind;
 const INDEX: &str = "world/index";
 
 /// The machine user, who is the author for now (REQ-CON-34).
-/// `THWART_USER` stands in for it, so transcripts read the same anywhere.
+/// `THWART_USER` stands in for it (`settings::current_user`), so
+/// transcripts read the same anywhere.
 pub fn machine_user() -> String {
-    std::env::var("THWART_USER")
-        .or_else(|_| std::env::var("USER")).or_else(|_| std::env::var("USERNAME")).unwrap_or_else(|_| "author".to_string())
+    crate::settings::current_user().unwrap_or_else(|| "author".to_string())
 }
 
 impl Console {
