@@ -70,7 +70,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] One command registry: every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
 - [ ] Forgiving play verbs: aliases, unique prefixes and did-you-mean for verbs, the way commands get them (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, to write)
 - [x] (0.73.1) The sidebar's exits read as aligned columns with arrow leaders (`east -----> bedroom    closed door`); a door shows only as its state when it blocks the way, and its title and id move to `/inspect` (Bruce, 2026-11-24) [console]
-- [ ] A new door's id and title read from both sides: `door-bedroom-hallway`, titled from its rooms ("Bedroom door"), not the template's "Door" (Bruce, 2026-11-24) [coder, console]
+- [x] A new door's id and title read from both sides (faebdce, 5aa92db, b878529): `door-bedroom-hallway`, titled from its rooms ("Bedroom door"), not the template's "Door" (Bruce, 2026-11-24) [coder, console]
 - [ ] `authors:`, one id or a list, replaces `author:` (still read); new worlds get `authors: $USER`; the author check is the machine user (Bruce, 2026-11-24) [coder, console] (REQ-WS-5, REQ-WS-7)
 - [ ] World commands MAY be Rhai scripts that read the world and run console commands, with the world scripts' limits (Bruce, 2026-11-24) [console] (`design/CONTENT_FORMAT.md` › type: command)
 - [x] (0.71.0) In edit mode an exit to a room nothing defines is only a TO WRITE entry, not a problem; `validate` and `package` still fail on it (Bruce, 2026-11-24) [console]
