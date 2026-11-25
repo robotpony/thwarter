@@ -29,6 +29,8 @@ use std::path::{Component, Path, PathBuf};
 pub(crate) struct FileRecord {
     pub path: PathBuf,
     pub layer: Result<Layer, String>,
+    /// The file as read (or as last set), for finding a line in it.
+    pub text: String,
 }
 
 /// Which chapter: the folder whose `chapters/` defines it (relative to the

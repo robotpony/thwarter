@@ -352,7 +352,8 @@ mod tests {
         world.set_file(&d.join("npcs/captain.md"), "---\nid: guard-captain\ntitle: Captain Marcus\ntype: character\n---\nStern.\n");
         world.set_file(&d.join("objects/stick.md"), "---\nid: stick\ntitle: Stick\ntype: object\nobject_type: x\n---\n@guard-captain dropped it near @hall. @nobody knows why.\n");
         let warnings = world.current_warnings();
-        assert!(warnings.iter().any(|w| w.contains("`@nobody` names nothing in the world")), "{:?}", warnings);
+        assert!(!warnings.iter().any(|w| w.contains("@nobody")), "{:?}", warnings);
+        assert_eq!(world.not_written().iter().map(|u| u.name.as_str()).collect::<Vec<_>>(), ["nobody"]);
         assert!(!warnings.iter().any(|w| w.contains("@guard-captain") || w.contains("@hall")), "{:?}", warnings);
         let game = GameEngine::new();
         let mut state = game.start(&world, "bedroom").unwrap();

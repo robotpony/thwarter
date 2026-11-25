@@ -130,6 +130,24 @@ impl OutputFormatter {
         }
     }
     
+    /// A line shown whatever the verbosity, with no status word in text;
+    /// `status` labels it in JSON and YAML.
+    pub fn print_line(&self, status: &str, message: &str) {
+        // A world's names and text can't drive the terminal (REQ-CFG-9).
+        let message = &crate::render::clean_text(message);
+        match self.format {
+            OutputFormat::Text => println!("{}", message),
+            OutputFormat::Json => {
+                let output = serde_json::json!({ "status": status, "message": message });
+                println!("{}", serde_json::to_string_pretty(&output).unwrap());
+            }
+            OutputFormat::Yaml => {
+                let output = serde_yaml::to_string(&serde_json::json!({ "status": status, "message": message })).unwrap();
+                println!("{}", output);
+            }
+        }
+    }
+
     pub fn print_info(&self, message: &str) {
         // A world's names and text can't drive the terminal (REQ-CFG-9).
         let message = &crate::render::clean_text(message);

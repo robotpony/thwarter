@@ -39,6 +39,10 @@ pub fn validate_command(
     for problem in &validation.problems {
         formatter.print_error(problem);
     }
+    // Apart from warnings, and not counted as one (REQ-CLI-19).
+    for line in validation.not_written_lines() {
+        formatter.print_line("not_written", &line);
+    }
     if validation.passed() {
         formatter.print_success(&validation.summary());
     } else {

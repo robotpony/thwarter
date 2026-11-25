@@ -61,6 +61,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.69.0 (2026-11-24)
+
+### Added
+
+- `WorldEngine::not_written()` and `Validation::not_written` (REQ-ENG-55): every name a link, `@name` or exit points at that nothing defines, one entry per name with each mention's file, line, holder and kind, for the console's TO WRITE list.
+- `validate` lists them under `Not written yet (n):`, apart from warnings and not counted as any (REQ-CLI-19). Bruce's test world goes from four warnings for two names to none, with two names listed.
+
+### Changed
+
+- A prose link or `@name` that names nothing is no longer a warning. An ambiguous one still is. An exit to nothing is still a problem, and is listed too.
+
 ## 0.68.1 (2026-11-24)
 
 ### Fixed

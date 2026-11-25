@@ -190,6 +190,9 @@ pub struct Version {
 pub struct Validation {
     pub problems: Vec<String>,
     pub warnings: Vec<String>,
+    /// Names the world mentions but nothing defines yet (REQ-ENG-55).
+    /// Neither problems nor warnings: a world being written has them.
+    pub not_written: Vec<Unwritten>,
 }
 
 impl Validation {
@@ -199,10 +202,73 @@ impl Validation {
 
     /// The closing line, worded the same in every client.
     pub fn summary(&self) -> String {
+        // Not-written names have their own list and aren't counted here.
         match (self.problems.len(), self.warnings.len()) {
             (0, 0) => "Validation passed: no problems or warnings".to_string(),
             (0, w) => format!("Validation passed: no problems, {} warning(s)", w),
             (p, w) => format!("Validation failed: {} problem(s), {} warning(s)", p, w),
+        }
+    }
+
+    /// The not-written-yet list as text, worded the same in every client
+    /// (REQ-CLI-19): a heading, then one line per name with each mention.
+    pub fn not_written_lines(&self) -> Vec<String> {
+        if self.not_written.is_empty() {
+            return Vec::new();
+        }
+        let mut lines = vec![format!("Not written yet ({}):", self.not_written.len())];
+        for entry in &self.not_written {
+            let mentions: Vec<String> = entry.mentions.iter().map(Mention::to_string).collect();
+            lines.push(format!("  {} ({}): {}", entry.name, entry.wants.type_name(), mentions.join(", ")));
+        }
+        lines
+    }
+}
+
+/// A name the world mentions that nothing defines (REQ-ENG-55), with
+/// every mention, in first-mention order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Unwritten {
+    /// The name as the mentions give it, which is the id or file name a
+    /// new thing needs for them to find it (`wallpaper`, `Old Photo`).
+    pub name: String,
+    /// What to make: a room when an exit leads to it, else an object.
+    pub wants: EntityKind,
+    pub mentions: Vec<Mention>,
+}
+
+/// One place a not-written name is mentioned.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Mention {
+    /// Relative to the world folder.
+    pub file: PathBuf,
+    /// 1-based, `None` when it can't be found in the file's text.
+    pub line: Option<usize>,
+    /// The room or thing whose file it's in; `None` for a door's.
+    pub holder: Option<Holder>,
+    pub how: MentionKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MentionKind {
+    /// `[[name]]` or `[text](name)` in prose.
+    Link,
+    /// `@name` in prose.
+    At,
+    /// An exit, by its direction.
+    Exit(String),
+}
+
+impl std::fmt::Display for Mention {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.file.display())?;
+        if let Some(line) = self.line {
+            write!(f, ":{}", line)?;
+        }
+        match &self.how {
+            MentionKind::Link => write!(f, " link"),
+            MentionKind::At => write!(f, " @name"),
+            MentionKind::Exit(direction) => write!(f, " exit {}", direction),
         }
     }
 }
@@ -392,6 +458,7 @@ impl WorldEngine {
                 }
                 continue;
             }
+            let mut text = String::new();
             let layer = if size > crate::engines::layers::MAX_FILE_BYTES as u64 {
                 Err(format!(
                     "is {} KB, over the {} KB a content file may be, so it isn't read",
@@ -400,11 +467,14 @@ impl WorldEngine {
                 ))
             } else {
                 match std::fs::read_to_string(&path) {
-                    Ok(text) => Layer::parse(&path, &text),
+                    Ok(read) => {
+                        text = read;
+                        Layer::parse(&path, &text)
+                    }
                     Err(e) => Err(format!("Failed to read file {:?}: {}", path, e)),
                 }
             };
-            self.files.push(FileRecord { path, layer });
+            self.files.push(FileRecord { path, layer, text });
         }
         let built = self.rebuild();
 
@@ -595,23 +665,133 @@ impl WorldEngine {
             let files = std::iter::once(&thing.index).chain(thing.states.values()).chain(thing.overlays.values());
             let layers = files.flat_map(|l| std::iter::once(l).chain(l.sections.iter().map(|s| &s.layer)));
             for layer in layers {
+                // A name nothing defines is not written yet (REQ-ENG-55),
+                // not a warning; only an ambiguous one is.
                 for (_, id) in super::variables::mentions(&layer.body) {
-                    if self.thing_by_id(&id).is_err() {
-                        warnings.push(format!("{}: `@{}` names nothing in the world, so play shows `{}`", layer.path.display(), id, id));
+                    if let Err(e) = self.thing_by_id(&id) {
+                        if !self.kinds_with_id(&id).is_empty() {
+                            warnings.push(format!("{}: `@{}` is ambiguous: {}", layer.path.display(), id, e));
+                        }
                     }
                 }
                 for name in crate::render::prose_links(&layer.body) {
                     if self.link_for(&name).is_some() {
                         continue;
                     }
-                    match self.link_ambiguity(&name, None) {
-                        Some(why) => warnings.push(format!("{}: a link in the prose is ambiguous: {}", layer.path.display(), why)),
-                        None => warnings.push(format!("{}: the link to `{}` names nothing in the world", layer.path.display(), name)),
+                    if let Some(why) = self.link_ambiguity(&name, None) {
+                        warnings.push(format!("{}: a link in the prose is ambiguous: {}", layer.path.display(), why));
                     }
                 }
             }
         }
         warnings
+    }
+
+    /// Every name the world mentions that nothing defines (REQ-ENG-55):
+    /// prose links and `@name`s that name nothing, and exits to no room or
+    /// door. One entry per name, in first-mention order (by file, then
+    /// line), each with every mention. An ambiguous name isn't here; it
+    /// stays a warning.
+    pub fn not_written(&self) -> Vec<Unwritten> {
+        let root = self.world_root.clone().unwrap_or_default();
+        let rel = |p: &Path| p.strip_prefix(&root).unwrap_or(p).to_path_buf();
+        // (file, line, order in file, name, mention)
+        let mut found: Vec<(PathBuf, usize, usize, String, Mention)> = Vec::new();
+        let mut things: Vec<&Thing> = self.things.values().collect();
+        things.sort_by(|a, b| a.index.path.cmp(&b.index.path));
+        for thing in things {
+            let holder = match thing.kind {
+                EntityKind::Location => Some(Holder::Room(thing.id.clone())),
+                EntityKind::Object => Some(Holder::Object(thing.id.clone())),
+                EntityKind::Character => Some(Holder::Character(thing.id.clone())),
+                _ => None,
+            };
+            let files = std::iter::once(&thing.index).chain(thing.states.values()).chain(thing.overlays.values());
+            let mut layers: Vec<&Layer> = files.flat_map(|l| std::iter::once(l).chain(l.sections.iter().map(|s| &s.layer))).collect();
+            layers.sort_by(|a, b| a.path.cmp(&b.path));
+            let mut text_of: HashMap<PathBuf, String> = HashMap::new();
+            // Where to look next for each name, so repeats find later lines.
+            let mut cursors: HashMap<(PathBuf, String, bool), usize> = HashMap::new();
+            for layer in layers {
+                let text = text_of
+                    .entry(layer.path.clone())
+                    .or_insert_with(|| self.file_text(&layer.path));
+                let mut names: Vec<(usize, String, MentionKind)> = super::variables::mentions(&layer.body)
+                    .into_iter()
+                    .filter(|(_, id)| self.kinds_with_id(id).is_empty())
+                    .map(|(at, id)| (at.start, id, MentionKind::At))
+                    .collect();
+                // Links don't carry a position; place them after the
+                // `@name`s, then find each in the file in turn.
+                names.extend(
+                    crate::render::prose_links(&layer.body)
+                        .into_iter()
+                        .filter(|n| self.link_for(n).is_none() && self.link_ambiguity(n, None).is_none())
+                        .map(|n| (usize::MAX, n, MentionKind::Link)),
+                );
+                names.sort_by_key(|(at, _, _)| *at);
+                for (_, name, how) in names {
+                    let cursor = cursors.entry((layer.path.clone(), name.clone(), how == MentionKind::At)).or_insert(0);
+                    let needles: Vec<String> = match how {
+                        MentionKind::At => vec![format!("@{}", name)],
+                        _ => vec![format!("[[{}", name), format!("({}", name), format!("({}.md", name)],
+                    };
+                    let hit = needles.iter().filter_map(|n| text[*cursor..].find(n.as_str()).map(|i| *cursor + i)).min();
+                    let line = hit.map(|i| {
+                        *cursor = i + 1;
+                        text[..i].matches('\n').count() + 1
+                    });
+                    let order = found.len();
+                    found.push((
+                        rel(&layer.path),
+                        line.unwrap_or(usize::MAX),
+                        order,
+                        name.clone(),
+                        Mention { file: rel(&layer.path), line, holder: holder.clone(), how },
+                    ));
+                }
+            }
+        }
+        for (from, direction, target) in self.broken_connections() {
+            if !self.kinds_with_id(&target).is_empty() || self.link_ambiguity(&target, Some(EntityKind::Location)).is_some() {
+                continue;
+            }
+            let path = self.sources.get(&(EntityKind::Location, from.clone())).and_then(|v| v.first()).cloned();
+            let Some(path) = path else { continue };
+            let text = self.file_text(&path);
+            let line = text
+                .lines()
+                .position(|l| l.trim_start().starts_with(&format!("{}:", direction)) && l.contains(target.as_str()))
+                .map(|i| i + 1);
+            let order = found.len();
+            found.push((
+                rel(&path),
+                line.unwrap_or(usize::MAX),
+                order,
+                target.clone(),
+                Mention { file: rel(&path), line, holder: Some(Holder::Room(from.clone())), how: MentionKind::Exit(direction) },
+            ));
+        }
+        found.sort_by(|a, b| (&a.0, a.1, a.2).cmp(&(&b.0, b.1, b.2)));
+        let mut out: Vec<Unwritten> = Vec::new();
+        for (_, _, _, name, mention) in found {
+            match out.iter_mut().find(|u| u.name == name) {
+                Some(entry) => entry.mentions.push(mention),
+                None => out.push(Unwritten { name, wants: EntityKind::Object, mentions: vec![mention] }),
+            }
+        }
+        for entry in &mut out {
+            if entry.mentions.iter().any(|m| matches!(m.how, MentionKind::Exit(_))) {
+                entry.wants = EntityKind::Location;
+            }
+        }
+        out
+    }
+
+    /// A loaded file's text as the engine has it, unsaved changes
+    /// included; empty if it isn't loaded.
+    fn file_text(&self, path: &Path) -> String {
+        self.files.iter().find(|r| r.path == path).map(|r| r.text.clone()).unwrap_or_default()
     }
 
     /// How a holder holds things (`holds:`), `on` when it doesn't say.
@@ -926,7 +1106,7 @@ impl WorldEngine {
             self.rebuild();
             return;
         }
-        let record = FileRecord { path: path.to_path_buf(), layer: Layer::parse(path, text) };
+        let record = FileRecord { path: path.to_path_buf(), layer: Layer::parse(path, text), text: text.to_string() };
         match self.files.iter_mut().find(|r| r.path == path) {
             Some(existing) => *existing = record,
             None => self.files.push(record),
@@ -1204,7 +1384,7 @@ impl WorldEngine {
     /// client that checks a world calls this, so the console's check and
     /// the command line's never differ (REQ-ENG-44).
     pub fn validation(&self, strict: bool) -> Validation {
-        Validation { problems: self.current_problems(strict), warnings: self.current_warnings() }
+        Validation { problems: self.current_problems(strict), warnings: self.current_warnings(), not_written: self.not_written() }
     }
 
     /// The one file `(kind, id)` was loaded from. An error if it wasn't
@@ -1735,6 +1915,33 @@ mod tests {
         assert!(!v.passed());
         assert!(v.summary().starts_with("Validation failed: 1 problem(s)"), "{}", v.summary());
         assert_eq!(Validation::default().summary(), "Validation passed: no problems or warnings");
+    }
+
+    #[test]
+    fn names_nothing_defines_are_not_written_yet_one_per_name() {
+        let (dir, mut engine, _) = small_world();
+        let hall = dir.path().join("castle/hall.md");
+        engine.set_file(
+            &hall,
+            "---\nid: castle/hall\ntitle: Hall\ntype: location\nconnections:\n  east: castle/attic\n---\nThe [[wallpaper]] peels.\n\n## #peeled: @wallpaper\n\nBehind the [[wallpaper]], a [[hole]].\n",
+        );
+        let v = engine.validation(false);
+        assert!(!v.warnings.iter().any(|w| w.contains("wallpaper") || w.contains("hole")), "{:?}", v.warnings);
+        let names: Vec<(&str, EntityKind)> = v.not_written.iter().map(|u| (u.name.as_str(), u.wants)).collect();
+        assert_eq!(names, [("castle/attic", EntityKind::Location), ("wallpaper", EntityKind::Object), ("hole", EntityKind::Object)]);
+        let wallpaper = &v.not_written[1];
+        let at: Vec<(Option<usize>, &MentionKind)> = wallpaper.mentions.iter().map(|m| (m.line, &m.how)).collect();
+        assert_eq!(at, [(Some(8), &MentionKind::Link), (Some(10), &MentionKind::At), (Some(12), &MentionKind::Link)]);
+        assert_eq!(wallpaper.mentions[0].file, PathBuf::from("castle/hall.md"));
+        assert_eq!(wallpaper.mentions[0].holder, Some(Holder::Room("castle/hall".into())));
+        assert_eq!(v.not_written[0].mentions[0].how, MentionKind::Exit("east".into()));
+        assert_eq!(v.not_written[0].mentions[0].line, Some(6));
+        // An exit to nothing still fails validation (REQ-CLI-3).
+        assert!(v.problems.iter().any(|p| p.contains("castle/attic")), "{:?}", v.problems);
+        let lines = v.not_written_lines();
+        assert_eq!(lines[0], "Not written yet (3):");
+        assert_eq!(lines[2], "  wallpaper (object): castle/hall.md:8 link, castle/hall.md:10 @name, castle/hall.md:12 link");
+        assert!(!v.summary().contains("written"), "{}", v.summary());
     }
 
     #[test]

@@ -1523,7 +1523,12 @@ mod tests {
         let look = game.act(&world, &mut state, &PlayAction::Look).text;
         assert!(look.contains("A long hall. The King Aldric sits by the well. royal\n\nA door to castle/nowhere."), "{}", look);
         let warnings = world.current_warnings();
-        assert!(warnings.iter().any(|w| w.contains("castle/hall.md: the link to `castle/nowhere` names nothing in the world")), "{:?}", warnings);
+        // A link to nothing is not written yet, not a warning (REQ-ENG-55).
+        assert!(!warnings.iter().any(|w| w.contains("castle/nowhere")), "{:?}", warnings);
+        let unwritten = world.not_written();
+        let nowhere = unwritten.iter().find(|u| u.name == "castle/nowhere").expect("castle/nowhere is not written");
+        assert_eq!(nowhere.mentions.len(), 1, "{:?}", unwritten);
+        assert_eq!(nowhere.mentions[0].line, Some(11));
         assert!(!warnings.iter().any(|w| w.contains("`king`") || w.contains("objects/well")), "{:?}", warnings);
         let tags = world.tags();
         assert_eq!(tags["royal"], vec![(EntityKind::Location, "castle/hall".to_string())]);
