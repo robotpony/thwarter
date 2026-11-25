@@ -71,6 +71,14 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.77.0 (2026-11-24)
+
+### Added
+
+- Story overrides of built-in replies (REQ-ENG-57): a `## When:` section whose tags are exactly a reply's outcome tags rewords it, in the thing, its room or the chapter, before `[engine]`. `## When: #take #immovable` in an anvil gives "The anvil laughs at you."; `## When: #not-here` in a chapter rewords "There's no lamp here." The prose fills `{{ turn.noun }}`, `{{ turn.verb }}` and the reply's other slots. The parser's own replies follow the chapter's wording too.
+- The outcome names (`#no-noun`, `#not-here`, `#immovable`, `#nothing` and the rest) are reserved tags, and `validate` warns about a state named like one.
+- `tests/text_guard.rs` (REQ-ENG-58): fails on a sentence-like literal in `src/engines/` or `src/render.rs` outside tests, tooling call sites and `tests/text_allowlist.txt`, and on an allowlist line that matches nothing. `src/console/` joins it once its last sentences move.
+
 ## 0.76.0 (2026-11-24)
 
 ### Added

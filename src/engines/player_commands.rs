@@ -3,7 +3,6 @@
 //! `GameEngine::act`, or a reply that changes nothing (REQ-PC-1 to 15).
 
 use crate::engines::location_view::expand_direction;
-use crate::engines::texts::Texts;
 use crate::engines::{GameEngine, WorldEngine};
 use crate::models::game::{PlayAction, PlayState};
 
@@ -44,14 +43,21 @@ impl GameEngine {
                 return Parsed::Action(PlayAction::Examine(typed.to_string()));
             }
         }
-        let texts = world.texts();
-        match parse_words(line, texts, state.turn) {
+        // A reply the line gets: a chapter's `## When:` wording first
+        // (`design/ENGINE_TEXT.md` › Story overrides), else `[engine]`'s.
+        let say = |key: &str, args: &[(&str, &str)]| -> String {
+            match self.story_reply(world, state, key, None, args) {
+                Some(text) => crate::render::prose_plain(crate::engines::layers::strip_comments(&text).trim(), &|n| world.link_for(n)),
+                None => world.texts().text_at("engine", key, args, state.turn),
+            }
+        };
+        match parse_words(line, &say) {
             Words::Other { verb, noun, with } => {
                 let known = world.has_action(&verb);
                 match noun {
-                    None if known => Parsed::Reply(texts.text_at("engine", "no_noun", &[("verb", &verb)], state.turn)),
+                    None if known => Parsed::Reply(say("no_noun", &[("verb", &verb)])),
                     Some(noun) if known || self.names_anything(world, state, &noun) => Parsed::Action(PlayAction::Use { verb, noun, with }),
-                    _ => unknown(line, texts, state.turn),
+                    _ => unknown(line, &say),
                 }
             }
             Words::Parsed(parsed) => parsed,
@@ -66,18 +72,21 @@ enum Words {
     Other { verb: String, noun: Option<String>, with: Option<String> },
 }
 
-fn unknown(line: &str, texts: &Texts, turn: u64) -> Parsed {
-    Parsed::Unknown(texts.text_at("engine", "not_understood", &[("line", line.trim())], turn))
+/// How the parser words a reply: a key and its slots.
+type Say<'a> = dyn Fn(&str, &[(&str, &str)]) -> String + 'a;
+
+fn unknown(line: &str, say: &Say) -> Parsed {
+    Parsed::Unknown(say("not_understood", &[("line", line.trim())]))
 }
 
 /// The syntax alone: no world, no state (REQ-PC-2 to 8).
-fn parse_words(line: &str, texts: &Texts, state_turn: u64) -> Words {
+fn parse_words(line: &str, say: &Say) -> Words {
     use PlayAction::*;
-    let ask = |key: &str| texts.text_at("engine", key, &[], state_turn);
+    let ask = |key: &str| say(key, &[]);
     let lower = line.trim().to_lowercase();
     let words: Vec<&str> = lower.split_whitespace().collect();
     let Some((&verb, rest)) = words.split_first() else {
-        return Words::Parsed(unknown(line, texts, state_turn));
+        return Words::Parsed(unknown(line, say));
     };
     let done = |p: Parsed| Words::Parsed(p);
 
@@ -103,15 +112,15 @@ fn parse_words(line: &str, texts: &Texts, state_turn: u64) -> Words {
         },
         "pick" => match rest {
             ["up", noun @ ..] => done(with_noun(noun, Take, ask("pick_up_what"))),
-            _ => done(unknown(line, texts, state_turn)),
+            _ => done(unknown(line, say)),
         },
         "examine" | "x" | "inspect" => done(with_noun(rest, Examine, ask("examine_what"))),
         "inventory" | "i" | "inv" if rest.is_empty() => done(Parsed::Action(Inventory)),
         "search" if rest.is_empty() => done(Parsed::Action(Search)),
         // Built-in verbs used another way (`inventory lamp`, `n please`)
         // aren't read.
-        "inventory" | "i" | "inv" => done(unknown(line, texts, state_turn)),
-        _ if direction(verb).is_some() => done(unknown(line, texts, state_turn)),
+        "inventory" | "i" | "inv" => done(unknown(line, say)),
+        _ if direction(verb).is_some() => done(unknown(line, say)),
         _ => {
             // `listen to the chest`, `talk to the captain` (REQ-PC-20).
             let rest = match rest {
@@ -155,15 +164,18 @@ fn with_noun(words: &[&str], make: fn(String) -> PlayAction, ask: String) -> Par
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engines::texts::Texts;
     use PlayAction::*;
 
     /// The syntax alone, as verbs.rs had it.
     fn parse(line: &str) -> Parsed {
-        match parse_words(line, &Texts::defaults(), 0) {
+        let texts = Texts::defaults();
+        let say = |key: &str, args: &[(&str, &str)]| texts.text_at("engine", key, args, 0);
+        match parse_words(line, &say) {
             Words::Parsed(p) => p,
             Words::Other { verb, noun, with } => match noun {
                 Some(noun) => Parsed::Action(Use { verb, noun, with }),
-                None => unknown(line, &Texts::defaults(), 0),
+                None => unknown(line, &say),
             },
         }
     }

@@ -38,7 +38,7 @@ struct Found<'a> {
 fn sections<'a>(thing: &'a Thing, current: Option<&'a str>) -> Vec<Found<'a>> {
     let mut out = Vec::new();
     let mut push = |layer: &'a crate::engines::layers::Layer, state_file: Option<&'a str>, own: bool| {
-        for section in layer.sections.iter().filter(|s| s.reserved().is_none()) {
+        for section in layer.sections.iter().filter(|s| s.reserved().is_none() && !rewords_a_reply(s)) {
             out.push(Found { section, state_file, own });
         }
     };
@@ -62,6 +62,74 @@ fn sections<'a>(thing: &'a Thing, current: Option<&'a str>) -> Vec<Found<'a>> {
 fn prose_of(section: &Section) -> Option<String> {
     let text = section.layer.body.trim();
     (!strip_comments(text).trim().is_empty()).then(|| text.to_string())
+}
+
+/// Who may reword a built-in reply with a `## When:` section
+/// (`design/ENGINE_TEXT.md` › Story overrides).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Chain {
+    /// The thing it's about, its room, the chapter, then `[engine]`.
+    Thing,
+    /// The chapter, then `[engine]`: the reply is about no thing.
+    World,
+}
+
+/// Each `[engine]` reply's outcome tags and chain: a section whose `#`
+/// tags are exactly these rewords it. `src/builtins/text/engine.toml`
+/// gives the same after each key, which a test checks.
+pub const OUTCOMES: &[(&str, &str, Chain)] = &[
+    ("not_understood", "#not-understood", Chain::World),
+    ("no_noun", "#no-noun", Chain::World),
+    ("go_where", "#go #no-noun", Chain::World),
+    ("take_what", "#take #no-noun", Chain::World),
+    ("pick_up_what", "#take #no-noun", Chain::World),
+    ("examine_what", "#examine #no-noun", Chain::World),
+    ("look_at_what", "#examine #no-noun", Chain::World),
+    ("not_here", "#not-here", Chain::World),
+    ("which", "#ambiguous", Chain::Thing),
+    ("who", "#ambiguous", Chain::Thing),
+    ("nowhere", "#nowhere", Chain::World),
+    ("nowhere_gone", "#nowhere", Chain::World),
+    ("no_exit", "#go #no-exit", Chain::World),
+    ("door_locked", "#go #locked", Chain::Thing),
+    ("door_closed", "#go #closed", Chain::Thing),
+    ("taken", "#take", Chain::Thing),
+    ("already_have", "#take #carried", Chain::Thing),
+    ("take_person", "#take #person", Chain::Thing),
+    ("take_scenery", "#take #scenery", Chain::Thing),
+    ("immovable", "#take #immovable", Chain::Thing),
+    ("nothing_special", "#examine #nothing", Chain::Thing),
+    ("search_nothing", "#search #nothing", Chain::World),
+    ("search_found", "#search #found", Chain::World),
+    ("look_closely_nothing", "#examine-room #nothing", Chain::World),
+    ("look_closely_found", "#examine-room #found", Chain::World),
+    ("found", "#search #found", Chain::World),
+    ("nothing", "#nothing", Chain::Thing),
+    ("acted", "#acted", Chain::Thing),
+    ("refused", "#refused", Chain::Thing),
+    ("talk_nothing", "#talk #nothing", Chain::Thing),
+    ("cant_verb_person", "#person", Chain::Thing),
+];
+
+/// A reply key's outcome tags and chain, if it has them.
+pub fn outcome_of(key: &str) -> Option<(Vec<&'static str>, Chain)> {
+    OUTCOMES.iter().find(|(k, _, _)| *k == key).map(|(_, tags, chain)| (tags.split_whitespace().collect(), *chain))
+}
+
+/// Whether a section rewords a built-in reply: its `#` tags are exactly
+/// one with a reserved outcome name. Such a section is never description
+/// or an action's reply.
+fn rewords_a_reply(section: &Section) -> bool {
+    if section.unless {
+        return false;
+    }
+    let mut hashes: Vec<&str> = section.tags.iter().map(String::as_str).filter(|t| t.starts_with('#')).collect();
+    hashes.sort();
+    OUTCOMES.iter().any(|(_, tags, _)| {
+        let mut want: Vec<&str> = tags.split_whitespace().collect();
+        want.sort();
+        want == hashes && want.iter().any(|t| crate::engines::layers::RESERVED_TAGS.contains(t) && *t != "#ambiguous")
+    })
 }
 
 /// What an action turn did to its target: the state it moved into, or
@@ -212,6 +280,85 @@ impl GameEngine {
         out
     }
 
+    /// A story's wording for the built-in reply `key` (`design/ENGINE_TEXT.md`
+    /// › Story overrides): the `## When:` section whose `#` tags are
+    /// exactly the reply's outcome tags, and whose `@` tags all hold, in
+    /// the first place along its chain that has one: for a reply about a
+    /// thing, `about` (its own sections over its templates'), then the
+    /// room; then the chapter, innermost first. The most tags wins within
+    /// a place. Its prose, with `{{ turn.x }}` filled from `args`.
+    pub(crate) fn story_reply(
+        &self,
+        world: &WorldEngine,
+        state: &PlayState,
+        key: &str,
+        about: Option<(EntityKind, &str)>,
+        args: &[(&str, &str)],
+    ) -> Option<String> {
+        let (outcome, chain) = outcome_of(key)?;
+        let mut want: Vec<&str> = outcome.clone();
+        want.sort();
+        let mut tags = self.turn_tags(state);
+        if let Some((_, id)) = about {
+            tags.insert(format!("@{}", id));
+        }
+        let fits = |s: &Section| -> bool {
+            if s.unless {
+                return false;
+            }
+            let mut hashes: Vec<&str> = s.tags.iter().map(String::as_str).filter(|t| t.starts_with('#')).collect();
+            hashes.sort();
+            hashes == want && s.tags.iter().filter(|t| t.starts_with('@')).all(|t| tags.contains(t))
+        };
+        // Each place's layers, the most authoritative first.
+        let mut places: Vec<(Option<(EntityKind, String)>, Vec<&crate::engines::layers::Layer>)> = Vec::new();
+        if chain == Chain::Thing {
+            let room = (EntityKind::Location, state.location.clone());
+            for (kind, id) in about.map(|(k, id)| (k, id.to_string())).into_iter().chain(std::iter::once(room)) {
+                let Some(thing) = world.thing(kind, &id) else { continue };
+                let current = self.current_state(world, state, kind, &id);
+                let mut layers: Vec<&crate::engines::layers::Layer> = Vec::new();
+                if let Some(layer) = current.as_deref().and_then(|s| thing.states.get(s)) {
+                    layers.push(layer);
+                }
+                layers.push(&thing.index);
+                if let Some(s) = current.as_deref() {
+                    layers.extend(thing.template_states.get(s).into_iter().flatten().rev());
+                }
+                layers.extend(thing.templates.iter().rev());
+                places.push((Some((kind, id)), layers));
+            }
+        }
+        if let Some(key) = state.chapter.as_ref().and_then(|c| world.chapter_key(c)) {
+            for n in (1..=key.path.len()).rev() {
+                let part = crate::engines::bundles::ChapterKey { scope: key.scope.clone(), path: key.path[..n].to_vec() };
+                if let Some(chapter) = world.chapters().iter().find(|c| c.key == part) {
+                    places.push((None, vec![&chapter.layer]));
+                }
+            }
+        }
+        for (this, layers) in places {
+            let best = layers
+                .iter()
+                .flat_map(|l| l.sections.iter())
+                .filter(|s| fits(s))
+                .filter_map(|s| prose_of(s).map(|text| (s.tags.len(), text)))
+                .fold(None::<(usize, String)>, |best, (n, text)| match best {
+                    Some((m, _)) if m >= n => best,
+                    _ => Some((n, text)),
+                });
+            if let Some((_, text)) = best {
+                let scope = crate::engines::variables::Scope {
+                    at: crate::engines::At::play(state),
+                    this: this.as_ref().map(|(k, id)| (*k, id.as_str())),
+                    here: None,
+                };
+                return Some(world.fill_turn(&text, &scope, args));
+            }
+        }
+        None
+    }
+
     /// The room's `## When: #searched` section, if it has one that matches.
     pub(crate) fn searched(&self, world: &WorldEngine, state: &PlayState) -> Option<String> {
         let thing = world.thing(EntityKind::Location, &state.location)?;
@@ -261,6 +408,73 @@ mod tests {
             Parsed::Action(a) => game.act(world, state, &a).text,
             Parsed::Reply(t) | Parsed::Unknown(t) => t,
         }
+    }
+
+    #[test]
+    fn a_story_rewords_a_built_in_reply_by_its_outcome() {
+        let dir = tempfile::tempdir().unwrap();
+        let write = |rel: &str, text: &str| {
+            let p = dir.path().join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        };
+        write("forge.md", "---\nid: forge\ntitle: Forge\ntype: location\nobjects: [anvil, safe, lamp, box]\n---\nHot.\n\n## When: #take #immovable\nEverything here is bolted down.\n");
+        write("objects/anvil.md", "---\nid: anvil\ntitle: Anvil\ntype: object\nobject_type: x\nweight: immovable\n---\nHeavy.\n\n## When: #take #immovable\nThe anvil laughs at you.\n");
+        write("objects/safe.md", "---\nid: safe\ntitle: Safe\ntype: object\nobject_type: x\nweight: immovable\n---\nSteel.\n");
+        write("objects/lamp.md", "---\nid: lamp\ntitle: Lamp\ntype: object\nobject_type: x\n---\nA lamp.\n\n## When: #nothing\nYou {{ turn.verb }} the lamp. It flickers.\n");
+        write("objects/box/index.md", "---\nid: box\ntitle: Box\ntype: object\nobject_type: x\nstate: nothing\n---\nA box.\n");
+        write("objects/box/nothing.md", "---\ninherits: index\n---\n");
+        write("chapters/10-dark.md", "---\ntitle: Dark\n---\n## When: #not-here\nIn the dark, you can't find any {{ turn.noun }}.\n\n## When: #not-understood\nThe dark swallows \"{{ turn.line }}\".\n");
+        let mut world = WorldEngine::new();
+        world.load_world(dir.path()).unwrap();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "forge").unwrap();
+        let s = |state: &mut PlayState, line: &str| say(&game, &world, state, line);
+
+        // The thing's own wording, then its room's, then the built-in.
+        assert_eq!(s(&mut state, "take anvil"), "The anvil laughs at you.");
+        assert_eq!(s(&mut state, "take safe"), "Everything here is bolted down.");
+        assert_eq!(s(&mut state, "take ghost"), "There's no ghost here.");
+        // A slot in the prose form, and a section that rewords a reply is
+        // never part of the description.
+        assert_eq!(s(&mut state, "kick lamp"), "You kick the lamp. It flickers.");
+        assert_eq!(s(&mut state, "x anvil"), "Heavy.");
+        // A chapter rewords the replies about no thing, the parser's too.
+        state.enter_chapter(&world, std::path::Path::new(""), "dark").unwrap();
+        assert_eq!(s(&mut state, "take ghost"), "In the dark, you can't find any ghost.");
+        assert_eq!(s(&mut state, "dance wildly"), "The dark swallows \"dance wildly\".");
+
+        // A state named like an outcome is warned about.
+        let warnings = world.current_warnings();
+        assert!(warnings.iter().any(|w| w.contains("the state `nothing` has a reserved name")), "{:?}", warnings);
+        // `{{ turn.x }}` is declared, so no variable warning.
+        assert!(!warnings.iter().any(|w| w.contains("turn.")), "{:?}", warnings);
+    }
+
+    /// `engine.toml` gives each key's outcome tag and chain after it;
+    /// they're the same as `OUTCOMES`, which play uses.
+    #[test]
+    fn engine_toml_comments_match_the_outcomes() {
+        let mut seen = 0;
+        let engine = crate::engines::texts::DEFAULTS.iter().find(|(name, _)| *name == "engine").unwrap().1;
+        for line in engine.lines() {
+            let Some((key, rest)) = line.split_once(" = ") else { continue };
+            let Some((_, comment)) = rest.rsplit_once("  # ") else { continue };
+            if !comment.starts_with('#') {
+                continue;
+            }
+            let (tags, chain) = comment.split_once(", ").unwrap_or((comment, ""));
+            let chain = chain.split_whitespace().next().unwrap_or("");
+            let (want, want_chain) = super::outcome_of(key.trim()).unwrap_or_else(|| panic!("`{}` isn't in OUTCOMES", key));
+            assert_eq!(tags.split_whitespace().collect::<Vec<_>>(), want, "{}", key);
+            let want_chain = match want_chain {
+                super::Chain::Thing => "thing",
+                super::Chain::World => "world",
+            };
+            assert_eq!(chain, want_chain, "{}", key);
+            seen += 1;
+        }
+        assert_eq!(seen, super::OUTCOMES.len());
     }
 
     #[test]

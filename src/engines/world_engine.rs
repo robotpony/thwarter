@@ -828,6 +828,28 @@ impl WorldEngine {
         out
     }
 
+    /// A state named like a reserved tag (`#nothing`, `#immovable`): a
+    /// `## When:` section naming it would reword a built-in reply, not
+    /// match the state (`design/ENGINE_TEXT.md` › Story overrides).
+    fn reserved_state_warnings(&self) -> Vec<String> {
+        let mut things: Vec<&Thing> = self.things.values().collect();
+        things.sort_by(|a, b| a.index.path.cmp(&b.index.path));
+        let mut out = Vec::new();
+        for thing in things {
+            for (name, layer) in &thing.states {
+                if crate::engines::layers::RESERVED_TAGS.contains(&format!("#{}", name).as_str()) {
+                    out.push(format!(
+                        "{}: the state `{}` has a reserved name, so `## When: #{}` rewords a built-in reply instead of matching it; rename the state",
+                        layer.path.display(),
+                        name,
+                        name
+                    ));
+                }
+            }
+        }
+        out
+    }
+
     /// A loaded file's text as the engine has it, unsaved changes
     /// included; empty if it isn't loaded.
     fn file_text(&self, path: &Path) -> String {
@@ -1425,6 +1447,7 @@ impl WorldEngine {
         warnings.extend(self.holds_warnings());
         warnings.extend(self.play_text_warnings.iter().cloned());
         warnings.extend(self.door_warnings());
+        warnings.extend(self.reserved_state_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }

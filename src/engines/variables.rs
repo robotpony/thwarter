@@ -6,10 +6,14 @@
 
 /// The levels that aren't thing ids. They're reserved: no thing may use
 /// one as its id.
-pub const LEVELS: &[&str] = &["game", "story", "player", "location", "this"];
+pub const LEVELS: &[&str] = &["game", "story", "player", "location", "this", "turn"];
 
 /// What the engine itself declares at each fixed level.
 pub const GAME_VALUES: &[&str] = &["turn", "score"];
+/// A built-in reply's slots, as a `## When:` section that rewords it
+/// writes them (`{{ turn.noun }}`; `design/ENGINE_TEXT.md` › Story
+/// overrides). Blank outside such a section.
+pub const TURN_VALUES: &[&str] = &["noun", "verb", "direction", "door", "name", "thing", "person", "list", "or", "line"];
 pub const STORY_VALUES: &[&str] = &["chapter"];
 pub const PLAYER_VALUES: &[&str] = &["title"];
 pub const LOCATION_VALUES: &[&str] = &["title", "visits"];
@@ -177,7 +181,16 @@ impl WorldEngine {
     /// that thing's name in the version play sees (`@guard-captain` →
     /// Captain Marcus). An `@` that names nothing stays as the bare word.
     pub fn fill(&self, text: &str, scope: &Scope) -> String {
-        let filled = substitute(text, |name| self.variable(name, scope));
+        self.fill_turn(text, scope, &[])
+    }
+
+    /// `fill`, with `{{ turn.x }}` from `turn`: a built-in reply's slots,
+    /// for the `## When:` section that rewords it.
+    pub fn fill_turn(&self, text: &str, scope: &Scope, turn: &[(&str, &str)]) -> String {
+        let filled = substitute(text, |name| match name.strip_prefix("turn.") {
+            Some(key) => Some(turn.iter().find(|(k, _)| *k == key).map(|(_, v)| v.to_string()).unwrap_or_default()),
+            None => self.variable(name, scope),
+        });
         let mut out = String::with_capacity(filled.len());
         let mut last = 0;
         for (range, id) in mentions(&filled) {
@@ -200,6 +213,7 @@ impl WorldEngine {
         };
         let ok = match level {
             "game" => GAME_VALUES.contains(&key),
+            "turn" => TURN_VALUES.contains(&key),
             "story" => STORY_VALUES.contains(&key) || self.world().story.contains_key(key),
             "player" => PLAYER_VALUES.contains(&key) || self.world().player.as_ref().map_or(false, |p| p.vars.contains_key(key)),
             "location" => {

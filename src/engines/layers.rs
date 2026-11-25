@@ -36,8 +36,14 @@ fn depth(value: &Value) -> usize {
 }
 
 /// Tags a section may use that aren't states: replies for engine moments
-/// (`design/SECTIONS.md` › Replies).
-pub const RESERVED_TAGS: &[&str] = &["#ambiguous", "#searched"];
+/// (`design/SECTIONS.md` › Replies), and the outcome names of built-in
+/// replies a story may reword (`design/ENGINE_TEXT.md` › Story overrides;
+/// `turn::OUTCOMES`). `#locked` and `#closed` are outcomes too, but they
+/// mean the door's state of the same name, so they aren't reserved.
+pub const RESERVED_TAGS: &[&str] = &[
+    "#ambiguous", "#searched", "#not-understood", "#no-noun", "#not-here", "#nowhere", "#no-exit", "#carried", "#person",
+    "#scenery", "#immovable", "#nothing", "#found", "#acted", "#refused",
+];
 
 /// One file's frontmatter and prose, untyped.
 #[derive(Debug, Clone, PartialEq, Default)]

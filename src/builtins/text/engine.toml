@@ -5,7 +5,9 @@
 #
 # The comment after each key is its outcome tag, then who may replace it:
 # thing (the thing, its room, the chapter or the world) or world (the
-# chapter or the world only).
+# chapter or the world only). A story rewords one with a `## When:`
+# section whose tags are exactly the outcome tag, with the slots written
+# `{{ turn.noun }}` (design/ENGINE_TEXT.md).
 [engine]
 
 # Reading the line
@@ -42,8 +44,8 @@ search_nothing = "You search carefully, but find nothing new."  # #search #nothi
 search_found = "You search carefully and find {list}."  # #search #found, world
 look_closely_nothing = "You look closely, but find nothing new."  # #examine-room #nothing, world
 look_closely_found = "You look closely and find {list}."  # #examine-room #found, world
-found = "You find {list}."                         # #search #found, after the room's own #searched reply
-a_way = "a way {direction}"                        # a found exit, in {list}
+found = "You find {list}."                         # #search #found, world (after the room's own #searched reply)
+a_way = "a way {direction}"                        # a found exit, in {list}; not a reply
 
 # Other verbs
 nothing = "Nothing happens."                       # #nothing, thing
