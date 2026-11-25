@@ -46,6 +46,7 @@ const KINDS: &[(&str, Kind)] = &[
     ("usage_bare", Kind::Refused),
     ("unknown_command", Kind::Error),
     ("list_what", Kind::Refused),
+    ("usage_new_objects", Kind::Refused),
     ("edit_look_toward_none", Kind::Missing),
     ("edit_look_toward_no_room", Kind::Refused),
     ("reload_failed", Kind::Error),

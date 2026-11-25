@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.85.0 (2026-11-25)
+
+### Added
+
+- `/new object a, b, c <type>` makes several objects of one type in one command, each as `/new object <id> <type>` would (REQ-CON-27). Covered by `tests/transcripts/making.txt`. The rest of scope (`/scope`, `in global|area|here`, `/move <id> global|area|local`) waits on the writer creating and moving files in a folder.
+
 ## 0.84.0 (2026-11-25)
 
 ### Added

@@ -89,3 +89,20 @@ You put-out the torch.
 You open the old chest. Something changes.
 > close chest
 You close the old chest.
+> /edit
+Edit mode, at village/square.
+/edit opens village/square.md in a full-screen editor, which needs a terminal.
+> go /village/well
+The Well (room)
+> /new object rope, bucket, hook tool
+Created object rope, Rope, placed in village/well.
+Created object bucket, Bucket, placed in village/well.
+Created object hook, Hook, placed in village/well.
+> /new object rope2, tool
+Usage: /new object <id>, <id>, ... <type>, with one type for them all and no titles
+> look
+A mossy stone well. The rope is long gone.
+
+You see a rope, a bucket, and a hook.
+
+You can go south.

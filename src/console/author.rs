@@ -36,6 +36,7 @@ impl Console {
         match args {
             ["room", rest @ ..] => self.new_room(rest),
             ["character", rest @ ..] => self.new_character(rest),
+            ["object", rest @ ..] if rest.iter().any(|w| w.ends_with(',')) => self.new_objects(rest),
             ["object", rest @ ..] => self.new_object(rest),
             _ => super::session::suggest(&self.t("usage_details", &[]), &["/new room|character|object {id} [{title}]"]),
         }
@@ -129,6 +130,20 @@ impl Console {
         let title = title_or_default(title, id);
         let new = NewEntity { kind: EntityKind::Character, id: id.to_string(), title: title.clone(), object_type: None };
         self.create_and_place(&new, &edits, "characters", here)
+    }
+
+    /// `/new object a, b, c <type>`: several objects of one type, each
+    /// made as `/new object <id> <type>` would (REQ-CON-27).
+    fn new_objects(&mut self, args: &[&str]) -> String {
+        let last_comma = args.iter().rposition(|w| w.ends_with(',')).unwrap_or(0);
+        let (ids, rest) = args.split_at((last_comma + 2).min(args.len()));
+        let ids: Vec<&str> = ids.iter().map(|w| w.trim_end_matches(',')).filter(|w| !w.is_empty()).collect();
+        let [object_type] = rest else { return self.t("usage_new_objects", &[]) };
+        if ids.len() < 2 {
+            return self.t("usage_new_objects", &[]);
+        }
+        let replies: Vec<String> = ids.iter().map(|id| self.new_object(&[id, object_type])).collect();
+        replies.join("\n")
     }
 
     fn new_object(&mut self, args: &[&str]) -> String {
