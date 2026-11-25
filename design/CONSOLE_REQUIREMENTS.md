@@ -304,18 +304,18 @@ Bruce, 2026-11-24: console commands should solve common problems easily, through
 
 ## To write
 
-*Proposed (Bruce, 2026-11-24; the key scheme is the commander's, not yet seen by Bruce).* A name the prose mentions but nothing defines (`[[hole]]`, `@wallpaper`) is a warning per mention today, so hallway.md's three `wallpaper` mentions make three warnings.
+Bruce, 2026-11-24. A name the prose mentions but nothing defines (`[[hole]]`, `@wallpaper`) is a warning per mention today, so hallway.md's three `wallpaper` mentions make three warnings.
 
 - REQ-CON-57: The sidebar MUST show a TO WRITE list: each name the world mentions but doesn't define, once, with how many times it's mentioned when that's more than once, and its key. It comes from the engine's not-written-yet list (grouped by name, each mention's file), not from warning text.
 
   ```
-  TO WRITE                      alt-1
-    a  wallpaper  ×3
-    b  hole
+  TO WRITE
+    ⌘1  wallpaper  ×3
+    ⌘2  hole
   ```
 
 - REQ-CON-58: Picking an entry MUST make it with defaults and open it in the editor, as `/add` would but without the question picker: the card REQ-CF-8 makes (scenery, title from the id), listed in the first room whose prose names it. A name an exit leads to becomes a room instead. Changing it afterwards is a normal `/set`.
-- REQ-CON-59: A leader key opens the list, then a to z picks in list order, so `1a` is list 1, item a. Other lists (open documents) MAY take other numbers later. The default leader MUST work in every terminal, Alt-1 (Option-1), since kitty, iTerm2 and Ghostty keep Cmd-1 for their own tabs; `config.toml` MAY set another, and the sidebar shows the key that's set. `/write [<name>]` does the same from the prompt.
+- REQ-CON-59: Each of the first nine entries MUST have its own key, Cmd-1 to Cmd-9 in list order, like browser tabs (Bruce, 2026-11-24): no leader, no letter. Entries past nine have no key; `/write <name>` reaches them, and `/write [<name>]` does the same for any entry from the prompt. Cmd-9 is the ninth entry, not the last. Cmd keys reach the console only through the kitty keyboard protocol, and kitty, iTerm2 and Ghostty keep Cmd-1 to Cmd-9 for their own tabs until the author unbinds them, so `config.toml` MAY set another modifier (Alt) for a terminal that doesn't pass Cmd; the sidebar shows the key that's set.
 
 ## Command registry
 
