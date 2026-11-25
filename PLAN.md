@@ -46,7 +46,9 @@ Done when a locked-door puzzle plays from both sides.
 - [x] Done (squashed): 17 items, from doors as their own type and `## When:` sections to Rhai scripts, keys, `/add door`, `/validate` and the parser in the engine; the full list is `git show a33296b:PLAN.md`.
 - [ ] Try sections on real content with Bruce, then fold `design/SECTIONS.md` into the content requirements [commander, Bruce]
 - [x] Clocks and game values: `after:` and `at:`, a seed per game, game time, and `@thing:state` in headings for weather (0.93.0; weather in `world/` and `#arrive` in 0.94.0) (Bruce, 2026-11-25) [coder] (`design/STATES.md` › Clocks)
-- [ ] Settle the player command open questions with Bruce [commander] (`design/PLAYER_COMMANDS.md` › Open questions)
+- [ ] Settle the player command open questions with Bruce: 1, 2, 3 and 5 settled 2026-11-25, 4 (game commands every client needs) to go [commander] (`design/PLAYER_COMMANDS.md` › Open questions)
+- [ ] Multi-word verbs a world names (`#turn-on`), longest first, with built-in `look in` and `look under`; paused until Bruce restarts the coder [coder] (`design/PLAYER_COMMANDS.md` › Open question 5)
+- [ ] `refuse: true` in a built-in verb's section stops the verb for that thing; paused until Bruce restarts the coder [coder] (`design/PLAYER_COMMANDS.md` › Open question 3)
 
 ## Phase 7 · A real sample world
 

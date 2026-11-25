@@ -102,7 +102,7 @@ Bruce chose these on 2026-11-25, answering Open question 1. A thing's, room's or
 ## Open questions
 
 1. ~~Which verbs come next?~~ Settled 2026-11-25 by Bruce: › More verbs. The topic list shape REQ-PC-31 proposed was built as written.
-2. Should `search` and `look around` stay two verbs or become one? Both find faint things today; `search` has its own reply (`design/STATES.md` › Hidden things).
-3. May a world override a built-in verb for one object, such as a `take` action on a cursed idol that refuses? Proposed: yes, through a reply section on the thing, `## When: #take`, the same way a door's `## When: #go` answers a refused exit, with the take's outcome named so the idol stays put.
+2. ~~Should `search` and `look around` stay two verbs or become one?~~ Two (Bruce, 2026-11-25): `look around` re-reads the room and lists what's faint; `search` is the deliberate act, with its own reply and `## When: #searched` sections.
+3. ~~May a world make a built-in verb refuse for one thing?~~ Yes (Bruce, 2026-11-25): a `## When: #take` section whose ` ```thwarter ` block says `refuse: true` rewords the reply and stops the take, so a cursed idol stays put. The same works for `go`, `drop` and the other built-in verbs. Not built yet.
 4. Which game commands beyond saving does every client need: `/quit`, `/restart`, `/help`, a list of saves?
-5. Should multi-word verbs parse (`turn on lamp`, `look under rug`)? Today the first word is the verb, so a world would name that action `turn` and the player would type `turn lamp`.
+5. ~~Should multi-word verbs parse?~~ Yes, and a world names them (Bruce, 2026-11-25): an action or section tag can be two words (`#turn-on`, `#look-under`), and the parser tries the longest verb first, so `turn on lamp` is `turn-on` and `turn lamp` is `turn`. Built-in `look in` and `look under` join them. Not built yet.
