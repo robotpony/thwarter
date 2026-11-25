@@ -41,6 +41,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Removed
 
+- `bin/thwart` and `build.sh`: a 0.1.0 binary from July 2025, committed though `.gitignore` listed it, and the script that copied a release build there. Nothing used them; the console runs from `target/debug/thwart`. Recover with `git show 267e541:build.sh` and `git show 267e541:bin/thwart > thwart`.
 - `design/STATES.md` › Engine rules' text, now `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-10 to 29 so there's one copy. Recover with `git show 1e2af89:design/STATES.md`.
 - `REQUIREMENTS.md` › 4.1 to 4.4, split into one requirements document per component: `design/CONTENT_REQUIREMENTS.md` (REQ-CF, REQ-WS), `design/ENGINE_REQUIREMENTS.md` (REQ-ENG) and `design/CLI_REQUIREMENTS.md` (REQ-CLI), with ids unchanged; the principles moved from `design/STATES.md` to `REQUIREMENTS.md` › 4 (Bruce, 2026-11-23). Recover the old sections with `git show 1620350:REQUIREMENTS.md`.
 - `PLAN.md`'s old Phase 4 (Play) and Phase 5 (Tooling), regrouped into Phases 4 to 9 with a "done when" each (Bruce, 2026-11-23). Recover with `git show e4e87e6:PLAN.md`.
