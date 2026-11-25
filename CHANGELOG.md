@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.95.2 (2026-11-25)
+
+### Fixed
+
+- `validate` warns about a state file nothing can switch its thing into, which never applies and whose actions never run: not the starting state, and named by no `becomes:`, `after:` or `at:` in a file that can apply, nor as a quoted string in a script. A `becomes:` inside an unreached state doesn't count, so a chain from one is reported too. A thing with a script of its own is skipped, since `become()` can name a state it works out.
+
 ## 0.95.1 (2026-11-25)
 
 ### Changed

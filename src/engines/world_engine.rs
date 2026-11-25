@@ -891,6 +891,166 @@ impl WorldEngine {
         out
     }
 
+    /// A state file nothing can switch its thing into, so it never
+    /// applies and its actions never run: not the starting state
+    /// (REQ-ENG-18), and no `becomes:`, `after:` or `at:` in a file that
+    /// can apply names it, nor a script as a quoted string. A `becomes:`
+    /// in a state counts only once that state is reached. A thing with a
+    /// script of its own is skipped, since `become()` can name a state
+    /// the script works out; the console's `/set state` is a tool, not
+    /// play, so it doesn't count.
+    fn unreached_state_warnings(&self) -> Vec<String> {
+        use std::collections::BTreeMap;
+        type Key = (EntityKind, String, String);
+        let mut always: BTreeSet<Key> = BTreeSet::new();
+        let mut from_state: BTreeMap<Key, BTreeSet<Key>> = BTreeMap::new();
+        let scripts: Vec<&str> = self.things.values().flat_map(|t| t.scripts.iter().map(|s| s.source.as_str())).collect();
+        let in_script = |state: &str| {
+            let (quoted, ticked) = (format!("\"{}\"", state), format!("`{}`", state));
+            scripts.iter().any(|s| s.contains(&quoted) || s.contains(&ticked))
+        };
+        for thing in self.things.values() {
+            let owner = Some((thing.kind, thing.id.as_str()));
+            let mut always_layers: Vec<&Layer> = vec![&thing.index];
+            always_layers.extend(thing.overlays.values());
+            always_layers.extend(thing.area_overlays.iter().map(|a| &a.layer));
+            always_layers.extend(thing.templates.iter());
+            for layer in always_layers {
+                self.named_states(layer, owner, &mut always);
+            }
+            for (name, layer) in &thing.states {
+                self.named_states(layer, owner, from_state.entry((thing.kind, thing.id.clone(), name.clone())).or_default());
+            }
+            for (name, layers) in &thing.template_states {
+                let into = from_state.entry((thing.kind, thing.id.clone(), name.clone())).or_default();
+                for layer in layers {
+                    self.named_states(layer, owner, into);
+                }
+            }
+            if let Some(start) = &thing.starting_state {
+                always.insert((thing.kind, thing.id.clone(), start.clone()));
+            }
+            for name in thing.state_names() {
+                if in_script(&name) {
+                    always.insert((thing.kind, thing.id.clone(), name));
+                }
+            }
+        }
+        for chapter in self.chapters() {
+            self.named_states(&chapter.layer, None, &mut always);
+        }
+        let mut reached = always.clone();
+        let mut queue: Vec<Key> = always.into_iter().collect();
+        while let Some(key) = queue.pop() {
+            for next in from_state.get(&key).into_iter().flatten() {
+                if reached.insert(next.clone()) {
+                    queue.push(next.clone());
+                }
+            }
+        }
+
+        let mut things: Vec<&Thing> = self.things.values().collect();
+        things.sort_by(|a, b| a.index.path.cmp(&b.index.path));
+        let mut out = Vec::new();
+        for thing in things {
+            let own_dir = thing.bundle.as_ref().and_then(|_| thing.index.path.parent());
+            let own_script = thing.scripts.iter().any(|s| s.path == thing.index.path || own_dir.is_some_and(|d| s.path.starts_with(d)));
+            if own_script {
+                continue;
+            }
+            for (name, layer) in &thing.states {
+                let key = (thing.kind, thing.id.clone(), name.clone());
+                if reached.contains(&key) {
+                    continue;
+                }
+                let start = match &thing.starting_state {
+                    Some(_) => "it isn't the starting state",
+                    None => "it isn't the starting state (index.md has no `state:`)",
+                };
+                let namers: Vec<String> = from_state
+                    .iter()
+                    .filter(|(from, to)| to.contains(&key) && *from != &key)
+                    .map(|((kind, id, state), _)| match (kind, id) {
+                        (k, i) if *k == thing.kind && *i == thing.id => format!("`{}`", state),
+                        (k, i) => format!("{} `{}`'s `{}`", k.type_name(), i, state),
+                    })
+                    .collect();
+                let why = match namers.as_slice() {
+                    [] => "no `becomes:`, `after:`, `at:` or script names it".to_string(),
+                    [one] => format!("only {} names it, and that's never reached either", one),
+                    many => format!("only {} name it, and those are never reached either", many.join(", ")),
+                };
+                let mut actions: Vec<&str> = match layer.metadata.get("actions") {
+                    Some(serde_yaml::Value::Mapping(m)) => m.keys().filter_map(|k| k.as_str()).collect(),
+                    _ => Vec::new(),
+                };
+                actions.sort();
+                let then = match actions.as_slice() {
+                    [] => "so it never applies".to_string(),
+                    [one] => format!("so its action ({}) can't run", one),
+                    many => format!("so its actions ({}) can't run", many.join(", ")),
+                };
+                out.push(format!(
+                    "{}: {} `{}` never becomes `{}`: {}, and {}, {}",
+                    layer.path.display(),
+                    thing.kind.type_name(),
+                    thing.id,
+                    name,
+                    start,
+                    why,
+                    then
+                ));
+            }
+        }
+        out
+    }
+
+    /// Every state a layer can switch something into: a `becomes:` map of
+    /// thing to state (`this` is `owner`) in its frontmatter or a
+    /// section's block, and `after:`'s and `at:`'s `becomes:` naming
+    /// `owner`'s own state.
+    fn named_states(&self, layer: &Layer, owner: Option<(EntityKind, &str)>, into: &mut BTreeSet<(EntityKind, String, String)>) {
+        fn walk(engine: &WorldEngine, value: &serde_yaml::Value, owner: Option<(EntityKind, &str)>, into: &mut BTreeSet<(EntityKind, String, String)>) {
+            match value {
+                serde_yaml::Value::Mapping(map) => {
+                    for (k, v) in map {
+                        if k.as_str() != Some("becomes") {
+                            walk(engine, v, owner, into);
+                            continue;
+                        }
+                        match v {
+                            serde_yaml::Value::String(state) => {
+                                if let Some((kind, id)) = owner {
+                                    into.insert((kind, id.to_string(), state.trim().to_string()));
+                                }
+                            }
+                            serde_yaml::Value::Mapping(pairs) => {
+                                for (target, state) in pairs {
+                                    let (Some(target), Some(state)) = (target.as_str(), state.as_str()) else { continue };
+                                    let found = match (target, owner) {
+                                        ("this", Some((kind, id))) => Some((kind, id.to_string())),
+                                        ("this", None) => None,
+                                        _ => engine.thing_by_id(&engine.resolve_name(target, None)).ok().map(|t| (t.kind, t.id.clone())),
+                                    };
+                                    if let Some((kind, id)) = found {
+                                        into.insert((kind, id, state.trim().to_string()));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                serde_yaml::Value::Sequence(items) => items.iter().for_each(|v| walk(engine, v, owner, into)),
+                _ => {}
+            }
+        }
+        walk(self, &serde_yaml::Value::Mapping(layer.metadata.clone()), owner, into);
+        for section in &layer.sections {
+            self.named_states(&section.layer, owner, into);
+        }
+    }
+
     /// A world alias that can't work (REQ-ENG-51): one that's a direction,
     /// a direction's shorthand or a built-in verb, which are read first, or
     /// one whose verb nothing in the world knows.
@@ -1515,6 +1675,7 @@ impl WorldEngine {
         warnings.extend(self.play_text_warnings.iter().cloned());
         warnings.extend(self.door_warnings());
         warnings.extend(self.reserved_state_warnings());
+        warnings.extend(self.unreached_state_warnings());
         warnings.extend(self.verb_alias_warnings());
         warnings.extend(self.clock_warnings());
         warnings.extend(self.shared_id_warnings());
@@ -2008,6 +2169,43 @@ mod tests {
         let mut engine = WorldEngine::new();
         let report = engine.load_world(dir.path()).unwrap();
         (dir, engine, report)
+    }
+
+    #[test]
+    fn warns_about_a_state_nothing_reaches() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        // The test world's hallway: no starting state, and `peel` lives in
+        // the state nothing reaches, so `removed` isn't reached either.
+        write(d, "hallway/index.md", "---\nid: hallway\ntitle: Hallway\ntype: location\n---\nDark.\n");
+        write(d, "hallway/hanging.md", "---\ninherits: index\nactions:\n  peel: { becomes: { hallway: removed } }\n---\n");
+        write(d, "hallway/removed.md", "---\ninherits: index\n---\n");
+        // A chain from the starting state, `after:`, and a talk reply's block.
+        write(d, "objects/bread/index.md", "---\nid: bread\ntitle: Bread\ntype: object\nobject_type: x\nstate: fresh\n---\n");
+        write(d, "objects/bread/fresh.md", "---\ninherits: index\nafter: { turns: 3, becomes: stale }\n---\n");
+        write(d, "objects/bread/stale.md", "---\ninherits: index\nactions:\n  toast: { becomes: { this: toasted } }\n---\n");
+        write(d, "objects/bread/toasted.md", "---\ninherits: index\n---\n");
+        write(d, "objects/bread/mouldy.md", "---\ninherits: index\n---\n");
+        write(d, "objects/bell/index.md", "---\nid: bell\ntitle: Bell\ntype: object\nobject_type: x\n---\nA bell.\n\n## When: #ring\n```thwarter\nbecomes: { this: ringing }\n```\nDong.\n");
+        write(d, "objects/bell/ringing.md", "---\ninherits: index\n---\n");
+        // A script naming a state reaches it; a thing with its own script is skipped.
+        write(d, "objects/lamp/index.md", "---\nid: lamp\ntitle: Lamp\ntype: object\nobject_type: x\n---\n");
+        write(d, "objects/lamp/lit.md", "---\ninherits: index\n---\n");
+        write(d, "objects/box/index.md", "---\nid: box\ntitle: Box\ntype: object\nobject_type: x\n---\n");
+        write(d, "objects/box/open.md", "---\ninherits: index\n---\n");
+        write(d, "objects/box/actions.rhai", "fn shake() { change(\"lamp\", \"lit\"); become(turn.verb); }\n");
+        let mut engine = WorldEngine::new();
+        engine.load_world(d).unwrap();
+        let warnings: Vec<String> = engine.current_warnings().into_iter().filter(|w| w.contains("never becomes")).collect();
+        let shown = |rel: &str| d.join(rel).display().to_string();
+        assert_eq!(
+            warnings,
+            [
+                format!("{}: location `hallway` never becomes `hanging`: it isn't the starting state (index.md has no `state:`), and no `becomes:`, `after:`, `at:` or script names it, so its action (peel) can't run", shown("hallway/hanging.md")),
+                format!("{}: location `hallway` never becomes `removed`: it isn't the starting state (index.md has no `state:`), and only `hanging` names it, and that's never reached either, so it never applies", shown("hallway/removed.md")),
+                format!("{}: object `bread` never becomes `mouldy`: it isn't the starting state, and no `becomes:`, `after:`, `at:` or script names it, so it never applies", shown("objects/bread/mouldy.md")),
+            ]
+        );
     }
 
     #[test]

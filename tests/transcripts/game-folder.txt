@@ -11,6 +11,8 @@ Brass Lantern (object)
 Made the unlit state; it's where the thing starts.
 > /state lit
 Made the lit state.
+This adds 1 problem(s):
+  tests/worlds/tiny/objects/lantern/lit.md: object `lantern` never becomes `lit`: it isn't the starting state, and no `becomes:`, `after:`, `at:` or script names it, so it never applies
 > go /game
 No game is running. /play starts one, or /play here from a room.
 > /play

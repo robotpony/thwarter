@@ -40,6 +40,15 @@ isn't part of the world as loaded	src/engines/world_engine.rs: a validation mess
 {}: `[verbs] {}` is a direction, which is read first, so the alias never applies	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
 {}: `[verbs] {}` is a built-in verb, which is read first, so the alias never applies	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
 {}: `[verbs] {} = "{}"`: nothing in the world answers to `{}`	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+it isn't the starting state	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+it isn't the starting state (index.md has no `state:`)	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+no `becomes:`, `after:`, `at:` or script names it	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+only {} names it, and that's never reached either	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+only {} name it, and those are never reached either	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+so it never applies	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+so its action ({}) can't run	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+so its actions ({}) can't run	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
+{}: {} `{}` never becomes `{}`: {}, and {}, {}	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
 object `{}`: `holds:` is empty; say how it holds things, like `holds: in`	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
 door `{}`: `holds:` is empty; say how it holds things, like `holds: in`	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
 `{}` matches more than one file: {}	src/engines/world_engine.rs: a validation message or part of one; tooling, Phase 11
