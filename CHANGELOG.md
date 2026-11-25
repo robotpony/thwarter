@@ -72,6 +72,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.79.1 (2026-11-24)
+
+### Changed
+
+- `thwart edit` and `thwart play` open the world picker when no world is given and none is found (REQ-CON-62, REQ-CLI-21), through `console::run_or_pick`. Play still looks up an installed `persona/world` by name first. Without a terminal, both print the list of worlds and stop, as before.
+
 ## 0.79.0 (2026-11-24)
 
 ### Added

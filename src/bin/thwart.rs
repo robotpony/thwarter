@@ -154,13 +154,16 @@ fn main() -> ExitCode {
     };
 
     let result = match cli.command {
-        Commands::Edit { world_dir } => world(world_dir).and_then(|path| thwarter::console::run(std::path::Path::new(&path), thwarter::console::Mode::Edit)),
+        // With no world found, edit and play offer a picker (REQ-CON-62).
+        Commands::Edit { world_dir } => {
+            let named = world_dir.or_else(|| cli.world.clone());
+            thwarter::console::run_or_pick(thwarter::worlds::resolve_world(named.as_deref(), &here), thwarter::console::Mode::Edit)
+        }
         Commands::Play { world_dir } => (|| {
             // An installed world by name (`persona/world`) is looked up
             // before the folder search.
-            let path = match world_dir.or_else(|| cli.world.clone()) {
-                Some(named) => named,
-                None => world(None)?,
+            let Some(path) = world_dir.or_else(|| cli.world.clone()) else {
+                return thwarter::console::run_or_pick(thwarter::worlds::resolve_world(None, &here), thwarter::console::Mode::Play);
             };
             // An installed world by name, when there's no such folder here.
             let path = match thwarter::settings::data_dir() {
@@ -169,7 +172,7 @@ fn main() -> ExitCode {
                 }
                 _ => std::path::PathBuf::from(&path),
             };
-            thwarter::console::run(&path, thwarter::console::Mode::Play)
+            thwarter::console::run_or_pick(Ok(path), thwarter::console::Mode::Play)
         })(),
         Commands::Package { world_dir, output, strip_comments, yes } => {
             world(world_dir).and_then(|path| thwarter::cli::commands::package_command(path, output, strip_comments, yes))
