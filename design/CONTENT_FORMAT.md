@@ -144,7 +144,7 @@ Puts a thing in a room and opens its card to write.
 
 ## How play words a room: `[play]` in `world.toml`
 
-Play writes rooms and the inventory as plain sentences, each from a template in `world.toml`'s `[play]` table (REQ-ENG-43). A world MAY change any of them; the test world's `world.toml` lists every key at its default, as the reference.
+Play writes rooms and the inventory as plain sentences, each from a template in `world.toml`'s `[play]` table (REQ-ENG-43). A world MAY change any of them. The full list, with each default, is `src/builtins/text/play.toml`; copy a line from there into a world's `[play]` to reword it.
 
 | Key | Default | Used for |
 |---|---|---|
@@ -155,6 +155,8 @@ Play writes rooms and the inventory as plain sentences, each from a template in 
 | `exits` | `You can go {or}.` | The ways out |
 | `door_exit` | `{direction} through {door}` | One way out through a door: "down through an iron door" |
 | `no_exits` | `There's no way out.` | A room with no exits |
+| `see_through` | `Through the {door} you can see the {room}.` | A door you can see through |
+| `no_description` | `(no description yet)` | A room with no prose |
 | `inventory`, `empty_inventory` | `You have {list}.`, `You aren't carrying anything.` | The inventory |
 | `serial_comma` | `true` | "a, b, and c" rather than "a, b and c" |
 
