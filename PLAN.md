@@ -142,21 +142,9 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 
 ## Phase 8 · Text as data
 
-Every sentence the engine, play and the console write comes from a text table with compiled-in defaults, the same shape everywhere (Bruce, 2026-11-24). Started 2026-11-24, at Bruce's go. Done when no user-facing string is left in the source outside the defaults files and a test keeps it that way.
+Every sentence the engine, play and the console write comes from a text table with compiled-in defaults, the same shape everywhere (Bruce, 2026-11-24). Started 2026-11-24, at Bruce's go; done 2026-11-25. Done when no user-facing string is left in the source outside the defaults files and a test keeps it that way.
 
-- [x] One `Texts` type for `[play]`, `[engine]` and `[console]` tables, defaults from `src/builtins/text/` [coder] (`design/ENGINE_TEXT.md` › The shape)
-- [x] Engine and play strings become `[engine]` keys, the default text unchanged [coder]
-- [x] Console strings become `[console]` keys, the default text unchanged [console]
-- [x] A test that fails on a new user-facing string outside the defaults: a heuristic scan with an allowlist [coder, console] (`design/ENGINE_TEXT.md` › The guard test)
-- [x] Overrides: `world.toml`'s `[play]` and `[engine]` over the defaults, with validate's warning for an unknown key [coder]
-- [x] Overrides: the personal config's `[console]` over the defaults, with a warning for an unknown key [console]
-- [x] Story overrides: a `## When:` section replaces an `[engine]` reply by exact outcome tag, reserved outcome names, `{{ turn.x }}` slots [coder] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies)
-- [x] A console reply carries its kind (saved, refused, usage), so a reworded reply keeps its colour in `theme.rs` and `/recipe` in `states.rs` still sees a failed step; today both match the reply's text [console] (`design/ENGINE_TEXT.md` › The shape)
-- [x] The built-up `/new` and `/add` replies in `author.rs` become one whole `[console]` reply per case, and the `/help` rows move to `[console]` [console] (`design/ENGINE_TEXT.md` › Story overrides of built-in replies, "Whole replies only")
-- [x] The guard test widened to any literal with words and a space, file templates exempt by call site, and the ~90 console labels, views and short replies it then finds moved to `[console]`; after the world picker (Bruce, 2026-11-24) [console, coder] (`design/ENGINE_TEXT.md` › The guard test)
-- [x] Edit mode's room view reads as play's plus its title line; ids, targets and door states go to the console as a `LocationView` [coder] (`design/ENGINE_TEXT.md` › Where tables live)
-- [x] The sidebar shows the current room's ids, exits and doors, and `/inspect <thing>` shows one in full (0.65.0) [console] (`design/CONSOLE_REQUIREMENTS.md`)
-- [x] Edit mode's room view drops its title line (f17588d, 0.66.2); `show_room_names` decides in both modes, and the room's title and id show in the sidebar [coder, console] (`design/ENGINE_TEXT.md` › Where tables live)
+- [x] Done (squashed): 13 items, from the shared `Texts` type to the widened guard test, 2026-11-24 to 25; the full list is `git show 60c6e88:PLAN.md`. Thing-kind labels and tooling text went to Phase 11 (Bruce, 2026-11-25).
 
 ## Phase 9 · Writing helpers
 
@@ -187,6 +175,7 @@ Built when authoring or play asks for them, most likely as console commands. Unt
 - [ ] `CharacterEngine` wired into `show` and `validate --strict` [coder] (`design/ARCHITECTURE.md` › Character Engine)
 - [ ] Read `thwart.toml` through `ConfigManager` [coder] (REQ-CFG-1)
 - [ ] Validation warnings, author notes and `thwart` command-line output move to text tables (Bruce, 2026-11-24) [coder] (`design/ENGINE_TEXT.md` › Settled questions)
+- [ ] The console's thing-kind labels ("world settings", "chapter overlay" and the rest in `world.rs`) move to `[console]`; they double as words authors type (`/edit room`), so this needs a text-aware label at six call sites (Bruce, 2026-11-25) [console] (`design/ENGINE_TEXT.md` › Settled questions)
 - [x] `validate` checks a location's `id` against its file path [coder] (`design/CONTENT_FORMAT.md` › What's still open)
 - [x] Minimal CI: `cargo build` and `cargo test` on push [coder] (`TESTING.md` › CI)
 

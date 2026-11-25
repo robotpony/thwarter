@@ -2,7 +2,7 @@
 
 Every sentence thwarter writes, in play or in the console, MUST come from a text table, not from a string in the Rust source (Bruce, 2026-11-24). The defaults are compiled in, and the same shape of table is used everywhere, so the engine, play and the console each override their text the same way (Bruce: "console messages should be configurable too, even if text is compiled in. the same shape of config should be used everywhere, if possible").
 
-Owner: commander (design). The coder builds the shared type and the engine's tables; the console coder moves the console's text. Status: agreed; Bruce said go on 2026-11-24. Planned as `PLAN.md` › Phase 8.
+Owner: commander (design). The coder builds the shared type and the engine's tables; the console coder moves the console's text. Status: built in Phase 8, 2026-11-24 to 25; tooling text and the thing-kind labels follow in `PLAN.md` › Phase 11.
 
 ## The shape
 
@@ -57,15 +57,17 @@ Not covered in Phase 8: author notes (`ActionResult::note`), validation warnings
 
 ## The guard test
 
-A heuristic scan with a checked-in allowlist (Bruce, 2026-11-24). It's cheap and catches most slips, and a false positive costs one allowlist line.
+A heuristic scan with a checked-in allowlist (Bruce, 2026-11-24), widened in 60c6e88 once the world picker had landed, as Bruce chose. A false positive costs one allowlist line.
 
 - **Where it looks.** String literals in `src/engines/`, `src/render.rs` and `src/console/`, outside `#[cfg(test)]` code.
-- **What it flags.** A literal that reads like a sentence: it starts with a capital letter, holds a space, and ends with `.`, `?`, `!` or `:`, with its `{placeholders}` set aside.
+- **What it flags.** Any literal holding two or more words of letters once its `{placeholders}` are set aside, whatever its case or punctuation, so labels ("Story values"), key hints and short replies ("Bye.") count as text.
+- **Not text.** A file template starting `---` and a newline; a command line (a literal starting `/` and a letter that doesn't end like a sentence); a literal after a `// text-guard: not text` comment; and `unimplemented!` and `todo!` panics.
 - **The allowlist.** `tests/text_allowlist.txt`, one literal per line, each with a comment saying why it's exempt (a log line, a format spec). The test also fails on an allowlist line that matches no literal any more, so the list doesn't rot.
 - **Exempt by call site.** Author notes, validation warnings and `thwart` command-line output, while they stay in code (› Not covered, above). They're exempted by file or by the function they're passed to, not one by one.
-- **Who builds it.** The coder writes the test and the engine's allowlist entries. It covers `src/console/` once the console coder has moved the console's strings and added its entries, so it doesn't fail while the move is under way.
+- **Who keeps it.** The test is `tests/text_guard.rs` (REQ-ENG-58). Each lane adds its own allowlist entries, and a change to the rule comes with the string moves it needs in the same commit, so the tree never fails on it.
 
 ## Settled questions
 
 1. Validation warnings and `thwart` command-line output don't move to tables in Phase 8. They're a later item in `PLAN.md` › Phase 11 (Bruce, 2026-11-24).
 2. A chapter doesn't override an `[engine]` key outside a `## When:` section. It rewords a built-in reply with a `## When: #outcome` section, as a thing or a room does, so there's one way to do it (Bruce, 2026-11-24).
+3. The thing-kind labels in `world.rs` stay in code for now, allowlisted, since they're also words authors type; they're a Phase 11 item (Bruce, 2026-11-25).
