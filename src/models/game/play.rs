@@ -47,6 +47,18 @@ pub struct PlayState {
     /// The last action read as a command, for `again` (REQ-PC-27).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_action: Option<PlayAction>,
+    /// The game's seed (`design/STATES.md` › Clocks): ranges and the
+    /// choice between same-headed reply sections draw from it, so a
+    /// loaded game turns out the same. A new game gets a new one.
+    #[serde(default)]
+    pub seed: u64,
+    /// The turn each thing entered its current state, by `type:id`, for
+    /// `after:`. A thing in its starting state entered it at turn 0.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub entered: BTreeMap<String, u64>,
+    /// The last turn the clocks ran for, so each `at:` fires once.
+    #[serde(default)]
+    pub clocked: u64,
     /// The last thing the player named, as typed, for `it` (REQ-PC-28).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub it: Option<String>,

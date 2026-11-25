@@ -41,7 +41,9 @@ impl GameEngine {
         if world.get_location(location).is_none() {
             bail!("can't start at `{}`: no such location", location);
         }
-        Ok(PlayState::new(location))
+        let mut state = PlayState::new(location);
+        state.seed = crate::engines::clock::new_seed();
+        Ok(state)
     }
 
     /// Apply one action. Only a success changes `state`, and its
@@ -49,10 +51,68 @@ impl GameEngine {
     pub fn act(&self, world: &WorldEngine, state: &mut PlayState, action: &PlayAction) -> ActionResult {
         // Every reply is cleaned of terminal control sequences (REQ-CFG-9):
         // built-in replies quote titles, which come from the world.
+        let before = state.turn;
         let mut result = self.act_raw(world, state, action);
+        // The clocks run after the turn's action (`design/STATES.md` › Clocks).
+        if state.turn > before {
+            result.changes.extend(self.run_clocks(world, state));
+        }
         result.text = crate::render::clean_text(&result.text);
         result.note = result.note.map(|n| crate::render::clean_text(&n));
         result
+    }
+
+    /// Every `after:` that's due and every `at:` reached since the clocks
+    /// last ran (`design/STATES.md` › Clocks): each switches its thing's
+    /// state, in a stable order, and an `after:` on the new state counts
+    /// from when the old one ran out, so a chain keeps time.
+    pub fn run_clocks(&self, world: &WorldEngine, state: &mut PlayState) -> Vec<Change> {
+        use crate::engines::clock::{after_of, at_of, When};
+        let mut changes = Vec::new();
+        let from = state.clocked;
+        let to = state.turn;
+        state.clocked = to;
+        let mut things: Vec<&crate::engines::bundles::Thing> = world.things_iter().collect();
+        things.sort_by(|a, b| (a.kind.type_name(), &a.id).cmp(&(b.kind.type_name(), &b.id)));
+        let def = world.world();
+        let game_time = def.start_time.zip(def.minutes_per_turn);
+        for thing in things {
+            let key = format!("{}:{}", thing.kind.type_name(), thing.id);
+            let switch = |state: &mut PlayState, to_state: &str, at_turn: u64, changes: &mut Vec<Change>| {
+                if state.switch_state(world, thing.kind, &thing.id, to_state).is_ok() {
+                    state.entered.insert(key.clone(), at_turn);
+                    changes.push(Change::Became { type_name: thing.kind.type_name().to_string(), id: thing.id.clone(), state: to_state.to_string() });
+                }
+            };
+            // `at:`, once for each point passed in (from, to].
+            for timed in at_of(thing).into_iter().flatten() {
+                let passed = match timed.when {
+                    When::Turn(t) => (from < t && t <= to).then_some(t),
+                    When::Time(minute) => game_time.and_then(|(start, per)| {
+                        let (a, b) = (start + per * from, start + per * to);
+                        // The first moment after `a` that is `minute` past midnight.
+                        let first = a - a % 1440 + minute;
+                        let first = if first <= a { first + 1440 } else { first };
+                        (first <= b).then(|| (first - start).div_ceil(per))
+                    }),
+                };
+                if let Some(at_turn) = passed {
+                    switch(state, &timed.becomes, at_turn, &mut changes);
+                }
+            }
+            // `after:`, following a chain at most a few steps a turn.
+            for _ in 0..8 {
+                let Some(now) = self.current_state(world, state, thing.kind, &thing.id) else { break };
+                let Some(Ok(after)) = after_of(thing, &now) else { break };
+                let entered = state.entered.get(&key).copied().unwrap_or(0);
+                let due = entered + after.when.pick(state.seed, &format!("{}:{}@{}", key, now, entered));
+                if due > to || after.becomes == now {
+                    break;
+                }
+                switch(state, &after.becomes, due, &mut changes);
+            }
+        }
+        changes
     }
 
     fn act_raw(&self, world: &WorldEngine, state: &mut PlayState, action: &PlayAction) -> ActionResult {
@@ -1398,6 +1458,9 @@ impl PlayState {
         if !thing.has_state(state) {
             bail!("{} `{}` has no state `{}`", kind.type_name(), id, state);
         }
+        if self.state_of(kind.type_name(), id).or(thing.starting_state.as_deref()) != Some(state) {
+            self.entered.insert(format!("{}:{}", kind.type_name(), id), self.turn);
+        }
         self.set_state(kind.type_name(), id, state, thing.starting_state.as_deref());
         Ok(())
     }
@@ -1448,6 +1511,11 @@ pub fn load_game(path: &Path, world: &WorldEngine) -> Result<(PlayState, Vec<Str
         bail!("{} is save format {}; this thwart reads format {}", path.display(), save.thwarter_save, SAVE_VERSION);
     }
     let mut state = save.state;
+    // A save from before clocks: they start from its turn, so an `at:`
+    // already passed doesn't fire on the first move.
+    if state.clocked == 0 {
+        state.clocked = state.turn;
+    }
     let warnings = state.reconcile(world);
     Ok((state, warnings))
 }
@@ -2118,6 +2186,71 @@ mod tests {
         assert!(r.text.starts_with("Gold."), "{}", r.text);
         game.act(&world, &mut state, &PlayAction::Go("up".into()));
         assert_eq!(state.location, "castle/hall");
+    }
+
+    #[test]
+    fn clocks_change_things_over_turns_and_at_points_and_game_time_counts() {
+        let dir = tempfile::tempdir().unwrap();
+        let w = |rel: &str, text: &str| {
+            let p = dir.path().join(rel);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, text).unwrap();
+        };
+        w("world/index.md", "---\ntype: world\ntitle: Town\nstart: market\nstart_time: \"11:50\"\nminutes_per_turn: 5\n---\n");
+        w("market/index.md", "---\nid: market\ntitle: Market\ntype: location\nobjects: [bread, bell, clock]\n---\nIt's {{ game.time }} on day {{ game.day }}.\n\n## When: @bread:stale\nSomething smells off.\n");
+        w("objects/bread/index.md", "---\nid: bread\ntitle: Bread\ntype: object\nobject_type: food\nstate: fresh\n---\n");
+        w("objects/bread/fresh.md", "---\ninherits: index\nafter: { turns: 3, becomes: stale }\n---\nWarm.\n");
+        w("objects/bread/stale.md", "---\ninherits: index\nafter: { turns: 2-4, becomes: mouldy }\n---\nHard.\n");
+        w("objects/bread/mouldy.md", "---\ninherits: index\n---\nGreen.\n");
+        w("objects/bell/index.md", "---\nid: bell\ntitle: Bell\ntype: object\nobject_type: x\nstate: still\nat: { turn: 2, becomes: ringing }\n---\n");
+        w("objects/bell/still.md", "---\ninherits: index\n---\n");
+        w("objects/bell/ringing.md", "---\ninherits: index\n---\n");
+        w("objects/clock/index.md", "---\nid: clock\ntitle: Clock\ntype: object\nobject_type: x\nstate: quiet\nat: { time: \"12:00\", becomes: chiming }\n---\n");
+        w("objects/clock/quiet.md", "---\ninherits: index\n---\n");
+        w("objects/clock/chiming.md", "---\ninherits: index\n---\n");
+        let mut world = WorldEngine::new();
+        world.load_world(dir.path()).unwrap();
+        let warnings = world.current_warnings();
+        assert!(warnings.iter().all(|w| !w.contains("after:") && !w.contains("at:")) && world.current_problems(true).is_empty(), "{:?} {:?}", warnings, world.current_problems(true));
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "market").unwrap();
+        state.seed = 42;
+        assert!(game.act(&world, &mut state, &PlayAction::Look).text.starts_with("It's 11:55 on day 1."));
+        // Turn 1 done. The bell rings at turn 2; the clock chimes at 12:00, turn 2.
+        game.act(&world, &mut state, &PlayAction::Wait);
+        assert_eq!((state.state_of("object", "bell"), state.state_of("object", "clock")), (Some("ringing"), Some("chiming")));
+        assert_eq!(state.state_of("object", "bread"), None);
+        let r = game.act(&world, &mut state, &PlayAction::Wait);
+        assert_eq!(r.changes, vec![Change::Became { type_name: "object".into(), id: "bread".into(), state: "stale".into() }]);
+        assert_eq!(state.entered["object:bread"], 3);
+        assert!(game.act(&world, &mut state, &PlayAction::Look).text.contains("Something smells off."));
+        // The range is picked from the seed, the same on a replay.
+        let mut again = game.start(&world, "market").unwrap();
+        again.seed = 42;
+        let (mut first, mut second) = (None, None);
+        for _ in 0..10 {
+            game.act(&world, &mut state, &PlayAction::Wait);
+            game.act(&world, &mut again, &PlayAction::Wait);
+            if first.is_none() && state.state_of("object", "bread") == Some("mouldy") { first = Some(state.turn); }
+            if second.is_none() && again.state_of("object", "bread") == Some("mouldy") { second = Some(again.turn); }
+        }
+        assert!(first.is_some() && first == second, "{:?} {:?}", first, second);
+        assert!((5..=7).contains(&first.unwrap()));
+        // The bell rang once.
+        assert_eq!(state.state_of("object", "bell"), Some("ringing"));
+    }
+
+    #[test]
+    fn several_sections_with_one_heading_are_picked_by_the_seed() {
+        let (dir, mut world) = world();
+        world.set_file(&dir.path().join("objects/well.md"), "---\nid: well\ntitle: Well\ntype: object\nobject_type: environmental\nweight: immovable\n---\nDeep.\n\n## When: #kick\nOw.\n\n## When: #kick\nThat hurt.\n\n## When: #kick\nYour toe throbs.\n");
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "castle/yard").unwrap();
+        state.seed = 9;
+        let kick = PlayAction::Use { verb: "kick".into(), noun: "well".into(), with: None };
+        let said: Vec<String> = (0..12).map(|_| game.act(&world, &mut state, &kick).text).collect();
+        assert!(said.iter().all(|s| ["Ow.", "That hurt.", "Your toe throbs."].contains(&s.as_str())), "{:?}", said);
+        assert!(said.iter().any(|s| *s != said[0]), "{:?}", said);
     }
 
     #[test]

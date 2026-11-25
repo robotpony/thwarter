@@ -202,6 +202,19 @@ impl GameEngine {
         tags
     }
 
+    /// `turn_tags`, plus `@thing:state` for every thing in a state, so a
+    /// heading can test another thing's state from anywhere
+    /// (`## When: @weather:rain`; `design/SECTIONS.md` › Open question 1).
+    pub fn turn_tags_in(&self, world: &WorldEngine, state: &PlayState) -> Tags {
+        let mut tags = self.turn_tags(state);
+        for thing in world.things_iter() {
+            if let Some(now) = self.current_state(world, state, thing.kind, &thing.id) {
+                tags.insert(format!("@{}:{}", thing.id, now));
+            }
+        }
+        tags
+    }
+
     /// A thing's current state in play.
     pub(crate) fn current_state(&self, world: &WorldEngine, state: &PlayState, kind: EntityKind, id: &str) -> Option<String> {
         let thing = world.thing(kind, id)?;
@@ -218,7 +231,7 @@ impl GameEngine {
     pub(crate) fn describe(&self, world: &WorldEngine, state: &PlayState, kind: EntityKind, id: &str, base: &str) -> String {
         let Some(thing) = world.thing(kind, id) else { return base.to_string() };
         let current = self.current_state(world, state, kind, id);
-        let mut tags = self.turn_tags(state);
+        let mut tags = self.turn_tags_in(world, state);
         if let Some(s) = &current {
             tags.insert(format!("#{}", s));
         }
@@ -274,7 +287,7 @@ impl GameEngine {
     ) -> Vec<Reply> {
         let action = format!("#{}", verb.trim().to_lowercase().replace(' ', "-"));
         let outcome_tag = format!("#{}", outcome.0);
-        let mut tags = self.turn_tags(state);
+        let mut tags = self.turn_tags_in(world, state);
         tags.insert(action.clone());
         tags.insert(format!("@{}", target.1));
         tags.extend(extra.iter().cloned());
@@ -348,10 +361,19 @@ impl GameEngine {
             // A thing's own reply replaces its template's for the same
             // action and outcome.
             let own_keys: Vec<Vec<String>> = matched.iter().filter(|m| m.1).map(|m| m.0.clone()).collect();
-            for (key, own, text, block, path) in matched {
-                if !own && own_keys.contains(&key) {
+            let matched: Vec<_> = matched.into_iter().filter(|m| m.1 || !own_keys.contains(&m.0)).collect();
+            // Several sections with the same heading are one reply's
+            // wordings: the game's seed picks one each turn
+            // (`design/STATES.md` › Clocks).
+            let mut done: Vec<&Vec<String>> = Vec::new();
+            for (key, ..) in &matched {
+                if done.contains(&key) {
                     continue;
                 }
+                done.push(key);
+                let same: Vec<&(Vec<String>, bool, String, serde_yaml::Mapping, std::path::PathBuf)> = matched.iter().filter(|m| &m.0 == key).collect();
+                let salt = format!("{}#{}@{}", id, key.join(" "), state.turn);
+                let (_, _, text, block, path) = same[crate::engines::clock::draw(state.seed, &salt, same.len() as u64) as usize].clone();
                 out.push(Reply { kind, id: id.to_string(), text, block, path });
             }
         }
@@ -376,7 +398,7 @@ impl GameEngine {
         let (outcome, chain) = outcome_of(key)?;
         let mut want: Vec<&str> = outcome.clone();
         want.sort();
-        let mut tags = self.turn_tags(state);
+        let mut tags = self.turn_tags_in(world, state);
         if let Some((_, id)) = about {
             tags.insert(format!("@{}", id));
         }
@@ -440,7 +462,7 @@ impl GameEngine {
     /// The room's `## When: #searched` section, if it has one that matches.
     pub(crate) fn searched(&self, world: &WorldEngine, state: &PlayState) -> Option<String> {
         let thing = world.thing(EntityKind::Location, &state.location)?;
-        let mut tags = self.turn_tags(state);
+        let mut tags = self.turn_tags_in(world, state);
         if let Some(s) = self.current_state(world, state, EntityKind::Location, &state.location) {
             tags.insert(format!("#{}", s));
         }

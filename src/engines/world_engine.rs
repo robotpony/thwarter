@@ -836,6 +836,42 @@ impl WorldEngine {
     /// A state named like a reserved tag (`#nothing`, `#immovable`): a
     /// `## When:` section naming it would reword a built-in reply, not
     /// match the state (`design/ENGINE_TEXT.md` › Story overrides).
+    /// An `after:` or `at:` that can't work: one that doesn't read, names a
+    /// state the thing doesn't have, or (`at: { time: }`) needs game time
+    /// the world doesn't set (`design/STATES.md` › Clocks).
+    fn clock_warnings(&self) -> Vec<String> {
+        use crate::engines::clock::{after_of, at_of, When};
+        let mut things: Vec<&Thing> = self.things.values().collect();
+        things.sort_by(|a, b| a.index.path.cmp(&b.index.path));
+        let mut warnings = Vec::new();
+        let timed = self.world().start_time.is_some();
+        for thing in things {
+            let mut names: Vec<&String> = thing.states.keys().chain(thing.template_states.keys()).collect();
+            names.sort();
+            names.dedup();
+            for name in names {
+                match after_of(thing, name) {
+                    Some(Ok(after)) if !thing.has_state(&after.becomes) => {
+                        warnings.push(format!("{} `{}`: state `{}`'s `after:` becomes `{}`, which isn't one of its states", thing.kind.type_name(), thing.id, name, after.becomes))
+                    }
+                    Some(Err(e)) => warnings.push(e),
+                    _ => {}
+                }
+            }
+            for at in at_of(thing) {
+                match at {
+                    Ok(at) if !thing.has_state(&at.becomes) => warnings.push(format!("{} `{}`: `at:` becomes `{}`, which isn't one of its states", thing.kind.type_name(), thing.id, at.becomes)),
+                    Ok(at) if matches!(at.when, When::Time(_)) && !timed => {
+                        warnings.push(format!("{} `{}`: `at: {{ time: }}` needs game time; set `start_time:` and `minutes_per_turn:` in world/index.md", thing.kind.type_name(), thing.id))
+                    }
+                    Err(e) => warnings.push(e),
+                    _ => {}
+                }
+            }
+        }
+        warnings
+    }
+
     fn reserved_state_warnings(&self) -> Vec<String> {
         let mut things: Vec<&Thing> = self.things.values().collect();
         things.sort_by(|a, b| a.index.path.cmp(&b.index.path));
@@ -1480,6 +1516,7 @@ impl WorldEngine {
         warnings.extend(self.door_warnings());
         warnings.extend(self.reserved_state_warnings());
         warnings.extend(self.verb_alias_warnings());
+        warnings.extend(self.clock_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }

@@ -28,6 +28,10 @@ pub struct WorldDef {
     /// `story.` values, declared with their starting values.
     pub story: BTreeMap<String, String>,
     pub player: Option<PlayerDef>,
+    /// Game time (`design/STATES.md` › Clocks): `start_time: "08:00"` as
+    /// minutes past midnight, and `minutes_per_turn`. Both, or no time.
+    pub start_time: Option<u64>,
+    pub minutes_per_turn: Option<u64>,
 }
 
 /// The player, from `world/player.md`.
@@ -142,7 +146,7 @@ fn check_keys(layer: &Layer, expected_type: &str, allowed: &[&str], problems: &m
 
 impl WorldDef {
     pub(crate) fn read_index(&mut self, layer: &Layer, problems: &mut Vec<String>, warnings: &mut Vec<String>) {
-        if !check_keys(layer, "world", &["type", "title", "authors", "author", "version", "start"], problems, warnings) {
+        if !check_keys(layer, "world", &["type", "title", "authors", "author", "version", "start", "start_time", "minutes_per_turn"], problems, warnings) {
             return;
         }
         let text = |key: &str| layer.metadata.get(key).and_then(value_text);
@@ -168,6 +172,21 @@ impl WorldDef {
         self.start = layer.metadata.get("start").and_then(crate::parsers::id_value);
         self.intro = layer.body.clone();
         self.source = Some(layer.path.clone());
+        let start_time = text("start_time");
+        let per_turn = layer.metadata.get("minutes_per_turn");
+        self.start_time = start_time.as_deref().and_then(crate::engines::clock::minutes_of);
+        self.minutes_per_turn = per_turn.and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.trim().parse().ok()))).filter(|n| *n > 0);
+        if start_time.is_some() && self.start_time.is_none() {
+            problems.push(format!("{}: `start_time:` is a time of day, like \"08:00\"", shown));
+        }
+        if per_turn.is_some() && self.minutes_per_turn.is_none() {
+            problems.push(format!("{}: `minutes_per_turn:` is a whole number of minutes, like 5", shown));
+        }
+        if self.start_time.is_some() != self.minutes_per_turn.is_some() {
+            warnings.push(format!("{}: game time needs both `start_time:` and `minutes_per_turn:`, so there's none", shown));
+            self.start_time = None;
+            self.minutes_per_turn = None;
+        }
     }
 
     fn set_authors(&mut self, ids: Vec<String>) {

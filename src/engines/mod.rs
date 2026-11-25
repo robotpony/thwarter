@@ -19,6 +19,7 @@ pub mod texts;
 pub mod scripts;
 pub mod questions;
 pub mod verbs;
+pub mod clock;
 
 pub use world_engine::*;
 pub use location_view::*;

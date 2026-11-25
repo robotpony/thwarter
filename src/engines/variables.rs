@@ -139,6 +139,13 @@ impl WorldEngine {
         match level {
             "game" => match key {
                 "turn" => Some(play.map_or(0, |p| p.turn).to_string()),
+                // Game time, when the world sets it (`design/STATES.md` › Clocks).
+                "time" | "day" => {
+                    let def = self.world();
+                    let (start, per) = (def.start_time?, def.minutes_per_turn?);
+                    let (clock, day) = crate::engines::clock::game_time(start, per, play.map_or(0, |p| p.turn));
+                    Some(if key == "time" { clock } else { day.to_string() })
+                }
                 "score" => Some(set("game.score".into()).unwrap_or_else(|| "0".into())),
                 _ => None,
             },

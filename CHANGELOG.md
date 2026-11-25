@@ -4,6 +4,23 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.93.0 (2026-11-25)
+
+### Added
+
+- Clocks (`design/STATES.md` › Clocks), all but weather in `world/`:
+  - A state's `after: { turns: 20, becomes: stale }` switches its thing that many turns after it entered the state, counted per thing; a range (`turns: 15-25`) picks its point from the game's seed. A chain keeps time: the next state counts from when the last ran out.
+  - A thing's `at: { turn: 50, becomes: ringing }` switches it once when the game reaches that turn, whatever state it's in; `at: { time: "12:00", ... }` does it at that time each day when the world has game time. One map or a list.
+  - The clocks run after each turn's action, and their changes are in `ActionResult::changes`.
+- A seed per game (`PlayState::seed`), new for each game `GameEngine::start` makes. Several `## When:` sections in one thing with the same heading are one reply's wordings, and the seed picks one each turn, so "Ow." doesn't repeat word for word. `[engine]` lists still pick `turn % len`.
+- Game time: `start_time: "08:00"` and `minutes_per_turn: 5` in `world/index.md` give `{{ game.time }}` ("08:05") and `{{ game.day }}` (from 1). Without both, there's no game time.
+- `@thing:state` in a heading holds while that thing is in that state, from any thing or room: `## When: @weather:rain`, `## When: @window:broken`.
+- `validate` warns about an `after:` or `at:` that doesn't read, names a state the thing doesn't have, or wants game time the world doesn't set.
+
+### Changed
+
+- Saves keep the seed, each thing's entry turn (`PlayState::entered`) and the last turn the clocks ran (`clocked`). An older save loads with clocks starting from its own turn.
+
 ## 0.92.0 (2026-11-25)
 
 ### Added
