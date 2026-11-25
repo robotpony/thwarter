@@ -7,7 +7,7 @@ Shown in chapter: {}	src/render.rs: `thwart show <thing> --chapter`; command-lin
 
 # Found by the wider guard (two words or more), 2026-11-24. Engine and render; the coder's.
 `{}` is a reserved name and can't be a state of {}/	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
-a bundle is a leaf: {}/ may hold only its state files and one `chapters/` folder	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
+a bundle is a leaf: {}/ may hold only its state files, one `chapters/` folder, and its own things in `objects/`, `npcs/` and `doors/`	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
 `{}` is a reserved name here	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
 a state file	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11
 ; overlays are named without the chapter's number (`{}.md`)	src/engines/bundles.rs: a load or validation problem, built in a helper; tooling, Phase 11

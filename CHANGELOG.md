@@ -4,6 +4,12 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.91.0 (2026-11-25)
+
+### Added
+
+- A room's bundle may hold its own things in `objects/`, `npcs/` and `doors/` (`castle/hall/objects/torch.md`), loaded as things in their own right, bundles included, as an area's folders are (`design/STATES.md` › Scope, REQ-CON-28). Anything else in a bundle is still refused.
+
 ## 0.90.0 (2026-11-25)
 
 ### Added

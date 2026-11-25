@@ -330,14 +330,26 @@ fn excluded(parts: &[String]) -> bool {
         || parts[..parts.len().saturating_sub(1)].iter().any(|p| p == "templates" || p == "questions")
 }
 
+/// The folders in a bundle that hold its own things (`design/STATES.md` ›
+/// Scope): `castle/hall/objects/torch.md` is a torch of the hall's.
+const LOCAL_FOLDERS: &[&str] = &["objects", "npcs", "doors"];
+
 fn classify(rel: &Path, bundles: &BTreeSet<PathBuf>) -> Role {
     let parts = names(rel);
     if excluded(&parts) {
         return Role::Excluded;
     }
     // The outermost bundle holding the file: a nested index.md is then
-    // just a file in a subfolder of a bundle, which is refused.
-    if let Some(bundle) = bundles.iter().find(|b| rel.starts_with(b) && rel != b.as_path()) {
+    // just a file in a subfolder of a bundle, which is refused. A room's
+    // own things sit in its bundle's `objects/`, `npcs/` and `doors/`
+    // (`design/STATES.md` › Scope): those are things in their own right,
+    // as in an area's folders, so the file belongs to a bundle further in,
+    // or to none.
+    let holding = bundles.iter().filter(|b| rel.starts_with(b) && rel != b.as_path()).find(|b| {
+        let inner = names(rel.strip_prefix(b).unwrap());
+        !(inner.len() > 1 && LOCAL_FOLDERS.contains(&inner[0].as_str()))
+    });
+    if let Some(bundle) = holding {
         let inner = names(rel.strip_prefix(bundle).unwrap());
         return match inner.as_slice() {
             [file] if file == "index.md" => Role::Entity { bundle: Some(bundle.clone()) },
@@ -351,7 +363,7 @@ fn classify(rel: &Path, bundles: &BTreeSet<PathBuf>) -> Role {
             }
             [dir, rest @ ..] if dir == "chapters" => Role::InChapters { scope: bundle.clone(), parts: rest.to_vec() },
             _ => Role::Invalid(format!(
-                "a bundle is a leaf: {}/ may hold only its state files and one `chapters/` folder",
+                "a bundle is a leaf: {}/ may hold only its state files, one `chapters/` folder, and its own things in `objects/`, `npcs/` and `doors/`",
                 bundle.display()
             )),
         };
@@ -1033,6 +1045,30 @@ fn dedup(items: &mut Vec<String>) {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_rooms_bundle_holds_its_own_things_as_things() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        let w = |rel: &str, text: &str| {
+            let p = d.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        };
+        w("village/square/index.md", "---\nid: village/square\ntitle: Square\ntype: location\nstate: day\nobjects: [torch, chest]\ncharacters: [crier]\n---\n");
+        w("village/square/day.md", "---\ninherits: index\n---\nSunny.\n");
+        w("village/square/objects/torch.md", "---\nid: torch\ntitle: Torch\ntype: object\nobject_type: light\n---\n");
+        w("village/square/objects/chest/index.md", "---\nid: chest\ntitle: Chest\ntype: object\nobject_type: container\nstate: shut\n---\n");
+        w("village/square/objects/chest/shut.md", "---\ninherits: index\n---\nShut.\n");
+        w("village/square/npcs/crier.md", "---\nid: crier\ntitle: Crier\ntype: character\n---\n");
+        let mut engine = crate::engines::WorldEngine::new();
+        engine.load_world(d).unwrap();
+        assert!(engine.current_problems(true).is_empty(), "{:?}", engine.current_problems(true));
+        assert!(engine.objects.contains_key("torch") && engine.characters.contains_key("crier"));
+        assert_eq!(engine.thing(crate::engines::EntityKind::Object, "chest").unwrap().state_names(), ["shut"]);
+        assert_eq!(engine.thing(crate::engines::EntityKind::Location, "village/square").unwrap().state_names(), ["day"]);
+    }
+
     use crate::engines::{EntityKind, WorldEngine};
     use crate::parsers::ParsedEntity;
     use std::path::Path;
