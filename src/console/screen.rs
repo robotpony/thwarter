@@ -827,11 +827,14 @@ fn wrap_row(row: &Row, width: usize) -> Vec<Row> {
         Row::Heading(t) => (t, Row::Heading),
         Row::Text(t) => (t, Row::Text),
         Row::Dim(t) => (t, Row::Dim),
-        Row::Missing(t) => (t, Row::Missing),
         Row::Warning(t) => (t, Row::Warning),
         Row::Error(t) => (t, Row::Error),
         // A map row keeps its shape: cut at the edge, never wrapped.
         Row::Map(t) => return vec![Row::Map(t.chars().take(width).collect())],
+        Row::Exit(t, missing) => {
+            let cut = if t.chars().count() > width { format!("{}…", t.chars().take(width.saturating_sub(1)).collect::<String>()) } else { t.clone() };
+            return vec![Row::Exit(cut, *missing)];
+        }
         Row::Blank => return vec![Row::Blank],
     };
     // The first row as it is; the rest indented two more, so they're
@@ -856,10 +859,11 @@ fn row_line(row: &Row) -> Line<'static> {
         Row::Heading(text) => styled(text, Role::Heading),
         Row::Text(text) => Line::from(code_spans(&format!(" {}", text), Style::default())),
         Row::Dim(text) => styled(text, Role::Note),
-        Row::Missing(text) => styled(text, Role::Missing),
         Row::Warning(text) => styled(text, Role::Warning),
         Row::Error(text) => styled(text, Role::Error),
         Row::Map(text) => styled(text, Role::Link),
+        Row::Exit(text, true) => styled(text, Role::Missing),
+        Row::Exit(text, false) => Line::from(format!(" {}", text)),
         Row::Blank => Line::from(""),
     }
 }

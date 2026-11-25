@@ -67,6 +67,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.73.1 (2026-11-24)
+
+### Changed
+
+- The sidebar's exits are one per line with an arrow to a common column (`east -----> bedroom    closed door`), so a direction, its room and a door no longer run together (Bruce). A door shows only when it's in the way; its name and id are `/inspect`'s. A line too long for the sidebar is cut with an ellipsis.
+
+### Added
+
+- `/inspect <direction>`: the exit from here, where it goes, and its door in full.
+
 ## 0.73.0 (2026-11-24)
 
 ### Added

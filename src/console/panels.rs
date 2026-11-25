@@ -14,13 +14,14 @@ pub enum Row {
     Text(String),
     /// Something to notice but not act on, such as no game yet.
     Dim(String),
-    /// Something not written yet: an exit's room, a thing's card.
-    Missing(String),
     Warning(String),
     Error(String),
     /// A row of the map, drawn as it is: cut at the sidebar's edge, never
     /// wrapped.
     Map(String),
+    /// An exit: one line, cut with an ellipsis at the edge, never wrapped
+    /// (Bruce, 2026-11-24). `true` when its room isn't written yet.
+    Exit(String, bool),
     Blank,
 }
 
@@ -284,6 +285,17 @@ impl Console {
     /// A room as a game master's notes: its exits and where they lead,
     /// its people, things and scenery by id, held things under their
     /// holders, and its warnings. HERE shows it for edit mode's room, and
+    /// A door's state when it's in the way (closed, locked), in the game
+    /// if one is running, else where it starts. An open door is no note.
+    fn door_in_the_way(&self, id: &str) -> Option<String> {
+        let state = self
+            .game
+            .as_ref()
+            .and_then(|g| g.states.values().find_map(|m| m.get(id)).cloned())
+            .or_else(|| self.world.engine.thing(crate::engines::EntityKind::Door, id).and_then(|t| t.starting_state.clone()))?;
+        (!matches!(state.as_str(), "open" | "opened" | "ajar")).then_some(state)
+    }
+
     /// ROOM for the player's, so play's own text can stay plain.
     fn room_rows(&self, room: &str) -> Vec<Row> {
         let mut rows = Vec::new();
@@ -296,27 +308,31 @@ impl Console {
         }
         let mut exits: Vec<(&String, &String)> = location.connections.iter().collect();
         exits.sort();
-        for (direction, to) in exits {
-            // Through a door: the room beyond, and the door by name.
-            // Through a door: its title, its id, and the state it's in, in
-            // the game if one is running, else where it starts.
-            let (room, through) = match self.world.engine.doors.get(to) {
-                Some(door) => {
-                    let state = self
-                        .game
-                        .as_ref()
-                        .and_then(|g| g.states.values().find_map(|m| m.get(to)).cloned())
-                        .or_else(|| self.world.engine.thing(crate::engines::EntityKind::Door, to).and_then(|t| t.starting_state.clone()));
-                    let state = state.map(|s| format!(", {}", s)).unwrap_or_default();
-                    (door.leads_to(&location.id).unwrap_or("?").to_string(), format!("  through {} (`{}`){}", door.title, to, state))
-                }
-                None => (to.clone(), String::new()),
-            };
-            if self.world.engine.get_location(&room).is_some() {
-                rows.push(Row::Text(format!("  {}  {}{}", direction, room, through)));
-            } else {
-                rows.push(Row::Missing(format!("  {}  {}{}  (not written)", direction, room, through)));
-            }
+        // `east -----> bedroom    closed door`: an arrow out to a common
+        // column, the room, and a door only when it's in the way (Bruce,
+        // 2026-11-24). The door's name and id are /inspect's.
+        let column = exits.iter().map(|(d, _)| d.chars().count()).max().unwrap_or(0) + 4;
+        let lines: Vec<(String, String, bool)> = exits
+            .iter()
+            .map(|(direction, to)| {
+                let (room, blocked) = match self.world.engine.doors.get(*to) {
+                    Some(door) => (door.leads_to(&location.id).unwrap_or("?").to_string(), self.door_in_the_way(to)),
+                    None => (to.to_string(), None),
+                };
+                let written = self.world.engine.get_location(&room).is_some();
+                let note = match (written, blocked) {
+                    (false, _) => "(not written)".to_string(),
+                    (true, Some(state)) => format!("{} door", state),
+                    (true, None) => String::new(),
+                };
+                let arrow = format!("{}>", "-".repeat(column - direction.chars().count()));
+                (format!("  {} {} {}", direction, arrow, room), note, written)
+            })
+            .collect();
+        let width = lines.iter().map(|(l, _, _)| l.chars().count()).max().unwrap_or(0) + 4;
+        for (line, note, written) in lines {
+            let text = if note.is_empty() { line } else { format!("{:<width$}{}", line, note, width = width) };
+            rows.push(Row::Exit(text, !written));
         }
         // People, things, then scenery: the things built from the built-in
         // `scenery` template, or listed with no card yet (dimmed). Scope
@@ -481,7 +497,7 @@ pub fn folded(sidebar: &Sidebar) -> String {
         .fixed
         .iter()
         .filter_map(|r| match r {
-            Row::Text(t) | Row::Dim(t) | Row::Missing(t) | Row::Warning(t) | Row::Error(t) | Row::Map(t) => Some(t.as_str()),
+            Row::Text(t) | Row::Dim(t) | Row::Warning(t) | Row::Error(t) | Row::Map(t) | Row::Exit(t, _) => Some(t.as_str()),
             _ => None,
         })
         .collect();
@@ -502,8 +518,10 @@ mod tests {
             .map(|r| match r {
                 Row::Heading(t) => format!("# {}", t),
                 Row::Text(t) => t.clone(),
-                Row::Dim(t) | Row::Missing(t) | Row::Warning(t) | Row::Error(t) => format!("~ {}", t),
+                Row::Dim(t) | Row::Warning(t) | Row::Error(t) => format!("~ {}", t),
                 Row::Map(t) => format!("| {}", t),
+                Row::Exit(t, true) => format!("~ {}", t),
+                Row::Exit(t, false) => t.clone(),
                 Row::Blank => String::new(),
             })
             .collect()
@@ -536,8 +554,8 @@ mod tests {
             vec![
                 "# HERE  Village Square (village/square)",
                 "# exits",
-                "~   east  village/inn  (not written)",
-                "  north  village/well",
+                "~   east -----> village/inn     (not written)",
+                "  north ----> village/well",
                 "# people",
                 "  elder",
                 "# things",
@@ -566,7 +584,7 @@ mod tests {
         let mut console = Console::open(root, Mode::Edit).unwrap();
         console.handle("go hall");
         let rest = texts(&console.sidebar().rest);
-        assert!(rest.contains(&"  down  vault  through Iron door (`vault-door`), closed".to_string()), "{:?}", rest);
+        assert!(rest.contains(&"  down ----> vault    closed door".to_string()), "{:?}", rest);
         assert_eq!(console.handle("down").0, "Vault (room)");
         assert_eq!(console.world.files["doors/vault-door"].kind, Kind::Door);
     }
@@ -646,6 +664,6 @@ mod tests {
         assert!(!texts(&console.sidebar().rest).iter().any(|r| r.starts_with("# HERE")));
         let rest = texts(&console.sidebar().rest);
         assert!(rest.contains(&"# ROOM  Village Square (village/square)".to_string()), "play's detail is in the sidebar: {:?}", rest);
-        assert!(rest.contains(&"  north  village/well".to_string()), "{:?}", rest);
+        assert!(rest.contains(&"  north ----> village/well".to_string()), "{:?}", rest);
     }
 }

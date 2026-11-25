@@ -14,6 +14,9 @@ impl Console {
     /// `/inspect [<name>]`: the thing named, or the one edit mode is at.
     pub(super) fn inspect(&self, args: &[&str]) -> String {
         let typed = args.join(" ");
+        if let Some(out) = self.inspect_exit(&typed) {
+            return out;
+        }
         let (kind, id) = match self.thing_named(&typed) {
             Some(found) => found,
             None if typed.is_empty() => return suggest("Inspect what? Name a thing, or go to one:", &["/inspect {thing}"]),
@@ -58,6 +61,28 @@ impl Console {
             out.extend(mentions.iter().map(|w| format!("  {}", w)));
         }
         out.join("\n")
+    }
+
+    /// `/inspect east`: an exit from the room edit mode is in, where it
+    /// goes, and its door in full, since the sidebar shows only whether a
+    /// door is in the way (Bruce, 2026-11-24).
+    fn inspect_exit(&self, typed: &str) -> Option<String> {
+        let room = self.current_room()?;
+        let location = self.world.engine.get_location(&room)?;
+        let direction = super::author::expand_direction(typed.trim());
+        let to = location.connections.get(&direction)?;
+        let engine = &self.world.engine;
+        let (beyond, door) = match engine.doors.get(to) {
+            Some(door) => (door.leads_to(&room).unwrap_or("?").to_string(), Some(to.clone())),
+            None => (to.clone(), None),
+        };
+        let written = if engine.get_location(&beyond).is_some() { "" } else { " (not written)" };
+        let mut out = vec![format!("{} from {}, to {}{}", direction, room, beyond, written)];
+        if let Some(door) = door {
+            out.push(String::new());
+            out.push(self.inspect(&[door.as_str()]));
+        }
+        Some(out.join("\n"))
     }
 
     /// The rows from a thing's layers: scope, templates, states, sections, actions.
@@ -142,5 +167,8 @@ mod tests {
         let square = console.inspect(&["village/square"]);
         assert!(square.contains("village/inn"), "its warning is listed: {}", square);
         assert!(console.inspect(&["nothing-at-all"]).starts_with("Nothing called"));
+        let mut console = console;
+        console.handle("go /village/square");
+        assert_eq!(console.inspect(&["e"]), "east from village/square, to village/inn (not written)");
     }
 }

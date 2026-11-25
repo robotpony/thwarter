@@ -48,7 +48,7 @@ bedroom already has a west exit, to door-bedroom-west. To change it:
   world/    World settings
   ```
 
-- REQ-CON-48: The room view in edit mode MUST be exactly play's view, with no title line unless the world's `show_room_names` asks for one (Bruce, 2026-11-24: titles are for search and lists); the author's detail goes to the sidebar and `/inspect` instead. HERE leads with the room's title and id, then shows its exits with where they lead, each door's title, id and state, and the people, things and scenery by id. `/inspect [<thing>]` MUST show one thing or door in full: its file, scope, where it starts, its templates, states, actions and sections, its sides for a door, its state in the game, and every problem or warning that names it.
+- REQ-CON-48: The room view in edit mode MUST be exactly play's view, with no title line unless the world's `show_room_names` asks for one (Bruce, 2026-11-24: titles are for search and lists); the author's detail goes to the sidebar and `/inspect` instead. HERE leads with the room's title and id, then shows its exits one per line, each direction with an arrow out to a common column and its room (`east -----> bedroom    closed door`), noting a door only when it's in the way (closed, locked) and a room not written yet; a line too long for the sidebar is cut with an ellipsis, never wrapped (Bruce, 2026-11-24). Then the people, things and scenery by id. `/inspect [<thing>]` MUST show one thing or door in full, and `/inspect <direction>` an exit and its door: its file, scope, where it starts, its templates, states, actions and sections, its sides for a door, its state in the game, and every problem or warning that names it.
 
   ```
   in village/square > /inspect lantern
