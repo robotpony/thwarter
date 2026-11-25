@@ -62,6 +62,7 @@ impl Console {
         let place = match &self.place {
             Place::Dir(dir) => ("dir".to_string(), dir.clone()),
             Place::File(path) => ("file".to_string(), path.clone()),
+            Place::Game(sub) => ("game".to_string(), sub.clone()),
         };
         let snapshot = Snapshot {
             thwarter_restart: RESUME_VERSION,
@@ -116,7 +117,11 @@ impl Console {
         }
 
         let (kind, at) = snapshot.place;
-        self.place = if kind == "file" { Place::File(at) } else { Place::Dir(at) };
+        self.place = match kind.as_str() {
+            "file" => Place::File(at),
+            "game" => Place::Game(at),
+            _ => Place::Dir(at),
+        };
         if !self.place_exists() {
             let gone = self.pwd();
             self.move_to_existing_folder();

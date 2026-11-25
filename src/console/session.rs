@@ -33,6 +33,9 @@ pub enum Flow {
 pub(super) enum Place {
     Dir(String),
     File(String),
+    /// The virtual `game/` folder, the running game (REQ-CON-24): `""`
+    /// for `game/` itself, `things` and `things/<id>` below it.
+    Game(String),
 }
 
 pub struct Console {
@@ -244,6 +247,10 @@ impl Console {
             ("load", args) => self.load_game_named(args),
             ("reload", _) => self.reload(),
             ("new", args) => self.new_and_edit(args),
+            ("set", args) if matches!(self.place, Place::Game(_)) => {
+                let Place::Game(sub) = self.place.clone() else { unreachable!() };
+                self.game_set(&sub, args)
+            }
             ("set", args) if args.len() >= 4 && args[args.len() - 2] == "in" => self.set_in_state(args),
             ("set", args) => self.set(args),
             ("state", args) => self.state_command(args),
@@ -423,7 +430,7 @@ impl Console {
     fn look_toward(&self, direction: &str) -> String {
         let room = match &self.place {
             Place::File(path) => self.world.files.get(path).filter(|e| e.kind == Kind::Room).map(|e| e.id.clone()),
-            Place::Dir(_) => None,
+            Place::Dir(_) | Place::Game(_) => None,
         };
         let Some(room) = room else { return self.t("edit_look_toward_no_room", &[]) };
         let way: String = direction.chars().take(1).flat_map(char::to_uppercase).chain(direction.chars().skip(1)).collect();
@@ -449,7 +456,11 @@ impl Console {
                 None => self.t("no_way_back", &[]),
             };
         }
-        match self.resolve(target) {
+        let place = match self.game_place(target) {
+            Some(found) => found,
+            None => self.resolve(target),
+        };
+        match place {
             Ok(place) => {
                 if place != self.place {
                     self.trail.push(std::mem::replace(&mut self.place, place));
@@ -467,6 +478,7 @@ impl Console {
     /// title, or what a folder holds.
     fn arrival(&self) -> String {
         match &self.place {
+            Place::Game(sub) => self.game_look(sub),
             Place::File(path) => match self.world.files.get(path) {
                 Some(entry) if entry.kind == Kind::Room => self.t("arrival_room", &[("title", &entry.title)]),
                 Some(entry) if entry.kind == Kind::Broken => self.t("arrival_broken", &[("path", path)]),
@@ -510,7 +522,7 @@ impl Console {
                 self.looked_at = Some(path);
                 view
             }
-            Some(Ok(Place::Dir(_))) | None => {
+            Some(Ok(Place::Dir(_) | Place::Game(_))) | None => {
                 self.t("nothing_here_to_examine", &[("name", noun)])
             }
             Some(Err(message)) => message,
@@ -566,6 +578,8 @@ impl Console {
             Place::Dir(dir) if dir.is_empty() => "/".to_string(),
             Place::Dir(dir) => format!("{}/", dir),
             Place::File(path) => path.clone(),
+            Place::Game(sub) if sub.is_empty() => "game/".to_string(),
+            Place::Game(sub) => format!("game/{}", sub),
         }
     }
 
@@ -613,6 +627,7 @@ impl Console {
             (Mode::Play, _) => self.play_look(),
             (Mode::Edit, Place::Dir(dir)) => self.list_dir(dir),
             (Mode::Edit, Place::File(path)) => self.view_of(path),
+            (Mode::Edit, Place::Game(sub)) => self.game_look(sub),
         }
     }
 
@@ -746,6 +761,7 @@ impl Console {
                     .map(|p| match p {
                         Place::File(path) => path.clone(),
                         Place::Dir(dir) => format!("{}/", dir),
+                        Place::Game(sub) => format!("game/{}", sub),
                     })
                     .collect();
                 Err(self.t("which_do_you_mean", &[("names", &names.join(", "))]))
@@ -803,6 +819,7 @@ impl Console {
         match &self.place {
             Place::Dir(dir) => dir.clone(),
             Place::File(path) => parent_of(path),
+            Place::Game(_) => String::new(),
         }
     }
 
@@ -810,6 +827,7 @@ impl Console {
         match &self.place {
             Place::Dir(dir) => parent_of(dir),
             Place::File(path) => parent_of(path),
+            Place::Game(_) => String::new(),
         }
     }
 
@@ -817,6 +835,7 @@ impl Console {
         match &self.place {
             Place::Dir(dir) => self.world.dirs.contains(dir),
             Place::File(path) => self.world.files.contains_key(path),
+            Place::Game(_) => true,
         }
     }
 

@@ -625,6 +625,7 @@ impl Console {
                     *path = moved;
                 }
             }
+            Place::Game(_) => {}
         };
         follow(&mut self.place);
         for place in &mut self.trail {

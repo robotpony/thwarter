@@ -12,6 +12,7 @@ mod commands;
 mod doors;
 mod editor;
 mod full_edit;
+mod game_folder;
 mod inspect;
 mod kinds;
 pub mod registry;

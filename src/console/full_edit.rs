@@ -241,6 +241,7 @@ impl Console {
                     let label = kind.label();
                     super::session::suggest(&self.t("edit_kind_here", &[("kind", label)]), &[&format!("/edit {} {{id}}", label)])
                 }
+                None if matches!(self.place, Place::Game(_)) => self.t("game_folder_not_a_file", &[]),
                 None => super::session::suggest(
                     &self.t("edit_folder", &[("place", &self.pwd())]),
                     &["/edit {name}"],
@@ -318,6 +319,7 @@ impl Console {
         }
         match self.resolve(&id)? {
             Place::File(path) => self.target_for_file(&path, None),
+            Place::Game(_) => Err(self.t("game_folder_not_a_file", &[])),
             Place::Dir(dir) => Err(format!("{}/ is a folder, with nothing to edit. /edit a room or thing in it.", dir)),
         }
     }

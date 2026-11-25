@@ -4,6 +4,13 @@ Thwarter's changes, newest first. This file also records what was removed or rep
 
 Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `### Fixed` and `### Removed`. Changes not yet in a versioned build go under `## Unreleased`.
 
+## 0.82.0 (2026-11-25)
+
+### Added
+
+- Edit mode's virtual `game/` folder, the running game (REQ-CON-24). `go /game`, or `go game` from the root, shows where the player is, the chapter, what they carry, what has changed and the values. `things/` lists what has left its starting state, and `things/<id>` shows a thing's state and its states.
+- Inside `game/`, `/set` changes only the running game and says no file changed (REQ-CON-25): `/set state <state>` at a thing, and anywhere in `game/` `/set chapter`, `/set location`, `/set carrying` and `/set <name.value> <value>`. `/play` then plays the scene as set. Covered by `tests/transcripts/game-folder.txt`.
+
 ## 0.81.3 (2026-11-25)
 
 ### Fixed

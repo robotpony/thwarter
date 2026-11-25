@@ -43,6 +43,7 @@ impl Console {
         let folder = match &self.place {
             Place::File(path) => Path::new(path).parent().map(Path::to_path_buf).unwrap_or_default(),
             Place::Dir(dir) => Path::new(dir).to_path_buf(),
+            Place::Game(_) => Default::default(),
         };
         let set = self.world.engine.questions_for_thing(&folder, id, None, kind_word)?;
         let root = self.world.engine.world_root.clone().unwrap_or_default();

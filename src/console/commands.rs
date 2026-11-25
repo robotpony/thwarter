@@ -207,7 +207,7 @@ impl Console {
             Mode::Play => self.game.as_ref().map(|g| g.location.clone()),
             Mode::Edit => match &self.place {
                 Place::File(path) => self.world.files.get(path).filter(|e| e.kind == Kind::Room).map(|e| e.id.clone()),
-                Place::Dir(_) => None,
+                Place::Dir(_) | Place::Game(_) => None,
             },
         }
     }

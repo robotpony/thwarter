@@ -289,16 +289,17 @@ impl Console {
                 Some(entry) if entry.kind == Kind::Room => self.t("side_here_room", &[("title", &entry.title), ("id", &entry.id)]),
                 _ => self.t("side_here", &[("place", &self.pwd())]),
             },
-            Place::Dir(_) => self.t("side_here", &[("place", &self.pwd())]),
+            Place::Dir(_) | Place::Game(_) => self.t("side_here", &[("place", &self.pwd())]),
         };
         let mut rows = vec![Row::Heading(heading)];
         let room = match &self.place {
             Place::File(path) => self.world.files.get(path).filter(|e| e.kind == Kind::Room).map(|e| e.id.clone()),
-            Place::Dir(_) => None,
+            Place::Dir(_) | Place::Game(_) => None,
         };
         let Some(room) = room else {
             match &self.place {
                 Place::File(path) => rows.extend(self.file_rows(path)),
+                Place::Game(sub) => rows.extend(self.game_look(sub).lines().map(|l| Row::Text(format!("  {}", l)))),
                 // A folder: what it holds, folders first.
                 Place::Dir(dir) => {
                     let prefix = if dir.is_empty() { String::new() } else { format!("{}/", dir) };

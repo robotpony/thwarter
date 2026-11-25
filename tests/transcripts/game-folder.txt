@@ -1,0 +1,112 @@
+# world: tests/worlds/tiny
+# mode: edit
+# copy: yes
+Editing Tiny World (tests/worlds/tiny). Type /help for commands.
+1 warning(s), such as exits to rooms not written yet. /validate lists them.
+> go /game
+No game is running. /play starts one, or /play here from a room.
+> go lantern
+Brass Lantern (object)
+> /state unlit start
+Made the unlit state; it's where the thing starts.
+> /state lit
+Made the lit state.
+> go /game
+No game is running. /play starts one, or /play here from a room.
+> /play
+Play mode.
+
+A small square of packed earth. An old well stands to the north.
+The Elder is here.
+
+You see a brass lantern.
+
+You can go north or east.
+> /edit
+Edit mode, at village/square.
+/edit opens village/square.md in a full-screen editor, which needs a terminal.
+> go /game
+location  village/square
+chapter   none
+carrying  nothing
+things/   0 changed from their starting state
+values    none set
+> look
+location  village/square
+chapter   none
+carrying  nothing
+things/   0 changed from their starting state
+values    none set
+> go things
+Nothing has left its starting state. go things/<id> shows any thing's.
+> look
+Nothing has left its starting state. go things/<id> shows any thing's.
+> go things/lantern
+lantern: unlit (its starting state)
+States: lit, unlit
+> look
+lantern: unlit (its starting state)
+States: lit, unlit
+> /set state lit
+Game: lantern is now lit. No file changed.
+> /set state broken
+lantern has no state `broken`. Its states: lit, unlit
+> look
+lantern: lit
+States: lit, unlit
+> go /game
+location  village/square
+chapter   none
+carrying  nothing
+things/   1 changed from their starting state
+values    none set
+> /set chapter after
+There's no chapter `after` in this world.
+> /set location well
+Game: the player is now in village/well. No file changed.
+> /set carrying lantern
+Game: the player now carries lantern. No file changed.
+> /set story.met-elder yes
+Game: story.met-elder is now yes. No file changed.
+> /set colour red
+In game/, /set changes only the running game. Try:
+
+  /set state {state}
+  /set chapter {chapter}
+  /set location {room}
+  /set carrying {things}
+  /set {name.value} {value}
+> look
+location  village/well
+chapter   none
+carrying  lantern
+things/   1 changed from their starting state
+values    story.met-elder = yes
+> go things
+Changed from their starting state (go things/<id> for any thing):
+
+  lantern  lit
+> look
+Changed from their starting state (go things/<id> for any thing):
+
+  lantern  lit
+> /edit
+game/ is the running game, not a file. /set changes it here; /edit a room or thing to change its file.
+> go /
+/  3 items: npcs/, objects/, village/
+> go game
+location  village/well
+chapter   none
+carrying  lantern
+things/   1 changed from their starting state
+values    story.met-elder = yes
+> where
+Edit mode is at game/.
+> /play
+Play mode.
+
+A mossy stone well. The rope is long gone.
+
+You can go south.
+> inventory
+You have a brass lantern.
