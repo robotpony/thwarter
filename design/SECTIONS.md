@@ -128,7 +128,7 @@ A chapter changes a built-in reply only this way; there's no chapter `[engine]` 
 
 ### States
 
-States come from bundles (Bruce: "bundles are simpler"). A state exists because its file does (`objects/window/broken.md`), or because frontmatter's `state:` or a `becomes:` names it. A heading only reads states; `## When: #broken` is shown while the window is broken, and never makes `broken` exist. `validate` warns about a heading tag that can never be true: no state, action, thing or chapter has that name, so `## When: #lockd` is a warning.
+States come from bundles (Bruce: "bundles are simpler"). A state exists because its file does (`objects/window/broken.md`), or because frontmatter's `state:` or a `becomes:` names it. A heading only reads states; `## When: #broken` is shown while the window is broken, and never makes `broken` exist. `validate` warns about a heading tag that can never be true: no state, action, thing or chapter has that name, so `## When: #lockd` is a warning. Not built yet (`BUGS.md`).
 
 ### Prefixes, links and names
 
