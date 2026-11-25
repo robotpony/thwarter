@@ -117,6 +117,23 @@ impl<'a> Screen<'a> {
 
     /// One key, with the console to act on.
     pub fn key(&mut self, input: Input, console: &Mutex<Console>) {
+        // A TO WRITE key switches documents from the editor too: save this
+        // one, then make and open that one (REQ-CON-59).
+        if let (Some(_), Input { key: Key::Char(c @ '1'..='9'), alt: true, .. }) = (&self.editing, &input) {
+            let n = *c as usize - '0' as usize;
+            let Some(name) = lock(console).to_write_at(n) else { return };
+            let (editor, target) = self.editing.as_mut().expect("the editor is open");
+            let mut files = EditFiles { console, target };
+            if !editor.save_to_switch(&mut files) {
+                return;
+            }
+            let (editor, target) = self.editing.take().expect("the editor is open");
+            let report = lock(console).edit_closed(&target, editor.closed());
+            self.push(&report);
+            self.set_input(&format!("/write {}", name));
+            self.submit(console);
+            return;
+        }
         if let Some((editor, target)) = &mut self.editing {
             let mut files = EditFiles { console, target };
             if !editor.key(input, &mut files) {
@@ -1268,6 +1285,12 @@ mod tests {
         let hall = std::fs::read_to_string(root.join("hall.md")).unwrap();
         assert!(hall.contains("hole"), "listed in the room that names it: {}", hall);
         assert!(lock(&console).to_write().iter().all(|e| e.name != "hole"));
+        // From the editor: an unsaved change is saved, then the next opens.
+        screen.key(Input { key: Key::Char('!'), ..Input::default() }, &console);
+        screen.key(input_of(KeyEvent::new(KeyCode::Char('1'), KeyModifiers::CONTROL)), &console);
+        assert!(std::fs::read_to_string(root.join("objects/hole.md")).unwrap().contains('!'), "saved before switching");
+        assert!(root.join("objects/wallpaper.md").exists());
+        assert!(screen.editing.is_some());
         // Cmd-digits are the terminal's again, and Esc is never a key here.
         assert_eq!(input_of(KeyEvent::new(KeyCode::Char('1'), KeyModifiers::SUPER)).alt, false);
         assert_eq!(input_of(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)).key, Key::Esc);

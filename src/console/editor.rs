@@ -220,6 +220,21 @@ impl<'a> Editor<'a> {
         true
     }
 
+    /// Saves before switching to another document (REQ-CON-59). True when
+    /// there's nothing unsaved after; false leaves the reason in the status
+    /// line, and the editor stays open.
+    pub fn save_to_switch(&mut self, files: &mut impl Files) -> bool {
+        if !self.dirty() {
+            return true;
+        }
+        self.key(Input { key: Key::Char('s'), ctrl: true, ..Input::default() }, files);
+        if self.dirty() {
+            self.status = format!("{} Not switched; fix it, or esc to close.", self.status);
+            return false;
+        }
+        true
+    }
+
     /// Takes a change on disk to the files, if there is one.
     pub fn check_disk(&mut self, files: &mut impl Files) {
         if let Some(sections) = files.changed_on_disk() {

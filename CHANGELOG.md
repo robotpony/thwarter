@@ -63,6 +63,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.70.2 (2026-11-24)
+
+### Fixed
+
+- TO WRITE keys did nothing in the editor (Bruce). They now save the open document and switch to the entry; if the save fails, the editor stays with the reason. The editor binds no Ctrl- or Alt-digit, so nothing clashes. REQ-CON-59 updated.
+
 ## 0.70.1 (2026-11-24)
 
 ### Changed
