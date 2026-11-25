@@ -681,6 +681,59 @@ impl GameEngine {
         !matches!(resolve(noun, &things, the_object), Ok(None))
     }
 
+    /// The verbs the things in scope answer to (REQ-ENG-52, 54): what the
+    /// player carries, the room's objects, doors and people, and what
+    /// they hold. A thing's verbs are its actions, its script's functions
+    /// and the `#verb` tags in its section headings, less its own states,
+    /// the reserved tags and the chapters. Sorted, each once.
+    pub fn verbs_in_scope(&self, world: &WorldEngine, state: &PlayState) -> Vec<String> {
+        let Some(view) = self.view(world, state) else { return Vec::new() };
+        let mut things: Vec<(EntityKind, String)> = Vec::new();
+        for o in self.carried(world, state).into_iter().chain(view.objects.iter().cloned()).chain(self.inside_here(world, state, &view).into_iter().map(|(t, _)| t)) {
+            things.push((EntityKind::Object, o.id));
+        }
+        things.extend(doors_here(&view).into_iter().map(|d| (EntityKind::Door, d.id)));
+        things.extend(view.characters.iter().map(|c| (EntityKind::Character, c.id.clone())));
+        let chapters: Vec<String> = world.chapters().iter().map(|c| format!("#{}", c.name())).collect();
+        let mut verbs: Vec<String> = Vec::new();
+        for (kind, id) in things {
+            let actions = match kind {
+                EntityKind::Object => world.object_at(&id, At::play(state)).map(|o| o.actions),
+                EntityKind::Door => world.door_at(&id, At::play(state)).map(|d| d.actions),
+                _ => None,
+            };
+            verbs.extend(actions.into_iter().flat_map(|a| a.into_keys()).map(|k| k.to_lowercase()));
+            let Some(thing) = world.thing(kind, &id) else { continue };
+            verbs.extend(thing.script_actions.iter().cloned());
+            let states: Vec<String> = thing.state_names().into_iter().map(|s| format!("#{}", s)).collect();
+            let layers = thing.templates.iter().chain(std::iter::once(&thing.index)).chain(thing.states.values());
+            for section in layers.flat_map(|l| l.sections.iter()).filter(|s| !s.unless) {
+                for tag in section.tags.iter().filter(|t| t.starts_with('#')) {
+                    let tag = tag.to_lowercase();
+                    if !states.contains(&tag) && !chapters.contains(&tag) && !crate::engines::layers::RESERVED_TAGS.contains(&tag.as_str()) {
+                        verbs.push(tag[1..].to_string());
+                    }
+                }
+            }
+        }
+        verbs.retain(|v| !v.is_empty() && !crate::engines::verbs::BUILT_IN.contains(&v.as_str()));
+        verbs.sort();
+        verbs.dedup();
+        verbs
+    }
+
+    /// Every verb the player could type here (REQ-ENG-52): the built-in
+    /// verbs, the aliases, and the verbs the things in scope answer to,
+    /// sorted. For a client's completion or a verb list.
+    pub fn verbs(&self, world: &WorldEngine, state: &PlayState) -> Vec<String> {
+        let mut out: Vec<String> = crate::engines::verbs::BUILT_IN.iter().map(|v| v.to_string()).collect();
+        out.extend(world.verbs().aliases().map(|(a, _)| a.to_string()));
+        out.extend(self.verbs_in_scope(world, state));
+        out.sort();
+        out.dedup();
+        out
+    }
+
     /// What an object holds now (REQ-CF-31): what its file lists, less
     /// what's been taken from it or kept elsewhere, plus what it has kept
     /// in play (`keep()`), each as play shows it.

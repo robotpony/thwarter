@@ -19,6 +19,8 @@ pick_up_what = "Pick up what?"                     # #take #no-noun, world
 examine_what = "Examine what?"                     # #examine #no-noun, world
 look_at_what = "Look at what?"                     # #examine #no-noun, world
 not_here = "There's no {noun} here."               # #not-here, world
+which_verb = "Do you mean {or}?"                   # #ambiguous-verb, world
+did_you_mean = "Did you mean {or}?"                # #not-understood #suggest, world
 which = "Which {noun} do you want to {verb}, {or}?"  # #ambiguous, thing
 who = "Who do you want to {verb}, {or}?"           # #ambiguous, thing
 

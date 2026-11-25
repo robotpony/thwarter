@@ -68,7 +68,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [x] Removing a thing: its file or bundle deleted, and every reference to its id taken out (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, beside REQ-ENG-30)
 - [x] `/remove <thing>` deletes an object, room, character or door after the author confirms; no undo yet (Bruce, 2026-11-24) (0.68.0) [console] (`design/CONSOLE_REQUIREMENTS.md`, beside REQ-CON-5)
 - [ ] One command registry (built-ins, aliases, prefixes and did-you-mean done in 0.74.0; world commands and the config layer to go): every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
-- [ ] Forgiving play verbs: aliases, unique prefixes and did-you-mean for verbs, the way commands get them (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, to write)
+- [x] Forgiving play verbs: aliases, unique prefixes and did-you-mean for verbs, the way commands get them (Bruce, 2026-11-24) [coder] (`design/ENGINE_REQUIREMENTS.md`, to write)
 - [ ] No built-in default world: with no `--world`, no configured default and no world around the current folder, `thwart` lists the worlds it can find and stops with an error; `edit` and `play` offer them as a picker (Bruce, 2026-11-24) [coder, console] (REQ-CLI-2)
 - [x] (0.73.1) The sidebar's exits read as aligned columns with arrow leaders (`east -----> bedroom    closed door`); a door shows only as its state when it blocks the way, and its title and id move to `/inspect` (Bruce, 2026-11-24) [console]
 - [x] A new door's id and title read from both sides (faebdce, 5aa92db, b878529): `door-bedroom-hallway`, titled from its rooms ("Bedroom door"), not the template's "Door" (Bruce, 2026-11-24) [coder, console]
@@ -127,7 +127,7 @@ Asked for in playtesting (from the unknown-input log, 2026-11-23). Queued: Bruce
 - [ ] `where` and `where am i` [coder, console] (REQ-PC-21)
 - [ ] `enter <place>` as `go` [coder] (REQ-PC-22)
 - [ ] `look <direction>` and `what's <direction>` [coder] (REQ-PC-23)
-- [ ] Typo suggestions for verbs [coder] (REQ-PC-24)
+- [x] Typo suggestions for verbs [coder] (REQ-PC-24)
 - [ ] `/list objects|rooms|characters` in edit mode [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] `/map` from the world's root draws the whole world, instead of asking for a room [console] (`design/CONSOLE_REQUIREMENTS.md`)
 - [ ] A bare console command name in edit mode (`edit`) runs it or asks "Did you mean /edit?" [console] (`design/CONSOLE_REQUIREMENTS.md`)

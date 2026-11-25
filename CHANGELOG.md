@@ -72,6 +72,19 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+## 0.78.0 (2026-11-24)
+
+### Added
+
+- Forgiving play verbs (REQ-ENG-51 to 54). Aliases live in `src/builtins/verbs.toml` (`l`, `x`, `inspect`, `get`, `walk`, `move`, `i`, `inv`), and a world adds its own in `world.toml`'s `[verbs]` (`yank = "pull"`). A unique prefix of two letters or more runs its verb (`exa pot`, `pu lever`), several ask ("Do you mean take or talk?"), and a verb one typo away gets "Did you mean \"look\"?", which runs nothing. Directions and exact verbs always win, so `in` is a direction. Only verbs forgive, never nouns, and a world verb counts only when a thing in scope answers to it.
+- `GameEngine::verbs(world, state)`, every verb the player could type here, and `verbs_in_scope`, for clients.
+- `validate` warns about a world alias that is a direction or a built-in verb, or whose verb nothing knows.
+- `[engine]` keys `which_verb` and `did_you_mean`, with outcomes `#ambiguous-verb` and `#not-understood #suggest`, both reserved.
+
+### Changed
+
+- The parser's own alias list is gone; every alias comes from the table.
+
 ## 0.77.3 (2026-11-24)
 
 ### Changed

@@ -51,7 +51,24 @@ impl GameEngine {
                 None => world.texts().text_at("engine", key, args, state.turn),
             }
         };
-        match parse_words(line, &say) {
+        // The verb, forgiven (REQ-ENG-52 to 54): an alias or a unique
+        // prefix becomes the verb it means; several prefixes ask; a typo
+        // gets a suggestion that runs nothing.
+        let typed = line;
+        let trimmed = line.trim_start();
+        let (head, rest) = trimmed.split_at(trimmed.find(char::is_whitespace).unwrap_or(trimmed.len()));
+        let first = head.to_lowercase();
+        let resolved;
+        let line = match self.resolve_verb(world, state, &first) {
+            VerbMatch::Keep => line,
+            VerbMatch::Means(verb) => {
+                resolved = format!("{}{}", verb, rest);
+                resolved.as_str()
+            }
+            VerbMatch::Ask(verbs) => return Parsed::Reply(say("which_verb", &[("or", &or_list(&verbs, false))])),
+            VerbMatch::Suggest(verbs) => return Parsed::Unknown(say("did_you_mean", &[("or", &or_list(&verbs, true)), ("line", line.trim())])),
+        };
+        let parsed = match parse_words(line, &say) {
             Words::Other { verb, noun, with } => {
                 let known = world.has_action(&verb);
                 match noun {
@@ -61,7 +78,72 @@ impl GameEngine {
                 }
             }
             Words::Parsed(parsed) => parsed,
+        };
+        // Not understood quotes the line as typed, not as an alias read it.
+        match parsed {
+            Parsed::Unknown(_) => unknown(typed, &say),
+            other => other,
         }
+    }
+}
+
+/// What a typed verb comes to (REQ-ENG-52, 53).
+enum VerbMatch {
+    /// Read the line as typed.
+    Keep,
+    /// The verb an alias or a unique prefix means.
+    Means(String),
+    /// A prefix of several verbs: ask which.
+    Ask(Vec<String>),
+    /// One small typo from these: suggest them, run nothing.
+    Suggest(Vec<String>),
+}
+
+impl GameEngine {
+    /// How the line's first word reads, the first match winning: a
+    /// direction or its shorthand, a built-in verb, an alias, a verb a
+    /// world thing answers to, then a unique prefix of two letters or more
+    /// among the built-in verbs and those in scope. With none, a word one
+    /// typo from one of those or an alias is a suggestion (REQ-ENG-52 to 54).
+    fn resolve_verb(&self, world: &WorldEngine, state: &PlayState, word: &str) -> VerbMatch {
+        use crate::engines::verbs::{one_typo, BUILT_IN};
+        if word.is_empty() || direction(word).is_some() || BUILT_IN.contains(&word) || PHRASES.contains(&word) {
+            return VerbMatch::Keep;
+        }
+        if let Some(verb) = world.verbs().alias(word) {
+            return VerbMatch::Means(verb.to_string());
+        }
+        if world.has_action(word) {
+            return VerbMatch::Keep;
+        }
+        let mut candidates: Vec<String> = BUILT_IN.iter().map(|v| v.to_string()).collect();
+        candidates.extend(self.verbs_in_scope(world, state));
+        if word.chars().count() >= 2 {
+            let fits: Vec<String> = candidates.iter().filter(|v| v.starts_with(word)).cloned().collect();
+            match fits.as_slice() {
+                [] => {}
+                [one] => return VerbMatch::Means(one.clone()),
+                _ => return VerbMatch::Ask(fits),
+            }
+        }
+        candidates.extend(world.verbs().aliases().map(|(a, _)| a.to_string()));
+        let mut near: Vec<String> = candidates.into_iter().filter(|v| one_typo(word, v)).collect();
+        near.sort();
+        near.dedup();
+        if near.is_empty() { VerbMatch::Keep } else { VerbMatch::Suggest(near) }
+    }
+}
+
+/// Words the parser reads as the start of a two-word verb.
+const PHRASES: &[&str] = &["pick"];
+
+/// Verbs joined with "or", each in plain quotes when `quoted`.
+fn or_list(verbs: &[String], quoted: bool) -> String {
+    let shown: Vec<String> = verbs.iter().map(|v| if quoted { format!("\"{}\"", v) } else { v.clone() }).collect();
+    match shown.as_slice() {
+        [] => String::new(),
+        [one] => one.clone(),
+        [init @ .., last] => format!("{} or {}", init.join(", "), last),
     }
 }
 
@@ -96,17 +178,17 @@ fn parse_words(line: &str, say: &Say) -> Words {
         }
     }
     match verb {
-        "look" | "l" => match rest {
+        "look" => match rest {
             [] => done(Parsed::Action(Look)),
             ["at", noun @ ..] => done(with_noun(noun, Examine, ask("look_at_what"))),
             noun => done(with_noun(noun, Examine, ask("look_at_what"))),
         },
-        "go" | "walk" | "move" => match rest {
+        "go" => match rest {
             [] => done(Parsed::Reply(ask("go_where"))),
             [one] => done(Parsed::Action(Go(direction(one).unwrap_or_else(|| one.to_string())))),
             more => done(Parsed::Action(Go(more.join(" ")))),
         },
-        "take" | "get" => match rest {
+        "take" => match rest {
             ["up", noun @ ..] if !noun.is_empty() => done(with_noun(noun, Take, ask("take_what"))),
             noun => done(with_noun(noun, Take, ask("take_what"))),
         },
@@ -114,12 +196,12 @@ fn parse_words(line: &str, say: &Say) -> Words {
             ["up", noun @ ..] => done(with_noun(noun, Take, ask("pick_up_what"))),
             _ => done(unknown(line, say)),
         },
-        "examine" | "x" | "inspect" => done(with_noun(rest, Examine, ask("examine_what"))),
-        "inventory" | "i" | "inv" if rest.is_empty() => done(Parsed::Action(Inventory)),
+        "examine" => done(with_noun(rest, Examine, ask("examine_what"))),
+        "inventory" if rest.is_empty() => done(Parsed::Action(Inventory)),
         "search" if rest.is_empty() => done(Parsed::Action(Search)),
         // Built-in verbs used another way (`inventory lamp`, `n please`)
         // aren't read.
-        "inventory" | "i" | "inv" => done(unknown(line, say)),
+        "inventory" => done(unknown(line, say)),
         _ if direction(verb).is_some() => done(unknown(line, say)),
         _ => {
             // `listen to the chest`, `talk to the captain` (REQ-PC-20).
@@ -171,12 +253,24 @@ mod tests {
     fn parse(line: &str) -> Parsed {
         let texts = Texts::defaults();
         let say = |key: &str, args: &[(&str, &str)]| texts.text_at("engine", key, args, 0);
-        match parse_words(line, &say) {
+        // The default aliases, as `parse_command` reads them first.
+        let verbs = crate::engines::verbs::Verbs::default();
+        let trimmed = line.trim_start();
+        let (head, rest) = trimmed.split_at(trimmed.find(char::is_whitespace).unwrap_or(trimmed.len()));
+        let resolved = match verbs.alias(&head.to_lowercase()) {
+            Some(verb) if super::direction(head).is_none() => format!("{}{}", verb, rest),
+            _ => line.to_string(),
+        };
+        let parsed = match parse_words(&resolved, &say) {
             Words::Parsed(p) => p,
             Words::Other { verb, noun, with } => match noun {
                 Some(noun) => Parsed::Action(Use { verb, noun, with }),
                 None => unknown(line, &say),
             },
+        };
+        match parsed {
+            Parsed::Unknown(_) => unknown(line, &say),
+            other => other,
         }
     }
     fn act(a: PlayAction) -> Parsed {

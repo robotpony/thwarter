@@ -86,6 +86,8 @@ pub const OUTCOMES: &[(&str, &str, Chain)] = &[
     ("examine_what", "#examine #no-noun", Chain::World),
     ("look_at_what", "#examine #no-noun", Chain::World),
     ("not_here", "#not-here", Chain::World),
+    ("which_verb", "#ambiguous-verb", Chain::World),
+    ("did_you_mean", "#not-understood #suggest", Chain::World),
     ("which", "#ambiguous", Chain::Thing),
     ("who", "#ambiguous", Chain::Thing),
     ("nowhere", "#nowhere", Chain::World),
@@ -408,6 +410,55 @@ mod tests {
             Parsed::Action(a) => game.act(world, state, &a).text,
             Parsed::Reply(t) | Parsed::Unknown(t) => t,
         }
+    }
+
+    #[test]
+    fn verbs_forgive_prefixes_aliases_and_typos() {
+        let dir = tempfile::tempdir().unwrap();
+        let write = |rel: &str, text: &str| {
+            let p = dir.path().join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, text).unwrap();
+        };
+        write("kitchen.md", "---\nid: kitchen\ntitle: Kitchen\ntype: location\nobjects: [lever, pot]\ncharacters: [cook]\nconnections: { north: hall }\n---\nSteam.\n");
+        write("hall.md", "---\nid: hall\ntitle: Hall\ntype: location\n---\nQuiet.\n");
+        write("objects/lever.md", "---\nid: lever\ntitle: Lever\ntype: object\nobject_type: x\nactions:\n  pull: { sets: { this.pulled: yes } }\nvars: { pulled: no }\n---\nA lever.\n\n## When: #pull\nClunk.\n");
+        write("objects/pot.md", "---\nid: pot\ntitle: Pot\ntype: object\nobject_type: x\n---\nA pot.\n");
+        write("npcs/cook.md", "---\nid: cook\ntitle: Cook\ntype: character\n---\nBusy.\n\n## When: #talk\n\"Out of my kitchen.\"\n");
+        write("world.toml", "[verbs]\nyank = \"pull\"\nn = \"pull\"\nlook = \"pull\"\nfly = \"soar\"\n");
+        let mut world = WorldEngine::new();
+        world.load_world(dir.path()).unwrap();
+        let game = GameEngine::new();
+        let mut state = game.start(&world, "kitchen").unwrap();
+        let mut s = |line: &str| say(&game, &world, &mut state, line);
+
+        // An alias from the table, the defaults' and the world's.
+        assert_eq!(s("x pot"), "A pot.");
+        assert_eq!(s("yank lever"), "Clunk.");
+        // A unique prefix of two letters or more.
+        assert_eq!(s("exa pot"), "A pot.");
+        assert_eq!(s("pu lever"), "Clunk.");
+        // Several fit: ask, never guess.
+        assert_eq!(s("ta cook"), "Do you mean take or talk?");
+        // An exact match beats a prefix: `in` is a direction.
+        assert_eq!(s("in"), "You can't go in from here.");
+        // A typo is a suggestion, and runs nothing.
+        assert_eq!(s("lookl"), "Did you mean \"look\"?");
+        assert_eq!(s("pul lever"), "Clunk.", "a prefix, not a typo");
+        assert_eq!(s("pyll lever"), "Did you mean \"pull\"?");
+        assert_eq!(s("dance"), "I don't understand \"dance\".");
+        // Not understood quotes the line as typed.
+        assert_eq!(s("i lamp"), "I don't understand \"i lamp\".");
+        // The player's verbs here, for a client.
+        let verbs = game.verbs(&world, &state);
+        assert!(["look", "pull", "talk", "x", "yank"].iter().all(|v| verbs.contains(&v.to_string())), "{:?}", verbs);
+
+        // Aliases that can't work are warned about.
+        let warnings = world.current_warnings();
+        for expected in ["`[verbs] n` is a direction", "`[verbs] look` is a built-in verb", "`[verbs] fly = \"soar\"`: nothing in the world answers to `soar`"] {
+            assert!(warnings.iter().any(|w| w.contains(expected)), "{}: {:?}", expected, warnings);
+        }
+        assert!(!warnings.iter().any(|w| w.contains("yank")), "{:?}", warnings);
     }
 
     #[test]

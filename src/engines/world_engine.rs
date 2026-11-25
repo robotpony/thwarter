@@ -82,6 +82,8 @@ pub struct WorldEngine {
     /// Every text table, `world.toml`'s `[play]` and `[engine]` over the
     /// compiled-in defaults (`design/ENGINE_TEXT.md`).
     texts: super::texts::Texts,
+    /// Verb aliases, `world.toml`'s `[verbs]` over the defaults (REQ-ENG-51).
+    verbs: super::verbs::Verbs,
     /// Problems and warnings from the last rebuild, each prefixed with its file.
     file_problems: Vec<String>,
     file_warnings: Vec<String>,
@@ -311,6 +313,7 @@ impl WorldEngine {
             play_text: Default::default(),
             play_text_warnings: Vec::new(),
             texts: Default::default(),
+            verbs: Default::default(),
             file_problems: Vec::new(),
             file_warnings: Vec::new(),
             world: WorldDef::default(),
@@ -850,6 +853,25 @@ impl WorldEngine {
         out
     }
 
+    /// A world alias that can't work (REQ-ENG-51): one that's a direction,
+    /// a direction's shorthand or a built-in verb, which are read first, or
+    /// one whose verb nothing in the world knows.
+    fn verb_alias_warnings(&self) -> Vec<String> {
+        let source = self.world_root.as_ref().map(|r| r.join("world.toml").display().to_string()).unwrap_or_else(|| "world.toml".into());
+        let mut out = Vec::new();
+        for (alias, verb) in self.verbs.added() {
+            let full = super::location_view::expand_direction(alias);
+            if super::player_commands::DIRECTIONS.contains(&full.as_str()) {
+                out.push(format!("{}: `[verbs] {}` is a direction, which is read first, so the alias never applies", source, alias));
+            } else if super::verbs::BUILT_IN.contains(&alias) {
+                out.push(format!("{}: `[verbs] {}` is a built-in verb, which is read first, so the alias never applies", source, alias));
+            } else if !super::verbs::BUILT_IN.contains(&verb) && !self.has_action(verb) {
+                out.push(format!("{}: `[verbs] {} = \"{}\"`: nothing in the world answers to `{}`", source, alias, verb, verb));
+            }
+        }
+        out
+    }
+
     /// A loaded file's text as the engine has it, unsaved changes
     /// included; empty if it isn't loaded.
     fn file_text(&self, path: &Path) -> String {
@@ -1102,6 +1124,7 @@ impl WorldEngine {
         self.play_text = Default::default();
         self.play_text_warnings.clear();
         self.texts = Default::default();
+        self.verbs = Default::default();
         self.world_toml = WorldDef::default();
         self.world_toml_warning = None;
         let path = root.join("world.toml");
@@ -1120,7 +1143,13 @@ impl WorldEngine {
         for table in ["play", "engine"] {
             self.texts.apply(table, value.get(table), "world.toml", &mut self.play_text_warnings);
         }
+        self.verbs.apply(value.get("verbs"), &path.display().to_string(), &mut self.play_text_warnings);
         self.play_text = super::play_text::PlayText::from_texts(&self.texts);
+    }
+
+    /// The verb aliases: the defaults, with `world.toml`'s `[verbs]` over them.
+    pub fn verbs(&self) -> &super::verbs::Verbs {
+        &self.verbs
     }
 
     /// Every text table, with this world's `[play]` and `[engine]` over
@@ -1448,6 +1477,7 @@ impl WorldEngine {
         warnings.extend(self.play_text_warnings.iter().cloned());
         warnings.extend(self.door_warnings());
         warnings.extend(self.reserved_state_warnings());
+        warnings.extend(self.verb_alias_warnings());
         warnings.extend(self.shared_id_warnings());
         warnings
     }
