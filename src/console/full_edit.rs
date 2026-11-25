@@ -351,7 +351,7 @@ impl Console {
 
     /// `/edit <kind> <id>`: a room by id (relative to this folder, as `cd`
     /// takes it), or a character or object by its bare id.
-    fn edit_target_named(&self, kind: Kind, typed: &str) -> Result<EditTarget, String> {
+    pub(super) fn edit_target_named(&self, kind: Kind, typed: &str) -> Result<EditTarget, String> {
         if kind == Kind::Room {
             let id = self.room_id(typed);
             let path = self.world.path_of(Kind::Room, &id).ok_or_else(|| super::session::suggest(&format!("No room `{}`. To make one:", id), &[&format!("/new room {}", id)]))?;

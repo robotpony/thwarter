@@ -147,6 +147,13 @@ impl<'a> Screen<'a> {
                 self.menu = None;
             }
             Input { key: Key::Char('d'), ctrl: true, .. } if self.input_text().is_empty() => self.quit = true,
+            Input { key: Key::Char(c @ '1'..='9'), alt: true, .. } => {
+                let name = lock(console).to_write_at(c as usize - '0' as usize);
+                if let Some(name) = name {
+                    self.set_input(&format!("/write {}", name));
+                    self.submit(console);
+                }
+            }
             input => {
                 self.browsing = None;
                 self.input.input(input);
@@ -771,6 +778,12 @@ fn input_of(key: ratatui::crossterm::event::KeyEvent) -> Input {
     if key.modifiers.contains(KeyModifiers::SUPER) && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S')) {
         return Input { key: Key::Char('s'), ctrl: true, ..Input::default() };
     }
+    // Command-1 to 9 pick a TO WRITE entry, as Alt-1 to 9 do (REQ-CON-59).
+    if key.modifiers.contains(KeyModifiers::SUPER) {
+        if let KeyCode::Char(c @ '1'..='9') = key.code {
+            return Input { key: Key::Char(c), alt: true, ..Input::default() };
+        }
+    }
     Input::from(key)
 }
 
@@ -1231,6 +1244,27 @@ mod tests {
         let well = std::fs::read_to_string(root.join("village/well.md")).unwrap();
         assert!(well.contains("desk"), "{}", well);
         assert!(!square.contains("desk"), "not in edit mode's room too: {}", square);
+    }
+
+    #[test]
+    fn command_number_writes_that_entry_and_opens_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("hall.md"), "---\nid: hall\ntitle: Hall\ntype: location\n---\nPeeling [[wallpaper]], and @wallpaper again. A [[hole]].\n").unwrap();
+        let mut console = Console::open(root, super::super::Mode::Edit).unwrap();
+        console.interactive = true;
+        console.handle("go hall");
+        let rows: Vec<String> = console.to_write_panel().iter().map(|r| format!("{:?}", r)).collect();
+        assert!(rows.iter().any(|r| r.contains("wallpaper") && r.contains("×2")), "{:?}", rows);
+        let console = Mutex::new(console);
+        let mut screen = Screen::new("", None);
+        use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        screen.key(input_of(KeyEvent::new(KeyCode::Char('2'), KeyModifiers::SUPER)), &console);
+        assert!(screen.editing.is_some(), "the new card opens: {:?}", screen.output);
+        assert!(root.join("objects/hole.md").exists());
+        let hall = std::fs::read_to_string(root.join("hall.md")).unwrap();
+        assert!(hall.contains("hole"), "listed in the room that names it: {}", hall);
+        assert!(lock(&console).to_write().iter().all(|e| e.name != "hole"));
     }
 
     #[test]

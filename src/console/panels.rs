@@ -135,6 +135,13 @@ impl Console {
                 rest.extend(self.notes.iter().map(|n| Row::Warning(format!("  {}", n))));
             }
         }
+        if self.mode == Mode::Edit {
+            let to_write = self.to_write_panel();
+            if !to_write.is_empty() {
+                rest.push(Row::Blank);
+                rest.extend(to_write);
+            }
+        }
         Sidebar { fixed, rest, warnings: self.warnings_panel() }
     }
 
@@ -514,7 +521,7 @@ mod tests {
             vec!["# GAME", "at  village/square", "chapter  none", "carrying  brass lantern"]
         );
         let rest = texts(&sidebar.rest);
-        let here: Vec<&str> = rest.iter().map(String::as_str).skip_while(|r| !r.starts_with("# HERE")).collect();
+        let here: Vec<&str> = rest.iter().map(String::as_str).skip_while(|r| !r.starts_with("# HERE")).take_while(|r| !r.is_empty()).collect();
         assert_eq!(
             here,
             vec![
@@ -558,10 +565,10 @@ mod tests {
     #[test]
     fn here_in_a_folder_lists_what_it_holds() {
         let mut console = tiny();
-        let here: Vec<String> = texts(&console.sidebar().rest).into_iter().skip_while(|r| !r.starts_with("# HERE")).collect();
+        let here: Vec<String> = texts(&console.sidebar().rest).into_iter().skip_while(|r| !r.starts_with("# HERE")).take_while(|r| !r.is_empty()).collect();
         assert_eq!(here, vec!["# HERE  /", "  npcs/", "  objects/", "  village/"]);
         console.handle("go village");
-        let here: Vec<String> = texts(&console.sidebar().rest).into_iter().skip_while(|r| !r.starts_with("# HERE")).collect();
+        let here: Vec<String> = texts(&console.sidebar().rest).into_iter().skip_while(|r| !r.starts_with("# HERE")).take_while(|r| !r.is_empty()).collect();
         assert_eq!(here, vec!["# HERE  village/", "  square  room", "  well  room"]);
     }
 

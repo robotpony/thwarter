@@ -23,3 +23,11 @@ Removed lantern: 1 deleted, 1 changed.
 Not removed: village/square still holds `elder`, `bench`; move or remove them first
 > /remove nothing-at-all
 Nothing called `nothing-at-all` here or anywhere in the world.
+> /write
+Not written yet:
+
+  /write village/inn
+> /write village/inn
+Wrote village/inn (room).
+> /write
+Nothing to write: every name the world mentions is written.

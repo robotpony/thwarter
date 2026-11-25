@@ -61,6 +61,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 
 
+
+## 0.70.0 (2026-11-24)
+
+### Added
+
+- TO WRITE (REQ-CON-57 to 59, Bruce, 2026-11-24): the sidebar lists each name the world mentions but doesn't define, once, with a count and a key, from the coder's `not_written()` (999e382). Cmd-1 to Cmd-9, or Alt-1 to Alt-9 in a terminal that keeps Cmd, and `/write [<name>]` make it with defaults: a room if an exit leads there, else a scenery card listed in the first room, thing or person whose file names it. Then it opens in the editor. Both modifiers always work; choosing one in `config.toml` isn't built yet.
+
 ## 0.69.0 (2026-11-24)
 
 ### Added
