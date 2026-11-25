@@ -78,7 +78,7 @@ The glass shatters. Cold air pours in.
 
 *Proposed*: this replaces the frontmatter `actions:` map. A world's verbs are the action tags its headings use, which is what the parser's REQ-PC-14 check already asks ("does any thing have this verb?"). `requires:` becomes names in the heading: `## When: #unlock @brass-key` works only while the player holds the key, and a section headed `## Unless: @brass-key` is the refusal. *Proposed*: `When:` and `Unless:` can't share one heading, so a refusal needs Open question 5's answer on combining them. The `actions:` map and `requires:` then go.
 
-Until Bruce confirms this, mechanics stay in frontmatter `actions:` (settled with the coder, 2026-11-23). A reply section supplies the words: with a matching action it replaces the built-in reply, and without one it shows its text and changes nothing. An action tag in any heading counts as a verb the world knows (REQ-PC-14).
+Until Bruce confirms this, mechanics stay in frontmatter `actions:` (settled with the coder, 2026-11-23). The exception is `talk` and `ask`, which have no frontmatter action: their reply sections' blocks run `becomes:` (with `this`), `sets:` and `chapter:` (2748ecc, REQ-ENG-61, 62). A reply section supplies the words: with a matching action it replaces the built-in reply, and without one it shows its text and changes nothing. An action tag in any heading counts as a verb the world knows (REQ-PC-14).
 
 A description section's block MAY hold data that applies while it matches, such as a door's `passable:`, merging over frontmatter the way layers merge today (REQ-CF-13). *Proposed*: one block per section, first in it.
 

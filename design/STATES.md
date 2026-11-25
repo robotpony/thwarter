@@ -312,7 +312,7 @@ Built in 0.24.0 (79af69c): the reply is the `## When: #ambiguous` section of the
 Where a thing's file lives is its scope (Bruce, 2026-11-23):
 - **Global**: the world's root folders (`objects/`, `npcs/`, `doors/`) and their `templates/`.
 - **Area**: inside an area folder, for things that belong to one part of the world.
-- **Local**: inside a thing's bundle.
+- **Local**: inside a thing's bundle, in the same kind folders an area uses one level down: a local torch in the room `castle/hall` is `castle/hall/objects/torch.md`, apart from the bundle's own `index.md` and states. A room that isn't a bundle becomes one first, as `/state` does (Bruce, 2026-11-25).
 
 The console MUST make scope easy. While writing a room, an author can add several things and choose their scope as they go (for example, add three objects, all global), and can later change a thing's scope. Changing scope moves the file; because object, character and door ids don't include their folder, references to them stay valid. The commands are console work, still to be designed (`design/CONSOLE_REQUIREMENTS.md`).
 
