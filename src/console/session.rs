@@ -327,6 +327,8 @@ impl Console {
                 self.t("help_play_rows", &[]),
             ]),
         }
+        // The console has the mouse for sidebar clicks (REQ-CON-70).
+        lines.extend([String::new(), self.t("help_mouse", &[])]);
         lines.join("\n")
     }
 

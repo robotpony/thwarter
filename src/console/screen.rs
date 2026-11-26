@@ -72,6 +72,10 @@ pub struct Screen<'a> {
     sidebar_scroll: usize,
     /// The output pane's height at the last draw, for Page Up and Down.
     page: Cell<usize>,
+    /// Where the sidebar was at the last draw, for the wheel, and what a
+    /// click on each of its screen rows does (REQ-CON-69, 70).
+    sidebar_area: Cell<Rect>,
+    clicks: std::cell::RefCell<Vec<(u16, Click)>>,
     /// This binary's modification time when it started, to notice a newer build.
     built: Option<SystemTime>,
     newer_build: bool,
@@ -98,6 +102,8 @@ impl<'a> Screen<'a> {
             menu_dismissed: None,
             sidebar_scroll: 0,
             page: Cell::new(20),
+            sidebar_area: Cell::new(Rect::default()),
+            clicks: Default::default(),
             built: binary_built(),
             newer_build: false,
             history_file: None,
@@ -370,6 +376,63 @@ impl<'a> Screen<'a> {
         if let Some(target) = console.take_pending_edit() {
             let document = console.edit_document(&target);
             self.editing = Some((Editor::new(document).with_texts(console.texts.clone()), target));
+        }
+    }
+
+    /// The mouse (REQ-CON-69, 70): a left click on a sidebar row does what
+    /// its key does; the wheel scrolls what's under the pointer.
+    pub fn mouse(&mut self, event: ratatui::crossterm::event::MouseEvent, console: &Mutex<Console>) {
+        use ratatui::crossterm::event::{MouseButton, MouseEventKind};
+        let side = self.sidebar_area.get();
+        let in_side = side.width > 0 && event.column >= side.x && event.column < side.right() && event.row >= side.y && event.row < side.bottom();
+        match event.kind {
+            MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
+                let up = event.kind == MouseEventKind::ScrollUp;
+                if in_side {
+                    self.sidebar_scroll = if up { self.sidebar_scroll.saturating_sub(1) } else { self.sidebar_scroll + 1 };
+                } else if let Some((editor, target)) = &mut self.editing {
+                    let key = if up { Key::MouseScrollUp } else { Key::MouseScrollDown };
+                    editor.key(Input { key, ..Input::default() }, &mut EditFiles { console, target });
+                } else if up {
+                    self.scroll += 3;
+                } else {
+                    self.scroll = self.scroll.saturating_sub(3);
+                }
+            }
+            MouseEventKind::Down(MouseButton::Left) if in_side => {
+                let click = self.clicks.borrow().iter().find(|(y, _)| *y == event.row).map(|(_, c)| c.clone());
+                if let Some(click) = click {
+                    self.click(click, console);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Does what a sidebar row's key or command does.
+    fn click(&mut self, click: Click, console: &Mutex<Console>) {
+        if self.quick.is_some() || self.picker.is_some() || self.dropdown.is_some() {
+            return;
+        }
+        match click {
+            Click::QuickMenu if self.editing.is_some() => self.key(Input { key: Key::Char('m'), ctrl: true, ..Input::default() }, console),
+            Click::QuickMenu => self.open_quick(console),
+            Click::ToWrite(n @ 1..=9) => {
+                let digit = char::from(b'0' + n as u8);
+                self.key(Input { key: Key::Char(digit), alt: true, ..Input::default() }, console);
+            }
+            Click::ToWrite(n) if self.editing.is_none() => {
+                let name = lock(console).to_write_at(n);
+                if let Some(name) = name {
+                    self.set_input(&format!("/write {}", name));
+                    self.submit(console);
+                }
+            }
+            Click::Exit(direction) if self.editing.is_none() => {
+                self.set_input(&format!("go {}", direction));
+                self.submit(console);
+            }
+            _ => {}
         }
     }
 
@@ -776,6 +839,7 @@ impl<'a> Screen<'a> {
     }
 
     fn draw_sidebar(&self, frame: &mut Frame, area: Rect, fixed: &[Row], rest: &[Row], warnings: &[Row]) {
+        self.sidebar_area.set(area);
         let block = Block::default().borders(Borders::LEFT).border_style(style(Role::Chrome));
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -798,6 +862,12 @@ impl<'a> Screen<'a> {
         // Long rows wrap within the sidebar, keeping their indent.
         let width = inner.width.saturating_sub(1).max(1) as usize;
         let wrapped = |rows: &[Row]| -> Vec<Row> { rows.iter().flat_map(|row| wrap_row(row, width)).collect() };
+        // What a click on each of rest's rows does, wrapped rows included.
+        let rest_clicks: Vec<Option<Click>> = clicks_of(rest, &self.words)
+            .into_iter()
+            .zip(rest)
+            .flat_map(|(click, row)| std::iter::repeat_n(click, wrap_row(row, width).len()))
+            .collect();
         let (fixed, rest) = (wrapped(fixed), wrapped(rest));
         let fixed_height = (fixed.len() as u16).min(inner.height);
         let [top, bottom] = Layout::vertical([Constraint::Length(fixed_height), Constraint::Min(0)]).areas(inner);
@@ -805,6 +875,13 @@ impl<'a> Screen<'a> {
 
         let height = bottom.height as usize;
         let start = self.sidebar_scroll.min(rest.len().saturating_sub(height));
+        let mut clicks = self.clicks.borrow_mut();
+        clicks.clear();
+        for (i, click) in rest_clicks.iter().enumerate().skip(start).take(height) {
+            if let Some(click) = click {
+                clicks.push((bottom.y + (i - start) as u16, click.clone()));
+            }
+        }
         let mut lines: Vec<Line> = rest.iter().skip(start).take(height).map(row_line).collect();
         if rest.len() > start + height && height > 0 {
             lines.pop();
@@ -1252,10 +1329,10 @@ pub fn run(console: Arc<Mutex<Console>>, notices: Receiver<String>, resumed: Opt
         loop {
             draw(&mut terminal, &screen, &console)?;
             if event::poll(Duration::from_millis(200))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind != KeyEventKind::Release {
-                        screen.key(input_of(key), &console);
-                    }
+                match event::read()? {
+                    Event::Key(key) if key.kind != KeyEventKind::Release => screen.key(input_of(key), &console),
+                    Event::Mouse(mouse) => screen.mouse(mouse, &console),
+                    _ => {}
                 }
             }
             screen.tick(&console, &notices);
@@ -1296,7 +1373,9 @@ pub(super) fn enter_terminal() -> std::io::Result<ratatui::DefaultTerminal> {
     let terminal = ratatui::try_init()?;
     let _ = ratatui::crossterm::execute!(
         std::io::stdout(),
-        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES),
+        // Clicks in the sidebar (REQ-CON-69); Shift-drag still selects.
+        ratatui::crossterm::event::EnableMouseCapture
     );
     clear_screen()?;
     Ok(terminal)
@@ -1304,7 +1383,11 @@ pub(super) fn enter_terminal() -> std::io::Result<ratatui::DefaultTerminal> {
 
 /// Gives the terminal back as it was.
 pub(super) fn leave_terminal() {
-    let _ = ratatui::crossterm::execute!(std::io::stdout(), ratatui::crossterm::event::PopKeyboardEnhancementFlags);
+    let _ = ratatui::crossterm::execute!(
+        std::io::stdout(),
+        ratatui::crossterm::event::DisableMouseCapture,
+        ratatui::crossterm::event::PopKeyboardEnhancementFlags
+    );
     ratatui::restore();
 }
 
@@ -1342,6 +1425,47 @@ fn input_line<'a>() -> TextArea<'a> {
 }
 
 /// A panel row as one or more rows of at most `width` characters.
+/// What a click on a sidebar row does (REQ-CON-69).
+#[derive(Debug, Clone, PartialEq)]
+enum Click {
+    QuickMenu,
+    /// The nth TO WRITE entry, from 1.
+    ToWrite(usize),
+    /// Go through this exit.
+    Exit(String),
+}
+
+/// The click for each row: exits by their direction, TO WRITE entries by
+/// their place in the list, and the quick menu's hint.
+fn clicks_of(rows: &[Row], words: &Words) -> Vec<Option<Click>> {
+    let to_write = words.text("side_to_write", &[]);
+    let hints = [words.text("side_quick_menu", &[]), words.text("side_quick_menu_editor", &[])];
+    let mut in_to_write = None;
+    rows.iter()
+        .map(|row| match row {
+            Row::Heading(t) => {
+                in_to_write = (t.trim() == to_write.trim()).then_some(0);
+                None
+            }
+            Row::Blank => {
+                in_to_write = None;
+                None
+            }
+            Row::Exit(t, _) => {
+                let direction = t.trim().split(" -").next().unwrap_or("").trim().to_string();
+                (!direction.is_empty()).then_some(Click::Exit(direction))
+            }
+            Row::Dim(t) if hints.contains(t) => Some(Click::QuickMenu),
+            Row::Text(_) if in_to_write.is_some() => {
+                let n = in_to_write.map(|n| n + 1).unwrap_or(1);
+                in_to_write = Some(n);
+                Some(Click::ToWrite(n))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 fn wrap_row(row: &Row, width: usize) -> Vec<Row> {
     let (text, make): (&str, fn(String) -> Row) = match row {
         Row::Heading(t) => (t, Row::Heading),
@@ -1904,6 +2028,50 @@ mod tests {
         keys(&mut screen, &console, "~");
         assert!(screen.dropdown.is_none());
         assert!(screen.editing.is_some());
+    }
+
+    #[test]
+    fn a_click_in_the_sidebar_does_what_its_key_does() {
+        use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+        let dir = tempfile::tempdir().unwrap();
+        let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny");
+        let root = dir.path().join("tiny");
+        for entry in walkdir::WalkDir::new(&from) {
+            let entry = entry.unwrap();
+            let to = root.join(entry.path().strip_prefix(&from).unwrap());
+            if entry.file_type().is_dir() {
+                std::fs::create_dir_all(&to).unwrap();
+            } else {
+                std::fs::copy(entry.path(), &to).unwrap();
+            }
+        }
+        let mut console = Console::open(&root, super::super::Mode::Edit).unwrap();
+        console.interactive = true;
+        let console = Mutex::new(console);
+        let mut screen = Screen::new("", None);
+        typed(&mut screen, &console, "go /village/square");
+        // Clicks the first sidebar row showing `text`.
+        let click = |screen: &mut Screen, text: &str| {
+            let shown = screen_text(screen, &console, 140, 50);
+            let side = screen.sidebar_area.get();
+            let row = shown.lines().position(|l| l.chars().skip(side.x as usize).collect::<String>().contains(text)).unwrap_or_else(|| panic!("{} in {}", text, shown));
+            let event = MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column: side.x + 2, row: row as u16, modifiers: KeyModifiers::NONE };
+            screen.mouse(event, &console);
+        };
+        click(&mut screen, "quick menu");
+        assert!(screen.quick.is_some(), "the hint opens the menu");
+        press(&mut screen, &console, Key::Esc);
+        click(&mut screen, "north");
+        assert!(lock(&console).pwd().contains("well"), "the exit is gone through: {}", lock(&console).pwd());
+        typed(&mut screen, &console, "go /village/square");
+        click(&mut screen, "⌃1");
+        assert!(screen.editing.is_some(), "the TO WRITE entry is written and opened");
+        press(&mut screen, &console, Key::Esc);
+        // The wheel over the sidebar scrolls it, not the output.
+        let side = screen.sidebar_area.get();
+        let wheel = MouseEvent { kind: MouseEventKind::ScrollDown, column: side.x + 2, row: side.y + 2, modifiers: KeyModifiers::NONE };
+        screen.mouse(wheel, &console);
+        assert_eq!(screen.sidebar_scroll, 1);
     }
 
     #[test]

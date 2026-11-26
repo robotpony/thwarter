@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.98.0 (2026-11-25)
+
+### Added
+
+- Sidebar clicks (REQ-CON-69, 70): a click on the quick menu's hint opens the menu, on a TO WRITE name writes and opens it, and on an exit goes through it. The console now captures the mouse, so the wheel scrolls the output, the sidebar or the editor under the pointer, and Shift-drag selects text; `/help` says so.
+
 ## 0.97.0 (2026-11-25)
 
 ### Added

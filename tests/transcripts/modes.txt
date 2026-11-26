@@ -98,6 +98,8 @@ Edit mode moves through the world as play does:
   go back               back to where you were;  go /  goes to the world root
   look                  show where you are: a room, a thing, or a folder
   examine <thing>, x    show a person or thing here without going to it
+
+Click a sidebar exit, TO WRITE name or the quick menu to use it. Shift-drag selects text.
 > /status
 Tiny World, at tests/worlds/tiny
 Mode: edit; edit mode is at village/square
