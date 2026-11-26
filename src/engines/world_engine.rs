@@ -290,7 +290,7 @@ pub struct WorldLoadReport {
     pub characters: Vec<Character>,
     pub errors: Vec<String>,
     /// Problems that don't fail validation: a key that differs only in
-    /// case from a known one, a list a layer replaces, an overlay that
+    /// case from a known one, a list a layer replaces, an area overlay that
     /// applies by where it sits (each prefixed with its file), or an id
     /// shared between kinds.
     pub warnings: Vec<String>,
