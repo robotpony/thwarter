@@ -51,6 +51,19 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.96.0 (2026-11-25)
+
+### Added
+
+- `/action <verb> any --> <to>` writes an action in the thing's own frontmatter, where it works in every state.
+- The quick menu's questions each have a hint line naming the world's own states or exits, and visibility and recipe options have a note each. Add action offers "any state" as its from-state and "a new state…" as its to-state (REQ-CON-65).
+
+### Fixed
+
+- `/action` from a state on a thing with no starting state left the action unable to run (REQ-ENG-18). It now asks whether the thing starts in that state.
+- While the editor is open, the sidebar's quick menu hint follows the open file and shows only ⌃M, never `/menu`; Ctrl-M there no longer moves edit mode's place.
+- A command that adds only warnings says "This adds 1 warning(s)", not "problem(s)".
+
 ## 0.95.2 (2026-11-25)
 
 ### Fixed

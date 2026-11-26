@@ -109,6 +109,7 @@ const KINDS: &[(&str, Kind)] = &[
     ("cant_read_world_index", Kind::Error),
     ("watching_failed", Kind::Error),
     ("adds_problems", Kind::Warning),
+    ("adds_warnings", Kind::Warning),
     ("play_mode", Kind::Done),
     ("reply_with_note", Kind::Note),
     ("changed_on_disk", Kind::Done),

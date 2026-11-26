@@ -33,6 +33,9 @@ pub enum Asked {
     Remove { kind: Kind, id: String },
     /// Whether to make `world/index.md`, which the world doesn't have.
     MakeWorldIndex,
+    /// Whether a thing with no starting state starts in `state`, after
+    /// `/action` made an action that works only there.
+    StartIn { kind: Kind, id: String, state: String },
 }
 
 impl Console {
@@ -96,6 +99,7 @@ impl Console {
                 }
             }
             Asked::Remove { kind, id } => self.confirm_remove(kind, &id, line),
+            Asked::StartIn { kind, id, state } => self.answer_start_in(kind, &id, &state, line),
             Asked::MakeWorldIndex => {
                 if matches!(line.trim().to_lowercase().as_str(), "y" | "yes") {
                     self.make_world_index(None, true)

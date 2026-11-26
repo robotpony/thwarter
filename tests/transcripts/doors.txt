@@ -13,7 +13,7 @@ Added door-village-cellar-steps-village-square: south of village/square, north o
 Added door-village-square, up from village/square. It has one side so far; to give it another:
 
   /add {room} door-village-square
-This adds 1 problem(s):
+This adds 1 warning(s):
   door `door-village-square`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
 > /add village/loft door-village-square-up
 Character and object ids are bare names, without folders: `loft`.
@@ -23,7 +23,7 @@ Which way is the door from village/square? north, east, south, west, up, down, o
 Added door-village-square-2, northwest of village/square. It has one side so far; to give it another:
 
   /add {room} door-village-square-2
-This adds 1 problem(s):
+This adds 1 warning(s):
   door `door-village-square-2`: it's only in `village/square` so far, so it leads nowhere; give it a side in the room it opens onto
 > go west
 Hallway (room)

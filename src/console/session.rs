@@ -189,7 +189,7 @@ impl Console {
         if let Some(asked) = self.asked.take() {
             // A yes-or-no question takes only yes or no; anything else
             // drops it and runs as typed.
-            let yes_no = matches!(asked, super::doors::Asked::MoveHere { .. } | super::doors::Asked::Remove { .. } | super::doors::Asked::MakeWorldIndex);
+            let yes_no = matches!(asked, super::doors::Asked::MoveHere { .. } | super::doors::Asked::Remove { .. } | super::doors::Asked::MakeWorldIndex | super::doors::Asked::StartIn { .. });
             let answers = !line.starts_with('/')
                 && (!yes_no || matches!(line.trim().to_lowercase().as_str(), "y" | "yes" | "n" | "no"));
             if answers {

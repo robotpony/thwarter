@@ -19,11 +19,27 @@ const RECIPES: &[&str] = &["fixed-until", "locked-with", "switch", "container"];
 /// One question an entry asks.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ask {
-    /// Something typed, named by its `[console]` text key. A required one
-    /// won't take a blank answer.
-    Text { key: &'static str, required: bool },
-    /// One of `options`, starting at `default`.
-    Choose { key: &'static str, options: Vec<String>, default: usize },
+    /// Something typed, named by its `[console]` text key, with a hint
+    /// under it. A required one won't take a blank answer.
+    Text { key: &'static str, hint: &'static str, required: bool },
+    /// One of `options`, starting at `default`. `new` adds a last option,
+    /// "a new state…", that asks for a name instead. `describe` is the
+    /// text key prefix for a note beside each option (`<prefix>_<option>`).
+    Choose { key: &'static str, hint: &'static str, options: Vec<String>, default: usize, new: bool, describe: Option<&'static str> },
+}
+
+impl Ask {
+    pub fn key(&self) -> &'static str {
+        match self {
+            Ask::Text { key, .. } | Ask::Choose { key, .. } => key,
+        }
+    }
+
+    pub fn hint(&self) -> &'static str {
+        match self {
+            Ask::Text { hint, .. } | Ask::Choose { hint, .. } => hint,
+        }
+    }
 }
 
 /// What an entry does with its answers.
@@ -82,37 +98,52 @@ pub struct QuickMenu {
     pub id: String,
     pub kind: Kind,
     pub entries: Vec<Entry>,
+    /// What the hints name from the world: `states` and `exits`.
+    pub facts: Vec<(&'static str, String)>,
 }
 
 /// The entries for a kind of place, given the thing's states (sorted) and
 /// the one it starts in.
 fn entries_for(kind: Kind, has_states_at_all: bool, states: &[String], start: Option<&str>) -> Vec<Entry> {
     let room = kind == Kind::Room;
-    let state_ask = |key: &'static str| match states.is_empty() {
-        true => Ask::Text { key, required: true },
-        false => Ask::Choose { key, options: states.to_vec(), default: 0 },
+    let text = |key, hint| Ask::Text { key, hint, required: true };
+    let choose = |key, hint, options: Vec<String>, default| Ask::Choose { key, hint, options, default, new: false, describe: None };
+    // A state question: a choice of the states there are, or typed when
+    // there are none. `any` offers "any state" first; `new` offers a new
+    // one last (Bruce, 2026-11-25).
+    let state_ask = |key, hint, any: bool, new: bool| {
+        let mut options: Vec<String> = if any { vec!["any".to_string()] } else { Vec::new() };
+        options.extend(states.iter().cloned());
+        if options.is_empty() {
+            Ask::Text { key, hint, required: true }
+        } else {
+            Ask::Choose { key, hint, options, default: 0, new, describe: None }
+        }
     };
-    let yes_no = vec!["no".to_string(), "start".to_string()];
+    let strings = |list: &[&str]| list.iter().map(|v| v.to_string()).collect::<Vec<_>>();
     let mut out = Vec::new();
     let mut entry = |letter, label, stands_for, asks, does| out.push(Entry { letter, label, stands_for, asks, does });
     if has_states_at_all {
-        entry('a', "qm_action", "/action", vec![Ask::Text { key: "qm_ask_verb", required: true }, state_ask("qm_ask_from"), state_ask("qm_ask_to")], Does::Action);
-        entry('s', "qm_state", "/state", vec![Ask::Text { key: "qm_ask_state_name", required: true }, Ask::Choose { key: "qm_ask_starts", options: yes_no, default: 0 }], Does::State);
-        let visibilities = VISIBILITIES.iter().map(|v| v.to_string()).collect();
-        entry('v', "qm_visibility", "/set visibility", vec![state_ask("qm_ask_which_state"), Ask::Choose { key: "qm_ask_visibility", options: visibilities, default: 2 }], Does::Visibility { has_states: !states.is_empty() });
+        let from = state_ask("qm_ask_from", "qm_hint_from", true, true);
+        let to = state_ask("qm_ask_to", "qm_hint_to", false, true);
+        entry('a', "qm_action", "/action", vec![text("qm_ask_verb", "qm_hint_verb"), from, to], Does::Action);
+        let starts = choose("qm_ask_starts", "qm_hint_starts", strings(&["no", "start"]), 0);
+        entry('s', "qm_state", "/state", vec![text("qm_ask_state_name", "qm_hint_state_name"), starts], Does::State);
+        let visibility = Ask::Choose { key: "qm_ask_visibility", hint: "qm_hint_visibility", options: strings(VISIBILITIES), default: 2, new: false, describe: Some("qm_vis") };
+        entry('v', "qm_visibility", "/set visibility", vec![state_ask("qm_ask_which_state", "qm_hint_which_state", false, true), visibility], Does::Visibility { has_states: !states.is_empty() });
         if !states.is_empty() {
             let default = start.and_then(|s| states.iter().position(|n| n == s)).unwrap_or(0);
-            entry('t', "qm_start", "/state {name} start", vec![Ask::Choose { key: "qm_ask_start", options: states.to_vec(), default }], Does::Start);
+            entry('t', "qm_start", "/state {name} start", vec![choose("qm_ask_start", "qm_hint_start", states.to_vec(), default)], Does::Start);
         }
     }
     if room {
-        entry('l', "qm_link", "/link", vec![Ask::Text { key: "qm_ask_direction", required: true }, Ask::Text { key: "qm_ask_room", required: true }], Does::Link);
-        entry('n', "qm_add_thing", "/add", vec![Ask::Text { key: "qm_ask_thing", required: true }], Does::AddThing);
-        entry('d', "qm_add_door", "/add door", vec![Ask::Text { key: "qm_ask_direction", required: true }, Ask::Text { key: "qm_ask_room", required: true }], Does::AddDoor);
+        entry('l', "qm_link", "/link", vec![text("qm_ask_direction", "qm_hint_direction"), text("qm_ask_room", "qm_hint_room")], Does::Link);
+        entry('n', "qm_add_thing", "/add", vec![text("qm_ask_thing", "qm_hint_thing")], Does::AddThing);
+        entry('d', "qm_add_door", "/add door", vec![text("qm_ask_direction", "qm_hint_direction"), text("qm_ask_room", "qm_hint_room")], Does::AddDoor);
     }
     if has_states_at_all && kind != Kind::Door {
-        let recipes = RECIPES.iter().map(|r| r.to_string()).collect();
-        entry('p', "qm_recipe", "/recipe", vec![Ask::Choose { key: "qm_ask_recipe", options: recipes, default: 0 }, Ask::Text { key: "qm_ask_recipe_with", required: false }], Does::Recipe);
+        let recipe = Ask::Choose { key: "qm_ask_recipe", hint: "qm_hint_recipe", options: strings(RECIPES), default: 0, new: false, describe: Some("qm_recipe") };
+        entry('p', "qm_recipe", "/recipe", vec![recipe, Ask::Text { key: "qm_ask_recipe_with", hint: "qm_hint_recipe_with", required: false }], Does::Recipe);
     }
     if room {
         entry('g', "qm_play", "/play here", Vec::new(), Does::Play);
@@ -123,13 +154,19 @@ fn entries_for(kind: Kind, has_states_at_all: bool, states: &[String], start: Op
 impl Console {
     /// The quick menu for where edit mode is, or why there's none.
     pub(super) fn quick_menu(&self) -> Result<QuickMenu, String> {
+        match &self.place {
+            Place::File(path) => self.quick_menu_for(Some(path)),
+            _ => self.quick_menu_for(None),
+        }
+    }
+
+    /// The quick menu for one file (`World::files`' key), such as the one
+    /// open in the editor.
+    pub(super) fn quick_menu_for(&self, path: Option<&str>) -> Result<QuickMenu, String> {
         if self.mode != super::Mode::Edit {
             return Err(self.t("edit_only_command", &[("command", "menu")]));
         }
-        let entry = match &self.place {
-            Place::File(path) => self.world.files.get(path),
-            _ => None,
-        };
+        let entry = path.and_then(|p| self.world.files.get(p));
         let Some(entry) = entry.filter(|e| matches!(e.kind, Kind::Room | Kind::Object | Kind::Character | Kind::Door)) else {
             return Err(self.t("qm_nowhere", &[]));
         };
@@ -138,7 +175,17 @@ impl Console {
         let states = thing.map(|t| t.state_names()).unwrap_or_default();
         let start = thing.and_then(|t| t.starting_state.clone());
         let entries = entries_for(entry.kind, engine_kind.is_some(), &states, start.as_deref());
-        Ok(QuickMenu { id: entry.id.clone(), kind: entry.kind, entries })
+        let listed = |names: Vec<String>| if names.is_empty() { self.t("qm_none_yet", &[]) } else { names.join(", ") };
+        let exits = match entry.kind {
+            Kind::Room => self.world.engine.get_location(&entry.id).map(|l| {
+                let mut names: Vec<String> = l.connections.keys().cloned().collect();
+                names.sort();
+                names
+            }).unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        let facts = vec![("states", listed(states)), ("exits", listed(exits))];
+        Ok(QuickMenu { id: entry.id.clone(), kind: entry.kind, entries, facts })
     }
 
     /// `/menu`: on a terminal the screen opens the menu; elsewhere, such

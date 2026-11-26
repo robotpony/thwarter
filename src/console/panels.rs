@@ -108,7 +108,15 @@ impl Console {
     }
 
     /// GAME, then MAP, then HERE in edit mode.
+    #[cfg(test)]
     pub(super) fn sidebar(&self) -> Sidebar {
+        self.sidebar_editing(None)
+    }
+
+    /// The sidebar, with the file open in the editor if there is one: the
+    /// quick menu's hint follows that file, and shows only the key the
+    /// editor has (REQ-CON-63).
+    pub(super) fn sidebar_editing(&self, editing: Option<&str>) -> Sidebar {
         let (fixed, mut rest) = self.game_panel();
         let map = self.map_panel();
         if !map.is_empty() {
@@ -119,9 +127,13 @@ impl Console {
             rest.push(Row::Blank);
             rest.extend(self.here_panel());
             // How to open the quick menu, where there's one (REQ-CON-63).
-            if self.quick_menu().is_ok() {
+            let (has_menu, key) = match editing {
+                Some(path) => (self.quick_menu_for(Some(path)).is_ok(), "side_quick_menu_editor"),
+                None => (self.quick_menu().is_ok(), "side_quick_menu"),
+            };
+            if has_menu {
                 rest.push(Row::Blank);
-                rest.push(Row::Dim(self.t("side_quick_menu", &[])));
+                rest.push(Row::Dim(self.t(key, &[])));
             }
         } else if let Some(game) = &self.game {
             // Play's text is the player's; the detail an author needs goes

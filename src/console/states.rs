@@ -102,6 +102,7 @@ impl Console {
     pub(super) fn action_command(&mut self, args: &[&str]) -> String {
         let usage = || suggest(&self.t("usage", &[]), &["/action {verb} {from} --> {to} [with {thing}]"]);
         let (verb, from, to, with) = match args {
+            [_, "any", "-->", "any", ..] => return usage(),
             [verb, from, "-->", to] => (*verb, *from, *to, None),
             [verb, from, "-->", to, "with", thing] => (*verb, *from, *to, Some(*thing)),
             _ => return usage(),
@@ -110,18 +111,33 @@ impl Console {
             Ok(thing) => thing,
             Err(e) => return e,
         };
+        // `any` is no state: the action goes in the thing's own frontmatter
+        // and works whatever state it's in (Bruce, 2026-11-25).
+        let any = from == "any";
         let mut written = Vec::new();
         for state in [from, to] {
+            if state == "any" {
+                continue;
+            }
             if let Err(e) = self.make_state(kind, entity, &id, state, &mut written) {
                 return self.after_writes(&written, e);
             }
         }
         let requires = with.map(|t| format!(", requires: {{ has: {} }}", t)).unwrap_or_default();
         let mechanics = format!("{{ becomes: {{ {}: {} }}{} }}", id, to, requires);
-        match self.edit_state_file(entity, &id, from, |text| set_action(text, verb, &mechanics)) {
+        let wrote = if any {
+            let index = self.index_text(entity, &id).unwrap_or_default();
+            self.save(kind, &id, &[Edit::ReplaceAll(set_action(&index, verb, &mechanics))])
+        } else {
+            self.edit_state_file(entity, &id, from, |text| set_action(text, verb, &mechanics))
+        };
+        match wrote {
             Ok(path) => written.push(path),
             Err(e) => return self.after_writes(&written, e),
         }
+        // A thing in no state never uses a state's action (REQ-ENG-18), so
+        // with no `state:` yet, ask whether it starts in this one.
+        let starts = !any && !has_start(&self.index_text(entity, &id).unwrap_or_default());
         // The reply goes where the thing ends up (SECTIONS.md): a section in
         // the thing's index, opened in the editor to write.
         let heading = format!("## When: #{} #{}", verb, to);
@@ -133,7 +149,7 @@ impl Console {
                 Err(e) => return self.after_writes(&written, e),
             }
         }
-        if self.interactive {
+        if self.interactive && !starts {
             if let Some(path) = self.world.path_of(kind, &id) {
                 if let Ok(target) = self.open_target(kind, id.clone(), path) {
                     self.pending_edit = Some(target);
@@ -144,7 +160,33 @@ impl Console {
             Some(key) => self.t("action_made_with", &[("verb", verb), ("from", from), ("to", to), ("key", key), ("heading", &heading)]),
             None => self.t("action_made", &[("verb", verb), ("from", from), ("to", to), ("heading", &heading)]),
         };
-        self.after_writes(&written, summary)
+        let mut out = self.after_writes(&written, summary);
+        if starts {
+            self.asked = Some(super::doors::Asked::StartIn { kind, id: id.clone(), state: from.to_string() });
+            out = format!("{}\n\n{}", out, self.t("action_starts_in", &[("id", &id), ("state", from)]));
+        }
+        out
+    }
+
+    /// The answer to "Does it start in <state>?": yes writes `state:`.
+    pub(super) fn answer_start_in(&mut self, kind: Kind, id: &str, state: &str, line: &str) -> String {
+        if !matches!(line.trim().to_lowercase().as_str(), "y" | "yes") {
+            return self.t("action_start_left", &[("id", id), ("state", state)]);
+        }
+        let edit = Edit::SetScalar { key: "state".into(), value: Value::String(state.to_string()) };
+        match self.save(kind, id, &[edit]) {
+            Ok(path) => {
+                if self.interactive {
+                    if let Some(file) = self.world.path_of(kind, id) {
+                        if let Ok(target) = self.open_target(kind, id.to_string(), file) {
+                            self.pending_edit = Some(target);
+                        }
+                    }
+                }
+                self.after_writes(&[path], self.t("action_starts_now", &[("id", id), ("state", state)]))
+            }
+            Err(e) => e,
+        }
     }
 
     /// `/recipe <name> ...`: a common shape, as the small verbs it stands for.
@@ -328,6 +370,16 @@ pub(super) fn set_key(text: &str, key: &str, value: &str) -> String {
 
 /// `text` with `verb: mechanics` under frontmatter `actions:`, replacing
 /// that verb's line if it's there.
+/// Whether a thing's index names its starting state (`state:` in its
+/// frontmatter).
+fn has_start(text: &str) -> bool {
+    let mut lines = text.lines();
+    if lines.next().map(str::trim_end) != Some("---") {
+        return false;
+    }
+    lines.take_while(|l| l.trim_end() != "---").any(|l| l.starts_with("state:"))
+}
+
 fn set_action(text: &str, verb: &str, mechanics: &str) -> String {
     let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
     let close = lines.iter().skip(1).position(|l| l.trim_end() == "---").map(|i| i + 1).unwrap_or(lines.len());

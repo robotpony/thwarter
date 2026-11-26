@@ -164,10 +164,12 @@ impl<'a> Screen<'a> {
             if !report.is_empty() {
                 self.push(&report);
             }
-            lock(console).place = super::session::Place::File(path);
-            self.open_quick(console);
+            self.open_quick_for(console, Some(&path));
             match self.quick.as_mut() {
-                Some(quick) => quick.reopen = Some((kind, id)),
+                Some(quick) => {
+                quick.reopen = Some((kind, id));
+                quick.file = Some(path);
+            }
                 None => self.reopen(console, kind, &id),
             }
             return;
@@ -358,7 +360,16 @@ impl<'a> Screen<'a> {
 
     /// Opens the quick menu for where edit mode is, or says why not.
     fn open_quick(&mut self, console: &Mutex<Console>) {
-        let menu = lock(console).quick_menu();
+        self.open_quick_for(console, None);
+    }
+
+    /// Opens the quick menu for a file, such as the editor's, leaving edit
+    /// mode's place where it is (Bruce, 2026-11-25).
+    fn open_quick_for(&mut self, console: &Mutex<Console>, file: Option<&str>) {
+        let menu = match file {
+            Some(path) => lock(console).quick_menu_for(Some(path)),
+            None => lock(console).quick_menu(),
+        };
         match menu {
             Ok(menu) if !menu.entries.is_empty() => self.quick = Some(Quick::new(menu)),
             Ok(_) => {}
@@ -383,6 +394,12 @@ impl<'a> Screen<'a> {
         }
         let quick = self.quick.take().expect("checked");
         let commands = quick.commands();
+        // From the editor the commands act on its file, and edit mode's
+        // place is put back afterwards (Bruce, 2026-11-25).
+        let before = quick.file.as_ref().map(|file| {
+            let mut guard = lock(console);
+            std::mem::replace(&mut guard.place, super::session::Place::File(file.clone()))
+        });
         for command in &commands {
             self.push(&format!("> {}", command));
             self.output.push(String::new());
@@ -393,6 +410,13 @@ impl<'a> Screen<'a> {
             }
             if flow == Flow::Quit {
                 self.quit = true;
+            }
+        }
+        if let Some(before) = before {
+            let mut guard = lock(console);
+            guard.place = before;
+            if !guard.place_exists() {
+                guard.move_to_existing_folder();
             }
         }
         let typed = lock(console).quick_menu_typed(&commands);
@@ -564,7 +588,8 @@ impl<'a> Screen<'a> {
     pub fn draw(&self, frame: &mut Frame, console: &Console) {
         let area = frame.area();
         let wide = area.width >= SIDEBAR_FROM;
-        let sidebar = console.sidebar();
+        let editing = self.editing.as_ref().map(|(_, target)| target.thing().2.to_string());
+        let sidebar = console.sidebar_editing(editing.as_deref());
         let rows = if wide {
             vec![Constraint::Length(1), Constraint::Min(1), Constraint::Length(1)]
         } else {
@@ -684,15 +709,19 @@ struct Quick<'a> {
     answers: Vec<String>,
     /// The option chosen in a choice question.
     choice: usize,
+    /// Whether "a new state…" was chosen, so the name is being typed.
+    naming: bool,
     area: TextArea<'a>,
     /// The thing to open the editor on again afterwards, when the menu
     /// was opened from the editor.
     reopen: Option<(super::world::Kind, String)>,
+    /// The editor's file the commands act on, if it was opened there.
+    file: Option<String>,
 }
 
 impl<'a> Quick<'a> {
     fn new(menu: QuickMenu) -> Self {
-        Quick { menu, selected: 0, asking: false, at: 0, answers: Vec::new(), choice: 0, area: input_line(), reopen: None }
+        Quick { menu, selected: 0, asking: false, at: 0, answers: Vec::new(), choice: 0, area: input_line(), reopen: None, file: None, naming: false }
     }
 
     fn entry(&self) -> &super::quick_menu::Entry {
@@ -709,6 +738,7 @@ impl<'a> Quick<'a> {
     /// Gets the next question ready; returns whether they're all answered.
     fn ready(&mut self) -> bool {
         self.area = input_line();
+        self.naming = false;
         match self.entry().asks.get(self.at) {
             None => true,
             Some(Ask::Choose { default, .. }) => {
@@ -745,18 +775,36 @@ impl<'a> Quick<'a> {
         }
         let ask = self.entry().asks[self.at].clone();
         let answer = match ask {
-            Ask::Choose { options, .. } => match input.key {
-                Key::Up => {
-                    self.choice = (self.choice + options.len() - 1) % options.len();
+            // "A new state…" asks for its name as a typed answer.
+            Ask::Choose { .. } if self.naming => match input.key {
+                Key::Enter => {
+                    let typed = self.area.lines().join(" ").trim().to_string();
+                    (!typed.is_empty()).then_some(typed)
+                }
+                _ => {
+                    self.area.input(input);
                     None
                 }
-                Key::Down => {
-                    self.choice = (self.choice + 1) % options.len();
-                    None
-                }
-                Key::Enter => Some(options[self.choice].clone()),
-                _ => None,
             },
+            Ask::Choose { options, new, .. } => {
+                let count = options.len() + usize::from(new);
+                match input.key {
+                    Key::Up => {
+                        self.choice = (self.choice + count - 1) % count;
+                        None
+                    }
+                    Key::Down => {
+                        self.choice = (self.choice + 1) % count;
+                        None
+                    }
+                    Key::Enter if self.choice == options.len() => {
+                        self.naming = true;
+                        None
+                    }
+                    Key::Enter => Some(options[self.choice].clone()),
+                    _ => None,
+                }
+            }
             Ask::Text { required, .. } => match input.key {
                 Key::Enter => {
                     let typed = self.area.lines().join(" ").trim().to_string();
@@ -796,19 +844,43 @@ impl<'a> Quick<'a> {
             let entry = self.entry();
             lines.push(Line::styled(format!(" {}", words.text(entry.label, &[])), style(Role::Title)));
             for (ask, answer) in entry.asks.iter().zip(&self.answers) {
-                lines.push(Line::styled(format!(" {} {}", words.text(ask_key(ask), &[]), answer), style(Role::Note)));
+                lines.push(Line::styled(format!(" {} {}", words.text(ask.key(), &[]), answer), style(Role::Note)));
             }
-            match &entry.asks[self.at] {
-                Ask::Choose { key, options, .. } => {
+            let ask = &entry.asks[self.at];
+            let facts: Vec<(&str, &str)> = self.menu.facts.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            let hint = Line::styled(format!(" {}", words.text(ask.hint(), &facts)), style(Role::Note));
+            match ask {
+                Ask::Choose { key, .. } if self.naming => {
                     lines.push(Line::from(format!(" {}", words.text(key, &[]))));
-                    for (i, option) in options.iter().enumerate() {
-                        let line = Line::from(format!("   {}", option));
+                    lines.push(hint);
+                    lines.push(Line::from(format!(" {} {}▏", words.text("qm_ask_new_state", &[]), self.area.lines().join(" "))));
+                    keys = words.text("qm_keys_typing", &[]);
+                }
+                Ask::Choose { key, options, new, describe, .. } => {
+                    lines.push(Line::from(format!(" {}", words.text(key, &[]))));
+                    lines.push(hint);
+                    let shown = |o: &str| if o == "any" { words.text("qm_any_state", &[]) } else { o.to_string() };
+                    let width = options.iter().map(|o| shown(o).chars().count()).max().unwrap_or(0);
+                    let mut rows: Vec<String> = options
+                        .iter()
+                        .map(|o| match describe {
+                            Some(prefix) => format!("   {:<width$}  {}", shown(o), words.text(&format!("{}_{}", prefix, o.replace('-', "_")), &[]), width = width),
+                            None => format!("   {}", shown(o)),
+                        })
+                        .collect();
+                    if *new {
+                        rows.push(format!("   {}", words.text("qm_new_state", &[])));
+                    }
+                    for (i, row) in rows.into_iter().enumerate() {
+                        let line = Line::from(row);
                         lines.push(if i == self.choice { line.style(reversed) } else { line });
                     }
                     keys = words.text("qm_keys_choose", &[]);
                 }
                 Ask::Text { key, .. } => {
-                    lines.push(Line::from(format!(" {} {}▏", words.text(key, &[]), self.area.lines().join(" "))));
+                    lines.push(Line::from(format!(" {}", words.text(key, &[]))));
+                    lines.push(hint);
+                    lines.push(Line::from(format!(" > {}▏", self.area.lines().join(" "))));
                     keys = words.text("qm_keys_typing", &[]);
                 }
             }
@@ -824,11 +896,6 @@ impl<'a> Quick<'a> {
     }
 }
 
-fn ask_key(ask: &Ask) -> &'static str {
-    match ask {
-        Ask::Text { key, .. } | Ask::Choose { key, .. } => key,
-    }
-}
 
 /// Questions being asked about one new thing.
 struct Picker<'a> {
@@ -1617,9 +1684,23 @@ mod tests {
         press(&mut screen, &console, Key::Esc);
         assert!(screen.editing.is_some(), "Esc goes back to the editor");
         press(&mut screen, &console, Key::Esc);
-        if screen.editing.is_some() {
-            screen.key(Input { key: Key::Char('q'), ctrl: true, ..Input::default() }, &console);
-        }
+        assert!(screen.editing.is_none());
+        // An editor opened from the world root: the hint follows the open
+        // file and shows only the key the editor has; Ctrl-M leaves edit
+        // mode's place alone.
+        typed(&mut screen, &console, "go /");
+        let place = lock(&console).pwd();
+        typed(&mut screen, &console, "/edit lantern");
+        assert!(screen.editing.is_some());
+        let text = screen_text(&screen, &console, 120, 40);
+        assert!(text.contains("⌃M  quick menu") && !text.contains("/menu  quick menu"), "{}", text);
+        screen.key(ctrl_m.clone(), &console);
+        assert!(screen.quick.as_ref().is_some_and(|q| q.menu.id == "lantern"));
+        press(&mut screen, &console, Key::Esc);
+        assert_eq!(lock(&console).pwd(), place, "place didn't move");
+        press(&mut screen, &console, Key::Esc);
+        assert!(screen.editing.is_none());
+        typed(&mut screen, &console, "go /village/square");
         typed(&mut screen, &console, "/menu");
         assert!(screen.quick.is_some(), "/menu opens it");
         // l: link to, then a direction and a room, one question at a time.

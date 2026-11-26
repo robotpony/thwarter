@@ -82,7 +82,7 @@ The Smith (character)
 Set attributes.strength on smith.
 > /set inventory rope, lantern
 Set inventory on smith.
-This adds 2 problem(s):
+This adds 2 warning(s):
   `lantern` starts in more than one place: room `village/square`, character `smith`'s inventory; play shows it in each
   `rope` starts in more than one place: room `village/square`, character `smith`'s inventory; play shows it in each
 > /set id blacksmith
@@ -214,3 +214,17 @@ You see an iron key.
 There's a brass lantern on the bench and a rope on the chair.
 
 You can go north or east.
+> go chair
+Chair (object)
+> /action sit any --> sat
+sit: any → sat. The reply is under `## When: #sit #sat`.
+> /action kick sat --> kicked
+kick: sat → kicked. The reply is under `## When: #kick #kicked`.
+
+chair has no starting state, so this action can't run yet. Does it start sat? (y/n)
+> y
+chair starts sat.
+> go chair
+Chair (object)
+> /action fold sat --> folded
+fold: sat → folded. The reply is under `## When: #fold #folded`.

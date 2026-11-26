@@ -786,8 +786,15 @@ impl Console {
         let before = self.warnings_before.take().unwrap_or_default();
         let new_problems: Vec<String> = self.world.warnings().into_iter().filter(|w| !before.contains(w)).collect();
         let mut out = vec![summary];
-        if !new_problems.is_empty() {
-            out.push(self.t("adds_problems", &[("count", &new_problems.len().to_string()), ("problems", &new_problems.join("\n  "))]));
+        // Problems and warnings are named apart, so a warning isn't
+        // called a problem (2026-11-25).
+        let warnings = self.world.engine.current_warnings();
+        let (added_warnings, added_problems): (Vec<String>, Vec<String>) = new_problems.into_iter().partition(|p| warnings.contains(p));
+        if !added_problems.is_empty() {
+            out.push(self.t("adds_problems", &[("count", &added_problems.len().to_string()), ("problems", &added_problems.join("\n  "))]));
+        }
+        if !added_warnings.is_empty() {
+            out.push(self.t("adds_warnings", &[("count", &added_warnings.len().to_string()), ("warnings", &added_warnings.join("\n  "))]));
         }
         out.extend(game_warnings.iter().map(|w| self.t("game_note", &[("note", w)])));
         out.join("\n")
