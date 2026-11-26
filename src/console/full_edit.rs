@@ -37,6 +37,8 @@ pub struct EditTarget {
     /// A bundle's state files, which the editor shows as `## When:`
     /// sections under the index (`design/STATES.md` › Console).
     states: Vec<StateFile>,
+    /// The bundle's starting state, marked beside its section.
+    starting: Option<String>,
 }
 
 /// One state file of a bundle being edited.
@@ -217,7 +219,10 @@ impl Console {
         let text = target.opened.clone().unwrap_or_else(|| scenery_card(&target.id, &title_or_default(&[], &target.id)));
         let mut document = Document::single(heading, text);
         for state in &target.states {
-            document.sections.push(super::editor::Section { heading: Some(state_heading(&state.name)), text: state_body(&state.opened) });
+            let start = target.starting.as_deref() == Some(state.name.as_str());
+            let path = state.rel.display().to_string();
+            let note = if start { self.t("edit_section_starting", &[("path", &path)]) } else { path };
+            document.sections.push(super::editor::Section { heading: Some(state_heading(&state.name)), note: Some(note), text: state_body(&state.opened) });
         }
         document
     }
@@ -413,7 +418,7 @@ impl Console {
             let target = if cardless {
                 let relative = crate::writer::new_entity_relative_path(EntityKind::Object, &id);
                 let path = relative.to_string_lossy().trim_end_matches(".md").replace('\\', "/");
-                Ok(EditTarget { kind, id, path, opened: None, file: self.world.root.join(&relative), states: Vec::new() })
+                Ok(EditTarget { kind, id, path, opened: None, file: self.world.root.join(&relative), states: Vec::new(), starting: None })
             } else {
                 self.edit_target_named(kind, &id)
             };
@@ -475,7 +480,7 @@ impl Console {
             let relative = crate::writer::new_entity_relative_path(EntityKind::Object, typed);
             let path = relative.to_string_lossy().trim_end_matches(".md").replace('\\', "/");
             let file = self.world.root.join(&relative);
-            return Ok(EditTarget { kind, id: typed.to_string(), path, opened: None, file, states: Vec::new() });
+            return Ok(EditTarget { kind, id: typed.to_string(), path, opened: None, file, states: Vec::new(), starting: None });
         }
         Err(match kind {
             Kind::Character => super::session::suggest(&self.t("edit_no_character", &[("id", typed)]), &[&format!("/new character {}", typed)]),
@@ -488,7 +493,8 @@ impl Console {
         let file = self.world.root.join(format!("{}.md", path));
         let text = fs::read_to_string(&file).map_err(|e| self.t("edit_cant_open", &[("path", &path), ("reason", &e.to_string())]))?;
         let states = self.state_files(kind, &id, &path);
-        Ok(EditTarget { kind, id, path, opened: Some(text), file, states })
+        let starting = entity_kind(kind).and_then(|k| self.world.engine.thing(k, &id)).and_then(|t| t.starting_state.clone());
+        Ok(EditTarget { kind, id, path, opened: Some(text), file, states, starting })
     }
 
     /// A bundle index's own state files, the starting state first and the
@@ -639,6 +645,14 @@ mod tests {
         let document = console.edit_document(&target);
         let headings: Vec<_> = document.sections.iter().map(|s| s.heading.clone()).collect();
         assert_eq!(headings, vec![None, Some("## When: #unlit".into()), Some("## When: #lit".into())], "the starting state first");
+        // Each heading is a rule ending in its file, the starting state marked.
+        let editor = super::super::editor::Editor::new(document.clone()).with_texts(console.texts.clone());
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).unwrap();
+        terminal.draw(|f| editor.draw(f, f.area(), &console.lookup_for(&target))).unwrap();
+        let buffer = terminal.backend().buffer().clone();
+        let rows: Vec<String> = (0..30).map(|y| (0..100).map(|x| buffer[(x, y)].symbol()).collect()).collect();
+        assert!(rows.iter().any(|r| r.contains("## When: #unlit ─") && r.contains("starting · objects/lantern/unlit.md")), "{:#?}", rows);
+        assert!(rows.iter().any(|r| r.contains("## When: #lit ─") && r.trim_end().ends_with("objects/lantern/lit.md")), "{:#?}", rows);
         // Each section goes back to its own file; a heading typed under a
         // state goes to the index.
         let sections = vec![document.sections[0].text.clone(), "Dark.\n".to_string(), "It glows.\n## When: #lit #night\nA beacon.\n".to_string()];

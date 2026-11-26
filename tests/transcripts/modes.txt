@@ -71,7 +71,7 @@ Console commands (/help <command> for one in full):
   /unlink {direction}                       remove an exit from this room
   /add {thing} [{room|character|thing}]     put a person or thing here too; scenery if it has no card
   /move {thing} {room|character|thing}      put something somewhere else, or a room in an area
-  /state {name} [start]                     a state of the thing you're at; makes it a bundle
+  /state {name} [start] | rename {old} {new} | delete {name}  a state of the thing you're at; makes it a bundle
   /action {verb} {from} --> {to} [with {thing}]  an action from one state to another
   /recipe fixed-until|locked-with|switch|container ...  a common shape, as the commands it stands for
   /save [{name}]                            save the game

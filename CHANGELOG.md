@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.101.1 (2026-11-25)
+
+### Changed
+
+- In bundle editing, each state or chapter heading's rule ends in the file it saves to, with the starting state marked (`starting · objects/lantern/unlit.md`), as `design/STATES.md` › Console draws it.
+
 ## 0.101.0 (2026-11-25)
 
 ### Added

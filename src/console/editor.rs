@@ -38,13 +38,16 @@ pub struct Section {
     /// The line that starts it, such as `## When: #open`; the first
     /// section has none. The author can't change it, since it names a file.
     pub heading: Option<String>,
+    /// What the editor shows at the end of the heading's rule, such as
+    /// the file it saves to.
+    pub note: Option<String>,
     pub text: String,
 }
 
 impl Document {
     /// A document holding one file's text.
     pub fn single(heading: impl Into<String>, text: impl Into<String>) -> Self {
-        Document { heading: heading.into(), sections: vec![Section { heading: None, text: text.into() }] }
+        Document { heading: heading.into(), sections: vec![Section { heading: None, note: None, text: text.into() }] }
     }
 
     /// The text the author edits. One section is the file exactly as it is
@@ -348,7 +351,8 @@ impl<'a> Editor<'a> {
         frame.render_widget(Paragraph::new(Line::from(heading)).style(style(Role::Bar)), top);
         frame.render_widget(&self.area, middle);
         let roles = highlight(self.area.lines(), lookup);
-        paint(frame.buffer_mut(), middle, self.area.lines(), &roles, self.area.cursor().0);
+        let notes: Vec<(&str, &str)> = self.document.sections.iter().filter_map(|s| Some((s.heading.as_deref()?, s.note.as_deref()?))).collect();
+        paint(frame.buffer_mut(), middle, self.area.lines(), &roles, self.area.cursor().0, &notes);
         let (status, kind) = if self.status.is_empty() && self.dirty() {
             (self.texts.text("console", "editor_modified", &[]), Some(Kind::Warning))
         } else if self.status.is_empty() && self.on_empty_line() {
@@ -406,7 +410,7 @@ where
 /// starts; the rows after it with no number are the same line wrapped,
 /// and pick up where the row before stopped. A row that doesn't match its
 /// line's text is left as drawn.
-fn paint(buf: &mut Buffer, area: Rect, lines: &[String], roles: &[Vec<Option<Role>>], cursor_row: usize) {
+fn paint(buf: &mut Buffer, area: Rect, lines: &[String], roles: &[Vec<Option<Role>>], cursor_row: usize, notes: &[(&str, &str)]) {
     let digits = lines.len().max(1).to_string().len();
     let gutter = digits + 2;
     // The line being drawn, and how many of its characters rows have shown.
@@ -448,10 +452,23 @@ fn paint(buf: &mut Buffer, area: Rect, lines: &[String], roles: &[Vec<Option<Rol
         }
         // A keyword heading is drawn as a rule across the rest of its row.
         if number.is_some() && is_keyword_heading(&lines[line_index]) {
-            for x in (area.x + (gutter + shown_chars.len() + 1) as u16)..area.right() {
+            let start = area.x + (gutter + shown_chars.len() + 1) as u16;
+            for x in start..area.right() {
                 let cell = &mut buf[(x, y)];
                 cell.set_symbol("─");
                 cell.set_style(style(Role::Chrome));
+            }
+            // A section's file at the rule's end (`design/STATES.md` › Console).
+            if let Some((_, note)) = notes.iter().find(|(h, _)| lines[line_index].trim_end() == *h) {
+                let text = format!(" {} ", note);
+                let width = text.chars().count() as u16;
+                if area.right() >= start + width + 3 {
+                    for (i, c) in text.chars().enumerate() {
+                        let cell = &mut buf[(area.right() - width + i as u16, y)];
+                        cell.set_symbol(&c.to_string());
+                        cell.set_style(style(Role::Chrome));
+                    }
+                }
             }
         }
         for i in 0..shown_chars.len() {
@@ -485,7 +502,7 @@ mod tests {
     #[test]
     fn a_document_with_sections_joins_and_splits_at_its_headings() {
         let mut document = Document::single("h", "---\nid: lamp\n---\nA lamp.\n");
-        document.sections.push(Section { heading: Some("## When: #lit".into()), text: "It glows.\n".into() });
+        document.sections.push(Section { heading: Some("## When: #lit".into()), note: None, text: "It glows.\n".into() });
         let text = document.combined();
         assert_eq!(text, "---\nid: lamp\n---\nA lamp.\n\n## When: #lit\nIt glows.\n");
         assert_eq!(document.split(text).unwrap(), vec!["---\nid: lamp\n---\nA lamp.\n", "It glows.\n"]);
