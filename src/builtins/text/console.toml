@@ -343,7 +343,6 @@ made_world_index = "Made world/index.md: authors {author}."
 offer_world_index = "This world has no world/index.md yet. Make one, with authors: {author} and start: {room}? (y/n)"
 
 # The full-screen console (screen.rs, watch.rs).
-last_time = "Last time:"
 which_one = "Which one?"
 watching_failed = "File watching failed: {reason}. /reload still works."
 

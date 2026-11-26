@@ -51,6 +51,17 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.99.1 (2026-11-25)
+
+### Changed
+
+- A fresh start no longer prints "Last time:" and the last few commands; the history still loads and is kept between sessions, and Up and Down recall it one command at a time (REQ-CON-43, Bruce, 2026-11-25).
+- Up and Down in the editor's drop-down recall the same history as the prompt, and its commands join that history, so either reaches the other's.
+
+### Removed
+
+- The `last_time` text and the "Last time:" block. Recover them with `git show ca26d12:src/console/screen.rs`.
+
 ## 0.99.0 (2026-11-25)
 
 ### Added

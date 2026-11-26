@@ -213,7 +213,7 @@ Where a thing's file lives is its scope: global, area or local (`design/STATES.m
 
 The console restarts itself onto a new build in place, so it can be changed and tried without losing the session (Bruce, 2026-11-23). It is an early feature, so the console can be iterated on quickly. Decided by Bruce, 2026-11-23, except where marked as proposed.
 
-- REQ-CON-43: The console MUST keep each world's command history between sessions (Bruce, 2026-11-24), so Up reaches commands from earlier sessions, and a fresh start shows the last few under "Last time:". It lives in the state folder beside the world's saves, never in the world.
+- REQ-CON-43: The console MUST keep each world's command history between sessions (Bruce, 2026-11-24), so Up and Down reach commands from earlier sessions. Nothing is shown until they're pressed: each press recalls one command into the line, at the prompt in either mode and in the editor's drop-down, which share one history (Bruce, 2026-11-25). In the editor itself they move the cursor. It lives in the state folder beside the world's saves, never in the world.
 - REQ-CON-30: `/restart` MUST restart the console onto the `thwart` binary now on disk, in the same terminal, and put the author back where they were: the mode, edit mode's place, the running game, the scope default, the output's scrollback, the input history, and an open editor with its unsaved text and cursor. The console never restarts by itself. If the new binary doesn't start, the console stays on the one running and says why.
 
   ```

@@ -35,8 +35,6 @@ use std::time::{Duration, Instant, SystemTime};
 const SCROLLBACK: usize = 5000;
 /// Lines of input history kept, and carried over a `/restart`.
 const HISTORY: usize = 500;
-/// How many of last session's commands a fresh start shows.
-const LAST_SHOWN: usize = 5;
 /// The narrowest terminal that gets a sidebar; narrower, it folds into one
 /// line above the input (REQ-CON-23, proposed).
 const SIDEBAR_FROM: u16 = 100;
@@ -328,13 +326,7 @@ impl<'a> Screen<'a> {
         self.set_input("");
         self.browsing = None;
         self.push(&format!("> {}", line));
-        if !line.trim().is_empty() {
-            self.history.push(line.clone());
-            if self.history.len() > HISTORY {
-                self.history.remove(0);
-            }
-            self.remember(&line);
-        }
+        self.add_history(&line);
         // A blank line after what was typed, in every mode (Bruce, 2026-11-24).
         self.output.push(String::new());
         let (text, flow) = lock(console).handle(&line);
@@ -447,11 +439,33 @@ impl<'a> Screen<'a> {
         let Some(dropdown) = self.dropdown.as_mut() else { return };
         let line = dropdown.area.lines().join(" ");
         match input.key {
-            Key::Esc => self.dropdown = None,
-            Key::Char('~') if line.trim().is_empty() && !input.ctrl && !input.alt => self.dropdown = None,
-            Key::Enter if !line.trim().is_empty() => self.dropdown_run(line.trim(), console),
+            Key::Esc => {
+                self.dropdown = None;
+                self.browsing = None;
+            }
+            Key::Char('~') if line.trim().is_empty() && !input.ctrl && !input.alt => {
+                self.dropdown = None;
+                self.browsing = None;
+            }
+            Key::Enter if !line.trim().is_empty() => {
+                self.browsing = None;
+                self.add_history(line.trim());
+                self.dropdown_run(line.trim(), console);
+            }
             Key::Enter => {}
+            // Up and Down recall the same history the prompt does.
+            Key::Up | Key::Down => {
+                let step = if input.key == Key::Up { -1 } else { 1 };
+                if let Some(recalled) = self.recall(step, line) {
+                    if let Some(dropdown) = self.dropdown.as_mut() {
+                        let mut area = input_line();
+                        area.insert_str(recalled);
+                        dropdown.area = area;
+                    }
+                }
+            }
             _ => {
+                self.browsing = None;
                 dropdown.area.input(input);
             }
         }
@@ -699,9 +713,9 @@ impl<'a> Screen<'a> {
     }
 
     /// Keeps the command history in `file` between sessions (Bruce,
-    /// 2026-11-24): what's there loads for Up, and a fresh start shows the
-    /// last few under "Last time:". After a /restart the session's own
-    /// history carries over instead.
+    /// 2026-11-24): what's there loads for Up and Down, and nothing is
+    /// shown until they're pressed (Bruce, 2026-11-25). After a /restart
+    /// the session's own history carries over instead.
     pub fn keep_history(&mut self, file: std::path::PathBuf, resumed: bool) {
         if !resumed {
             let earlier: Vec<String> = std::fs::read_to_string(&file)
@@ -710,15 +724,7 @@ impl<'a> Screen<'a> {
                 .filter(|l| !l.trim().is_empty())
                 .map(str::to_string)
                 .collect();
-            let earlier: Vec<String> = earlier[earlier.len().saturating_sub(HISTORY)..].to_vec();
-            if !earlier.is_empty() {
-                self.output.push(String::new());
-                self.output.push(self.words.text("last_time", &[]));
-                for line in &earlier[earlier.len().saturating_sub(LAST_SHOWN)..] {
-                    self.output.push(format!("  > {}", line));
-                }
-            }
-            self.history = earlier;
+            self.history = earlier[earlier.len().saturating_sub(HISTORY)..].to_vec();
         }
         self.history_file = Some(file);
     }
@@ -742,25 +748,46 @@ impl<'a> Screen<'a> {
 
     /// Up and Down through the input history.
     fn browse(&mut self, step: isize) {
+        let current = self.input_text();
+        if let Some(line) = self.recall(step, current) {
+            self.set_input(&line);
+        }
+    }
+
+    /// One step through the shared history from `current`, the line as
+    /// typed: the line to show, or `None` to leave it. The prompt and the
+    /// drop-down both use it (Bruce, 2026-11-25).
+    fn recall(&mut self, step: isize, current: String) -> Option<String> {
         if self.history.is_empty() {
-            return;
+            return None;
         }
         let (at, draft) = match self.browsing.take() {
             Some((at, draft)) => (at as isize + step, draft),
-            None if step < 0 => (self.history.len() as isize - 1, self.input_text()),
-            None => return,
+            None if step < 0 => (self.history.len() as isize - 1, current),
+            None => return None,
         };
         if at < 0 {
             self.browsing = Some((0, draft));
-            return;
+            return None;
         }
         if at as usize >= self.history.len() {
-            self.set_input(&draft);
+            return Some(draft);
+        }
+        self.browsing = Some((at as usize, draft));
+        Some(self.history[at as usize].clone())
+    }
+
+    /// Adds a command to the shared history, and to the file that keeps
+    /// it between sessions.
+    fn add_history(&mut self, line: &str) {
+        if line.trim().is_empty() {
             return;
         }
-        let line = self.history[at as usize].clone();
-        self.set_input(&line);
-        self.browsing = Some((at as usize, draft));
+        self.history.push(line.to_string());
+        if self.history.len() > HISTORY {
+            self.history.remove(0);
+        }
+        self.remember(line);
     }
 
     fn input_text(&self) -> String {
@@ -1845,8 +1872,7 @@ mod tests {
 
         let mut second = Screen::new("", None);
         second.keep_history(file, false);
-        assert!(second.output.iter().any(|l| l == "Last time:"), "{:?}", second.output);
-        assert!(second.output.iter().any(|l| l == "  > look"), "{:?}", second.output);
+        assert!(second.output.is_empty(), "nothing shown until Up: {:?}", second.output);
         press(&mut second, &console, Key::Up);
         assert_eq!(second.input_text(), "look", "Up reaches last session");
     }
@@ -2059,6 +2085,18 @@ mod tests {
         keys(&mut screen, &console, "~");
         assert!(screen.dropdown.is_none());
         assert!(screen.editing.is_some());
+        // One history: Up in the drop-down reaches the prompt's commands,
+        // and the drop-down's commands are there for the prompt.
+        keys(&mut screen, &console, "~");
+        press(&mut screen, &console, Key::Up);
+        assert_eq!(screen.dropdown.as_ref().unwrap().area.lines().join(""), "/state lit");
+        press(&mut screen, &console, Key::Up);
+        assert_eq!(screen.dropdown.as_ref().unwrap().area.lines().join(""), "/edit lantern");
+        press(&mut screen, &console, Key::Esc);
+        press(&mut screen, &console, Key::Esc);
+        assert!(screen.editing.is_none());
+        press(&mut screen, &console, Key::Up);
+        assert_eq!(screen.input_text(), "/state lit");
     }
 
     #[test]
