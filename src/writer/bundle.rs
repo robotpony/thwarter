@@ -247,24 +247,59 @@ impl WorldWriter {
     }
 }
 
-/// Every action, in any object, whose `becomes:` names `target` (by id
-/// or link) with state `state`: (object's engine path, action name).
-fn becomes_naming(engine: &WorldEngine, target: &str, state: &str) -> Vec<(PathBuf, String)> {
+/// Where an action switching a thing to a state is written: the file,
+/// the action's name, and whether it's in a `## When:` section's block
+/// rather than the file's frontmatter.
+struct BecomesAt {
+    path: PathBuf,
+    action: String,
+    in_section: bool,
+    /// A thing's index or one file, rather than a layer with no `id`.
+    whole: bool,
+}
+
+/// Every action whose `becomes:` names `target` (by id or link) with state
+/// `state`, in the file that holds it: each thing's index, state files and
+/// chapter overlays, frontmatter and section blocks both. The merged
+/// actions won't do, since an action in a state file isn't in the index.
+fn becomes_naming(engine: &WorldEngine, target: &str, state: &str) -> Vec<BecomesAt> {
+    let names_it = |actions: &serde_yaml::Value| -> Vec<String> {
+        let mut found = Vec::new();
+        if let serde_yaml::Value::Mapping(actions) = actions {
+            for (name, action) in actions {
+                let Some(serde_yaml::Value::Mapping(becomes)) = action.get("becomes") else { continue };
+                let hit = becomes.iter().any(|(k, v)| {
+                    v.as_str() == Some(state) && k.as_str().map_or(false, |k| engine.resolve_name(&crate::parsers::link_target(k), None) == target)
+                });
+                if hit {
+                    found.push(name.as_str().map(str::to_string).unwrap_or_else(|| format!("{:?}", name)));
+                }
+            }
+        }
+        found
+    };
+    let mut things: Vec<&crate::engines::bundles::Thing> = engine.things_iter().collect();
+    things.sort_by(|a, b| (a.kind, &a.id).cmp(&(b.kind, &b.id)));
     let mut found = Vec::new();
-    let mut ids: Vec<&String> = engine.objects.keys().collect();
-    ids.sort();
-    for oid in ids {
-        let object = &engine.objects[oid];
-        let mut names: Vec<&String> = object.actions.keys().collect();
-        names.sort();
-        for name in names {
-            if object.actions[name].becomes.get(target).map_or(false, |s| s == state) {
-                if let Ok(path) = engine.source_path(EntityKind::Object, oid) {
-                    found.push((path.to_path_buf(), name.clone()));
+    for thing in things {
+        let layers = std::iter::once((&thing.index, true)).chain(thing.states.values().chain(thing.overlays.values()).map(|l| (l, false)));
+        for (layer, whole) in layers {
+            if let Some(actions) = layer.metadata.get("actions") {
+                for action in names_it(actions) {
+                    found.push(BecomesAt { path: layer.path.clone(), action, in_section: false, whole });
+                }
+            }
+            for section in &layer.sections {
+                if let Some(actions) = section.layer.metadata.get("actions") {
+                    for action in names_it(actions) {
+                        found.push(BecomesAt { path: layer.path.clone(), action, in_section: true, whole });
+                    }
                 }
             }
         }
     }
+    found.sort_by(|a, b| (&a.path, &a.action).cmp(&(&b.path, &b.action)));
+    found.dedup_by(|a, b| a.path == b.path && a.action == b.action && a.in_section == b.in_section);
     found
 }
 
@@ -287,7 +322,7 @@ impl WorldWriter {
         self.check_inside(&abs)?;
         let by_hand = becomes_naming(engine, id, state)
             .into_iter()
-            .map(|(p, action)| format!("{}: action `{}` switches {} to `{}`, which is gone", p.strip_prefix(&engine_root).unwrap_or(&p).display(), action, id, state))
+            .map(|at| format!("{}: action `{}` switches {} to `{}`, which is gone", at.path.strip_prefix(&engine_root).unwrap_or(&at.path).display(), at.action, id, state))
             .collect();
         let before = engine.current_problems(strict);
         fs::remove_file(&abs).with_context(|| format!("can't remove {}", rel.display()))?;
@@ -325,12 +360,25 @@ impl WorldWriter {
             planned.push((index_rel.clone(), index));
         }
         let mut by_hand = Vec::new();
-        for (path, action) in becomes_naming(engine, id, old) {
-            let object_rel = rel(&path);
-            if planned.iter().any(|(p, _)| *p == object_rel) {
+        let mut done: Vec<PathBuf> = Vec::new();
+        for at in becomes_naming(engine, id, old) {
+            let object_rel = rel(&at.path);
+            let hand = || format!("{}: action `{}` switches {} to `{}`; change it to `{}` by hand", object_rel.display(), at.action, id, old, new);
+            if at.in_section {
+                by_hand.push(hand());
                 continue;
             }
-            let mut file = ContentFile::load(self.root().join(&object_rel))?;
+            // One rewrite covers every action in the file's frontmatter.
+            if done.contains(&object_rel) {
+                continue;
+            }
+            done.push(object_rel.clone());
+            let slot = planned.iter().position(|(p, _)| *p == object_rel);
+            let mut file = match slot {
+                Some(i) => planned[i].1.clone(),
+                None if at.whole => ContentFile::load(self.root().join(&object_rel))?,
+                None => ContentFile::load_layer(self.root().join(&object_rel))?,
+            };
             let doc = MarkdownParser::new().split_document(&file.text())?;
             let mut expected = match doc.metadata {
                 serde_yaml::Value::Mapping(m) => m,
@@ -349,14 +397,21 @@ impl WorldWriter {
                 }
             }
             match file.replace_in_key("actions", old, new, &expected) {
-                Ok(()) => planned.push((object_rel, file)),
-                Err(_) => by_hand.push(format!("{}: action `{}` switches {} to `{}`; change it to `{}` by hand", object_rel.display(), action, id, old, new)),
+                Ok(()) => match slot {
+                    Some(i) => planned[i].1 = file,
+                    None => planned.push((object_rel, file)),
+                },
+                Err(_) => by_hand.push(hand()),
             }
         }
 
-        // Move the state file, then save the rest.
+        // Move the state file (with its own rewrite, if it names itself),
+        // then save the rest.
         let before = engine.current_problems(strict);
-        let text = fs::read_to_string(self.root().join(&from))?;
+        let text = match planned.iter().position(|(p, _)| *p == from) {
+            Some(i) => planned.remove(i).1.text(),
+            None => fs::read_to_string(self.root().join(&from))?,
+        };
         ContentFile::layer_from_text(self.root().join(&to), &text)?.save_new()?;
         fs::remove_file(self.root().join(&from)).with_context(|| format!("wrote {} but can't remove {}", to.display(), from.display()))?;
         let mut written = Vec::new();
@@ -495,5 +550,31 @@ mod tests {
         assert_eq!(report.by_hand.len(), 1, "{:?}", report.by_hand);
         assert!(report.change.added.iter().any(|p| p.contains("`open`")), "{:?}", report.change);
         assert!(writer.rename_state_loaded(&mut engine, EntityKind::Location, "vault", "sealed", "chapters", true).is_err());
+    }
+
+    #[test]
+    fn a_becomes_in_a_state_file_is_renamed_and_found() {
+        // Chair's actions live in its state files, not its index: `kick`
+        // in sat.md, and kicked.md's own `kick` switching to itself.
+        let (dir, mut engine, writer) = world();
+        let d = dir.path();
+        write(d, "objects/chair/index.md", "---\nid: chair\ntitle: Chair\ntype: object\nobject_type: furniture\nstate: sat\n---\nA chair.\n");
+        write(d, "objects/chair/sat.md", "---\ninherits: index\nactions:\n  kick: { becomes: { chair: kicked } }\n  fold: { becomes: { chair: folded } }\n---\n");
+        write(d, "objects/chair/kicked.md", "---\ninherits: index\nactions:\n  kick: { becomes: { chair: kicked } }\n---\n");
+        write(d, "objects/chair/folded.md", "---\ninherits: index\n---\n");
+        engine.load_world(d).unwrap();
+        assert!(engine.current_problems(true).is_empty(), "{:?}", engine.current_problems(true));
+
+        let report = writer.rename_state_loaded(&mut engine, EntityKind::Object, "chair", "kicked", "broken", true).unwrap();
+        assert!(report.by_hand.is_empty() && report.change.problems.is_empty(), "{:?}", report);
+        assert_eq!(report.written, vec![PathBuf::from("objects/chair/sat.md")]);
+        let sat = fs::read_to_string(d.join("objects/chair/sat.md")).unwrap();
+        assert!(sat.contains("kick: { becomes: { chair: broken } }") && sat.contains("fold: { becomes: { chair: folded } }"), "{}", sat);
+        assert!(fs::read_to_string(d.join("objects/chair/broken.md")).unwrap().contains("kick: { becomes: { chair: broken } }"));
+        assert!(!d.join("objects/chair/kicked.md").exists());
+
+        // Delete names the file the action is in.
+        let report = writer.delete_state_loaded(&mut engine, EntityKind::Object, "chair", "folded", true).unwrap();
+        assert_eq!(report.by_hand, vec!["objects/chair/sat.md: action `fold` switches chair to `folded`, which is gone".to_string()]);
     }
 }

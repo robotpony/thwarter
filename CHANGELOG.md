@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.101.2 (2026-11-25)
+
+### Fixed
+
+- `/state rename` rewrites a `becomes:` written in another state file or a chapter overlay, not only in the index, so chair's `kick` in `sat.md` follows `kicked` to `broken`. One in a `## When:` section's block is listed to change by hand. `/state delete` names the file such an action is in, rather than the index.
+
 ## 0.101.1 (2026-11-25)
 
 ### Changed

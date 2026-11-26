@@ -232,10 +232,6 @@ fold: sat → folded. The reply is under `## When: #fold #folded`.
 Chair (object)
 > /state rename kicked broken
 Renamed chair's state kicked to broken.
-This adds 1 problem(s):
-  object `chair`, action `kick`: `becomes:` names state `kicked`, but object `chair` has no such state file
-This adds 1 warning(s):
-  tests/worlds/tiny/objects/chair/broken.md: object `chair` never becomes `broken`: it isn't the starting state, and no `becomes:`, `after:`, `at:` or script names it, so it never applies
 To change by hand:
   ## When: #kick #kicked: a heading tagged #kicked; change it to #broken if it means the state
 > /state delete sat
@@ -251,4 +247,4 @@ Deleted chair's state folded.
 This adds 1 problem(s):
   object `chair`, action `fold`: `becomes:` names state `folded`, but object `chair` has no such state file
 To change by hand:
-  objects/chair/index.md: action `fold` switches chair to `folded`, which is gone
+  objects/chair/sat.md: action `fold` switches chair to `folded`, which is gone

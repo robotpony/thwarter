@@ -6,7 +6,6 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 
 ## Open
 
-- [ ] **`/state rename` misses a `becomes:` in another state file**: chair's `kick: { becomes: { chair: kicked } }` lives in `sat.md`, and after `/state rename kicked broken` it still says `kicked`, with no by-hand note, so the only sign is a new `validate` problem. `rename_state_loaded`'s `becomes_naming` seems to read only the merged actions, not each state layer's. The end of `tests/transcripts/authoring.txt` shows it; re-bless once fixed (found by the console coder in 80a3300, 2026-11-25) [coder]
 - [ ] **`validate` doesn't warn about a heading tag that can never be true**: `design/SECTIONS.md` › States says it does, but `## When: #wallpaper.peeled` in the test world's hallway passes with no warning and never shows. It should warn, and suggest `@wallpaper:peeled` when the tag is a thing's id and one of its states joined by a dot (found 2026-11-25) [coder]
 - [ ] **A ```rhai block below a `## When:` heading is dropped silently**: the script runs only from above the first heading (`layers.rs` › `take_script` sees the description alone), so a block written after a section never runs, and `validate` passes. It should either count anywhere in the file or warn (found 2026-11-25 writing `design/CONTENT_FORMAT.md` › Adding a verb to an object) [coder]
 - [ ] **`#refused` and `#acted` can't be told apart by verb**: `## When: #spin #refused` never matches, only a bare `## When: #refused`, so a thing with two verbs gated by `requires:` gives both the same refusal. `## When: #take #immovable` names its verb, so these should too (found 2026-11-25, same place) [coder]
@@ -15,6 +14,7 @@ Keep the `## Open` and `## Fixed` headings as they are. Space Command's task par
 
 ## Fixed
 
+- 2026-11-25 (0.101.2): `/state rename` rewrites a `becomes:` in another state file, and `/state delete` names the file it's in.
 - 2026-11-25 (0.96.0): `/action` from a state on a thing with no `state:` asks whether it starts there, so the action can run; `any` makes an action for every state.
 - 2026-11-25 (0.96.0): the editor's quick menu hint follows the open file and shows only ⌃M, and Ctrl-M in the editor leaves edit mode's place where it was.
 - 2026-11-25 (0.95.2): `validate` warns about a state file nothing can switch its thing into, naming its actions that can't run; a thing with its own script is skipped.
