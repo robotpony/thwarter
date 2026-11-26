@@ -47,6 +47,9 @@ pub(super) struct StateFile {
     rel: PathBuf,
     /// Its text when the editor opened it, or as last saved.
     opened: String,
+    /// Whether its frontmatter says `inherits: index`, as a state file's
+    /// does; a chapter overlay's doesn't.
+    inherits: bool,
 }
 
 impl EditTarget {
@@ -249,7 +252,7 @@ impl Console {
         for (state, body) in target.states.iter().zip(&bodies) {
             files.push(crate::writer::Section {
                 path: state.rel.clone(),
-                text: state_file(body),
+                text: state_file(body, state.inherits),
                 expected: if force { None } else { Some(state.opened.clone()) },
             });
         }
@@ -504,9 +507,30 @@ impl Console {
             .filter_map(|name| {
                 let rel = dir.join(format!("{}.md", name));
                 let opened = fs::read_to_string(self.world.root.join(&rel)).ok()?;
-                Some(StateFile { name, rel, opened })
+                Some(StateFile { name, rel, inherits: has_inherits_index(&opened), opened })
             })
+            .chain(self.overlay_files(thing))
             .collect()
+    }
+
+    /// A thing's own chapter overlays (its `chapters/` files), in chapter
+    /// order, as `## When: #<chapter>` sections after its states
+    /// (`design/SECTIONS.md` › Open question 2, settled 2026-11-25).
+    fn overlay_files(&self, thing: &crate::engines::bundles::Thing) -> Vec<StateFile> {
+        let root = self.world.engine.world_root.clone().unwrap_or_else(|| self.world.root.clone());
+        let chapters = self.world.engine.chapters();
+        let mut overlays: Vec<(usize, StateFile)> = thing
+            .overlays
+            .iter()
+            .filter_map(|(key, layer)| {
+                let rel = layer.path.strip_prefix(&root).unwrap_or(&layer.path).to_path_buf();
+                let opened = fs::read_to_string(root.join(&rel)).ok()?;
+                let order = chapters.iter().position(|c| c.name() == key.name()).unwrap_or(usize::MAX);
+                Some((order, StateFile { name: key.name().to_string(), rel, inherits: has_inherits_index(&opened), opened }))
+            })
+            .collect();
+        overlays.sort_by_key(|(order, file)| (*order, file.name.clone()));
+        overlays.into_iter().map(|(_, file)| file).collect()
     }
 }
 
@@ -523,19 +547,29 @@ fn state_body(file: &str) -> String {
         return file.to_string();
     };
     let (front, prose) = (&rest[..end], &rest[end + 4..]);
-    let keys: Vec<&str> = front.lines().filter(|l| l.trim() != "inherits: index").collect();
+    let keys: Vec<&str> = front.lines().filter(|l| l.trim() != INHERITS_INDEX).collect();
     if keys.iter().all(|l| l.trim().is_empty()) {
         return prose.to_string();
     }
     format!("```thwarter\n{}\n```\n{}", keys.join("\n"), prose)
 }
 
-/// A state section back as its file: the inverse of `state_body`.
-fn state_file(body: &str) -> String {
+/// A state or chapter section back as its file: the inverse of
+/// `state_body`, with `inherits: index` put back where the file had it.
+fn state_file(body: &str, inherits: bool) -> String {
+    let first = if inherits { INHERITS_INDEX.to_string() + "\n" } else { String::new() };
     match body.strip_prefix("```thwarter\n").and_then(|rest| rest.split_once("\n```\n").or_else(|| rest.strip_suffix("\n```").map(|b| (b, "")))) {
-        Some((keys, prose)) => format!("---\ninherits: index\n{}\n---\n{}", keys.trim_end(), prose),
-        None => format!("---\ninherits: index\n---\n{}", body),
+        Some((keys, prose)) => format!("---\n{}{}\n---\n{}", first, keys.trim_end(), prose),
+        None if inherits => format!("---\n{}---\n{}", first, body),
+        None => body.to_string(),
     }
+}
+
+/// The line a state file's frontmatter starts with.
+const INHERITS_INDEX: &str = "inherits: index";
+
+fn has_inherits_index(file: &str) -> bool {
+    file.strip_prefix("---\n").is_some_and(|rest| rest.lines().take_while(|l| l.trim_end() != "---").any(|l| l.trim() == INHERITS_INDEX))
 }
 
 /// Splits a state section at the first `## When:` heading typed into it:
@@ -583,10 +617,13 @@ mod tests {
     fn a_state_file_shows_as_a_section_and_saves_back_as_itself() {
         let file = "---\ninherits: index\nweight: immovable\n---\nIt hangs.\n";
         assert_eq!(state_body(file), "```thwarter\nweight: immovable\n```\nIt hangs.\n");
-        assert_eq!(state_file(&state_body(file)), file);
+        assert_eq!(state_file(&state_body(file), true), file);
         let bare = "---\ninherits: index\n---\nLoose.\n";
         assert_eq!(state_body(bare), "Loose.\n");
-        assert_eq!(state_file("Loose.\n"), bare);
+        assert_eq!(state_file("Loose.\n", true), bare);
+        // A chapter overlay has no `inherits: index`, and gets none back.
+        let overlay = "---\ndescription: Dusty.\n---\nLater.\n";
+        assert_eq!(state_file(&state_body(overlay), false), overlay);
         assert_eq!(split_typed_sections("Lit.\n## When: #lit #night\nGlows.\n"), ("Lit.\n".to_string(), "## When: #lit #night\nGlows.\n".to_string()));
     }
 
@@ -613,6 +650,21 @@ mod tests {
         assert_eq!(fs::read_to_string(dir.join("unlit.md")).unwrap(), "---\ninherits: index\n---\nDark.\n");
         assert_eq!(fs::read_to_string(dir.join("lit.md")).unwrap(), "---\ninherits: index\n---\nIt glows.\n");
         assert!(fs::read_to_string(dir.join("index.md")).unwrap().contains("## When: #lit #night\nA beacon."));
+        // A chapter overlay in the bundle's chapters/ shows after the states.
+        fs::create_dir_all(root.join("chapters")).unwrap();
+        fs::write(root.join("chapters/10-later.md"), "---\ntitle: Later\n---\n").unwrap();
+        fs::create_dir_all(dir.join("chapters")).unwrap();
+        fs::write(dir.join("chapters/later.md"), "---\ndescription: Dusty now.\n---\n").unwrap();
+        let mut console = Console::open(&root, super::super::Mode::Edit).unwrap();
+        let path = console.world.path_of(Kind::Object, "lantern").unwrap();
+        let mut target = console.open_target(Kind::Object, "lantern".into(), path).unwrap();
+        let document = console.edit_document(&target);
+        assert_eq!(document.sections.last().unwrap().heading.as_deref(), Some("## When: #later"), "{:?}", document.sections);
+        assert_eq!(document.sections.last().unwrap().text, "```thwarter\ndescription: Dusty now.\n```\n");
+        let mut sections: Vec<String> = document.sections.iter().map(|s| s.text.clone()).collect();
+        *sections.last_mut().unwrap() = "```thwarter\ndescription: Dustier.\n```\n".into();
+        assert!(matches!(console.save_bundle_edit(&mut target, &sections, false), Saved::Yes(_)));
+        assert_eq!(fs::read_to_string(dir.join("chapters/later.md")).unwrap(), "---\ndescription: Dustier.\n---\n", "no inherits: index added");
         // A change on disk since it opened is a conflict; force overwrites.
         fs::write(dir.join("lit.md"), "---\ninherits: index\n---\nChanged.\n").unwrap();
         assert!(matches!(console.save_bundle_edit(&mut target, &sections, false), Saved::Conflict(_)));

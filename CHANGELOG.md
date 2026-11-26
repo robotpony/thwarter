@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.100.1 (2026-11-25)
+
+### Added
+
+- Bundle editing shows the thing's own chapter overlays (its `chapters/` files) as `## When: #<chapter>` sections after its states, in chapter order, and saves each back to its file without adding `inherits: index` (`design/SECTIONS.md` › Open question 2, settled in bf5247c).
+
 ## 0.100.0 (2026-11-25)
 
 ### Added
