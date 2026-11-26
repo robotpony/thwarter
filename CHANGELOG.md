@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.101.3 (2026-11-25)
+
+### Fixed
+
+- The sidebar click test looked for macOS's TO WRITE label (`⌃1`), so it failed on Linux CI since a84dae7; it now asks `key_label` for the label the sidebar shows.
+
 ## 0.101.2 (2026-11-25)
 
 ### Fixed

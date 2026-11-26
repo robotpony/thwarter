@@ -2133,7 +2133,8 @@ mod tests {
         click(&mut screen, "north");
         assert!(lock(&console).pwd().contains("well"), "the exit is gone through: {}", lock(&console).pwd());
         typed(&mut screen, &console, "go /village/square");
-        click(&mut screen, "⌃1");
+        // The label is the sidebar's own: ⌃1 on macOS, ctrl-1 elsewhere.
+        click(&mut screen, &super::super::to_write::key_label(1));
         assert!(screen.editing.is_some(), "the TO WRITE entry is written and opened");
         press(&mut screen, &console, Key::Esc);
         // In the menu's popup a click picks the entry, then the option.
