@@ -51,6 +51,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.99.0 (2026-11-25)
+
+### Added
+
+- A click on a quick menu entry or option in its popup picks it (REQ-CON-69).
+- The editor's foot line says "~ here opens the console for this file" while the cursor is on an empty line and there's nothing else to say (REQ-CON-73).
+
 ## 0.98.0 (2026-11-25)
 
 ### Added

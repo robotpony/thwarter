@@ -399,6 +399,12 @@ impl<'a> Screen<'a> {
                     self.scroll = self.scroll.saturating_sub(3);
                 }
             }
+            MouseEventKind::Down(MouseButton::Left) if self.quick.is_some() && !in_side => {
+                let run = self.quick.as_mut().is_some_and(|q| q.click(event.row));
+                if run {
+                    self.run_quick(console);
+                }
+            }
             MouseEventKind::Down(MouseButton::Left) if in_side => {
                 let click = self.clicks.borrow().iter().find(|(y, _)| *y == event.row).map(|(_, c)| c.clone());
                 if let Some(click) = click {
@@ -568,7 +574,12 @@ impl<'a> Screen<'a> {
         if !quick.key(input) {
             return;
         }
-        let quick = self.quick.take().expect("checked");
+        self.run_quick(console);
+    }
+
+    /// Runs the answered quick menu entry's commands.
+    fn run_quick(&mut self, console: &Mutex<Console>) {
+        let quick = self.quick.take().expect("an answered quick menu");
         let commands = quick.commands();
         // From the editor the commands act on its file, and edit mode's
         // place is put back afterwards (Bruce, 2026-11-25).
@@ -939,11 +950,13 @@ struct Quick<'a> {
     reopen: Option<(super::world::Kind, String)>,
     /// The editor's file the commands act on, if it was opened there.
     file: Option<String>,
+    /// Which screen row picks which entry or option, from the last draw.
+    rows: std::cell::RefCell<Vec<(u16, usize)>>,
 }
 
 impl<'a> Quick<'a> {
     fn new(menu: QuickMenu) -> Self {
-        Quick { menu, selected: 0, asking: false, at: 0, answers: Vec::new(), choice: 0, area: input_line(), reopen: None, file: None, naming: false }
+        Quick { menu, selected: 0, asking: false, at: 0, answers: Vec::new(), choice: 0, area: input_line(), reopen: None, file: None, naming: false, rows: Default::default() }
     }
 
     fn entry(&self) -> &super::quick_menu::Entry {
@@ -1048,17 +1061,32 @@ impl<'a> Quick<'a> {
         self.entry().commands(&self.answers)
     }
 
+    /// A click on screen row `y`: picks the entry or option there, as
+    /// moving to it and pressing Enter would. Returns whether to run.
+    fn click(&mut self, y: u16) -> bool {
+        let Some(pick) = self.rows.borrow().iter().find(|(row, _)| *row == y).map(|(_, p)| *p) else { return false };
+        if self.asking {
+            self.choice = pick;
+        } else {
+            self.selected = pick;
+        }
+        self.key(Input { key: Key::Enter, ..Input::default() })
+    }
+
     /// Drawn on the output's last rows, just above the input.
     fn draw(&self, frame: &mut Frame, area: Rect, words: &Words) {
         let heading = words.text("qm_heading", &[("id", &self.menu.id), ("kind", self.menu.kind.label())]);
         let mut lines = vec![Line::styled(heading, style(Role::Chrome))];
         let reversed = Style::default().add_modifier(ratatui::style::Modifier::REVERSED);
+        // (line index, what it picks), turned into screen rows below.
+        let mut picks: Vec<(usize, usize)> = Vec::new();
         let keys;
         if !self.asking {
             let width = self.menu.entries.iter().map(|e| words.text(e.label, &[]).chars().count()).max().unwrap_or(0);
             for (i, e) in self.menu.entries.iter().enumerate() {
                 let text = format!(" {}  {:<width$}  {}", e.letter, words.text(e.label, &[]), e.stands_for, width = width);
                 let line = Line::from(text);
+                picks.push((lines.len(), i));
                 lines.push(if i == self.selected { line.style(reversed) } else { line });
             }
             keys = words.text("qm_keys_menu", &[]);
@@ -1095,6 +1123,7 @@ impl<'a> Quick<'a> {
                     }
                     for (i, row) in rows.into_iter().enumerate() {
                         let line = Line::from(row);
+                        picks.push((lines.len(), i));
                         lines.push(if i == self.choice { line.style(reversed) } else { line });
                     }
                     keys = words.text("qm_keys_choose", &[]);
@@ -1109,6 +1138,8 @@ impl<'a> Quick<'a> {
         }
         let height = (lines.len() as u16 + 2).min(area.height);
         let popup = Rect { x: area.x, y: area.bottom().saturating_sub(height), width: area.width, height };
+        // Under the top rule; rows cut off by a short screen aren't clickable.
+        *self.rows.borrow_mut() = picks.into_iter().filter(|(line, _)| (*line as u16 + 1) < height.saturating_sub(1)).map(|(line, pick)| (popup.y + 1 + line as u16, pick)).collect();
         frame.render_widget(ratatui::widgets::Clear, popup);
         let block = Block::default()
             .borders(Borders::TOP | Borders::BOTTOM)
@@ -2067,6 +2098,22 @@ mod tests {
         click(&mut screen, "⌃1");
         assert!(screen.editing.is_some(), "the TO WRITE entry is written and opened");
         press(&mut screen, &console, Key::Esc);
+        // In the menu's popup a click picks the entry, then the option.
+        let click_at = |screen: &mut Screen, text: &str| {
+            let shown = screen_text(screen, &console, 140, 50);
+            let row = shown.lines().position(|l| l.contains(text)).unwrap_or_else(|| panic!("{} in {}", text, shown));
+            let event = MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column: 3, row: row as u16, modifiers: KeyModifiers::NONE };
+            screen.mouse(event, &console);
+        };
+        typed(&mut screen, &console, "go /village/square");
+        typed(&mut screen, &console, "/menu");
+        click_at(&mut screen, "add state");
+        assert!(screen.quick.as_ref().is_some_and(|q| q.asking && q.entry().label == "qm_state"));
+        keys(&mut screen, &console, "lit");
+        press(&mut screen, &console, Key::Enter);
+        click_at(&mut screen, "   start");
+        assert!(screen.quick.is_none(), "the option ran the entry");
+        assert!(screen.output.join("\n").contains("/state lit start"));
         // The wheel over the sidebar scrolls it, not the output.
         let side = screen.sidebar_area.get();
         let wheel = MouseEvent { kind: MouseEventKind::ScrollDown, column: side.x + 2, row: side.y + 2, modifiers: KeyModifiers::NONE };

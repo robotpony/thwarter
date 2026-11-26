@@ -364,7 +364,7 @@ Bruce, 2026-11-25, like the `~` console in games.
 
 Bruce, 2026-11-25.
 
-- REQ-CON-69: A click on a quick menu entry, a TO WRITE name or an exit in the sidebar MUST do what its key or command does, straight away: the entry starts its questions, the name is written as REQ-CON-58 says, and the exit is gone through, as `go <direction>` would. A click elsewhere does nothing.
+- REQ-CON-69: A click on a quick menu entry, a TO WRITE name or an exit in the sidebar MUST do what its key or command does, straight away: the entry starts its questions, the name is written as REQ-CON-58 says, and the exit is gone through, as `go <direction>` would. Inside the quick menu's popup, a click on an entry or an option picks it, as moving to it and pressing Enter would (Bruce, 2026-11-25). A click elsewhere does nothing.
 - REQ-CON-70: To get clicks the console captures the mouse, so it MUST scroll the output and the sidebar with the wheel itself, under the pointer. Selecting text then takes Shift-drag, which Ghostty and iTerm2 pass to the terminal by default; Bruce accepts that cost. `/help` and the sidebar's foot SHOULD say so once.
 
 ## Command registry

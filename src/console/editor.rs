@@ -311,6 +311,9 @@ impl<'a> Editor<'a> {
         paint(frame.buffer_mut(), middle, self.area.lines(), &roles, self.area.cursor().0);
         let (status, kind) = if self.status.is_empty() && self.dirty() {
             (self.texts.text("console", "editor_modified", &[]), Some(Kind::Warning))
+        } else if self.status.is_empty() && self.on_empty_line() {
+            // Named once where it works (REQ-CON-73).
+            (self.texts.text("console", "editor_tilde_hint", &[]), None)
         } else {
             (self.status.clone(), self.status_kind)
         };
