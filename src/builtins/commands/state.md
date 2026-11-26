@@ -3,7 +3,7 @@ type: command
 name: state
 aliases: []
 about: "a state of the thing you're at; makes it a bundle"
-args: "{name} [start]"
+args: "{name} [start] | rename {old} {new} | delete {name}"
 modes: [edit]
 changes: true
 handler: state

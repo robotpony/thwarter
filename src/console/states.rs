@@ -36,6 +36,8 @@ impl Console {
     /// `/state <name> [start]`.
     pub(super) fn state_command(&mut self, args: &[&str]) -> String {
         let (name, start) = match args {
+            ["rename", old, new] => return self.rename_state(old, new),
+            ["delete", name] => return self.ask_delete_state(name),
             [name] => (*name, false),
             [name, "start"] => (*name, true),
             _ => return suggest(&self.t("usage", &[]), &["/state {name} [start]"]),
@@ -166,6 +168,85 @@ impl Console {
             out = format!("{}\n\n{}", out, self.t("action_starts_in", &[("id", &id), ("state", from)]));
         }
         out
+    }
+
+    /// `/state rename <old> <new>`: the writer moves the file and rewrites
+    /// the index's `state:` and every `becomes:` naming it. Headings tagged
+    /// with the old name are listed to change by hand, since a tag may be
+    /// a verb or a chapter too.
+    fn rename_state(&mut self, old: &str, new: &str) -> String {
+        let (kind, entity, id) = match self.thing_here() {
+            Ok(thing) => thing,
+            Err(e) => return e,
+        };
+        let writer = match self.writer_for_states() {
+            Ok(w) => w,
+            Err(e) => return e,
+        };
+        self.note_warnings_before_states();
+        let report = match writer.rename_state_loaded(&mut self.world.engine, entity, &id, old, new, false) {
+            Ok(report) => report,
+            Err(e) => return self.t("not_saved", &[("reason", &format!("{:#}", e))]),
+        };
+        let mut written: Vec<PathBuf> = report.written.iter().chain(&report.created).cloned().collect();
+        for (from, to) in &report.moved {
+            written.push(from.clone());
+            written.push(to.clone());
+        }
+        self.follow_bundle(kind, &id);
+        let mut by_hand = report.by_hand.clone();
+        let tag = format!("#{}", old);
+        let index = self.index_text(entity, &id).unwrap_or_default();
+        for line in index.lines().filter(|l| l.starts_with("## When:") && l.split_whitespace().any(|w| w == tag)) {
+            by_hand.push(self.t("state_rename_heading", &[("heading", line), ("old", old), ("new", new)]));
+        }
+        let mut out = self.after_writes(&written, self.t("state_renamed", &[("id", &id), ("old", old), ("new", new)]));
+        if !by_hand.is_empty() {
+            out = format!("{}\n{}\n  {}", out, self.t("by_hand", &[]), by_hand.join("\n  "));
+        }
+        out
+    }
+
+    /// `/state delete <name>`: says what goes, then asks, since there's no
+    /// undo.
+    fn ask_delete_state(&mut self, name: &str) -> String {
+        let (kind, entity, id) = match self.thing_here() {
+            Ok(thing) => thing,
+            Err(e) => return e,
+        };
+        let Some(thing) = self.world.engine.thing(entity, &id) else { return self.t("not_in_world", &[("id", &id)]) };
+        if !thing.states.contains_key(name) {
+            return self.t("no_such_state", &[("id", &id), ("state", name)]);
+        }
+        if thing.starting_state.as_deref() == Some(name) {
+            return self.t("state_delete_starting", &[("id", &id), ("state", name)]);
+        }
+        self.asked = Some(super::doors::Asked::DeleteState { kind, id: id.clone(), state: name.to_string() });
+        self.t("state_delete_ask", &[("id", &id), ("state", name)])
+    }
+
+    /// The answer to "Delete <state>?".
+    pub(super) fn answer_delete_state(&mut self, kind: Kind, id: &str, state: &str, line: &str) -> String {
+        if !matches!(line.trim().to_lowercase().as_str(), "y" | "yes") {
+            return self.t("state_kept", &[("id", id), ("state", state)]);
+        }
+        let Some(entity) = entity_kind(kind) else { return self.t("not_in_world", &[("id", id)]) };
+        let writer = match self.writer_for_states() {
+            Ok(w) => w,
+            Err(e) => return e,
+        };
+        self.note_warnings_before_states();
+        match writer.delete_state_loaded(&mut self.world.engine, entity, id, state, false) {
+            Ok(report) => {
+                let deleted: Vec<PathBuf> = report.deleted.clone();
+                let mut out = self.after_writes(&deleted, self.t("state_deleted", &[("id", id), ("state", state)]));
+                if !report.by_hand.is_empty() {
+                    out = format!("{}\n{}\n  {}", out, self.t("by_hand", &[]), report.by_hand.join("\n  "));
+                }
+                out
+            }
+            Err(e) => self.t("not_saved", &[("reason", &format!("{:#}", e))]),
+        }
     }
 
     /// The answer to "Does it start in <state>?": yes writes `state:`.
