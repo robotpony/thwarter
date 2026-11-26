@@ -38,7 +38,7 @@ The console side (Bruce with the console coder). Done when an author can build a
 - [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
 - [ ] A quick menu in the sidebar for where you are: add action, add state, add chapter version, link to, add a reply, add a thing or door, recipes, hide or reveal (a state's `visibility:`), starting state, play from here. Each entry asks its questions in a picker, not a typed command, at the bottom of the console, opened with Ctrl-M at the prompt and in the editor, or `/menu` (Bruce, 2026-11-25; Ctrl-Space didn't reach the console) [console] (`design/CONSOLE_REQUIREMENTS.md` › Quick menu, REQ-CON-63 to 68)
 - [ ] Quick menu questions get a hint line with examples, taken from the world where it has them (the thing's own states, nearby rooms), and choices say what each option means (Bruce, 2026-11-25) [console] (REQ-CON-65)
-- [ ] A drop-down console over the editor, opened with a key like the `~` of games, running any command (`/menu` among them) for the open file; the editor shows only keys that work in it (Bruce, 2026-11-25) [console] (requirement to come in `design/CONSOLE_REQUIREMENTS.md`)
+- [x] A drop-down console over the editor, opened with a key like the `~` of games, running any command (`/menu` among them) for the open file; the editor shows only keys that work in it (Bruce, 2026-11-25) [console] (requirement to come in `design/CONSOLE_REQUIREMENTS.md`)
 - [ ] Mouse clicks in the sidebar: quick menu entries, TO WRITE names and exits; Shift-drag selects text (Bruce, 2026-11-25) [console] (requirement to come in `design/CONSOLE_REQUIREMENTS.md`)
 - [ ] Review the built-in question content with Bruce, once the mechanics work [commander, Bruce]
 

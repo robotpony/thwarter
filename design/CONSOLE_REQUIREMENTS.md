@@ -352,6 +352,14 @@ Bruce, 2026-11-25. Writing a room or thing means remembering which command does 
 - REQ-CON-67: Starting state MUST list the thing's states, with the current `state:` marked, and set the one picked.
 - REQ-CON-68: Add a reply MUST ask for the verb, offering first what the engine's response hints say the thing needs or could have, then add a `## When:` section for it and open the editor there. Until response hints exist it asks for the verb plainly.
 
+## Drop-down console
+
+Bruce, 2026-11-25, like the `~` console in games.
+
+- REQ-CON-71: In the full-screen editor, `~` typed on an empty line MUST slide a command line down over the top of the editor instead of typing the character; `~` anywhere else is text. Any console command typed there (`/menu`, `/state`, `/action`, `/validate` and the rest) runs for the open file, leaving edit mode's place where it was, and its reply shows under the line. Esc, or `~` on the empty command line, closes it and puts the author back at the cursor.
+- REQ-CON-72: Before a command runs from the drop-down, the editor MUST save the open document, as TO WRITE's keys do (REQ-CON-59); if the save fails the command doesn't run and the reason shows. A command that moves the file (`/state` making a bundle) reopens the editor on it, at the same line. One that asks questions or opens another file closes the drop-down and the editor for them, then comes back to this file.
+- REQ-CON-73: The drop-down MUST show only keys that work in it, and the editor's foot SHOULD name `~` once while the cursor is on an empty line.
+
 ## Sidebar clicks
 
 Bruce, 2026-11-25.

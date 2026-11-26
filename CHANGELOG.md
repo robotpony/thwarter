@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.97.0 (2026-11-25)
+
+### Added
+
+- A drop-down console over the full-screen editor (REQ-CON-71, 72): `~` on an empty line slides a command line down, and any console command typed there runs for the open file, after the editor saves it. Its reply shows under the line; a command that makes the file a bundle reopens the editor at the same line, and `/menu` or a command that asks questions closes the editor for them and comes back. Esc, or `~` on the empty line, closes it. `~` anywhere else is text.
+
 ## 0.96.0 (2026-11-25)
 
 ### Added

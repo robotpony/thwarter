@@ -132,6 +132,24 @@ impl<'a> Editor<'a> {
         self.status_kind = super::kinds::kind_of(key);
     }
 
+    /// Whether the cursor is on an empty line, where `~` opens the
+    /// drop-down console (REQ-CON-71).
+    pub fn on_empty_line(&self) -> bool {
+        let row = self.area.cursor().0;
+        self.area.lines().get(row).is_none_or(|l| l.trim().is_empty())
+    }
+
+    /// The cursor, as (row, column).
+    pub fn cursor(&self) -> (usize, usize) {
+        let cursor = self.area.cursor();
+        (cursor.0, cursor.1)
+    }
+
+    /// Puts the cursor at (row, column), as near as the text allows.
+    pub fn jump(&mut self, (row, col): (usize, usize)) {
+        self.area.move_cursor(CursorMove::Jump(row.min(u16::MAX as usize) as u16, col.min(u16::MAX as usize) as u16));
+    }
+
     pub fn new(document: Document) -> Self {
         let text = document.combined();
         let mut lines: Vec<String> = text.lines().map(str::to_string).collect();

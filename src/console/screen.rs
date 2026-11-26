@@ -65,6 +65,8 @@ pub struct Screen<'a> {
     picker: Option<Picker<'a>>,
     /// The quick menu, while it's open (REQ-CON-63).
     quick: Option<Quick<'a>>,
+    /// The drop-down console over the editor, while it's open (REQ-CON-71).
+    dropdown: Option<Dropdown<'a>>,
     /// The line Esc closed the menu on; it stays closed until the line changes.
     menu_dismissed: Option<String>,
     sidebar_scroll: usize,
@@ -92,6 +94,7 @@ impl<'a> Screen<'a> {
             menu: None,
             picker: None,
             quick: None,
+            dropdown: None,
             menu_dismissed: None,
             sidebar_scroll: 0,
             page: Cell::new(20),
@@ -130,6 +133,18 @@ impl<'a> Screen<'a> {
         if self.quick.is_some() {
             self.quick_key(input, console);
             return;
+        }
+        if self.dropdown.is_some() {
+            self.dropdown_key(input, console);
+            return;
+        }
+        // `~` on an empty line in the editor slides the console down
+        // (REQ-CON-71); anywhere else it's text.
+        if let (Some((editor, _)), Input { key: Key::Char('~'), ctrl: false, alt: false, .. }) = (&self.editing, &input) {
+            if editor.on_empty_line() {
+                self.dropdown = Some(Dropdown { area: input_line(), reply: Vec::new() });
+                return;
+            }
         }
         // A TO WRITE key switches documents from the editor too: save this
         // one, then make and open that one (REQ-CON-59).
@@ -355,6 +370,104 @@ impl<'a> Screen<'a> {
         if let Some(target) = console.take_pending_edit() {
             let document = console.edit_document(&target);
             self.editing = Some((Editor::new(document).with_texts(console.texts.clone()), target));
+        }
+    }
+
+    /// A key while the drop-down console is open over the editor.
+    fn dropdown_key(&mut self, input: Input, console: &Mutex<Console>) {
+        let Some(dropdown) = self.dropdown.as_mut() else { return };
+        let line = dropdown.area.lines().join(" ");
+        match input.key {
+            Key::Esc => self.dropdown = None,
+            Key::Char('~') if line.trim().is_empty() && !input.ctrl && !input.alt => self.dropdown = None,
+            Key::Enter if !line.trim().is_empty() => self.dropdown_run(line.trim(), console),
+            Key::Enter => {}
+            _ => {
+                dropdown.area.input(input);
+            }
+        }
+    }
+
+    /// Runs a drop-down command for the open file: saves first, runs it
+    /// with edit mode at the file, then puts the place back (REQ-CON-72).
+    fn dropdown_run(&mut self, line: &str, console: &Mutex<Console>) {
+        let Some((editor, target)) = self.editing.as_mut() else {
+            self.dropdown = None;
+            return;
+        };
+        if !editor.save_to_switch(&mut EditFiles { console, target }) {
+            if let Some(dropdown) = self.dropdown.as_mut() {
+                dropdown.reply = vec![self.words.text("dropdown_not_saved", &[])];
+            }
+            return;
+        }
+        let (kind, id, path) = target.thing();
+        let (kind, id, path) = (kind, id.to_string(), path.to_string());
+        let cursor = editor.cursor();
+        self.push(&format!("> {}", line));
+        self.output.push(String::new());
+        let (text, flow) = {
+            let mut guard = lock(console);
+            let before = std::mem::replace(&mut guard.place, super::session::Place::File(path.clone()));
+            let out = guard.handle(line);
+            guard.place = before;
+            if !guard.place_exists() {
+                guard.move_to_existing_folder();
+            }
+            out
+        };
+        if !text.is_empty() {
+            self.push(&text);
+            self.output.push(String::new());
+        }
+        if flow == Flow::Quit {
+            self.quit = true;
+        }
+        if let Some(dropdown) = self.dropdown.as_mut() {
+            dropdown.area = input_line();
+            dropdown.reply = text.lines().map(str::to_string).collect();
+        }
+        // /menu, questions or another file: the drop-down and the editor
+        // close for them, and the menu comes back to this file.
+        let (menu, other) = {
+            let mut guard = lock(console);
+            let menu = guard.take_pending_menu();
+            (menu, guard.pending_questions.is_some() || guard.pending_edit.is_some())
+        };
+        if menu || other {
+            self.dropdown = None;
+            let (editor, target) = self.editing.take().expect("the editor is open");
+            let report = lock(console).edit_closed(&target, editor.closed());
+            if !report.is_empty() {
+                self.push(&report);
+            }
+            if menu {
+                self.open_quick_for(console, Some(&path));
+                match self.quick.as_mut() {
+                    Some(quick) => {
+                        quick.reopen = Some((kind, id));
+                        quick.file = Some(path);
+                    }
+                    None => self.reopen(console, kind, &id),
+                }
+            } else {
+                self.after_command(console);
+                if self.editing.is_none() && self.picker.is_none() {
+                    self.reopen(console, kind, &id);
+                }
+            }
+            return;
+        }
+        // The file moved (a bundle now): reopen it at the same line.
+        // Otherwise take what the command wrote into the open text.
+        let moved = lock(console).world.path_of(kind, &id).is_some_and(|now| now != path);
+        if moved {
+            self.reopen(console, kind, &id);
+            if let Some((editor, _)) = self.editing.as_mut() {
+                editor.jump(cursor);
+            }
+        } else if let Some((editor, target)) = self.editing.as_mut() {
+            editor.check_disk(&mut EditFiles { console, target });
         }
     }
 
@@ -615,7 +728,12 @@ impl<'a> Screen<'a> {
             body
         };
         match &self.editing {
-            Some((editor, target)) => editor.draw(frame, output_area, &console.lookup_for(target)),
+            Some((editor, target)) => {
+                editor.draw(frame, output_area, &console.lookup_for(target));
+                if let Some(dropdown) = &self.dropdown {
+                    dropdown.draw(frame, output_area, &self.words);
+                }
+            }
             None if self.quick.is_some() => {
                 self.draw_output(frame, output_area);
                 if let Some(quick) = &self.quick {
@@ -693,6 +811,33 @@ impl<'a> Screen<'a> {
             lines.push(Line::styled(self.words.text("side_more", &[]), style(Role::Note)));
         }
         frame.render_widget(Paragraph::new(lines), bottom);
+    }
+}
+
+/// The drop-down console over the editor (REQ-CON-71): a command line,
+/// and the last reply under it.
+struct Dropdown<'a> {
+    area: TextArea<'a>,
+    reply: Vec<String>,
+}
+
+/// The most reply lines the drop-down shows; the output keeps them all.
+const DROPDOWN_ROWS: usize = 10;
+
+impl Dropdown<'_> {
+    /// Drawn over the top of the editor, between two rules.
+    fn draw(&self, frame: &mut Frame, area: Rect, words: &Words) {
+        let mut lines = vec![Line::from(format!(" ~ {}▏", self.area.lines().join(" ")))];
+        let shown = self.reply.len().min(DROPDOWN_ROWS);
+        lines.extend(self.reply[self.reply.len() - shown..].iter().map(|l| Line::from(format!("   {}", l))));
+        let height = (lines.len() as u16 + 2).min(area.height);
+        let top = Rect { x: area.x, y: area.y, width: area.width, height };
+        frame.render_widget(ratatui::widgets::Clear, top);
+        let block = Block::default()
+            .borders(Borders::TOP | Borders::BOTTOM)
+            .border_style(style(Role::Chrome))
+            .title_bottom(Line::styled(words.text("dropdown_keys", &[]), style(Role::Chrome)).right_aligned());
+        frame.render_widget(Paragraph::new(lines).block(block), top);
     }
 }
 
@@ -1717,6 +1862,48 @@ mod tests {
         assert!(square.contains("south"), "{}", square);
         let out = screen.output.join("\n");
         assert!(out.contains("Typed, that was:") && out.contains("  /link south well"), "{}", out);
+    }
+
+    #[test]
+    fn tilde_on_an_empty_line_drops_a_console_down_over_the_editor() {
+        let dir = tempfile::tempdir().unwrap();
+        let from = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/worlds/tiny");
+        let root = dir.path().join("tiny");
+        for entry in walkdir::WalkDir::new(&from) {
+            let entry = entry.unwrap();
+            let to = root.join(entry.path().strip_prefix(&from).unwrap());
+            if entry.file_type().is_dir() {
+                std::fs::create_dir_all(&to).unwrap();
+            } else {
+                std::fs::copy(entry.path(), &to).unwrap();
+            }
+        }
+        let mut console = Console::open(&root, super::super::Mode::Edit).unwrap();
+        console.interactive = true;
+        let console = Mutex::new(console);
+        let mut screen = Screen::new("", None);
+        typed(&mut screen, &console, "/edit lantern");
+        let place = lock(&console).pwd();
+        // ~ after text is text.
+        keys(&mut screen, &console, "x~");
+        assert!(screen.dropdown.is_none());
+        press(&mut screen, &console, Key::Backspace);
+        press(&mut screen, &console, Key::Backspace);
+        // On an empty line it opens; the unsaved new line is saved first.
+        press(&mut screen, &console, Key::Enter);
+        keys(&mut screen, &console, "~");
+        assert!(screen.dropdown.is_some(), "on an empty line");
+        assert!(screen_text(&screen, &console, 120, 40).contains("Esc or ~ closes"));
+        keys(&mut screen, &console, "/state lit");
+        press(&mut screen, &console, Key::Enter);
+        assert!(root.join("objects/lantern/lit.md").exists() || root.join("objects/lantern/index.md").exists(), "a bundle now");
+        assert!(screen.editing.is_some(), "the editor reopened on the bundle");
+        assert!(screen.dropdown.as_ref().is_some_and(|d| !d.reply.is_empty()), "the reply shows under the line");
+        assert_eq!(lock(&console).pwd(), place, "edit mode's place didn't move");
+        // ~ on the empty command line closes it.
+        keys(&mut screen, &console, "~");
+        assert!(screen.dropdown.is_none());
+        assert!(screen.editing.is_some());
     }
 
     #[test]
