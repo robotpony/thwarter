@@ -260,8 +260,6 @@ Chair (object)
 Added `## When: #later` to chair: write what changes in that chapter under it.
 > /chapter later file
 Made chair's version for chapter later (objects/chair/chapters/later.md).
-This adds 1 warning(s):
-  tests/worlds/tiny/objects/chair/chapters/later.md: applies to objects/chair/ in chapter `later` by where it sits
 > /chapter never
 There's no chapter never. The chapters: later.
 

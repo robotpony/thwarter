@@ -581,19 +581,22 @@ pub(crate) fn build(root: &Path, files: &[FileRecord], scripts: &BTreeMap<PathBu
             ));
             continue;
         };
-        let target = if o.is_bundle {
-            format!("{}/", o.scope.display())
-        } else if o.scope.as_os_str().is_empty() {
-            "everything in the world".to_string()
-        } else {
-            format!("everything in {}/", o.scope.display())
-        };
-        built.warnings.push(format!(
-            "{}: applies to {} in chapter `{}` by where it sits",
-            o.layer.path.display(),
-            target,
-            chapter.name()
-        ));
+        // An overlay in a bundle's own `chapters/` can only mean that
+        // thing, so only an area's overlay, which reaches everything in
+        // its folder, is warned about (Bruce, 2026-11-25).
+        if !o.is_bundle {
+            let target = if o.scope.as_os_str().is_empty() {
+                "everything in the world".to_string()
+            } else {
+                format!("everything in {}/", o.scope.display())
+            };
+            built.warnings.push(format!(
+                "{}: applies to {} in chapter `{}` by where it sits",
+                o.layer.path.display(),
+                target,
+                chapter.name()
+            ));
+        }
         if o.is_bundle {
             overlays.entry(o.scope).or_default().insert(chapter.key.clone(), o.layer);
         } else {
@@ -1185,11 +1188,12 @@ mod tests {
     }
 
     #[test]
-    fn overlays_warn_that_they_apply_by_placement() {
+    fn area_overlays_warn_that_they_apply_by_placement() {
         let (_dir, engine) = castle();
         let warnings = engine.current_warnings();
-        assert!(warnings.iter().any(|w| w.contains("castle/vault/chapters/after-the-king.md: applies to castle/vault/ in chapter `after-the-king`")), "{:?}", warnings);
-        assert!(warnings.iter().any(|w| w.contains("castle/chapters/after-the-king.md: applies to everything in castle/ in chapter `after-the-king`")));
+        assert!(warnings.iter().any(|w| w.contains("castle/chapters/after-the-king.md: applies to everything in castle/ in chapter `after-the-king`")), "{:?}", warnings);
+        // A bundle's own chapter file can only mean that thing.
+        assert!(!warnings.iter().any(|w| w.contains("castle/vault/chapters/after-the-king.md")), "{:?}", warnings);
     }
 
     #[test]

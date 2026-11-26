@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.102.1 (2026-11-25)
+
+### Changed
+
+- A thing's own chapter file (`<thing>/chapters/<name>.md`) no longer warns that it applies by where it sits, since it can only mean that thing; an area's overlay, which reaches everything in its folder, still does. `/chapter <name> file` no longer reports a warning for the file it just wrote (Bruce, 2026-11-25).
+
 ## 0.102.0 (2026-11-25)
 
 ### Added

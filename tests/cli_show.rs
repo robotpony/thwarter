@@ -106,7 +106,7 @@ fn warnings_go_to_stderr_as_a_count_and_json_is_one_document() {
     let doc: serde_json::Value = serde_json::from_str(&out).unwrap_or_else(|e| panic!("not one JSON document ({}):\n{}", e, out));
     assert_eq!(doc["id"], "diary");
     assert!(!out.contains("WARNING"));
-    assert!(err.trim() == "3 warnings; run `thwart validate` to list them", "{}", err);
+    assert!(err.trim() == "2 warnings; run `thwart validate` to list them", "{}", err);
 }
 
 #[test]
