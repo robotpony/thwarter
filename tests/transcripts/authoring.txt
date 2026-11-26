@@ -248,3 +248,21 @@ This adds 1 problem(s):
   object `chair`, action `fold`: `becomes:` names state `folded`, but object `chair` has no such state file
 To change by hand:
   objects/chair/sat.md: action `fold` switches chair to `folded`, which is gone
+> go /
+/  3 items: npcs/, objects/, village/
+> /chapter new 20 later
+Made chapter later (chapters/20-later.md).
+> /chapter new 30 later
+There's already a chapter numbered 30 or named later.
+> go chair
+Chair (object)
+> /chapter later
+Added `## When: #later` to chair: write what changes in that chapter under it.
+> /chapter later file
+Made chair's version for chapter later (objects/chair/chapters/later.md).
+This adds 1 warning(s):
+  tests/worlds/tiny/objects/chair/chapters/later.md: applies to objects/chair/ in chapter `later` by where it sits
+> /chapter never
+There's no chapter never. The chapters: later.
+
+  /chapter new {number} {name}

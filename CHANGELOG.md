@@ -51,6 +51,13 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.102.0 (2026-11-25)
+
+### Added
+
+- `/chapter new <number> <name>` makes a chapter at the world root (`chapters/<number>-<name>.md`), refusing a number or name that's taken. At a room, thing or door, `/chapter <name>` adds a `## When: #<name>` section to its own file for a small change, and `/chapter <name> file` gives it a `chapters/<name>.md` for a big one, making it a bundle first; both open the editor there (Bruce, 2026-11-25).
+- The quick menu's "add chapter version" (`c`), once the world has chapters: which chapter, then a section or a file.
+
 ## 0.101.3 (2026-11-25)
 
 ### Fixed

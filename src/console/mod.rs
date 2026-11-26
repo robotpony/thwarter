@@ -7,6 +7,7 @@
 //! transcript (REQ-CON-9).
 
 mod asking;
+mod chapters;
 mod author;
 mod commands;
 mod doors;

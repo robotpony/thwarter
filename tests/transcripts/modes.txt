@@ -86,6 +86,7 @@ Console commands (/help <command> for one in full):
   /start                                    play starts in the room you're in
   /write [{name}]                           make a name the world mentions but doesn't define, and open it
   /menu                                     the quick menu for where you are; Ctrl-M opens it too
+  /chapter new {number} {name} | {name} [file]  a chapter, or the thing you're at's version for one
   /remove {thing}                           delete a thing, room or door and what refers to it, after asking
   /inspect [{thing}]                        a thing in full: its file, where it starts, states, sections, warnings
   /clear                                    empty the output

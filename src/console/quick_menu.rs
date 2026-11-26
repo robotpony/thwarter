@@ -4,8 +4,8 @@
 //! for, so the author sees the typed form.
 //!
 //! This holds the entries and what their answers become; `screen.rs` asks
-//! the questions. The entries "add a reply" and "add chapter version"
-//! aren't here yet: their commands aren't built, so REQ-CON-64 hides them.
+//! the questions. "Add a reply" isn't here yet: it waits on
+//! response hints, so REQ-CON-64 hides it.
 
 use super::author::entity_kind;
 use super::session::{suggest, Console, Place};
@@ -53,6 +53,7 @@ enum Does {
     AddThing,
     AddDoor,
     Recipe,
+    Chapter,
     Play,
 }
 
@@ -86,6 +87,8 @@ impl Entry {
             Does::AddThing => vec![format!("/add {}", a(0))],
             Does::AddDoor => vec![format!("/add door {} {}", a(0), a(1))],
             Does::Recipe => vec![format!("/recipe {} {}", a(0), a(1)).trim_end().to_string()],
+            Does::Chapter if a(1) == "file" => vec![format!("/chapter {} file", a(0))],
+            Does::Chapter => vec![format!("/chapter {}", a(0))],
             Does::Play => vec!["/play here".to_string()],
         }
     }
@@ -104,7 +107,7 @@ pub struct QuickMenu {
 
 /// The entries for a kind of place, given the thing's states (sorted) and
 /// the one it starts in.
-fn entries_for(kind: Kind, has_states_at_all: bool, states: &[String], start: Option<&str>) -> Vec<Entry> {
+fn entries_for(kind: Kind, has_states_at_all: bool, states: &[String], start: Option<&str>, chapters: &[String]) -> Vec<Entry> {
     let room = kind == Kind::Room;
     let text = |key, hint| Ask::Text { key, hint, required: true };
     let choose = |key, hint, options: Vec<String>, default| Ask::Choose { key, hint, options, default, new: false, describe: None };
@@ -141,6 +144,12 @@ fn entries_for(kind: Kind, has_states_at_all: bool, states: &[String], start: Op
         entry('n', "qm_add_thing", "/add", vec![text("qm_ask_thing", "qm_hint_thing")], Does::AddThing);
         entry('d', "qm_add_door", "/add door", vec![text("qm_ask_direction", "qm_hint_direction"), text("qm_ask_room", "qm_hint_room")], Does::AddDoor);
     }
+    // A chapter version: a section here, or its own file (Bruce, 2026-11-25).
+    if has_states_at_all && !chapters.is_empty() {
+        let which = choose("qm_ask_chapter", "qm_hint_chapter", chapters.to_vec(), 0);
+        let form = Ask::Choose { key: "qm_ask_chapter_form", hint: "qm_hint_chapter_form", options: strings(&["section", "file"]), default: 0, new: false, describe: Some("qm_form") };
+        entry('c', "qm_chapter", "/chapter", vec![which, form], Does::Chapter);
+    }
     if has_states_at_all && kind != Kind::Door {
         let recipe = Ask::Choose { key: "qm_ask_recipe", hint: "qm_hint_recipe", options: strings(RECIPES), default: 0, new: false, describe: Some("qm_recipe") };
         entry('p', "qm_recipe", "/recipe", vec![recipe, Ask::Text { key: "qm_ask_recipe_with", hint: "qm_hint_recipe_with", required: false }], Does::Recipe);
@@ -174,7 +183,7 @@ impl Console {
         let thing = engine_kind.and_then(|k| self.world.engine.thing(k, &entry.id));
         let states = thing.map(|t| t.state_names()).unwrap_or_default();
         let start = thing.and_then(|t| t.starting_state.clone());
-        let entries = entries_for(entry.kind, engine_kind.is_some(), &states, start.as_deref());
+        let entries = entries_for(entry.kind, engine_kind.is_some(), &states, start.as_deref(), &self.chapter_names());
         let listed = |names: Vec<String>| if names.is_empty() { self.t("qm_none_yet", &[]) } else { names.join(", ") };
         let exits = match entry.kind {
             Kind::Room => self.world.engine.get_location(&entry.id).map(|l| {
@@ -229,19 +238,19 @@ mod tests {
 
     #[test]
     fn a_room_gets_links_doors_and_play_and_a_door_gets_neither() {
-        let room = entries_for(Kind::Room, true, &[], None);
+        let room = entries_for(Kind::Room, true, &[], None, &[]);
         for letter in ['a', 's', 'v', 'l', 'n', 'd', 'p', 'g'] {
             assert!(find(&room, letter).is_some(), "room has {}", letter);
         }
         assert!(find(&room, 't').is_none(), "no states, no starting state");
-        let door = entries_for(Kind::Door, true, &[], None);
+        let door = entries_for(Kind::Door, true, &[], None, &[]);
         assert!(find(&door, 'l').is_none() && find(&door, 'g').is_none() && find(&door, 'p').is_none());
     }
 
     #[test]
     fn answers_become_the_commands_they_stand_for() {
         let states = vec!["closed".to_string(), "open".to_string()];
-        let lamp = entries_for(Kind::Object, true, &states, Some("open"));
+        let lamp = entries_for(Kind::Object, true, &states, Some("open"), &["later".to_string()]);
         let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
         assert_eq!(find(&lamp, 'a').unwrap().commands(&s(&["open", "closed", "open"])), vec!["/action open closed --> open"]);
         assert_eq!(find(&lamp, 's').unwrap().commands(&s(&["lit", "start"])), vec!["/state lit start"]);
@@ -251,10 +260,13 @@ mod tests {
         assert_eq!(*default, 1, "the current starting state is the default");
         assert_eq!(find(&lamp, 'p').unwrap().commands(&s(&["fixed-until", "pull"])), vec!["/recipe fixed-until pull"]);
         assert_eq!(find(&lamp, 'p').unwrap().commands(&s(&["switch", ""])), vec!["/recipe switch"]);
+        assert_eq!(find(&lamp, 'c').unwrap().commands(&s(&["later", "section"])), vec!["/chapter later"]);
+        assert_eq!(find(&lamp, 'c').unwrap().commands(&s(&["later", "file"])), vec!["/chapter later file"]);
+        assert!(find(&entries_for(Kind::Object, true, &[], None, &[]), 'c').is_none(), "no chapters, no entry");
         // No states yet: hide or reveal makes the state first, as /state does.
-        let bare = entries_for(Kind::Object, true, &[], None);
+        let bare = entries_for(Kind::Object, true, &[], None, &[]);
         assert_eq!(find(&bare, 'v').unwrap().commands(&s(&["gone", "absent"])), vec!["/state gone", "/set visibility absent in gone"]);
-        let room = entries_for(Kind::Room, true, &[], None);
+        let room = entries_for(Kind::Room, true, &[], None, &[]);
         assert_eq!(find(&room, 'd').unwrap().commands(&s(&["west", "hallway"])), vec!["/add door west hallway"]);
         assert_eq!(find(&room, 'g').unwrap().commands(&[]), vec!["/play here"]);
     }

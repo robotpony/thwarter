@@ -278,6 +278,7 @@ impl Console {
             ("move", args) => self.move_thing(args),
             ("add", args) => self.add_and_edit(args),
             ("menu", []) => self.menu_command(),
+            ("chapter", args) => self.chapter_command(args),
             // Arguments the command doesn't take: its usage, from its file.
             _ if HANDLERS.contains(&name) => suggest(&self.t("usage", &[]), &[&def.usage()]),
             _ => self.t("no_handler", &[("command", &def.name)]),
@@ -994,7 +995,7 @@ fn parent_of(path: &str) -> String {
 /// a test fails on either gap.
 const HANDLERS: &[&str] = &[
     "quit", "help", "clear", "status", "validate", "map", "list", "scope", "inspect", "remove", "write", "start", "restart", "edit", "play", "save",
-    "load", "reload", "new", "set", "state", "action", "recipe", "link", "unlink", "move", "add", "menu",
+    "load", "reload", "new", "set", "state", "action", "recipe", "link", "unlink", "move", "add", "menu", "chapter",
 ];
 
 #[cfg(test)]
