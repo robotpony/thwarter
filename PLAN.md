@@ -27,7 +27,7 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 The console side (Bruce with the console coder). Done when an author can build a bundle with states and a chapter, and run the world, without touching a file by hand.
 
 - [x] Done (squashed): 25 items, among them `/restart`, the full-screen console, the `/` menu, the `game/` folder, renaming and removing with every reference updated, forgiving verbs, the world picker, doors named from both sides, `/start`, TO WRITE, objects that hold objects, question sets and scope with `/move`, to 0.92.0; the full list is `git show a33296b:PLAN.md`, and scope is in `git show c485a58:PLAN.md`.
-- [ ] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
+- [x] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
 - [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
 - [ ] One command registry (built-ins, aliases, prefixes and did-you-mean done in 0.74.0; world commands and the config layer to go): every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
