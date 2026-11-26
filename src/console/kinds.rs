@@ -116,6 +116,7 @@ const KINDS: &[(&str, Kind)] = &[
     ("editor_changed_on_disk", Kind::Warning),
     ("editor_reloaded", Kind::Done),
     ("editor_unsaved", Kind::Warning),
+    ("editor_heading_changed", Kind::Error),
     ("editor_modified", Kind::Warning),
     ("usage", Kind::Refused),
     ("game_note", Kind::Note),

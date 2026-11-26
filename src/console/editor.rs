@@ -35,30 +35,64 @@ pub struct Document {
 /// One file's text in a document.
 #[derive(Debug, Clone)]
 pub struct Section {
+    /// The line that starts it, such as `## When: #open`; the first
+    /// section has none. The author can't change it, since it names a file.
+    pub heading: Option<String>,
     pub text: String,
 }
 
 impl Document {
     /// A document holding one file's text.
     pub fn single(heading: impl Into<String>, text: impl Into<String>) -> Self {
-        Document { heading: heading.into(), sections: vec![Section { text: text.into() }] }
+        Document { heading: heading.into(), sections: vec![Section { heading: None, text: text.into() }] }
     }
 
     /// The text the author edits. One section is the file exactly as it is
-    /// (REQ-CON-6), with no section header.
+    /// (REQ-CON-6); each later one follows under its heading
+    /// (`design/STATES.md` › Console).
     fn combined(&self) -> String {
-        match self.sections.as_slice() {
-            [one] => one.text.clone(),
-            _ => unimplemented!("documents with several sections come with bundles (design/STATES.md)"),
+        let mut out = String::new();
+        for section in &self.sections {
+            if let Some(heading) = &section.heading {
+                if !out.is_empty() && !out.ends_with("\n\n") {
+                    out.push_str(if out.ends_with('\n') { "\n" } else { "\n\n" });
+                }
+                out.push_str(heading);
+                out.push('\n');
+            }
+            out.push_str(&section.text);
         }
+        out
     }
 
-    /// Splits edited text back into one text per section.
-    fn split(&self, text: String) -> Vec<String> {
-        match self.sections.len() {
-            1 => vec![text],
-            _ => unimplemented!("documents with several sections come with bundles (design/STATES.md)"),
+    /// Splits edited text back into one text per section, at each
+    /// section's heading, which must still be there, in order. `Err` names
+    /// the first heading that's missing.
+    fn split(&self, text: String) -> Result<Vec<String>, String> {
+        if self.sections.len() == 1 {
+            return Ok(vec![text]);
         }
+        let mut out = vec![String::new()];
+        let mut headings = self.sections.iter().skip(1).filter_map(|s| s.heading.as_deref()).peekable();
+        for line in text.split_inclusive('\n') {
+            if headings.peek().is_some_and(|h| line.trim_end() == *h) {
+                headings.next();
+                out.push(String::new());
+                continue;
+            }
+            out.last_mut().expect("one section at least").push_str(line);
+        }
+        if let Some(missing) = headings.next() {
+            return Err(missing.to_string());
+        }
+        // The blank line before a heading belongs to the layout, not the file.
+        let last = out.len() - 1;
+        for (i, section) in out.iter_mut().enumerate() {
+            if i < last && section.ends_with("\n\n") {
+                section.pop();
+            }
+        }
+        Ok(out)
     }
 }
 
@@ -233,7 +267,13 @@ impl<'a> Editor<'a> {
             Input { key: Key::Char('s'), ctrl: true, alt: false, .. } => {
                 self.discard_armed = false;
                 let text = self.text();
-                let sections = self.document.split(text.clone());
+                let sections = match self.document.split(text.clone()) {
+                    Ok(sections) => sections,
+                    Err(heading) => {
+                        self.say("editor_heading_changed", &[("heading", &heading)]);
+                        return true;
+                    }
+                };
                 match files.save(&sections, self.force_armed) {
                     Saved::Yes(report) => {
                         self.saved_text = text;
@@ -441,6 +481,16 @@ fn one_line(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_document_with_sections_joins_and_splits_at_its_headings() {
+        let mut document = Document::single("h", "---\nid: lamp\n---\nA lamp.\n");
+        document.sections.push(Section { heading: Some("## When: #lit".into()), text: "It glows.\n".into() });
+        let text = document.combined();
+        assert_eq!(text, "---\nid: lamp\n---\nA lamp.\n\n## When: #lit\nIt glows.\n");
+        assert_eq!(document.split(text).unwrap(), vec!["---\nid: lamp\n---\nA lamp.\n", "It glows.\n"]);
+        assert_eq!(document.split("A lamp.\n## When: #on\n".into()).unwrap_err(), "## When: #lit", "a state's heading can't change");
+    }
     use ratatui::backend::TestBackend;
     use std::collections::VecDeque;
 

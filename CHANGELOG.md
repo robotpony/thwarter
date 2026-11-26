@@ -51,6 +51,12 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 - `design/ARCHITECTURE.md` › Next steps, moved to `PLAN.md`. Recover with `git show 884ae96:design/ARCHITECTURE.md`.
 - The notes at the top of `TESTING.md` and the testing plan explaining what their earlier versions got wrong. That history is under 0.1.0 below.
 
+## 0.100.0 (2026-11-25)
+
+### Added
+
+- A bundle opens in the editor as one document (`design/STATES.md` › Console): the index, then a `## When: #<state>` section per state file, the starting state first and the rest A to Z. A state file's frontmatter, apart from `inherits: index`, shows as its `thwarter` block. Saving writes each section back to its own file through the writer's one bundle save, so nothing is written unless every file and the merged thing check out. A state's heading can't be changed or removed there (`/state` does that); a `## When:` heading typed under a state goes to the index. A change on disk to any of the files is a conflict, which a second save overwrites.
+
 ## 0.99.1 (2026-11-25)
 
 ### Changed

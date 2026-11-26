@@ -59,6 +59,7 @@ answers_were = "The answers were:"
 # The quick menu (quick_menu.rs, REQ-CON-63 to 68).
 side_quick_menu = "  ⌃M or /menu  quick menu"
 side_quick_menu_editor = "  ⌃M  quick menu"
+editor_heading_changed = "Not saved: `{heading}` names a state file, so it can't change here. Put it back; /state renames or removes a state."
 editor_tilde_hint = "~ here opens the console for this file"
 dropdown_keys = " a command for this file · Enter runs · Esc or ~ closes "
 dropdown_not_saved = "Not run: the file didn't save. The editor says why."

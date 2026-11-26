@@ -19,7 +19,7 @@ use super::Mode;
 use crate::engines::EntityKind;
 use crate::writer::{ContentFile, Edit, NewEntity};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 /// The file a `/edit` opened, held while the editor is open.
@@ -34,6 +34,19 @@ pub struct EditTarget {
     opened: Option<String>,
     /// The file on disk.
     file: PathBuf,
+    /// A bundle's state files, which the editor shows as `## When:`
+    /// sections under the index (`design/STATES.md` › Console).
+    states: Vec<StateFile>,
+}
+
+/// One state file of a bundle being edited.
+#[derive(Debug, Clone)]
+pub(super) struct StateFile {
+    name: String,
+    /// Relative to the world root.
+    rel: PathBuf,
+    /// Its text when the editor opened it, or as last saved.
+    opened: String,
 }
 
 impl EditTarget {
@@ -52,6 +65,26 @@ impl EditTarget {
         }
         self.opened = Some(now.clone());
         Some(now)
+    }
+
+    /// Every section's text, if any of the bundle's files changed on disk.
+    fn bundle_changed_on_disk(&mut self, root: &Path) -> Option<Vec<String>> {
+        let index = self.changed_on_disk();
+        let mut changed = index.is_some();
+        for state in &mut self.states {
+            if let Ok(now) = fs::read_to_string(root.join(&state.rel)) {
+                if now != state.opened {
+                    state.opened = now;
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            return None;
+        }
+        let mut out = vec![self.opened.clone().unwrap_or_default()];
+        out.extend(self.states.iter().map(|s| state_body(&s.opened)));
+        Some(out)
     }
 }
 
@@ -93,10 +126,19 @@ pub struct EditFiles<'a> {
 
 impl Files for EditFiles<'_> {
     fn save(&mut self, sections: &[String], force: bool) -> Saved {
-        super::lock(self.console).save_full_edit(self.target, &sections[0], force)
+        let mut console = super::lock(self.console);
+        if self.target.states.is_empty() {
+            console.save_full_edit(self.target, &sections[0], force)
+        } else {
+            console.save_bundle_edit(self.target, sections, force)
+        }
     }
     fn changed_on_disk(&mut self) -> Option<Vec<String>> {
-        self.target.changed_on_disk().map(|text| vec![text])
+        if self.target.states.is_empty() {
+            return self.target.changed_on_disk().map(|text| vec![text]);
+        }
+        let root = super::lock(self.console).world.root.clone();
+        self.target.bundle_changed_on_disk(&root)
     }
 }
 
@@ -170,7 +212,71 @@ impl Console {
         };
         let heading = self.t(key, &[("kind", target.kind.label()), ("path", &target.path)]);
         let text = target.opened.clone().unwrap_or_else(|| scenery_card(&target.id, &title_or_default(&[], &target.id)));
-        Document::single(heading, text)
+        let mut document = Document::single(heading, text);
+        for state in &target.states {
+            document.sections.push(super::editor::Section { heading: Some(state_heading(&state.name)), text: state_body(&state.opened) });
+        }
+        document
+    }
+
+    /// Saves a bundle's document: the index section to `index.md` (with
+    /// any `## When:` sections typed under a state moved to it), and each
+    /// state section to its file, all through the writer's one bundle
+    /// save, which checks every file and the merged thing before writing
+    /// any (`design/STATES.md` › Console).
+    pub(super) fn save_bundle_edit(&mut self, target: &mut EditTarget, sections: &[String], force: bool) -> Saved {
+        let Some(entity) = entity_kind(target.kind) else { return Saved::No(self.t("edit_file_gone", &[("path", &target.path)])) };
+        let mut index = sections[0].clone();
+        let mut bodies = Vec::new();
+        for body in &sections[1..] {
+            let (own, typed) = split_typed_sections(body);
+            bodies.push(own);
+            if !typed.is_empty() {
+                if !index.ends_with("\n\n") {
+                    index.push('\n');
+                }
+                index.push_str(&typed);
+            }
+        }
+        if let Err(why) = same_thing(self, target, &index) {
+            return Saved::No(why);
+        }
+        let mut files = vec![crate::writer::Section {
+            path: PathBuf::from(format!("{}.md", target.path)),
+            text: index.clone(),
+            expected: if force { None } else { target.opened.clone() },
+        }];
+        for (state, body) in target.states.iter().zip(&bodies) {
+            files.push(crate::writer::Section {
+                path: state.rel.clone(),
+                text: state_file(body),
+                expected: if force { None } else { Some(state.opened.clone()) },
+            });
+        }
+        // A file changed on disk since it opened: a second save overwrites.
+        let changed = files.iter().any(|f| f.expected.as_ref().is_some_and(|was| fs::read_to_string(self.world.root.join(&f.path)).ok().as_ref() != Some(was)));
+        if changed {
+            return Saved::Conflict(self.t("edit_changed_on_disk", &[("path", &target.path)]));
+        }
+        let writer = match crate::writer::WorldWriter::new(&self.world.root) {
+            Ok(writer) => writer,
+            Err(e) => return Saved::No(self.t("cant_write_world", &[("reason", &e.to_string())])),
+        };
+        if self.warnings_before.is_none() {
+            self.warnings_before = Some(self.world.warnings());
+        }
+        match writer.save_bundle_loaded(&mut self.world.engine, entity, &target.id, &files, false) {
+            Ok(_) => {
+                let root = self.world.root.clone();
+                target.opened = fs::read_to_string(&target.file).ok().or(Some(index));
+                for (state, file) in target.states.iter_mut().zip(&files[1..]) {
+                    state.opened = fs::read_to_string(root.join(&state.rel)).unwrap_or_else(|_| file.text.clone());
+                }
+                let written: Vec<PathBuf> = files.iter().map(|f| root.join(&f.path)).collect();
+                Saved::Yes(self.after_writes(&written, self.t("edit_saved", &[("path", &target.path)])))
+            }
+            Err(e) => Saved::No(self.t("edit_not_saved", &[("reason", &format!("{:#}", e))])),
+        }
     }
 
     /// Saves the editor's text for `target`. Refuses text that doesn't
@@ -304,7 +410,7 @@ impl Console {
             let target = if cardless {
                 let relative = crate::writer::new_entity_relative_path(EntityKind::Object, &id);
                 let path = relative.to_string_lossy().trim_end_matches(".md").replace('\\', "/");
-                Ok(EditTarget { kind, id, path, opened: None, file: self.world.root.join(&relative) })
+                Ok(EditTarget { kind, id, path, opened: None, file: self.world.root.join(&relative), states: Vec::new() })
             } else {
                 self.edit_target_named(kind, &id)
             };
@@ -366,7 +472,7 @@ impl Console {
             let relative = crate::writer::new_entity_relative_path(EntityKind::Object, typed);
             let path = relative.to_string_lossy().trim_end_matches(".md").replace('\\', "/");
             let file = self.world.root.join(&relative);
-            return Ok(EditTarget { kind, id: typed.to_string(), path, opened: None, file });
+            return Ok(EditTarget { kind, id: typed.to_string(), path, opened: None, file, states: Vec::new() });
         }
         Err(match kind {
             Kind::Character => super::session::suggest(&self.t("edit_no_character", &[("id", typed)]), &[&format!("/new character {}", typed)]),
@@ -378,8 +484,72 @@ impl Console {
     pub(super) fn open_target(&self, kind: Kind, id: String, path: String) -> Result<EditTarget, String> {
         let file = self.world.root.join(format!("{}.md", path));
         let text = fs::read_to_string(&file).map_err(|e| self.t("edit_cant_open", &[("path", &path), ("reason", &e.to_string())]))?;
-        Ok(EditTarget { kind, id, path, opened: Some(text), file })
+        let states = self.state_files(kind, &id, &path);
+        Ok(EditTarget { kind, id, path, opened: Some(text), file, states })
     }
+
+    /// A bundle index's own state files, the starting state first and the
+    /// rest A to Z (`design/STATES.md` › Console). None for a one-file thing.
+    fn state_files(&self, kind: Kind, id: &str, path: &str) -> Vec<StateFile> {
+        let Some(entity) = entity_kind(kind) else { return Vec::new() };
+        if !path.ends_with("/index") {
+            return Vec::new();
+        }
+        let Some(thing) = self.world.engine.thing(entity, id) else { return Vec::new() };
+        let dir = Path::new(path).parent().map(Path::to_path_buf).unwrap_or_default();
+        let mut names: Vec<String> = thing.states.keys().cloned().collect();
+        names.sort_by_key(|n| (Some(n) != thing.starting_state.as_ref(), n.clone()));
+        names
+            .into_iter()
+            .filter_map(|name| {
+                let rel = dir.join(format!("{}.md", name));
+                let opened = fs::read_to_string(self.world.root.join(&rel)).ok()?;
+                Some(StateFile { name, rel, opened })
+            })
+            .collect()
+    }
+}
+
+/// A state section's heading.
+fn state_heading(name: &str) -> String {
+    format!("## When: #{}", name)
+}
+
+/// A state file as its section shows it: its frontmatter, apart from
+/// `inherits: index`, as a `thwarter` block, then its prose.
+fn state_body(file: &str) -> String {
+    let Some(rest) = file.strip_prefix("---\n") else { return file.to_string() };
+    let Some(end) = rest.find("\n---\n").map(|i| i + 1).or_else(|| rest.starts_with("---\n").then_some(0)) else {
+        return file.to_string();
+    };
+    let (front, prose) = (&rest[..end], &rest[end + 4..]);
+    let keys: Vec<&str> = front.lines().filter(|l| l.trim() != "inherits: index").collect();
+    if keys.iter().all(|l| l.trim().is_empty()) {
+        return prose.to_string();
+    }
+    format!("```thwarter\n{}\n```\n{}", keys.join("\n"), prose)
+}
+
+/// A state section back as its file: the inverse of `state_body`.
+fn state_file(body: &str) -> String {
+    match body.strip_prefix("```thwarter\n").and_then(|rest| rest.split_once("\n```\n").or_else(|| rest.strip_suffix("\n```").map(|b| (b, "")))) {
+        Some((keys, prose)) => format!("---\ninherits: index\n{}\n---\n{}", keys.trim_end(), prose),
+        None => format!("---\ninherits: index\n---\n{}", body),
+    }
+}
+
+/// Splits a state section at the first `## When:` heading typed into it:
+/// what's above stays the state's, and the rest goes to the index, since a
+/// typed heading never makes a state (`design/STATES.md` › Console).
+fn split_typed_sections(body: &str) -> (String, String) {
+    let mut at = 0;
+    for line in body.split_inclusive('\n') {
+        if line.starts_with("## When:") {
+            return (body[..at].to_string(), body[at..].to_string());
+        }
+        at += line.len();
+    }
+    (body.to_string(), String::new())
 }
 
 /// Refuses text that no longer holds the thing the editor opened: ids
@@ -408,6 +578,45 @@ pub(super) fn scenery_card(id: &str, title: &str) -> String {
 mod tests {
     use super::*;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn a_state_file_shows_as_a_section_and_saves_back_as_itself() {
+        let file = "---\ninherits: index\nweight: immovable\n---\nIt hangs.\n";
+        assert_eq!(state_body(file), "```thwarter\nweight: immovable\n```\nIt hangs.\n");
+        assert_eq!(state_file(&state_body(file)), file);
+        let bare = "---\ninherits: index\n---\nLoose.\n";
+        assert_eq!(state_body(bare), "Loose.\n");
+        assert_eq!(state_file("Loose.\n"), bare);
+        assert_eq!(split_typed_sections("Lit.\n## When: #lit #night\nGlows.\n"), ("Lit.\n".to_string(), "## When: #lit #night\nGlows.\n".to_string()));
+    }
+
+    #[test]
+    fn a_bundle_edits_as_one_document_and_saves_each_file() {
+        let (_dir, root) = tiny_copy();
+        let mut console = Console::open(&root, super::super::Mode::Edit).unwrap();
+        console.handle("go /objects/lantern");
+        console.handle("/state unlit start");
+        console.handle("/state lit");
+        let path = console.world.path_of(Kind::Object, "lantern").unwrap();
+        let mut target = console.open_target(Kind::Object, "lantern".into(), path).unwrap();
+        let document = console.edit_document(&target);
+        let headings: Vec<_> = document.sections.iter().map(|s| s.heading.clone()).collect();
+        assert_eq!(headings, vec![None, Some("## When: #unlit".into()), Some("## When: #lit".into())], "the starting state first");
+        // Each section goes back to its own file; a heading typed under a
+        // state goes to the index.
+        let sections = vec![document.sections[0].text.clone(), "Dark.\n".to_string(), "It glows.\n## When: #lit #night\nA beacon.\n".to_string()];
+        match console.save_bundle_edit(&mut target, &sections, false) {
+            Saved::Yes(_) => {}
+            other => panic!("{:?}", other),
+        }
+        let dir = root.join("objects/lantern");
+        assert_eq!(fs::read_to_string(dir.join("unlit.md")).unwrap(), "---\ninherits: index\n---\nDark.\n");
+        assert_eq!(fs::read_to_string(dir.join("lit.md")).unwrap(), "---\ninherits: index\n---\nIt glows.\n");
+        assert!(fs::read_to_string(dir.join("index.md")).unwrap().contains("## When: #lit #night\nA beacon."));
+        // A change on disk since it opened is a conflict; force overwrites.
+        fs::write(dir.join("lit.md"), "---\ninherits: index\n---\nChanged.\n").unwrap();
+        assert!(matches!(console.save_bundle_edit(&mut target, &sections, false), Saved::Conflict(_)));
+    }
 
     /// A copy of the transcript fixture world, safe to write to.
     fn tiny_copy() -> (tempfile::TempDir, PathBuf) {

@@ -75,3 +75,4 @@ world settings	src/console/world.rs: Kind::label, a label people also type; move
 chapter overlay	src/console/world.rs: Kind::label, a label people also type; moves with a label_in(&Texts), follow-up
 game start	src/console/world.rs: Kind::label, a label people also type; moves with a label_in(&Texts), follow-up
 In state {}	src/render.rs: `thwart show <door> --state`; command-line output, Phase 11
+inherits: index	src/console/full_edit.rs: the frontmatter key a state file carries, hidden in its bundle section; content, not a sentence
