@@ -1,0 +1,44 @@
+#!/bin/sh
+# Runs the tests before a push, in place of GitHub CI, which Bruce turned
+# off on 2026-11-25 to stop paying for it (TESTING.md › Before pushing).
+#
+# Tests the commit being pushed, not the working tree: three sessions
+# share this checkout, so the tree often holds someone else's unfinished
+# edits. Each pushed commit is checked out into a throwaway worktree and
+# tested there with `cargo test --locked`, which also catches a Cargo.lock
+# left out of a version bump. A push that only changes docs (root *.md,
+# design/) skips the tests.
+#
+# Enabled per checkout with `git config core.hooksPath .githooks`.
+# `git push --no-verify` skips it; don't, unless Bruce says to.
+
+set -e
+ZERO=0000000000000000000000000000000000000000
+TARGET=${THWART_PUSH_TARGET:-$HOME/.cache/thwarter-prepush-target}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$ZERO" ] && continue  # deleting a branch
+    range=$remote_sha..$local_sha
+    # A new branch has nothing to compare with, so it's always tested.
+    if [ "$remote_sha" != "$ZERO" ] \
+        && ! git diff --name-only "$range" -- . ':(exclude)*.md' ':(exclude)design/**' | grep -q . \
+        && ! git diff --name-only "$range" -- 'src/**/*.md' 'tests/**/*.md' | grep -q .; then
+        echo "pre-push: docs only, skipping tests"
+        continue
+    fi
+
+    dir=$(mktemp -d "${TMPDIR:-/tmp}/thwarter-prepush.XXXXXX")
+    git worktree add -q --detach "$dir" "$local_sha"
+    echo "pre-push: cargo test --locked at $(git rev-parse --short "$local_sha")"
+    if (cd "$dir" && CARGO_TARGET_DIR="$TARGET" cargo test --locked -q); then
+        status=0
+    else
+        status=1
+    fi
+    git worktree remove --force "$dir"
+    if [ $status -ne 0 ]; then
+        echo "pre-push: tests failed; push refused. Fix them and push again." >&2
+        exit 1
+    fi
+done
+exit 0

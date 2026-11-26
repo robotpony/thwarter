@@ -18,6 +18,6 @@ No coverage target: tests cover the parts with real behaviour, and each change b
 
 Text a player or author reads is pinned by transcripts, so a wording change is a reviewed `THWART_BLESS=1` diff. With Phase 8, a test also fails on a new user-facing string written in code (`design/ENGINE_TEXT.md`).
 
-## CI
+## Before pushing
 
-`.github/workflows/ci.yml` runs `cargo build --locked --all-targets` and `cargo test --locked` on every push (`TESTING.md` › CI). A version bump commits `Cargo.lock` with `Cargo.toml`, or `--locked` fails.
+There's no CI. The pre-push hook runs `cargo test --locked` on each pushed commit in a clean worktree (`TESTING.md` › Before pushing). A version bump commits `Cargo.lock` with `Cargo.toml`, or `--locked` fails.

@@ -8,6 +8,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Added
 
+- `.githooks/pre-push`: runs `cargo test --locked` on each pushed commit in a throwaway worktree and refuses the push if it fails, in place of CI. Docs-only pushes skip it. On with `git config core.hooksPath .githooks` (`TESTING.md` › Before pushing).
 - `design/CONSOLE_REQUIREMENTS.md` › Quick menu (REQ-CON-63 to 68): a sidebar menu for where edit mode is, opened with Ctrl-Space or `/menu`, whose entries ask their questions at the bottom of the console and print the command they stood for (Bruce, 2026-11-25).
 - `design/CONTENT_FORMAT.md` › Example: a room with objects and states: a dark study with room states, local and global objects, a portrait whose action changes two things, a hidden safe and a heading on another thing's state, with its play-through. Checked against 0.94.0; `README.md` and `design/STATES.md` point to it.
 - `design/CONTENT_FORMAT.md` › Adding a verb to an object: the five ways, from a reply section alone to `actions:`, `@thing` headings, Rhai functions and `[verbs]` aliases, with `#refused` and `#acted` rewording and today's limits. Checked against 0.94.0. Two defects it found are in `BUGS.md`.
@@ -41,6 +42,7 @@ Versions are `0.x.y` semver, pre-1.0. Sections are `### Added`, `### Changed`, `
 
 ### Removed
 
+- `.github/workflows/ci.yml`, the GitHub CI that built and tested every push, and the workflow is disabled on GitHub: Bruce turned CI off on 2026-11-25 to stop paying for it. The pre-push hook runs the same tests locally. Recover with `git show 4e760ee:.github/workflows/ci.yml`.
 - `bin/thwart` and `build.sh`: a 0.1.0 binary from July 2025, committed though `.gitignore` listed it, and the script that copied a release build there. Nothing used them; the console runs from `target/debug/thwart`. Recover with `git show 267e541:build.sh` and `git show 267e541:bin/thwart > thwart`.
 - `design/STATES.md` › Engine rules' text, now `design/ENGINE_REQUIREMENTS.md` › REQ-ENG-10 to 29 so there's one copy. Recover with `git show 1e2af89:design/STATES.md`.
 - `REQUIREMENTS.md` › 4.1 to 4.4, split into one requirements document per component: `design/CONTENT_REQUIREMENTS.md` (REQ-CF, REQ-WS), `design/ENGINE_REQUIREMENTS.md` (REQ-ENG) and `design/CLI_REQUIREMENTS.md` (REQ-CLI), with ids unchanged; the principles moved from `design/STATES.md` to `REQUIREMENTS.md` › 4 (Bruce, 2026-11-23). Recover the old sections with `git show 1620350:REQUIREMENTS.md`.

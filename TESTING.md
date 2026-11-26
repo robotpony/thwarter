@@ -64,10 +64,16 @@ thwart validate --world /tmp/empty-world
 
 `debug` exists as a CLI subcommand but reports "not implemented" and exits non-zero rather than producing output; `map` and `search` are built. Running it is a valid way to confirm that behaviour, but there's nothing further to test until it's built. See `design/ARCHITECTURE.md`'s implementation status table for what's planned and in what order, and `design/CLI_DESIGN.md` for the target interface (including flags that don't exist yet, like fog-of-war maps or regex search).
 
-## CI
+## Before pushing
 
-`.github/workflows/ci.yml` builds and tests on every push and pull request (added in bca9973): `cargo build --locked --all-targets`, then `cargo test --locked`, on Ubuntu with the stable Rust toolchain and read-only repository permissions. It runs once `main` is pushed to GitHub.
+Tests run on this machine, not on GitHub; Bruce turned CI off on 2026-11-25 to stop paying for it. The pre-push hook (`.githooks/pre-push`) checks out each pushed commit into a throwaway worktree and runs `cargo test --locked` there, so other sessions' uncommitted edits don't affect the result and a `Cargo.lock` left out of a version bump fails. A push that only changes root `*.md` files or `design/` skips it. A failing test refuses the push.
 
-It doesn't yet run `thwart validate --strict` against the test world as its own step; the test suite's `the_shipped_test_world_validates` covers it for problems.
+The hook is on once per checkout:
 
-The workflow's actions are pinned by version tag (`actions/checkout@v5` and the rest), not by commit; pinning by commit is the stricter choice if supply-chain risk ever matters more.
+```sh
+git config core.hooksPath .githooks
+```
+
+Its build goes to `~/.cache/thwarter-prepush-target` (`THWART_PUSH_TARGET` overrides), apart from the shared `target/`. Don't push with `--no-verify` unless Bruce says to.
+
+Everything runs on macOS, so a test that depends on the platform (a key label such as `⌃1` versus `ctrl-1`) goes through the same function the code uses, never a literal for one platform.
