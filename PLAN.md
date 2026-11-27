@@ -26,20 +26,9 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 
 The console side (Bruce with the console coder). Done when an author can build a bundle with states and a chapter, and run the world, without touching a file by hand.
 
-- [x] Done (squashed): 25 items, among them `/restart`, the full-screen console, the `/` menu, the `game/` folder, renaming and removing with every reference updated, forgiving verbs, the world picker, doors named from both sides, `/start`, TO WRITE, objects that hold objects, question sets and scope with `/move`, to 0.92.0; the full list is `git show a33296b:PLAN.md`, and scope is in `git show c485a58:PLAN.md`.
-- [x] Bundle editing as one document, `/state` and `/chapter` commands [console] (`design/STATES.md` › Console)
+- [x] Done (squashed): 29 items, among them `/restart`, the full-screen console, the `/` menu, the `game/` folder, renaming and removing with every reference updated, forgiving verbs, the world picker, doors named from both sides, `/start`, TO WRITE, objects that hold objects, question sets, scope with `/move`, bundle editing with `/state` and `/chapter`, the quick menu's hints, the editor's drop-down console and sidebar clicks; the full list is `git show a33296b:PLAN.md`, scope is in `git show c485a58:PLAN.md`, and the rest in `git show 2a7114b:PLAN.md`.
 - [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
-- [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
-- [ ] One command registry (built-ins, aliases, prefixes and did-you-mean done in 0.74.0; world commands and the config layer to go): every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
-- [ ] Author-only console features check `WorldEngine::is_author`; `authors:`, `thwart new` and the picker's `authors: $USER` are built (0.72.0 to 0.83.1) [console] (REQ-CON-55, REQ-WS-7)
-- [ ] World commands MAY be Rhai scripts that read the world and run console commands, with the world scripts' limits (Bruce, 2026-11-24) [console] (`design/CONTENT_FORMAT.md` › type: command)
-- [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
-- [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
-- [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
-- [ ] A quick menu in the sidebar for where you are: add action, add state, add chapter version, link to, add a reply, add a thing or door, recipes, hide or reveal (a state's `visibility:`), starting state, play from here. Each entry asks its questions in a picker, not a typed command, at the bottom of the console, opened with Ctrl-M at the prompt and in the editor, or `/menu` (Bruce, 2026-11-25; Ctrl-Space didn't reach the console) [console] (`design/CONSOLE_REQUIREMENTS.md` › Quick menu, REQ-CON-63 to 68)
-- [x] Quick menu questions get a hint line with examples, taken from the world where it has them (the thing's own states, nearby rooms), and choices say what each option means (Bruce, 2026-11-25) [console] (REQ-CON-65)
-- [x] A drop-down console over the editor, opened with a key like the `~` of games, running any command (`/menu` among them) for the open file; the editor shows only keys that work in it (Bruce, 2026-11-25) [console] (requirement to come in `design/CONSOLE_REQUIREMENTS.md`)
-- [x] Mouse clicks in the sidebar: quick menu entries, TO WRITE names and exits; Shift-drag selects text (Bruce, 2026-11-25) [console] (requirement to come in `design/CONSOLE_REQUIREMENTS.md`)
+- [ ] The quick menu's "add a reply", once response hints exist; its other entries are built (Bruce, 2026-11-25) [console] (`design/CONSOLE_REQUIREMENTS.md` › Quick menu, REQ-CON-68)
 - [ ] Review the built-in question content with Bruce, once the mechanics work [commander, Bruce]
 
 ## Phase 6 · Doors and play
@@ -81,6 +70,9 @@ Done when a persona can package a world, and someone else can install it and pla
 
 - [x] Done (squashed): 4 items: personas, personal settings, packaging and installing, and play data kept apart; the full list is `git show a33296b:PLAN.md`.
 - [ ] First run asks who's writing; `/author` switches persona; the status bar shows it; packaging says which contact details ship [console] (REQ-CON-34 to 37, REQ-WS-4)
+- [ ] Author-only console features check `WorldEngine::is_author`; `authors:`, `thwart new` and the picker's `authors: $USER` are built (0.72.0 to 0.83.1) [console] (REQ-CON-55, REQ-WS-7)
+- [ ] One command registry (built-ins, aliases, prefixes and did-you-mean done in 0.74.0; world commands and the config layer to go): every console command in a `type: command` file, world commands as `run:` lists for the world's authors, aliases, unique prefixes and did-you-mean (agreed by Bruce, 2026-11-24) [console] (REQ-CON-50 to 56)
+- [ ] World commands MAY be Rhai scripts that read the world and run console commands, with the world scripts' limits (Bruce, 2026-11-24) [console] (`design/CONTENT_FORMAT.md` › type: command)
 
 ## Phase 11 · Tooling, as needed
 
@@ -91,6 +83,10 @@ Built when authoring or play asks for them, most likely as console commands. Unt
 - [ ] Read `thwart.toml` through `ConfigManager` [coder] (REQ-CFG-1)
 - [ ] Validation warnings, author notes and `thwart` command-line output move to text tables (Bruce, 2026-11-24) [coder] (`design/ENGINE_TEXT.md` › Settled questions)
 - [ ] The console's thing-kind labels ("world settings", "chapter overlay" and the rest in `world.rs`) move to `[console]`; they double as words authors type (`/edit room`), so this needs a text-aware label at six call sites (Bruce, 2026-11-25) [console] (`design/ENGINE_TEXT.md` › Settled questions)
+- [ ] Proposing a rename when two kinds share an id [console] (`design/ENGINE_REQUIREMENTS.md` › Ids and values)
+- [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
+- [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
+- [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
 
 ## Open questions
 
