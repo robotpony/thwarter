@@ -24,12 +24,9 @@ The engine side of `design/STATES.md` (run by the commander with the coder). Don
 
 ## Phase 5 · Authoring the model
 
-The console side (Bruce with the console coder). Done when an author can build a bundle with states and a chapter, and run the world, without touching a file by hand.
+The console side (Bruce with the console coder). Done when an author can build a bundle with states and a chapter, and run the world, without touching a file by hand. Done 2026-11-27.
 
 - [x] Done (squashed): 29 items, among them `/restart`, the full-screen console, the `/` menu, the `game/` folder, renaming and removing with every reference updated, forgiving verbs, the world picker, doors named from both sides, `/start`, TO WRITE, objects that hold objects, question sets, scope with `/move`, bundle editing with `/state` and `/chapter`, the quick menu's hints, the editor's drop-down console and sidebar clicks; the full list is `git show a33296b:PLAN.md`, scope is in `git show c485a58:PLAN.md`, and the rest in `git show 2a7114b:PLAN.md`.
-- [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
-- [ ] The quick menu's "add a reply", once response hints exist; its other entries are built (Bruce, 2026-11-25) [console] (`design/CONSOLE_REQUIREMENTS.md` › Quick menu, REQ-CON-68)
-- [ ] Review the built-in question content with Bruce, once the mechanics work [commander, Bruce]
 
 ## Phase 6 · Doors and play
 
@@ -48,6 +45,7 @@ Bruce authors it with the console coder, starting now, using what exists and gro
 - [x] Done (squashed): 19 items, the test world restarted and every playtest ask so far: `where`, `enter`, `look <direction>`, typo suggestions, `/list`, `/map` of the whole world, bare command names, prose room views, door states, `drop`, `give`, `talk`, `ask`, `take all`, `wait`, `again`, `it` and the story verbs, to 0.90.0; the full list is `git show a33296b:PLAN.md`, and the story verbs are in `git show c485a58:PLAN.md`.
 - [ ] Write the world: a short story that uses states, chapters, templates and a door [Bruce, console]
 - [ ] A transcript that plays it through [console] (REQ-CON-9)
+- [ ] Review the built-in question content with Bruce, as the sample world uses it [commander, Bruce]
 
 ## Phase 8 · Text as data
 
@@ -87,6 +85,8 @@ Built when authoring or play asks for them, most likely as console commands. Unt
 - [ ] `/move` and `/add` into an object, and held things in the sidebar [console] (REQ-CF-31)
 - [ ] Showing a template or built-in in the console (`/template`) [console] (REQ-CF-21)
 - [ ] Tag search, once designed with Bruce [console] (REQ-CF-30)
+- [ ] Response hints: which responses an object needs and could have [console] (`design/STATES.md` › Responses)
+- [ ] The quick menu's "add a reply", once response hints exist; its other entries are built (Bruce, 2026-11-25) [console] (`design/CONSOLE_REQUIREMENTS.md` › Quick menu, REQ-CON-68)
 
 ## Open questions
 
